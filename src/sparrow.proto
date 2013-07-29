@@ -1,0 +1,202 @@
+package sparrow;
+
+option optimize_for = SPEED;
+
+enum MessageTypes {
+  MTYPE_RUN_KERNEL = 1;
+  MTYPE_KERNEL_DONE = 2;
+  
+  MTYPE_PUT_REQUEST = 4;  
+  
+  MTYPE_GET = 5;
+    
+  MTYPE_WORKER_SHUTDOWN = 8;
+  MTYPE_REGISTER_WORKER = 9;
+  
+  MTYPE_START_CHECKPOINT = 10;
+  MTYPE_START_CHECKPOINT_ASYNC = 18;
+  MTYPE_START_CHECKPOINT_DONE = 11;
+  MTYPE_FINISH_CHECKPOINT = 12;
+  MTYPE_FINISH_CHECKPOINT_ASYNC = 19;
+  MTYPE_FINISH_CHECKPOINT_DONE = 13;
+  
+  MTYPE_RESTORE = 14;
+  MTYPE_WORKER_FLUSH = 15;  
+  MTYPE_SHARD_ASSIGNMENT = 17;
+
+  MTYPE_ITERATOR = 20;
+
+  MTYPE_SYNC_REPLY = 31;
+
+  MTYPE_WORKER_APPLY = 33;
+  MTYPE_WORKER_APPLY_DONE = 34;
+
+  MTYPE_SWAP_TABLE = 35;  
+  MTYPE_CLEAR_TABLE = 37;
+
+  MTYPE_ENABLE_TRIGGER = 38;
+
+  MTYPE_FLUSH_RESPONSE = 39;
+
+  MTYPE_WORKER_FINALIZE = 40;
+  MTYPE_WORKER_FINALIZE_DONE = 41;
+
+  MTYPE_BACKUP_FORWARD = 42;
+};
+
+message EmptyMessage {}
+
+message Arg {
+  required bytes key = 1;
+  required bytes value = 2;
+}
+
+message Args {
+  repeated Arg param = 1;
+}
+
+enum CompressionFormat {
+  NONE = 0;
+  LZO = 1;
+  ZLIB = 2;
+};
+
+message FileParams {
+  repeated Arg attr = 1;
+  optional int32 compression = 2 [default=0];
+}
+
+message ConfigData {
+  required int32 num_workers = 1;
+  required int32 worker_id = 2;
+  required int32 master_id = 3;
+}
+
+
+enum CheckpointType {
+  CP_NONE = 0;
+  CP_TASK_COMMIT = 1;
+  CP_INTERVAL = 2;
+  CP_CONTINUOUS = 3;
+};
+
+message RegisterWorkerRequest {
+  required int32 id = 1;
+//  optional repeated ShardInfo shards;
+}
+
+message ShardAssignment {
+  required int32 table = 1;
+  required int32 shard = 2;
+//  required int32 old_worker = 3;
+  required int32 new_worker = 4;
+}
+
+message ShardAssignmentRequest {
+  repeated ShardAssignment assign = 1;
+}
+
+message ShardInfo {
+  required uint32 table = 1;
+  required uint32 shard = 2;
+  required uint64 entries = 3;
+  required int32 owner = 4 [default = -1];
+}
+
+message MethodStats {
+  required double total_time = 1;
+  required double shard_time = 2;
+  required int32 calls = 3;
+  required int32 shard_calls = 4;
+};
+
+message KernelRequest {
+  required string kernel = 1;
+  required string method = 2;
+  optional int32 table = 3;
+  optional int32 shard = 4;
+  required Args args = 5;
+}
+
+message KernelDone {
+  required KernelRequest kernel = 1;
+
+  // updated information about the state of this workers
+  // table shards.
+  repeated ShardInfo shards = 5;
+}
+
+message IteratorRequest {
+  required uint32 table = 1;
+  required uint32 shard = 2;
+  optional int32 id = 3 [default = -1];
+  optional uint32 row_count = 4 [default = 1];
+}
+
+message IteratorResponse {
+  required uint32 id = 1;
+  required bool done = 2;
+  repeated bytes key = 3;
+  repeated bytes value = 4;
+  required uint32 row_count = 5;
+}
+
+message HashGet {
+  required uint32 table = 1;
+  required uint32 shard = 2;
+  optional bytes key = 3;
+  optional uint32 index = 4;
+}
+
+message TableData {
+  required uint32 source = 1;
+  required uint32 table = 2;
+  required uint32 shard = 3;
+  required bool done = 4;
+
+  optional bytes table_data = 5;
+  repeated Arg kv_data = 6;
+
+  optional int32 epoch = 11;
+  optional int32 marker = 12 [default = -1];
+
+  optional bool missing_key = 13;
+}
+
+message CheckpointRequest {
+  required int32 epoch = 1;
+  required int32 checkpoint_type = 2;
+  repeated int32 table = 3;
+}
+
+message StartRestore {
+  required int32 epoch = 1;
+}
+
+message CheckpointInfo {
+  required int32 checkpoint_epoch = 1;
+  required int32 kernel_epoch = 2;
+}
+
+message SwapTable {
+  required int32 table_a = 1;
+  required int32 table_b = 2;
+}
+
+message ClearTable {
+  required int32 table = 1;
+}
+
+//message EnableTrigger {
+//  required int32 trigger_id = 1;
+//  required int32 table = 2;
+//  required bool enable = 3;
+//}
+
+message FlushResponse {
+  required int32 updatesdone = 1;
+}
+
+message CheckpointFinishRequest {
+  required bool next_delta_only = 1;
+}

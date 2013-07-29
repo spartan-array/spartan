@@ -1,0 +1,40 @@
+*.a
+*.o
+*.la
+*.lo
+*.so
+*.pb.h
+*.pb.cc
+*.pyc
+*.aux
+*.bbl
+*.blg
+*.dvi
+*.ent
+*.log
+.svn
+
+config.log
+config.status
+libtool
+
+#runtime files
+logs/
+checkpoints/
+testdata/
+profile/
+bin/
+logs/
+
+#dependency generation
+.deps/
+Makefile.dep
+
+#eclipse stuff
+.project
+.pydevproject
+.cproject
+.libs/
+.settings
+
+build/
