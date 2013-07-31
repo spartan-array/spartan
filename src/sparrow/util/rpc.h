@@ -1,16 +1,16 @@
 #ifndef UTIL_RPC_H
 #define UTIL_RPC_H
 
-#include "util/common.h"
-#include "util/file.h"
-#include "util/stats.h"
-#include "sparrow.pb.h"
+#include "sparrow/util/common.h"
+#include "sparrow/util/file.h"
+#include "sparrow/util/stats.h"
+#include "sparrow/sparrow.pb.h"
 
 #include <boost/thread.hpp>
 #include <boost/function.hpp>
 #include <google/protobuf/message.h>
 
-#include <tr1/unordered_set>
+#include <boost/unordered_set.hpp>
 
 #include <deque>
 
@@ -100,7 +100,7 @@ private:
   CallbackInfo* callbacks_[kMaxMethods];
 
   std::vector<RPCRequest*> pending_sends_;
-  std::tr1::unordered_set<RPCRequest*> active_sends_;
+  boost::unordered_set<RPCRequest*> active_sends_;
 
   Queue requests[kMaxMethods][kMaxHosts];
   Queue replies[kMaxMethods][kMaxHosts];

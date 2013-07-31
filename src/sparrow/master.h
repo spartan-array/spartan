@@ -1,11 +1,13 @@
 #ifndef MASTER_H_
 #define MASTER_H_
 
-#include "kernel/kernel.h"
-#include "kernel/table.h"
-#include "util/common.h"
-#include "util/rpc.h"
-#include "sparrow.pb.h"
+#include "sparrow/kernel.h"
+#include "sparrow/table.h"
+#include "sparrow/util/common.h"
+#include "sparrow/util/rpc.h"
+#include "sparrow/util/timer.h"
+#include "sparrow/util/tuple.h"
+#include "sparrow/sparrow.pb.h"
 
 #include <vector>
 #include <map>
@@ -17,7 +19,6 @@ class TaskState;
 
 struct RunDescriptor {
   string kernel;
-  string method;
 
   Table *table;
   std::vector<int> shards;
@@ -25,21 +26,51 @@ struct RunDescriptor {
 
 class Master: public TableHelper {
 public:
-  Master(const ConfigData &conf);
+  Master();
   ~Master();
 
-  //TableHelper methods
+  int num_workers() const {
+    return network_->size() - 1;
+  }
+
   int id() const {
     return -1;
   }
+
   int epoch() const {
     return kernel_epoch_;
+  }
+
+  Table* create_table() {
+    CreateTableRequest req;
+    int table_id = tables_.size();
+    req.set_id(table_id);
+    req.set_num_shards(10);
+    req.set_sharder_type("");
+
+    Table* t = new Table(table_id, 10);
+    t->set_helper(this);
+    tables_[t->id()] = t;
+
+    network_->SyncBroadcast(MessageTypes::CREATE_TABLE, req);
+
+    assign_shards(t);
+    return t;
+  }
+
+  void map_shards(Table* t, const std::string& kernel) {
+    RunDescriptor r;
+    r.kernel = kernel;
+    r.table = t;
+    r.shards = range(0, t->num_shards());
+
+    run(r);
   }
 
   void run(RunDescriptor r);
 
   int peer_for_shard(int table, int shard) const {
-    return tables_[table]->worker_for_shard(shard);
+    return tables_.find(table)->second->worker_for_shard(shard);
   }
 
   void handle_put_request() {
@@ -70,7 +101,7 @@ private:
 
   void send_table_assignments();
   bool steal_work(const RunDescriptor& r, int idle_worker, double avg_time);
-  void assign_tables();
+  void assign_shards(Table *t);
   void assign_tasks(const RunDescriptor& r, std::vector<int> shards);
   int dispatch_work(const RunDescriptor& r);
 
@@ -93,7 +124,7 @@ private:
   typedef std::map<string, MethodStats> MethodStatsMap;
   MethodStatsMap method_stats_;
 
-  TableRegistry::Map& tables_;
+  TableMap tables_;
   rpc::NetworkThread* network_;
   Timer runtime_;
 };}

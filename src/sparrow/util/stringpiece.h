@@ -35,7 +35,7 @@ public:
   static std::vector<StringPiece> split(StringPiece sp, StringPiece delim);
 };
 
-static bool operator==(const StringPiece& a, const StringPiece& b) {
+static inline bool operator==(const StringPiece& a, const StringPiece& b) {
   return a.data == b.data && a.len == b.len;
 }
 

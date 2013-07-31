@@ -16,7 +16,7 @@
 #endif
 
 namespace sparrow {
-static uint32_t SuperFastHash (const char * data, int len) {
+static inline uint32_t SuperFastHash (const char * data, int len) {
 uint32_t hash = len, tmp;
 int rem;
 

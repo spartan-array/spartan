@@ -1,20 +1,18 @@
 #ifndef WORKER_H_
 #define WORKER_H_
 
-#include "util/common.h"
-#include "util/rpc.h"
-#include "kernel/kernel.h"
-#include "kernel/table.h"
-#include "kernel/global-table.h"
-#include "kernel/shard.h"
+#include "sparrow/util/common.h"
+#include "sparrow/util/rpc.h"
+#include "sparrow/kernel.h"
+#include "sparrow/table.h"
 
-#include "sparrow.pb.h"
+#include "sparrow/sparrow.pb.h"
 
 #include <boost/thread.hpp>
 #include <map>
 #include <mpi.h>
-#include <tr1/unordered_map>
-#include <tr1/unordered_set>
+#include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 
 using boost::shared_ptr;
 
@@ -22,7 +20,7 @@ namespace sparrow {
 
 // If this node is the master, return false immediately.  Otherwise
 // start a worker and exit when the computation is finished.
-bool StartWorker(const ConfigData& conf);
+bool StartWorker();
 
 class Worker: public TableHelper, private boost::noncopyable {
   struct Stub;
@@ -41,28 +39,27 @@ public:
   void CheckForMasterUpdates();
   void CheckNetwork();
 
-  void HandleGetRequest(const HashGet& get_req, TableData *get_resp,
+  void create_table(const CreateTableRequest& req, EmptyMessage* resp, const rpc::RPCInfo& rpc);
+  void get(const HashGet& get_req, TableData *get_resp,
                         const rpc::RPCInfo& rpc);
-  void HandleClearRequest(const ClearTable& req, EmptyMessage *resp,
-                          const rpc::RPCInfo& rpc);
-  void HandleIteratorRequest(const IteratorRequest& iterator_req,
+  void iterator_request(const IteratorRequest& iterator_req,
                              IteratorResponse *iterator_resp,
                              const rpc::RPCInfo& rpc);
-  void HandleShardAssignment(const ShardAssignmentRequest& req,
+  void assign_shards(const ShardAssignmentRequest& req,
                              EmptyMessage *resp, const rpc::RPCInfo& rpc);
 
   void handle_put_request();
 
   // Barrier: wait until all table data is transmitted.
-  void HandleFlush(const EmptyMessage& req, FlushResponse *resp,
+  void flush(const EmptyMessage& req, FlushResponse *resp,
                    const rpc::RPCInfo& rpc);
-  void HandleApply(const EmptyMessage& req, EmptyMessage *resp,
+  void apply(const EmptyMessage& req, EmptyMessage *resp,
                    const rpc::RPCInfo& rpc);
   void HandleStartCheckpointAsync(const CheckpointRequest& req,
                                   EmptyMessage* resp, const rpc::RPCInfo& rpc);
   void HandleFinishCheckpointAsync(const CheckpointFinishRequest& req,
                                    EmptyMessage *resp, const rpc::RPCInfo& rpc);
-  void HandleStartRestore(const StartRestore& req, EmptyMessage *resp,
+  void restore(const StartRestore& req, EmptyMessage *resp,
                           const rpc::RPCInfo& rpc);
 
   int peer_for_shard(int table_id, int shard) const;
@@ -78,6 +75,10 @@ public:
   bool network_idle() const;
 
   bool has_incoming_data() const;
+
+  TableMap& tables() {
+    return tables_;
+  }
 
 private:
   void StartCheckpoint(int epoch, CheckpointType type, bool deltaOnly);
@@ -96,7 +97,7 @@ private:
   bool handling_putreqs_;
   CheckpointType active_checkpoint_;
 
-  typedef std::tr1::unordered_map<int, bool> CheckpointMap;
+  typedef boost::unordered_map<int, bool> CheckpointMap;
   CheckpointMap checkpoint_tables_;
 
   ConfigData config_;
@@ -105,18 +106,20 @@ private:
   std::vector<Stub*> peers_;
 
   rpc::NetworkThread *network_;
-  std::tr1::unordered_set<Table*> dirty_tables_;
+  boost::unordered_set<Table*> dirty_tables_;
 
   uint32_t iterator_id_;
-  std::tr1::unordered_map<uint32_t, TableIterator*> iterators_;
+  boost::unordered_map<uint32_t, TableIterator*> iterators_;
+
+  TableMap tables_;
 
   struct KernelId {
-    string kname_;
+    string id_;
     int table_;
     int shard_;
 
-    KernelId(string kname, int table, int shard) :
-        kname_(kname), table_(table), shard_(shard) {
+    KernelId(string id, int table, int shard) :
+        id_(id), table_(table), shard_(shard) {
     }
 
 #define CMP_LESS(a, b, member)\
@@ -124,14 +127,14 @@ private:
   if ((b).member < (a).member) { return false; }
 
     bool operator<(const KernelId& o) const {
-      CMP_LESS(*this, o, kname_);
+      CMP_LESS(*this, o, id_);
       CMP_LESS(*this, o, table_);
       CMP_LESS(*this, o, shard_);
       return false;
     }
   };
 
-  std::map<KernelId, KernelBase*> kernels_;
+  std::map<KernelId, Kernel*> kernels_;
 
   Stats stats_;
 };

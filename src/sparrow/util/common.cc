@@ -1,7 +1,7 @@
-#include "util/common.h"
-#include "util/file.h"
-#include "util/rpc.h"
-#include "util/stats.h"
+#include "sparrow/util/common.h"
+#include "sparrow/util/file.h"
+#include "sparrow/util/rpc.h"
+#include "sparrow/util/stats.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -230,7 +230,6 @@ void Init(int argc, char** argv) {
         " -x LD_LIBRARY_PATH"
         " -x LD_PRELOAD=/usr/lib/openmpi/lib/libmpi.so"
         " -hostfile %s"
-        " -bycore"
         " -nooversubscribe"
         " -n %d"
         " %s",
@@ -245,7 +244,6 @@ void Init(int argc, char** argv) {
   }
 
   rpc::NetworkThread::Init();
-
   srandom(time(NULL));
 }
 }

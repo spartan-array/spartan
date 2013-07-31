@@ -1,7 +1,14 @@
 #ifndef UTIL_MARSHAL_H_
 #define UTIL_MARSHAL_H_
 
-#include "util/stringpiece.h"
+#include "sparrow/util/stringpiece.h"
+
+#include <boost/utility/enable_if.hpp>
+#include <boost/type_traits/is_fundamental.hpp>
+
+using boost::enable_if;
+using boost::is_arithmetic;
+using boost::is_fundamental;
 
 namespace sparrow {
 
@@ -61,7 +68,7 @@ struct Reader {
   virtual int read_bytes(void* v, int num_bytes) = 0;
 };
 
-class StringReader : public Reader {
+class StringReader: public Reader {
 private:
   StringPiece src_;
   int pos_;
@@ -81,7 +88,7 @@ public:
   }
 };
 
-class StringWriter : public Writer {
+class StringWriter: public Writer {
 private:
   std::string* v_;
 
@@ -91,7 +98,26 @@ public:
   }
 
   void write_bytes(const void* v, int sz) {
-    v_->append((char*)v, sz);
+    v_->append((char*) v, sz);
+  }
+};
+
+template<class T, class Enable = void>
+class Marshal {
+public:
+  static bool read_value(Reader* r, T* v);
+  static void write_value(Writer *w, const T& v);
+};
+
+template<class T>
+class Marshal<T, typename enable_if<is_arithmetic<T>>::type> {
+public:
+  static bool read_value(Reader *r, T* v) {
+    return r->read_bytes(v, sizeof(T)) == sizeof(T);
+  }
+
+  static void write_value(Writer *w, const T& v) {
+    w->write_bytes(&v, sizeof(v));
   }
 };
 

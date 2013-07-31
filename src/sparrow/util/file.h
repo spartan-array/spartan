@@ -1,12 +1,10 @@
 #ifndef FILE_H_
 #define FILE_H_
 
-#include "sparrow.pb.h"
-
 #include "boost/noncopyable.hpp"
-#include "util/common.h"
-#include "util/marshal.h"
-#include "util/stringpiece.h"
+#include "sparrow/util/common.h"
+#include "sparrow/util/marshal.h"
+#include "sparrow/util/stringpiece.h"
 
 
 #include <string>

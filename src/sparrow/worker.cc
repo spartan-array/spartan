@@ -1,11 +1,13 @@
 #include <boost/bind.hpp>
 #include <signal.h>
 
-#include "kernel/kernel.h"
-#include "kernel/table.h"
-#include "util/common.h"
-#include "util/stats.h"
-#include "worker/worker.h"
+#include "sparrow/kernel.h"
+#include "sparrow/table.h"
+#include "sparrow/util/common.h"
+#include "sparrow/util/stats.h"
+#include "sparrow/util/timer.h"
+#include "sparrow/util/tuple.h"
+#include "sparrow/worker.h"
 
 DECLARE_double(sleep_time);
 DEFINE_double(sleep_hack, 0.0, "");
@@ -13,8 +15,8 @@ DEFINE_string(checkpoint_write_dir, "/var/tmp/piccolo-checkpoint", "");
 DEFINE_string(checkpoint_read_dir, "/var/tmp/piccolo-checkpoint", "");
 
 using
-std::tr1::unordered_map;
-using std::tr1::unordered_set;
+boost::unordered_map;
+using boost::unordered_set;
 
 namespace sparrow {
 
@@ -46,47 +48,35 @@ Worker::Worker(const ConfigData &c) {
   krunning_ = false; //and this is for KERNEL running
   iterator_id_ = 0;
 
-  // HACKHACKHACK - register ourselves with any existing tables
-  TableRegistry::Map &t = TableRegistry::Get()->tables();
-  for (TableRegistry::Map::iterator i = t.begin(); i != t.end(); ++i) {
-    i->second->set_helper(this);
-  }
-
   // Register RPC endpoints.
-  rpc::RegisterCallback(MTYPE_GET, new HashGet, new TableData,
-      &Worker::HandleGetRequest, this);
+  rpc::RegisterCallback(MessageTypes::GET, new HashGet, new TableData,
+      &Worker::get, this);
 
-  rpc::RegisterCallback(MTYPE_SHARD_ASSIGNMENT, new ShardAssignmentRequest,
-      new EmptyMessage, &Worker::HandleShardAssignment, this);
+  rpc::RegisterCallback(MessageTypes::SHARD_ASSIGNMENT,
+      new ShardAssignmentRequest, new EmptyMessage, &Worker::assign_shards,
+      this);
 
-  rpc::RegisterCallback(MTYPE_ITERATOR, new IteratorRequest,
-      new IteratorResponse, &Worker::HandleIteratorRequest, this);
+  rpc::RegisterCallback(MessageTypes::CREATE_TABLE, new CreateTableRequest,
+      new EmptyMessage, &Worker::create_table, this);
 
-  rpc::RegisterCallback(MTYPE_CLEAR_TABLE, new ClearTable, new EmptyMessage,
-      &Worker::HandleClearRequest, this);
+  rpc::RegisterCallback(MessageTypes::ITERATOR, new IteratorRequest,
+      new IteratorResponse, &Worker::iterator_request, this);
 
-  rpc::RegisterCallback(MTYPE_WORKER_FLUSH, new EmptyMessage, new FlushResponse,
-      &Worker::HandleFlush, this);
+  rpc::RegisterCallback(MessageTypes::WORKER_FLUSH, new EmptyMessage,
+      new FlushResponse, &Worker::flush, this);
 
-  rpc::RegisterCallback(MTYPE_WORKER_APPLY, new EmptyMessage, new EmptyMessage,
-      &Worker::HandleApply, this);
+  rpc::RegisterCallback(MessageTypes::WORKER_APPLY, new EmptyMessage,
+      new EmptyMessage, &Worker::apply, this);
 
-  rpc::RegisterCallback(MTYPE_START_CHECKPOINT_ASYNC, new CheckpointRequest,
-      new EmptyMessage, &Worker::HandleStartCheckpointAsync, this);
+  rpc::RegisterCallback(MessageTypes::RESTORE, new StartRestore,
+      new EmptyMessage, &Worker::restore, this);
 
-  rpc::RegisterCallback(MTYPE_FINISH_CHECKPOINT_ASYNC,
-      new CheckpointFinishRequest, new EmptyMessage,
-      &Worker::HandleFinishCheckpointAsync, this);
-
-  rpc::RegisterCallback(MTYPE_RESTORE, new StartRestore, new EmptyMessage,
-      &Worker::HandleStartRestore, this);
-
-  rpc::NetworkThread::Get()->SpawnThreadFor(MTYPE_WORKER_FLUSH);
-  rpc::NetworkThread::Get()->SpawnThreadFor(MTYPE_WORKER_APPLY);
+  rpc::NetworkThread::Get()->SpawnThreadFor(MessageTypes::WORKER_FLUSH);
+  rpc::NetworkThread::Get()->SpawnThreadFor(MessageTypes::WORKER_APPLY);
 }
 
 int Worker::peer_for_shard(int table, int shard) const {
-  return TableRegistry::Get()->tables()[table]->worker_for_shard(shard);
+  return tables_.find(table)->second->worker_for_shard(shard);
 }
 
 void Worker::Run() {
@@ -105,14 +95,15 @@ void Worker::KernelLoop() {
   VLOG(1) << "Worker " << config_.worker_id() << " registering...";
   RegisterWorkerRequest req;
   req.set_id(id());
-  network_->Send(0, MTYPE_REGISTER_WORKER, req);
+  network_->Send(0, MessageTypes::REGISTER_WORKER, req);
 
   KernelRequest kreq;
 
   while (running_) {
     Timer idle;
 
-    while (!network_->TryRead(config_.master_id(), MTYPE_RUN_KERNEL, &kreq)) {
+    while (!network_->TryRead(config_.master_id(), MessageTypes::RUN_KERNEL,
+        &kreq)) {
       CheckNetwork();
       Sleep(FLAGS_sleep_time);
 
@@ -124,50 +115,30 @@ void Worker::KernelLoop() {
     krunning_ = true; //a kernel is running
     stats_["idle_time"] += idle.elapsed();
 
-    VLOG(1) << "Received run request for " << kreq;
+//    LOG(INFO) << "Received run request for " << kreq;
 
     if (peer_for_shard(kreq.table(), kreq.shard()) != config_.worker_id()) {
       LOG(FATAL)<< "Received a shard I can't work on! : " << kreq.shard()
       << " : " << peer_for_shard(kreq.table(), kreq.shard());
     }
 
-    KernelInfo *helper = KernelRegistry::Get()->kernel(kreq.kernel());
+    Kernel* k = TypeRegistry<Kernel>::get_by_name(kreq.kernel());
+    k->init(this, kreq.table(), kreq.shard());
     KernelId id(kreq.kernel(), kreq.table(), kreq.shard());
-    KernelBase* d = kernels_[id];
-
-    if (!d) {
-      d = helper->create();
-      kernels_[id] = d;
-      d->initialize_internal(this, kreq.table(), kreq.shard());
-      d->InitKernel();
-    }
 
     if (this->id() == 1 && FLAGS_sleep_hack > 0) {
       Sleep(FLAGS_sleep_hack);
     }
 
-    // Run the user kernel
-    helper->Run(d, kreq.method());
+    k->run();
+
+//    LOG(INFO)<< "Kernel finished: " << kreq;
 
     KernelDone kd;
     kd.mutable_kernel()->CopyFrom(kreq);
-    TableRegistry::Map &tmap = TableRegistry::Get()->tables();
-    for (TableRegistry::Map::iterator i = tmap.begin(); i != tmap.end(); ++i) {
-      Table* t = i->second;
-      for (int j = 0; j < t->num_shards(); ++j) {
-        if (t->is_local_shard(j)) {
-          ShardInfo *si = kd.add_shards();
-          si->set_entries(t->shard(j)->size());
-          si->set_owner(this->id());
-          si->set_table(i->first);
-          si->set_shard(j);
-        }
-      }
-    }
     krunning_ = false;
-    network_->Send(config_.master_id(), MTYPE_KERNEL_DONE, kd);
+    network_->Send(config_.master_id(), MessageTypes::KERNEL_DONE, kd);
 
-    VLOG(1) << "Kernel finished: " << kreq;
     DumpProfile();
   }
 }
@@ -193,9 +164,8 @@ void Worker::CheckNetwork() {
 int64_t Worker::pending_writes() const {
   int64_t t = 0;
 
-  TableRegistry::Map &tmap = TableRegistry::Get()->tables();
-  for (TableRegistry::Map::iterator i = tmap.begin(); i != tmap.end(); ++i) {
-    Table *mg = i->second;
+  for (auto i : tables_) {
+    Table *mg = i.second;
     if (mg) {
       t += mg->pending_writes();
     }
@@ -227,9 +197,8 @@ void Worker::UpdateEpoch(int peer, int peer_epoch) {
     << MP(epoch_, peer_epoch);
 
     checkpoint_tables_.clear();
-    TableRegistry::Map &t = TableRegistry::Get()->tables();
-    for (TableRegistry::Map::iterator i = t.begin(); i != t.end(); ++i) {
-      checkpoint_tables_.insert(std::make_pair(i->first, true));
+    for (auto i : tables_) {
+      checkpoint_tables_.insert(std::make_pair(i.first, true));
     }
 
     StartCheckpoint(peer_epoch, CP_INTERVAL, false);
@@ -279,22 +248,21 @@ void Worker::StartCheckpoint(int epoch, CheckpointType type, bool deltaOnly) {
       StringPrintf("%s/epoch_%05d/", FLAGS_checkpoint_write_dir.c_str(),
           epoch_));
 
-  TableRegistry::Map &t = TableRegistry::Get()->tables();
-  for (TableRegistry::Map::iterator i = t.begin(); i != t.end(); ++i) {
-    if (checkpoint_tables_.find(i->first) != checkpoint_tables_.end()) {
+  for (auto i : tables_) {
+    if (checkpoint_tables_.find(i.first) != checkpoint_tables_.end()) {
       VLOG(1) << "Starting checkpoint... " << MP(id(), epoch_, epoch) << " : "
-                 << i->first;
-      Checkpointable *t = dynamic_cast<Checkpointable*>(i->second);
+                 << i.first;
+      Checkpointable *t = dynamic_cast<Checkpointable*>(i.second);
       if (t == NULL && type == CP_INTERVAL) {
         VLOG(1) << "Removing read-only table from INTERVAL list";
-        checkpoint_tables_.erase(checkpoint_tables_.find(i->first));
+        checkpoint_tables_.erase(checkpoint_tables_.find(i.first));
       } else {
         CHECK(t != NULL) << "Tried to checkpoint a read-only table? "
                             << checkpoint_tables_.size() << " tables marked";
 
         t->start_checkpoint(
             StringPrintf("%s/epoch_%05d/checkpoint.table-%d",
-                FLAGS_checkpoint_write_dir.c_str(), epoch_, i->first),
+                FLAGS_checkpoint_write_dir.c_str(), epoch_, i.first),
             deltaOnly);
       }
     }
@@ -313,12 +281,12 @@ void Worker::StartCheckpoint(int epoch, CheckpointType type, bool deltaOnly) {
     epoch_marker.set_done(true);
     epoch_marker.set_marker(epoch_);
     for (size_t i = 0; i < peers_.size(); ++i) {
-      network_->Send(i + 1, MTYPE_PUT_REQUEST, epoch_marker);
+      network_->Send(i + 1, MessageTypes::PUT_REQUEST, epoch_marker);
     }
   }
 
   EmptyMessage req;
-  network_->Send(config_.master_id(), MTYPE_START_CHECKPOINT_DONE, req);
+  network_->Send(config_.master_id(), MessageTypes::START_CHECKPOINT_DONE, req);
   VLOG(1) << "Starting delta logging... " << MP(id(), epoch_, epoch);
 }
 
@@ -329,23 +297,23 @@ void Worker::FinishCheckpoint(bool deltaOnly) {
 
   active_checkpoint_ =
       (active_checkpoint_ == CP_CONTINUOUS) ? CP_CONTINUOUS : CP_NONE;
-  TableRegistry::Map &t = TableRegistry::Get()->tables();
 
   for (size_t i = 0; i < peers_.size(); ++i) {
     peers_[i]->epoch = epoch_;
   }
 
-  for (TableRegistry::Map::iterator i = t.begin(); i != t.end(); ++i) {
-    Checkpointable *t = dynamic_cast<Checkpointable*>(i->second);
+  for (auto i : tables_) {
+    Checkpointable *t = dynamic_cast<Checkpointable*>(i.second);
     if (t) {
       t->finish_checkpoint();
     } else {
-      VLOG(2) << "Skipping finish checkpoint for " << i->second->id();
+      VLOG(2) << "Skipping finish checkpoint for " << i.second->id();
     }
   }
 
   EmptyMessage req;
-  network_->Send(config_.master_id(), MTYPE_FINISH_CHECKPOINT_DONE, req);
+  network_->Send(config_.master_id(), MessageTypes::FINISH_CHECKPOINT_DONE,
+      req);
 
   if (active_checkpoint_ == CP_CONTINUOUS) {
     VLOG(1) << "Continuous checkpointing starting epoch " << epoch_ + 1;
@@ -353,7 +321,7 @@ void Worker::FinishCheckpoint(bool deltaOnly) {
   }
 }
 
-void Worker::HandleStartRestore(const StartRestore& req, EmptyMessage* resp,
+void Worker::restore(const StartRestore& req, EmptyMessage* resp,
     const rpc::RPCInfo& rpc) {
   int epoch = req.epoch();
   boost::recursive_mutex::scoped_lock sl(state_lock_);
@@ -376,18 +344,17 @@ void Worker::HandleStartRestore(const StartRestore& req, EmptyMessage* resp,
 
   CHECK_EQ(foundfull,true)<< "Ran out of non-delta-only checkpoints to start from!";
 
-  TableRegistry::Map &t = TableRegistry::Get()->tables();
   // CRM 2011-10-13: Look for latest and later epochs that might
   // contain deltas.  Master will have sent the epoch number of the
   // last FULL checkpoint
-  for (TableRegistry::Map::iterator i = t.begin(); i != t.end(); ++i) {
-    Checkpointable* t = dynamic_cast<Checkpointable*>(i->second);
+  for (auto i : tables_) {
+    Checkpointable* t = dynamic_cast<Checkpointable*>(i.second);
     epoch_ = epoch;
     if (t) {
       do {
         string full_cp_pattern = StringPrintf(
             "%s/epoch_%05d/checkpoint.table-%d.???\?\?-of-?????",
-            FLAGS_checkpoint_read_dir.c_str(), epoch_, i->first);
+            FLAGS_checkpoint_read_dir.c_str(), epoch_, i.first);
         std::vector<string> full_cps = File::MatchingFilenames(full_cp_pattern);
         if (!full_cps.empty()) break;
       } while (--epoch_ >= 0);
@@ -396,14 +363,14 @@ void Worker::HandleStartRestore(const StartRestore& req, EmptyMessage* resp,
           VLOG(1) << "Worker restoring state from epoch: " << epoch_;
           t->restore(
               StringPrintf("%s/epoch_%05d/checkpoint.table-%d",
-                  FLAGS_checkpoint_read_dir.c_str(), epoch_, i->first));
+                  FLAGS_checkpoint_read_dir.c_str(), epoch_, i.first));
           epoch_++;
         } while (finalepoch >= epoch_
             && File::Exists(
                 StringPrintf("%s/epoch_%05d", FLAGS_checkpoint_read_dir.c_str(),
                     epoch_)));
       } else {
-        LOG(WARNING)<< "Table " << i->first << " seems to have no full checkpoints.";
+        LOG(WARNING)<< "Table " << i.first << " seems to have no full checkpoints.";
       }
     }
   }
@@ -414,7 +381,7 @@ void Worker::handle_put_request() {
   boost::recursive_try_mutex::scoped_lock sl(state_lock_);
 
   TableData put;
-  while (network_->TryRead(rpc::ANY_SOURCE, MTYPE_PUT_REQUEST, &put)) {
+  while (network_->TryRead(rpc::ANY_SOURCE, MessageTypes::PUT_REQUEST, &put)) {
     if (put.marker() != -1) {
       UpdateEpoch(put.source(), put.marker());
       continue;
@@ -423,15 +390,11 @@ void Worker::handle_put_request() {
     VLOG(2) << "Read put request of size: " << put.kv_data_size() << " for "
                << MP(put.table(), put.shard());
 
-    Table *t = TableRegistry::Get()->table(put.table());
-    TableValue::ScopedPtr k(t->new_key());
-    TableValue::ScopedPtr v(t->new_value());
+    Table *t = tables_[put.table()];
 
     for (int i = 0; i < put.kv_data_size(); ++i) {
-      const Arg& kv = put.kv_data(i);
-      k->read(kv.key());
-      v->read(kv.value());
-      t->put(*k, *v);
+      const KV& kv = put.kv_data(i);
+      t->put(kv.key(), kv.value());
     }
 
     VLOG(3) << "Finished ApplyUpdate from handle_put_request";
@@ -446,16 +409,16 @@ void Worker::handle_put_request() {
       }
     }
 
-    if (put.done() && t->get_partition_info(put.shard())->tainted) {
+    if (put.done() && t->get_partition_info(put.shard())->tainted()) {
       VLOG(1) << "Clearing taint on: " << MP(put.table(), put.shard());
-      t->get_partition_info(put.shard())->tainted = false;
+      t->get_partition_info(put.shard())->clear_tainted();
     }
   }
 }
 
-void Worker::HandleGetRequest(const HashGet& get_req, TableData *get_resp,
+void Worker::get(const HashGet& get_req, TableData *get_resp,
     const rpc::RPCInfo& rpc) {
-//    LOG(INFO) << "Get request: " << get_req;
+    LOG(INFO) << "Get request: " << get_req;
 
   get_resp->Clear();
   get_resp->set_source(config_.worker_id());
@@ -465,16 +428,13 @@ void Worker::HandleGetRequest(const HashGet& get_req, TableData *get_resp,
   get_resp->set_epoch(epoch_);
 
   {
-    Table *t = TableRegistry::Get()->table(get_req.table());
-    TableValue::ScopedPtr k(t->new_key());
-    TableValue::ScopedPtr v(t->new_value());
-    k->read(get_req.key());
-    bool found = t->get(*k, v.get());
-    get_resp->set_missing_key(found);
-    if (found) {
-      Arg* a = get_resp->add_kv_data();
+    Table *t = tables_[get_req.table()];
+    if (!t->contains(get_req.key())) {
+      get_resp->set_missing_key(true);
+    } else {
+      KV* a = get_resp->add_kv_data();
       a->set_key(get_req.key());
-      v->write(a->mutable_value());
+      a->set_value(t->get(get_req.key()));
     }
   }
 
@@ -482,23 +442,12 @@ void Worker::HandleGetRequest(const HashGet& get_req, TableData *get_resp,
              << " - found? " << !get_resp->missing_key();
 }
 
-void Worker::HandleClearRequest(const ClearTable& req, EmptyMessage *resp,
-    const rpc::RPCInfo& rpc) {
-  Table *ta = TableRegistry::Get()->table(req.table());
-
-  for (int i = 0; i < ta->num_shards(); ++i) {
-    if (ta->is_local_shard(i)) {
-      ta->shard(i)->clear();
-    }
-  }
-}
-
-void Worker::HandleIteratorRequest(const IteratorRequest& iterator_req,
+void Worker::iterator_request(const IteratorRequest& iterator_req,
     IteratorResponse *iterator_resp, const rpc::RPCInfo& rpc) {
   int table = iterator_req.table();
   int shard = iterator_req.shard();
 
-  Table * t = TableRegistry::Get()->table(table);
+  Table * t = tables_[table];
   TableIterator* it = NULL;
   if (iterator_req.id() == -1) {
     it = t->get_iterator(shard);
@@ -515,11 +464,11 @@ void Worker::HandleIteratorRequest(const IteratorRequest& iterator_req,
   iterator_resp->set_row_count(0);
   iterator_resp->clear_key();
   iterator_resp->clear_value();
-  for (int i = 1; i <= iterator_req.row_count(); i++) {
+  for (size_t i = 1; i <= iterator_req.row_count(); i++) {
     iterator_resp->set_done(it->done());
     if (!it->done()) {
-      it->key().write(iterator_resp->add_key());
-      it->value().write(iterator_resp->add_value());
+      iterator_resp->add_key(it->key());
+      iterator_resp->add_value(it->value());
       iterator_resp->set_row_count(i);
       if (i < iterator_req.row_count()) {
         it->next();
@@ -531,47 +480,30 @@ void Worker::HandleIteratorRequest(const IteratorRequest& iterator_req,
              << " rows in table " << table << ", shard " << shard;
 }
 
-void Worker::HandleShardAssignment(const ShardAssignmentRequest& shard_req,
+void Worker::create_table(const CreateTableRequest& req, EmptyMessage *resp,
+    const rpc::RPCInfo& rpc) {
+  Table* t = new Table(req.id(), req.num_shards());
+  t->set_helper(this);
+  tables_[req.id()] = t;
+}
+
+void Worker::assign_shards(const ShardAssignmentRequest& shard_req,
     EmptyMessage *resp, const rpc::RPCInfo& rpc) {
-//  LOG(INFO) << "Shard assignment: " << shard_req.DebugString();
+  LOG(INFO)<< "Shard assignment: " << shard_req.DebugString();
   for (int i = 0; i < shard_req.assign_size(); ++i) {
     const ShardAssignment &a = shard_req.assign(i);
-    Table *t = TableRegistry::Get()->table(a.table());
-    int old_owner = t->worker_for_shard(a.shard());
-    t->get_partition_info(a.shard())->sinfo.set_owner(a.new_worker());
-
-    VLOG(3) << "Setting owner: " << MP(a.shard(), a.new_worker());
-
-    if (a.new_worker() == id() && old_owner != id()) {
-      VLOG(1) << "Setting self as owner of " << MP(a.table(), a.shard());
-
-      // Don't consider ourselves canonical for this shard until we receive updates
-      // from the old owner.
-      if (old_owner != -1) {
-        LOG(INFO)<< "Setting " << MP(a.table(), a.shard())
-        << " as tainted.  Old owner was: " << old_owner
-        << " new owner is :  " << id();
-        t->get_partition_info(a.shard())->tainted = true;
-      }
-    } else if (old_owner == id() && a.new_worker() != id()) {
-      VLOG(1)
-      << "Lost ownership of " << MP(a.table(), a.shard()) << " to "
-      << a.new_worker();
-      // A new worker has taken ownership of this shard.  Flush our data out.
-      t->get_partition_info(a.shard())->dirty = true;
-      dirty_tables_.insert(t);
-    }
+    Table *t = tables_[a.table()];
+    t->get_partition_info(a.shard())->set_owner(a.new_worker());
   }
 }
 
-void Worker::HandleFlush(const EmptyMessage& req, FlushResponse *resp,
+void Worker::flush(const EmptyMessage& req, FlushResponse *resp,
     const rpc::RPCInfo& rpc) {
   Timer net;
 
-  TableRegistry::Map &tmap = TableRegistry::Get()->tables();
   int updates_sent = 0;
-  for (TableRegistry::Map::iterator i = tmap.begin(); i != tmap.end(); ++i) {
-    Table* t = i->second;
+  for (auto i : tables_) {
+    Table* t = i.second;
     if (t) {
       updates_sent += t->send_updates();
     }
@@ -580,13 +512,13 @@ void Worker::HandleFlush(const EmptyMessage& req, FlushResponse *resp,
 
   VLOG(2) << "Telling master: " << updates_sent << " updates done.";
   resp->set_updatesdone(updates_sent);
-  network_->Send(config_.master_id(), MTYPE_FLUSH_RESPONSE, *resp);
+  network_->Send(config_.master_id(), MessageTypes::FLUSH_RESPONSE, *resp);
 
   network_->Flush();
   stats_["network_time"] += net.elapsed();
 }
 
-void Worker::HandleApply(const EmptyMessage& req, EmptyMessage *resp,
+void Worker::apply(const EmptyMessage& req, EmptyMessage *resp,
     const rpc::RPCInfo& rpc) {
   if (krunning_) {
     LOG(FATAL)<< "Received APPLY message while still running!?!";
@@ -595,7 +527,7 @@ void Worker::HandleApply(const EmptyMessage& req, EmptyMessage *resp,
 
   handle_put_request();
 
-  network_->Send(config_.master_id(), MTYPE_WORKER_APPLY_DONE, *resp);
+  network_->Send(config_.master_id(), MessageTypes::WORKER_APPLY_DONE, *resp);
 }
 
 void Worker::CheckForMasterUpdates() {
@@ -604,14 +536,15 @@ void Worker::CheckForMasterUpdates() {
   EmptyMessage empty;
   KernelRequest k;
 
-  if (network_->TryRead(config_.master_id(), MTYPE_WORKER_SHUTDOWN, &empty)) {
+  if (network_->TryRead(config_.master_id(), MessageTypes::WORKER_SHUTDOWN,
+      &empty)) {
     VLOG(1) << "Shutting down worker " << config_.worker_id();
     running_ = false;
     return;
   }
 
   CheckpointRequest checkpoint_msg;
-  while (network_->TryRead(config_.master_id(), MTYPE_START_CHECKPOINT,
+  while (network_->TryRead(config_.master_id(), MessageTypes::START_CHECKPOINT,
       &checkpoint_msg)) {
     for (int i = 0; i < checkpoint_msg.table_size(); ++i) {
       checkpoint_tables_.insert(std::make_pair(checkpoint_msg.table(i), true));
@@ -624,32 +557,21 @@ void Worker::CheckForMasterUpdates() {
   }
 
   CheckpointFinishRequest checkpoint_finish_msg;
-  while (network_->TryRead(config_.master_id(), MTYPE_FINISH_CHECKPOINT,
+  while (network_->TryRead(config_.master_id(), MessageTypes::FINISH_CHECKPOINT,
       &checkpoint_finish_msg)) {
     VLOG(1) << "Finishing checkpoint on master's instruction";
     FinishCheckpoint(checkpoint_finish_msg.next_delta_only());
   }
 }
 
-void Worker::HandleStartCheckpointAsync(const CheckpointRequest& req,
-    EmptyMessage* resp, const rpc::RPCInfo& rpc) {
-  VLOG(1) << "Async order for checkpoint received.";
-  checkpoint_tables_.clear();
-  for (int i = 0; i < req.table_size(); ++i) {
-    checkpoint_tables_.insert(std::make_pair(req.table(i), true));
-  }
-  StartCheckpoint(req.epoch(), (CheckpointType) req.checkpoint_type(), false);
-}
-
-void Worker::HandleFinishCheckpointAsync(const CheckpointFinishRequest& req,
-    EmptyMessage *resp, const rpc::RPCInfo& rpc) {
-  VLOG(1) << "Async order for checkpoint finish received.";
-  FinishCheckpoint(req.next_delta_only());
-}
-
-bool StartWorker(const ConfigData& conf) {
-
+bool StartWorker() {
   if (rpc::NetworkThread::Get()->id() == 0) return false;
+
+  rpc::NetworkThread* net = rpc::NetworkThread::Get();
+  ConfigData conf;
+  conf.set_master_id(0);
+  conf.set_worker_id(net->id());
+  conf.set_num_workers(net->size() - 1);
 
   Worker w(conf);
   w.Run();

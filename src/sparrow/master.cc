@@ -1,10 +1,10 @@
-#include "kernel/global-table.h"
-#include "kernel/shard.h"
-#include "kernel/table.h"
-#include "master/master.h"
-#include "util/registry.h"
+#include "sparrow/table.h"
+#include "sparrow/master.h"
+#include "sparrow/util/registry.h"
+#include "sparrow/util/tuple.h"
 
 #include <set>
+#include <algorithm>
 
 using std::map;
 using std::vector;
@@ -38,7 +38,8 @@ struct Taskid {
   }
 };
 
-struct TaskState: private boost::noncopyable {
+class TaskState: private boost::noncopyable {
+public:
   enum Status {
     PENDING = 0, ACTIVE = 1, FINISHED = 2
   };
@@ -66,7 +67,9 @@ struct TaskState: private boost::noncopyable {
 
 typedef map<Taskid, TaskState*> TaskMap;
 typedef std::set<Taskid> ShardSet;
-struct WorkerState: private boost::noncopyable {
+
+class WorkerState: private boost::noncopyable {
+public:
   WorkerState(int w_id) :
       id(w_id) {
     last_ping_time = Now();
@@ -117,12 +120,10 @@ struct WorkerState: private boost::noncopyable {
     return Now() - last_ping_time;
   }
 
-  void assign_shard(int shard, bool should_service) {
-    TableRegistry::Map &tables = TableRegistry::Get()->tables();
-    for (TableRegistry::Map::iterator i = tables.begin(); i != tables.end();
-        ++i) {
-      if (shard < i->second->num_shards()) {
-        Taskid t(i->first, shard);
+  void assign_shard(TableMap& tables, int shard, bool should_service) {
+    for (auto i : tables) {
+      if (shard < i.second->num_shards()) {
+        Taskid t(i.first, shard);
         if (should_service) {
           shards.insert(t);
         } else {
@@ -153,6 +154,11 @@ struct WorkerState: private boost::noncopyable {
     TaskState *t = work[id];
     CHECK(t->status == TaskState::ACTIVE);
     t->status = TaskState::FINISHED;
+  }
+
+  std::string str() {
+    return StringPrintf("W: p: %d; a: %d a: %d f: %d", id, num_pending(), num_active(),
+        num_assigned(), num_finished());
   }
 
 #define COUNT_TASKS(name, type)\
@@ -203,9 +209,9 @@ struct WorkerState: private boost::noncopyable {
         &TaskState::WeightCompare);
 
     msg->set_kernel(r.kernel);
-    msg->set_method(r.method);
     msg->set_table(r.table->id());
     msg->set_shard(best->id.shard);
+    msg->mutable_args();
 
     best->status = TaskState::ACTIVE;
     last_task_start = Now();
@@ -214,9 +220,7 @@ struct WorkerState: private boost::noncopyable {
   }
 };
 
-Master::Master(const ConfigData &conf) :
-    tables_(TableRegistry::Get()->tables()) {
-  config_.CopyFrom(conf);
+Master::Master() {
   kernel_epoch_ = 0;
   finished_ = dispatched_ = 0;
 
@@ -225,16 +229,16 @@ Master::Master(const ConfigData &conf) :
 
   CHECK_GT(network_->size(), 1)<< "At least one master and one worker required!";
 
-  for (int i = 0; i < config_.num_workers(); ++i) {
+  for (int i = 0; i < num_workers(); ++i) {
     workers_.push_back(new WorkerState(i));
   }
 
-  for (int i = 0; i < config_.num_workers(); ++i) {
+  for (int i = 0; i < num_workers(); ++i) {
     RegisterWorkerRequest req;
     int src = 0;
-    network_->Read(rpc::ANY_SOURCE, MTYPE_REGISTER_WORKER, &req, &src);
-    VLOG(1) << "Registered worker " << src - 1 << "; "
-               << config_.num_workers() - 1 - i << " remaining.";
+    network_->Read(rpc::ANY_SOURCE, MessageTypes::REGISTER_WORKER, &req, &src);
+    VLOG(1) << "Registered worker " << src - 1 << "; " << num_workers() - i
+               << " remaining.";
   }
 
   LOG(INFO)<< "All workers registered; starting up.";
@@ -268,7 +272,7 @@ Master::~Master() {
   LOG(INFO) << "Shutting down workers.";
   EmptyMessage msg;
   for (int i = 1; i < network_->size(); ++i) {
-    network_->Send(i, MTYPE_WORKER_SHUTDOWN, msg);
+    network_->Send(i, MessageTypes::WORKER_SHUTDOWN, msg);
   }
 }
 
@@ -298,7 +302,7 @@ WorkerState* Master::assign_worker(int table, int shard) {
   int64_t work_size = 1;
 
   if (ws) {
-//    LOG(INFO) << "Worker for shard: " << MP(table, shard, ws->id);
+    LOG(INFO)<< "Worker for shard: " << MP(table, shard, ws->id);
     ws->assign_task(new TaskState(Taskid(table, shard), work_size));
     return ws;
   }
@@ -317,9 +321,8 @@ WorkerState* Master::assign_worker(int table, int shard) {
 //  LOG(INFO) << "Assigned " << MP(table, shard, best->id);
   CHECK(best->alive());
 
-  VLOG(1) << "Assigning " << MP(table, shard) << " to " << best->id;
-  best->assign_shard(shard, true);
-  best->assign_task(new TaskState(Taskid(table, shard), work_size));
+  LOG(INFO)<< "Assigning " << MP(table, shard) << " to " << best->id;
+  best->assign_shard(tables_, shard, true);
   return best;
 }
 
@@ -337,7 +340,7 @@ void Master::send_table_assignments() {
     }
   }
 
-  network_->SyncBroadcast(MTYPE_SHARD_ASSIGNMENT, req);
+  network_->SyncBroadcast(MessageTypes::SHARD_ASSIGNMENT, req);
 }
 
 bool Master::steal_work(const RunDescriptor& r, int idle_worker,
@@ -394,29 +397,20 @@ bool Master::steal_work(const RunDescriptor& r, int idle_worker,
 
   LOG(INFO)<< "Worker " << idle_worker << " is stealing task "
   << MP(tid.shard, task->size) << " from worker " << src.id;
-  dst.assign_shard(tid.shard, true);
-  src.assign_shard(tid.shard, false);
+  dst.assign_shard(tables_, tid.shard, true);
+  src.assign_shard(tables_, tid.shard, false);
 
   src.remove_task(task);
   dst.assign_task(task);
   return true;
 }
 
-void Master::assign_tables() {
-  shards_assigned_ = true;
-
-  // Assign workers for all table shards, to ensure every shard has an owner.
-  TableRegistry::Map &tables = TableRegistry::Get()->tables();
-  for (TableRegistry::Map::iterator i = tables.begin(); i != tables.end();
-      ++i) {
-    if (!i->second->num_shards()) {
-      VLOG(2) << "Note: assigning tables; table " << i->first
-                 << " has no shards.";
-    }
-    for (int j = 0; j < i->second->num_shards(); ++j) {
-      assign_worker(i->first, j);
-    }
+void Master::assign_shards(Table* t) {
+  for (int j = 0; j < t->num_shards(); ++j) {
+    assign_worker(t->id(), j);
   }
+
+  send_table_assignments();
 }
 
 void Master::assign_tasks(const RunDescriptor& r, vector<int> shards) {
@@ -437,11 +431,12 @@ int Master::dispatch_work(const RunDescriptor& r) {
   KernelRequest w_req;
   for (size_t i = 0; i < workers_.size(); ++i) {
     WorkerState& w = *workers_[i];
+//    LOG(INFO)<< "Dispatching: " << w.str() << " : " << w_req;
     if (w.num_pending() > 0 && w.num_active() == 0) {
       w.get_next(r, &w_req);
 
       num_dispatched++;
-      network_->Send(w.id + 1, MTYPE_RUN_KERNEL, w_req);
+      network_->Send(w.id + 1, MessageTypes::RUN_KERNEL, w_req);
     }
   }
   return num_dispatched;
@@ -449,36 +444,28 @@ int Master::dispatch_work(const RunDescriptor& r) {
 
 void Master::dump_stats() {
   string status;
-  for (int k = 0; k < config_.num_workers(); ++k) {
+  for (int k = 0; k < num_workers(); ++k) {
     status += StringPrintf("%d/%d ", workers_[k]->num_finished(),
         workers_[k]->num_assigned());
   }
   LOG(INFO)<< StringPrintf("Running %s (%d); %s; assigned: %d done: %d",
-      current_run_.method.c_str(), current_run_.shards.size(),
+      current_run_.kernel.c_str(), current_run_.shards.size(),
       status.c_str(), dispatched_, finished_);
 
 }
 
 int Master::reap_one_task() {
-  MethodStats &mstats = method_stats_[current_run_.kernel + ":"
-      + current_run_.method];
+  MethodStats &mstats = method_stats_[ToString(current_run_.kernel)];
   KernelDone done_msg;
   int w_id = 0;
 
-  if (network_->TryRead(rpc::ANY_SOURCE, MTYPE_KERNEL_DONE, &done_msg, &w_id)) {
-
+  if (network_->TryRead(rpc::ANY_SOURCE, MessageTypes::KERNEL_DONE, &done_msg, &w_id)) {
+//    LOG(INFO) << "Done.";
     w_id -= 1;
 
     WorkerState& w = *workers_[w_id];
 
     Taskid task_id(done_msg.kernel().table(), done_msg.kernel().shard());
-
-    for (int i = 0; i < done_msg.shards_size(); ++i) {
-      const ShardInfo &si = done_msg.shards(i);
-      LOG(FATAL) << "WTF.";
-//      tables_[si.table()]->update_partitions(si);
-    }
-
     w.set_finished(task_id);
 
     w.total_runtime += Now() - w.last_task_start;
@@ -494,37 +481,22 @@ int Master::reap_one_task() {
 }
 
 void Master::run(RunDescriptor r) {
-  // HACKHACKHACK - register ourselves with any existing tables
-  for (TableRegistry::Map::iterator i = tables_.begin(); i != tables_.end();
-      ++i) {
-    i->second->set_helper(this);
-  }
-
   CHECK_EQ(current_run_.shards.size(), finished_)<<
   " Cannot start kernel before previous one is finished ";
   finished_ = dispatched_ = 0;
 
-  KernelInfo *k = KernelRegistry::Get()->kernel(r.kernel);
-  CHECK_NE(r.table, (void*)NULL)<< "Table locality must be specified!";
-  CHECK_NE(k, (void*)NULL)<< "Invalid kernel class " << r.kernel;
-  CHECK_EQ(k->has_method(r.method), true)<< "Invalid method: " << MP(r.kernel, r.method);
+  Kernel::ScopedPtr k(TypeRegistry<Kernel>::get_by_name(r.kernel));
+  CHECK_NE(k.get(), (void*)NULL)<< "Invalid kernel class " << r.kernel;
 
-  VLOG(1) << "Running: " << r.kernel << " : " << r.method << " on table "
-             << r.table->id();
+  VLOG(1) << "Running: " << r.kernel << " on table " << r.table->id();
 
   vector<int> shards = r.shards;
 
-  MethodStats &mstats = method_stats_[r.kernel + ":" + r.method];
+  MethodStats &mstats = method_stats_[ToString(r.kernel)];
   mstats.set_calls(mstats.calls() + 1);
 
   current_run_ = r;
   current_run_start_ = Now();
-
-  if (!shards_assigned_) {
-    //only perform table assignment before the first kernel run
-    assign_tables();
-    send_table_assignments();
-  }
 
   kernel_epoch_++;
 
@@ -537,45 +509,19 @@ void Master::run(RunDescriptor r) {
 }
 
 void Master::barrier() {
-  MethodStats &mstats = method_stats_[current_run_.kernel + ":"
-      + current_run_.method];
+  MethodStats &mstats = method_stats_[ToString(current_run_.kernel)];
 
   while (finished_ < current_run_.shards.size()) {
     PERIODIC(10, { DumpProfile(); dump_stats(); });
 
+    dispatch_work(current_run_);
+
     if (reap_one_task() >= 0) {
       finished_++;
-
-      static PeriodicTimer steal_timer(0.1);
-      if (steal_timer.fire()) {
-        double avg_completion_time = mstats.shard_time() / mstats.shard_calls();
-
-        bool need_update = false;
-        for (int i = 0; i < workers_.size(); ++i) {
-          WorkerState& w = *workers_[i];
-
-          // Don't try to steal tasks if the payoff is too small.
-          if (mstats.shard_calls() > 10 && avg_completion_time > 0.2
-              && w.idle_time() > 0.5) {
-            if (steal_work(current_run_, w.id, avg_completion_time)) {
-              need_update = true;
-            }
-          }
-        }
-
-        if (need_update) {
-          // Update the table assignments.
-          send_table_assignments();
-        }
-      }
-
-      if (dispatched_ < current_run_.shards.size()) {
-        dispatched_ += dispatch_work(current_run_);
-      }
     }
   }
   mstats.set_total_time(mstats.total_time() + Now() - current_run_start_);
-  LOG(INFO)<< "Kernel '" << current_run_.method << "' finished in " << Now() - current_run_start_;
+  LOG(INFO)<< "Kernel '" << current_run_.kernel << "' finished in " << Now() - current_run_start_;
 }
 
 } // namespace sparrow

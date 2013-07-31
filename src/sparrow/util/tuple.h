@@ -4,7 +4,7 @@
 // Defines utility functions for creating N-tuples, extensions of std::pair for
 // more then 2 values.
 
-#include "util/hash.h"
+#include "sparrow/util/hash.h"
 #include <vector>
 
 #define IN(container, item) (\
