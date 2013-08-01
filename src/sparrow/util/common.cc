@@ -227,6 +227,7 @@ void Init(int argc, char** argv) {
   if (!getenv("OMPI_UNIVERSE_SIZE")) {
     string cmd = StringPrintf(
         "mpirun "
+        " -x PYTHON_PATH "
         " -x LD_LIBRARY_PATH"
         " -x LD_PRELOAD=/usr/lib/openmpi/lib/libmpi.so"
         " -hostfile %s"

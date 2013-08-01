@@ -93,7 +93,7 @@ private:
 
   int num_peers_;
   bool running_;
-  bool krunning_;
+  bool kernel_active_;
   bool handling_putreqs_;
   CheckpointType active_checkpoint_;
 

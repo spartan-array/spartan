@@ -18,9 +18,10 @@ class WorkerState;
 class TaskState;
 
 struct RunDescriptor {
-  string kernel;
-
   Table *table;
+
+  string kernel;
+  Kernel::ArgMap args;
   std::vector<int> shards;
 };
 

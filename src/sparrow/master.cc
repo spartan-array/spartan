@@ -165,8 +165,8 @@ public:
   }
 
   std::string str() {
-    return StringPrintf("W: p: %d; a: %d a: %d f: %d", id, num_pending(), num_active(),
-        num_assigned(), num_finished());
+    return StringPrintf("W: p: %d; a: %d a: %d f: %d", id, num_pending(),
+        num_active(), num_assigned(), num_finished());
   }
 
 #define COUNT_TASKS(name, type)\
@@ -219,7 +219,11 @@ public:
     msg->set_kernel(r.kernel);
     msg->set_table(r.table->id());
     msg->set_shard(best->id.shard);
-    msg->mutable_args();
+    for (auto i : r.args) {
+      KV* kv = msg->add_args();
+      kv->set_key(i.first);
+      kv->set_value(i.second);
+    }
 
     best->status = TaskState::ACTIVE;
     last_task_start = Now();
@@ -260,24 +264,27 @@ Master::Master() {
 }
 
 Master::~Master() {
-  LOG(INFO)<< "Total runtime: " << runtime_.elapsed();
+  VLOG(1) << "Total runtime: " << runtime_.elapsed();
 
-  LOG(INFO) << "Worker execution time:";
-  for (size_t i = 0; i < workers_.size(); ++i) {
-    WorkerState& w = *workers_[i];
-    if (i % 10 == 0) {
-      fprintf(stderr, "\n%zu: ", i);
+  VLOG(1) << "Worker execution time:";
+  if (VLOG_IS_ON(1)) {
+    for (size_t i = 0; i < workers_.size(); ++i) {
+      WorkerState& w = *workers_[i];
+      if (i % 10 == 0) {
+        fprintf(stderr, "\n%zu: ", i);
+      }
+      fprintf(stderr, "%.3f ", w.total_runtime);
     }
-    fprintf(stderr, "%.3f ", w.total_runtime);
-  }
-  fprintf(stderr, "\n");
-
-  LOG(INFO) << "Kernel stats: ";
-  for (MethodStatsMap::iterator i = method_stats_.begin(); i != method_stats_.end(); ++i) {
-    LOG(INFO) << i->first << "--> " << i->second.ShortDebugString();
+    fprintf(stderr, "\n");
   }
 
-  LOG(INFO) << "Shutting down workers.";
+  VLOG(1) << "Kernel stats: ";
+  for (MethodStatsMap::iterator i = method_stats_.begin();
+      i != method_stats_.end(); ++i) {
+    VLOG(1) << i->first << "--> " << i->second.ShortDebugString();
+  }
+
+  VLOG(1) << "Shutting down workers.";
   EmptyMessage msg;
   for (int i = 1; i < network_->size(); ++i) {
     network_->Send(i, MessageTypes::WORKER_SHUTDOWN, msg);
@@ -310,7 +317,7 @@ WorkerState* Master::assign_worker(int table, int shard) {
   int64_t work_size = 1;
 
   if (ws) {
-    LOG(INFO)<< "Worker for shard: " << MP(table, shard, ws->id);
+    VLOG(1) << "Worker for shard: " << MP(table, shard, ws->id);
     ws->assign_task(new TaskState(Taskid(table, shard), work_size));
     return ws;
   }
@@ -329,7 +336,7 @@ WorkerState* Master::assign_worker(int table, int shard) {
 //  LOG(INFO) << "Assigned " << MP(table, shard, best->id);
   CHECK(best->alive());
 
-  LOG(INFO)<< "Assigning " << MP(table, shard) << " to " << best->id;
+  VLOG(1) << "Assigning " << MP(table, shard) << " to " << best->id;
   best->assign_shard(tables_, shard, true);
   return best;
 }
@@ -467,7 +474,8 @@ int Master::reap_one_task() {
   KernelDone done_msg;
   int w_id = 0;
 
-  if (network_->TryRead(rpc::ANY_SOURCE, MessageTypes::KERNEL_DONE, &done_msg, &w_id)) {
+  if (network_->TryRead(rpc::ANY_SOURCE, MessageTypes::KERNEL_DONE, &done_msg,
+      &w_id)) {
 //    LOG(INFO) << "Done.";
     w_id -= 1;
 

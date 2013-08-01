@@ -105,7 +105,7 @@ message KernelRequest {
 	required string kernel = 2;
 	optional int32 table = 3;
 	optional int32 shard = 4;
-	optional KVs args = 5;
+	repeated KV args = 5;
 }
 
 message KernelDone {

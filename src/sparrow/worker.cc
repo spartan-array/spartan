@@ -44,8 +44,8 @@ Worker::Worker(const ConfigData &c) {
     peers_[i] = new Stub(i + 1);
   }
 
-  running_ = true; //this is WORKER running, not KERNEL running!
-  krunning_ = false; //and this is for KERNEL running
+  running_ = true;
+  kernel_active_ = false;
   iterator_id_ = 0;
 
   // Register RPC endpoints.
@@ -112,10 +112,11 @@ void Worker::KernelLoop() {
       }
 
     }
-    krunning_ = true; //a kernel is running
+
+    kernel_active_ = true; //a kernel is running
     stats_["idle_time"] += idle.elapsed();
 
-//    LOG(INFO) << "Received run request for " << kreq;
+    VLOG(2) << "Received run request for " << kreq;
 
     if (peer_for_shard(kreq.table(), kreq.shard()) != config_.worker_id()) {
       LOG(FATAL)<< "Received a shard I can't work on! : " << kreq.shard()
@@ -123,7 +124,13 @@ void Worker::KernelLoop() {
     }
 
     Kernel* k = TypeRegistry<Kernel>::get_by_name(kreq.kernel());
-    k->init(this, kreq.table(), kreq.shard());
+
+    Kernel::ArgMap args;
+    for (auto kv : kreq.args()) {
+      args[kv.key()] = kv.value();
+    }
+
+    k->init(this, kreq.table(), kreq.shard(), args);
     KernelId id(kreq.kernel(), kreq.table(), kreq.shard());
 
     if (this->id() == 1 && FLAGS_sleep_hack > 0) {
@@ -132,11 +139,11 @@ void Worker::KernelLoop() {
 
     k->run();
 
-//    LOG(INFO)<< "Kernel finished: " << kreq;
+    VLOG(2) << "Kernel finished: " << kreq;
 
     KernelDone kd;
     kd.mutable_kernel()->CopyFrom(kreq);
-    krunning_ = false;
+    kernel_active_ = false;
     network_->Send(config_.master_id(), MessageTypes::KERNEL_DONE, kd);
 
     DumpProfile();
@@ -418,7 +425,7 @@ void Worker::handle_put_request() {
 
 void Worker::get(const HashGet& get_req, TableData *get_resp,
     const rpc::RPCInfo& rpc) {
-    LOG(INFO) << "Get request: " << get_req;
+  LOG(INFO)<< "Get request: " << get_req;
 
   get_resp->Clear();
   get_resp->set_source(config_.worker_id());
@@ -439,7 +446,7 @@ void Worker::get(const HashGet& get_req, TableData *get_resp,
   }
 
   VLOG(2) << "Returning result for " << MP(get_req.table(), get_req.shard())
-             << " - found? " << !get_resp->missing_key();
+  << " - found? " << !get_resp->missing_key();
 }
 
 void Worker::iterator_request(const IteratorRequest& iterator_req,
@@ -521,7 +528,7 @@ void Worker::flush(const EmptyMessage& req, FlushResponse *resp,
 
 void Worker::apply(const EmptyMessage& req, EmptyMessage *resp,
     const rpc::RPCInfo& rpc) {
-  if (krunning_) {
+  if (kernel_active_) {
     LOG(FATAL)<< "Received APPLY message while still running!?!";
     return;
   }
@@ -533,13 +540,14 @@ void Worker::apply(const EmptyMessage& req, EmptyMessage *resp,
 
 void Worker::CheckForMasterUpdates() {
   boost::recursive_mutex::scoped_lock sl(state_lock_);
+
   // Check for shutdown.
   EmptyMessage empty;
   KernelRequest k;
 
   if (network_->TryRead(config_.master_id(), MessageTypes::WORKER_SHUTDOWN,
       &empty)) {
-    VLOG(1) << "Shutting down worker " << config_.worker_id();
+    LOG(INFO) << "Shutting down worker " << config_.worker_id();
     running_ = false;
     return;
   }
