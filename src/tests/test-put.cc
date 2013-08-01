@@ -34,5 +34,7 @@ int main(int argc, char** argv) {
     Table* t = m.create_table();
     m.map_shards(t, "PutKernel");
     m.map_shards(t, "GetKernel");
+
+    LOG(INFO) << "Master: " << t->get("Hello.");
   }
 }

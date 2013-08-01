@@ -82,15 +82,11 @@ public:
       id_ = TypeRegistry<T>::put(k, this);
     }
 
-    Subclass* operator()() {
-      return new T;
-    }
-
     int id() {
       return id_;
     }
 
-    Subclass* create() {
+    T* create() {
       return new Subclass;
     }
   };

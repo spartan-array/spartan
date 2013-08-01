@@ -15,7 +15,73 @@ using namespace sparrow;
 #define GRAB_LOCK boost::recursive_mutex::scoped_lock sl(mutex())
 #endif
 
+#define _PASTE(x, y) x ## y
+#define PASTE(x, y) _PASTE(x, y)
+
+#define MAKE_ACCUMULATOR(AccumType, ValueType)\
+  struct Accum_ ## AccumType ## _ ## ValueType : public AccumType<ValueType> {\
+  const char* name() const { return #ValueType #AccumType; }\
+};\
+static TypeRegistry<Accumulator>::Helper<Accum_ ## AccumType ## _ ## ValueType>\
+    k_helper ## AccumType ## ValueType(#ValueType #AccumType)
+
+#define MAKE_ACCUMULATORS(ValueType)\
+  MAKE_ACCUMULATOR(Max, ValueType);\
+  MAKE_ACCUMULATOR(Min, ValueType);\
+  MAKE_ACCUMULATOR(Sum, ValueType);
+
 namespace sparrow {
+
+// Helper class which casts string values to struct types.
+template<class V>
+struct AccumulatorT: public Accumulator {
+  virtual ~AccumulatorT() {
+  }
+  virtual void accumulate(V* current, const V& update) const = 0;
+
+  void accumulate(TableValue* current, const TableValue& update) const {
+    V* cur_val = (V*) current->data();
+    const V* up_val = (const V*) update.data();
+
+    accumulate(cur_val, *up_val);
+  }
+};
+
+template<class V>
+struct Min: public AccumulatorT<V> {
+  virtual void accumulate(V* current, const V& update) const {
+    *current = std::min(*current, update);
+  }
+};
+
+template<class V>
+struct Max: public AccumulatorT<V> {
+  void accumulate(V* current, const V& update) const {
+    *current = std::max(*current, update);
+  }
+};
+
+template<class V>
+struct Sum: public AccumulatorT<V> {
+  void accumulate(V* current, const V& update) const {
+    *current += update;
+  }
+};
+
+struct Replace: public Accumulator {
+  void accumulate(TableValue* current, const TableValue& update) const {
+    *current = update;
+  }
+
+  const char* name() const {
+    return "Replace";
+  }
+};
+
+REGISTER_ACCUMULATOR("Replace", Replace);
+
+MAKE_ACCUMULATORS(int);
+MAKE_ACCUMULATORS(double);
 
 typedef boost::unordered_map<TableKey, TableValue> Map;
 
@@ -133,46 +199,47 @@ const TableValue& RemoteIterator::value() {
 }
 
 int Table::shard_for_key(const TableKey& k) {
-  return sharder_->shard_for_key(k, this->num_shards());
+  return sharder->shard_for_key(k, this->num_shards());
 }
 
 const TableValue& Table::get_local(const TableKey& k) {
   int shard = this->shard_for_key(k);
   CHECK(is_local_shard(shard)) << " non-local for shard: " << shard;
-  return (*partitions_[shard])[k];
+  return (*shards_[shard])[k];
 }
 
 void Table::put(const TableKey& k, const TableValue& v) {
   int shard = this->shard_for_key(k);
 
   GRAB_LOCK;
-  (*partitions_[shard])[k] = v;
+  (*shards_[shard])[k] = v;
 
   if (!is_local_shard(shard)) {
     ++pending_writes_;
   }
 
-  if (pending_writes_ > kWriteFlushCount) {
+  if (pending_writes_ > flush_frequency) {
     send_updates();
   }
 
   PERIODIC(0.1, {this->handle_put_requests();});
 }
 
-void Table::update(const TableKey& k, const TableValue& v, Accumulator* accum) {
+void Table::update(const TableKey& k, const TableValue& v) {
   int shard_id = this->shard_for_key(k);
 
   GRAB_LOCK;;
 
-  if (is_local_shard(shard_id)) {
-    TableValue& old_v = (*partitions_[shard_id])[k];
-    accum->accumulate(&old_v, v);
+  Shard& s = (*shards_[shard_id]);
+  Shard::iterator i = s.find(k);
+  if (i == s.end()) {
+    s[k] = v;
   } else {
-    LOG(FATAL)<< "Not implemented.";
+    accum->accumulate(&i->second, v);
   }
 
   ++pending_writes_;
-  if (pending_writes_ > kWriteFlushCount) {
+  if (pending_writes_ > flush_frequency) {
     send_updates();
   }
 
@@ -195,12 +262,15 @@ const TableValue& Table::get(const TableKey& k) {
 
   PERIODIC(0.1, this->handle_put_requests());
 
+  if (helper()->id() == -1) {
+    LOG(INFO)<< "get" << is_local_shard(shard);
+  }
   if (is_local_shard(shard)) {
     GRAB_LOCK;
-    return (*partitions_[shard])[k];
+    return (*shards_[shard])[k];
   }
 
-  LOG(INFO) << "Remote fetch...";
+  LOG(INFO)<< "Remote fetch...";
   TableValue* v = new TableValue;
   get_remote(shard, k, v);
   return *v;
@@ -221,7 +291,7 @@ bool Table::contains(const TableKey& k) {
   }
 
   if (is_local_shard(shard)) {
-    Shard& s = (*partitions_[shard]);
+    Shard& s = (*shards_[shard]);
     return s.find(k) != s.end();
   }
 
@@ -240,18 +310,18 @@ Shard* Table::create_local(int shard_id) {
 
 TableIterator* Table::get_iterator(int shard) {
   if (this->is_local_shard(shard)) {
-    return new LocalIterator(*(partitions_[shard]));
+    return new LocalIterator(*(shards_[shard]));
   } else {
     return new RemoteIterator(this, shard);
   }
 }
 
 void Table::update_partitions(const PartitionInfo& info) {
-  partinfo_[info.shard()].CopyFrom(info);
+  shard_info_[info.shard()].CopyFrom(info);
 }
 
 Table::~Table() {
-  for (auto p : partitions_) {
+  for (auto p : shards_) {
     delete p;
   }
 }
@@ -263,9 +333,9 @@ bool Table::is_local_shard(int shard) {
 
 int64_t Table::shard_size(int shard) {
   if (is_local_shard(shard)) {
-    return partitions_[shard]->size();
+    return shards_[shard]->size();
   } else {
-    return partinfo_[shard].entries();
+    return shard_info_[shard].entries();
   }
 }
 
@@ -343,9 +413,9 @@ int Table::send_updates() {
 
   TableData put;
   boost::recursive_mutex::scoped_lock sl(mutex());
-  for (size_t i = 0; i < partitions_.size(); ++i) {
-    Shard* t = partitions_[i];
-    if (!is_local_shard(i) && (partinfo_[i].dirty() || !t->empty())) {
+  for (size_t i = 0; i < shards_.size(); ++i) {
+    Shard* t = shards_[i];
+    if (!is_local_shard(i) && (shard_info_[i].dirty() || !t->empty())) {
       // Always send at least one chunk, to ensure that we clear taint on
       // tables we own.
       do {
@@ -377,8 +447,8 @@ int Table::send_updates() {
 
 int Table::pending_writes() {
   int64_t s = 0;
-  for (size_t i = 0; i < partitions_.size(); ++i) {
-    Shard *t = partitions_[i];
+  for (size_t i = 0; i < shards_.size(); ++i) {
+    Shard *t = shards_[i];
     if (!is_local_shard(i)) {
       s += t->size();
     }

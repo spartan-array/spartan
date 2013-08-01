@@ -17,7 +17,7 @@ $(srcdir)/src/sparrow/sparrow.pb.cc $(srcdir)/src/sparrow/sparrow.pb.h : $(srcdi
 BUILT_SOURCES = src/sparrow/sparrow.pb.h
 
 lib_LTLIBRARIES = libsparrow.la libgflags.la libglog.la
-noinst_PROGRAMS = test-put
+noinst_PROGRAMS = test-put test-accum
 
 LDADD = libsparrow.la libgflags.la libglog.la -lprotobuf -lboost_thread -lpthread
 
@@ -48,3 +48,4 @@ libsparrow_la_SOURCES =\
 	src/sparrow/master.cc
 
 test_put_SOURCES = src/tests/test-put.cc
+test_accum_SOURCES = src/tests/test-accum.cc

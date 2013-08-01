@@ -29,10 +29,7 @@ public:
   Master();
   ~Master();
 
-  int num_workers() const {
-    return network_->size() - 1;
-  }
-
+  // TableHelper implementation
   int id() const {
     return -1;
   }
@@ -41,15 +38,33 @@ public:
     return kernel_epoch_;
   }
 
-  Table* create_table() {
+  int peer_for_shard(int table, int shard) const {
+    return tables_.find(table)->second->worker_for_shard(shard);
+  }
+
+  void handle_put_request() {
+    // The master never owns any table partitions.
+  }
+
+  int num_workers() const {
+    return network_->size() - 1;
+  }
+
+  Table* create_table(
+      std::string sharder_type="Modulo",
+      std::string accum_type = "Replace") {
     CreateTableRequest req;
     int table_id = tables_.size();
     req.set_id(table_id);
     req.set_num_shards(10);
-    req.set_sharder_type("");
+    req.set_accum_type(accum_type);
+    req.set_sharder_type(sharder_type);
 
     Table* t = new Table(table_id, 10);
     t->set_helper(this);
+
+    // Flush master writes immediately.
+    t->flush_frequency = 0;
     tables_[t->id()] = t;
 
     network_->SyncBroadcast(MessageTypes::CREATE_TABLE, req);
@@ -68,14 +83,6 @@ public:
   }
 
   void run(RunDescriptor r);
-
-  int peer_for_shard(int table, int shard) const {
-    return tables_.find(table)->second->worker_for_shard(shard);
-  }
-
-  void handle_put_request() {
-    LOG(FATAL)<< "Not implemented for master.";
-  }
 
   void barrier();
 
@@ -114,8 +121,8 @@ private:
 
   RunDescriptor current_run_;
   double current_run_start_;
-  size_t dispatched_;//# of dispatched tasks
-  size_t finished_;//# of finished tasks
+  size_t dispatched_; //# of dispatched tasks
+  size_t finished_; //# of finished tasks
 
   bool shards_assigned_;
 
@@ -127,6 +134,7 @@ private:
   TableMap tables_;
   rpc::NetworkThread* network_;
   Timer runtime_;
-};}
+};
+}
 
 #endif /* MASTER_H_ */

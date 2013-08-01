@@ -1,5 +1,5 @@
-#ifndef ACCUMULATOR_H
-#define ACCUMULATOR_H
+#ifndef SPARROW_TABLE_H
+#define SPARROW_TABLE_H
 
 #include "sparrow/util/common.h"
 #include "sparrow/util/file.h"
@@ -27,16 +27,17 @@ class TableDescriptor;
 typedef std::string TableKey;
 typedef std::string TableValue;
 
-template<class T>
-bool read(T* v, StringPiece src) {
-  StringReader r(src);
-  return v->read(&r);
+template <class T>
+std::string prim_to_string(const T& t) {
+  std::string result;
+  result.resize(sizeof(t));
+  *((T*)result.data()) = t;
+  return result;
 }
 
-template<class T>
-void write(const T& v, string* out) {
-  StringWriter w(out);
-  v.write(&w);
+template <class T>
+T string_to_prim(const std::string& t) {
+  return *((T*)t.data());
 }
 
 struct Accumulator {
@@ -44,7 +45,13 @@ struct Accumulator {
   }
   virtual void accumulate(TableValue* current,
       const TableValue& update) const = 0;
+
+  // name() should match the name this accumulator was registered as.
+  virtual const char* name() const = 0;
 };
+
+#define REGISTER_ACCUMULATOR(name, klass)\
+    static TypeRegistry<Accumulator>::Helper<klass > k_helper_ ## __FILE__ ## __LINE__ (name);
 
 struct Sharder {
   virtual ~Sharder() {
@@ -63,46 +70,6 @@ struct TableHelper {
   virtual int epoch() const = 0;
   virtual int peer_for_shard(int table, int shard) const = 0;
   virtual void handle_put_request() = 0;
-};
-
-template<class V>
-struct AccumulatorT {
-  virtual ~AccumulatorT() {
-  }
-  virtual void accumulate(V* current, const V& update) const = 0;
-
-  void accumulate(TableValue* current, const TableValue& update) {
-    //accumulate(current, TableValueT<V>::get(update));
-    LOG(FATAL)<< "Not implemented.";
-  }
-};
-
-template<class V>
-struct Accumulators {
-  struct Min: public AccumulatorT<V> {
-    virtual void accumulate(V* current, const V& update) const {
-      *current = std::min(*current, update);
-    }
-  };
-
-  struct Max: public AccumulatorT<V> {
-    virtual void accumulate(V* current, const V& update) const {
-      *current = std::max(*current, update);
-    }
-  };
-
-  struct Sum: public AccumulatorT<V> {
-    virtual void accumulate(V* current, const V& update) const {
-      *current += update;
-    }
-  };
-
-  struct Replace: public AccumulatorT<V> {
-    virtual void accumulate(V* current, const V& update) const {
-      *current = update;
-    }
-  };
-
 };
 
 struct Sharding {
@@ -124,8 +91,6 @@ public:
   virtual void next() = 0;
 };
 
-class PartitionInfo;
-
 class Checkpointable {
 public:
   virtual void start_checkpoint(const string& f, bool delta) = 0;
@@ -137,6 +102,10 @@ public:
 class Shard: public boost::unordered_map<TableKey, TableValue> {
 };
 
+// Flush changes after this writes.
+static const int kDefaultFlushFrequency = 1000000;
+
+class PartitionInfo;
 class Table {
 private:
   struct CacheEntry {
@@ -148,30 +117,34 @@ private:
   int pending_writes_;
   int id_;
   TableHelper *helper_;
-
-  Sharder* sharder_;
-  std::vector<Shard*> partitions_;
-  std::vector<PartitionInfo> partinfo_;
+  std::vector<Shard*> shards_;
+  std::vector<PartitionInfo> shard_info_;
 
   boost::recursive_mutex m_;
-
 public:
+
+  Sharder* sharder;
+  Accumulator* accum;
+
+  int flush_frequency;
+
   Table(int id, int num_shards) {
     id_ = id;
-    sharder_ = new Sharding::Modulo();
+    sharder = new Sharding::Modulo();
     pending_writes_ = 0;
     helper_ = NULL;
+    flush_frequency = kDefaultFlushFrequency;
 
     initialize(num_shards);
   }
 
   void initialize(int num_shards) {
-    partitions_.resize(num_shards);
+    shards_.resize(num_shards);
     for (int i = 0; i < num_shards; ++i) {
-      partitions_[i] = new Shard;
+      shards_[i] = new Shard;
     }
 
-    partinfo_.resize(num_shards);
+    shard_info_.resize(num_shards);
   }
 
   virtual ~Table();
@@ -183,23 +156,13 @@ public:
 
   int64_t shard_size(int shard);
 
-// Fill in a response from a remote worker for the given key.
-  void handle_get(const HashGet& req, TableData* resp);
-
-  PartitionInfo* get_partition_info(int shard) {
-    return &partinfo_[shard];
-  }
-
-  Shard& get_partition(int shard) {
-    return *partitions_[shard];
-  }
-
+// Fill in a response from a remote worker for the given key
   bool tainted(int shard) {
-    return partinfo_[shard].tainted();
+    return shard_info_[shard].tainted();
   }
 
   int worker_for_shard(int shard) const {
-    return partinfo_[shard].owner();
+    return shard_info_[shard].owner();
   }
 
   bool is_local_shard(int shard) const {
@@ -207,7 +170,7 @@ public:
   }
 
   int num_shards() const {
-    return partitions_.size();
+    return shards_.size();
   }
 
   int id() const {
@@ -215,13 +178,17 @@ public:
   }
 
   Shard* shard(int id) {
-    return partitions_[id];
+    return shards_[id];
+  }
+
+  PartitionInfo* shard_info(int id) {
+    return &shard_info_[id];
   }
 
   int shard_for_key(const TableKey& k);
 
   void put(const TableKey& k, const TableValue& v);
-  void update(const TableKey& k, const TableValue& v, Accumulator* accum);
+  void update(const TableKey& k, const TableValue& v);
 
   const TableValue& get(const TableKey& k);
   bool contains(const TableKey& k);
@@ -260,9 +227,6 @@ protected:
 };
 
 typedef std::map<int, Table*> TableMap;
-
-static const int kWriteFlushCount = 1000000;
-
 
 }
 

@@ -230,7 +230,6 @@ void Init(int argc, char** argv) {
         " -x LD_LIBRARY_PATH"
         " -x LD_PRELOAD=/usr/lib/openmpi/lib/libmpi.so"
         " -hostfile %s"
-        " -nooversubscribe"
         " -n %d"
         " %s",
 //                              " --log_prefix=false ",

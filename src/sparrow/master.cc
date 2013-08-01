@@ -123,6 +123,14 @@ public:
   void assign_shard(TableMap& tables, int shard, bool should_service) {
     for (auto i : tables) {
       if (shard < i.second->num_shards()) {
+
+        // Update local partition information, for performing put/fetches
+        // on the master.
+        PartitionInfo* p = i.second->shard_info(shard);
+        p->set_owner(id);
+        p->set_shard(shard);
+        p->set_table(i.first);
+
         Taskid t(i.first, shard);
         if (should_service) {
           shards.insert(t);

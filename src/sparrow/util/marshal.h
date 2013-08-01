@@ -121,6 +121,18 @@ public:
   }
 };
 
+template<class T>
+bool read(T* v, StringPiece src) {
+  StringReader r(src);
+  return v->read(&r);
+}
+
+template<class T>
+void write(const T& v, string* out) {
+  StringWriter w(out);
+  v.write(&w);
+}
+
 } // namespace sparrow
 
 #endif /* MARSHAL_H_ */

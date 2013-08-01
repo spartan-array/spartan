@@ -409,9 +409,9 @@ void Worker::handle_put_request() {
       }
     }
 
-    if (put.done() && t->get_partition_info(put.shard())->tainted()) {
+    if (put.done() && t->shard_info(put.shard())->tainted()) {
       VLOG(1) << "Clearing taint on: " << MP(put.table(), put.shard());
-      t->get_partition_info(put.shard())->clear_tainted();
+      t->shard_info(put.shard())->clear_tainted();
     }
   }
 }
@@ -483,17 +483,18 @@ void Worker::iterator_request(const IteratorRequest& iterator_req,
 void Worker::create_table(const CreateTableRequest& req, EmptyMessage *resp,
     const rpc::RPCInfo& rpc) {
   Table* t = new Table(req.id(), req.num_shards());
+  t->accum = TypeRegistry<Accumulator>::get_by_name(req.accum_type());
   t->set_helper(this);
   tables_[req.id()] = t;
 }
 
 void Worker::assign_shards(const ShardAssignmentRequest& shard_req,
     EmptyMessage *resp, const rpc::RPCInfo& rpc) {
-  LOG(INFO)<< "Shard assignment: " << shard_req.DebugString();
+//  LOG(INFO)<< "Shard assignment: " << shard_req.DebugString();
   for (int i = 0; i < shard_req.assign_size(); ++i) {
     const ShardAssignment &a = shard_req.assign(i);
     Table *t = tables_[a.table()];
-    t->get_partition_info(a.shard())->set_owner(a.new_worker());
+    t->shard_info(a.shard())->set_owner(a.new_worker());
   }
 }
 
