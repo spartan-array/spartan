@@ -3,9 +3,9 @@ LT_INIT
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([configure.ac])
-AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_HEADERS([sparrow-config.h])
 
-AM_INIT_AUTOMAKE([foreign subdir-objects no-define])
+AM_INIT_AUTOMAKE([foreign subdir-objects no-define silent-rules])
 AM_PATH_PYTHON
 AX_SWIG_PYTHON
 

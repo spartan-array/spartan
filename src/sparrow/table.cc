@@ -215,11 +215,13 @@ void Table::put(const TableKey& k, const TableValue& v) {
   (*shards_[shard])[k] = v;
 
   if (!is_local_shard(shard)) {
+//    LOG(INFO) << "Is local: " << is_local_shard(shard);
     ++pending_writes_;
   }
 
   if (pending_writes_ > flush_frequency) {
     send_updates();
+    this->handle_put_requests();
   }
 
   PERIODIC(0.1, {this->handle_put_requests();});
@@ -241,6 +243,7 @@ void Table::update(const TableKey& k, const TableValue& v) {
   ++pending_writes_;
   if (pending_writes_ > flush_frequency) {
     send_updates();
+    this->handle_put_requests();
   }
 
   PERIODIC(0.1, {this->handle_put_requests();});
@@ -263,7 +266,7 @@ const TableValue& Table::get(const TableKey& k) {
   PERIODIC(0.1, this->handle_put_requests());
 
   if (helper()->id() == -1) {
-    LOG(INFO)<< "get" << is_local_shard(shard);
+    LOG(INFO)<< "is_local? : " << is_local_shard(shard);
   }
   if (is_local_shard(shard)) {
     GRAB_LOCK;
@@ -405,7 +408,7 @@ void Table::restore(const string& f) {
 }
 
 void Table::handle_put_requests() {
-  helper()->handle_put_request();
+  helper()->check_network();
 }
 
 int Table::send_updates() {
@@ -421,8 +424,12 @@ int Table::send_updates() {
       do {
         put.Clear();
 
+        for (auto kv : *t) {
+          KV* put_kv = put.add_kv_data();
+          put_kv->set_key(kv.first);
+          put_kv->set_value(kv.second);
+        }
         VLOG(3) << "Sending update from non-trigger table ";
-        LOG(FATAL)<< "TODO: serialize table.";
         t->clear();
 
         put.set_shard(i);
@@ -433,8 +440,7 @@ int Table::send_updates() {
         put.set_done(true);
 
         count += put.kv_data_size();
-        rpc::NetworkThread::Get()->Send(worker_for_shard(i) + 1,
-            MessageTypes::PUT_REQUEST, put);
+        rpc::NetworkThread::Get()->Send(worker_for_shard(i) + 1, MessageTypes::PUT_REQUEST, put);
       } while (!t->empty());
 
       t->clear();

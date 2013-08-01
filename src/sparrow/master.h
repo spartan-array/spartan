@@ -43,8 +43,9 @@ public:
     return tables_.find(table)->second->worker_for_shard(shard);
   }
 
-  void handle_put_request() {
-    // The master never owns any table partitions.
+  void check_network() {
+    EmptyMessage empty;
+    network_->SyncBroadcast(MessageTypes::WORKER_FLUSH, empty);
   }
 
   int num_workers() const {

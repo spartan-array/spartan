@@ -1,11 +1,13 @@
 CXX = mpic++
 LD = mpic++
-CXXFLAGS = -Wall -std=c++11 -O2 -fno-omit-frame-pointer
+CXXFLAGS = -Wall -Wno-sign-compare -std=c++11 -O2 -fno-omit-frame-pointer
 
 AM_LDFLAGS =  -Wl,--export-dynamic
 
 LDFLAGS = -no-fast-install \
-  -L/home/power/pkg/openmpi-1.7/lib -lmpi_cxx -lmpi -lopen-rte -lopen-pal -lm -ldl -lrdmacm -libverbs -lrt -lnsl -lutil -lprotobuf -lboost_thread
+  -L/home/power/pkg/openmpi-1.7/lib -lmpi_cxx -lmpi -lopen-rte -lopen-pal \
+  -lm -ldl -lrdmacm -libverbs -lrt -lnsl -lutil -lprotobuf -lboost_thread \
+  -lprofiler
 
 
 ACLOCAL_AMFLAGS = -I m4
@@ -24,7 +26,7 @@ BUILT_SOURCES = \
   src/sparrow/python/_sparrow.cc
   
 $(builddir)/src/sparrow/python/_sparrow.cc : $(srcdir)/src/sparrow/python/sparrow.i
-	swig -O -python -c++ -o $@ $< 
+	swig $(CPPFLAGS) -O -python -c++ -o $@ $< 
  
 $(builddir)/src/sparrow/sparrow.pb.cc $(builddir)/src/sparrow/sparrow.pb.h : $(srcdir)/src/sparrow/sparrow.proto
 	protoc --proto_path=$(srcdir)/src/sparrow --cpp_out=$(dir $@) $^
@@ -34,7 +36,8 @@ noinst_LIBRARIES = _sparrow.so
 lib_LTLIBRARIES = libsparrow.la libgflags.la libglog.la libpysparrow.la
 noinst_PROGRAMS = test-put test-accum
 
-LDADD = libsparrow.la libgflags.la libglog.la -lprotobuf -lboost_thread -lpthread
+LDADD = libsparrow.la libgflags.la libglog.la
+libpysparrow_la_LIBADD = libsparrow.la libgflags.la libglog.la
 
 libgflags_la_SOURCES = \
 	src/external/google-flags/gflags.cc\
@@ -62,7 +65,7 @@ libsparrow_la_SOURCES =\
 	src/sparrow/worker.cc\
 	src/sparrow/master.cc
 
-libpysparrow_la_LIBADD = libsparrow.la libgflags.la libglog.la -lprotobuf -lboost_thread -lpthread
+
 libpysparrow_la_SOURCES =\
 	src/sparrow/python/_sparrow.cc \
     src/sparrow/python/support.cc

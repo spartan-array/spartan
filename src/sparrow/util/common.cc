@@ -20,7 +20,9 @@
 #include <mpi.h>
 #include <google/protobuf/message.h>
 
-#ifdef HAVE_CPU_PROFILER
+#include "sparrow-config.h"
+
+#ifdef HAVE_GOOGLE_PROFILER_H
 #include <google/profiler.h>
 DEFINE_bool(cpu_profile, false, "");
 #endif
@@ -81,7 +83,7 @@ void Histogram::add(double val) {
 }
 
 void DumpProfile() {
-#ifdef HAVE_CPU_PROFILER
+#ifdef HAVE_GOOGLE_PROFILER_H
   ProfilerFlush();
 #endif
 }
@@ -205,7 +207,7 @@ void Init(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
 
-#ifdef HAVE_CPU_PROFILER
+#ifdef HAVE_GOOGLE_PROFILER_H
   if (FLAGS_cpu_profile) {
     mkdir("profile/", 0755);
     char buf[100];
@@ -222,18 +224,20 @@ void Init(int argc, char** argv) {
   }
 #endif
 
+  if (!getenv("PYTHONPATH")) {
+    setenv("PYTHONPATH", "", 0);
+  }
+
   // If we are not running in the context of MPI, go ahead and invoke
   // mpirun to start ourselves up.
   if (!getenv("OMPI_UNIVERSE_SIZE")) {
     string cmd = StringPrintf(
         "mpirun "
-        " -x PYTHON_PATH "
+        " -x PYTHONPATH "
         " -x LD_LIBRARY_PATH"
-        " -x LD_PRELOAD=/usr/lib/openmpi/lib/libmpi.so"
         " -hostfile %s"
         " -n %d"
         " %s",
-//                              " --log_prefix=false ",
         FLAGS_hostfile.c_str(),
         FLAGS_workers,
         JoinString(&argv[0], &argv[argc]).c_str());

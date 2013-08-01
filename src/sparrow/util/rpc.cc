@@ -363,6 +363,7 @@ void NetworkThread::_RegisterCallback(int message_type, Message *req,
 }
 
 void NetworkThread::SpawnThreadFor(int req_type) {
+  CHECK(callbacks_[req_type] != NULL);
   callbacks_[req_type]->spawn_thread = true;
 }
 

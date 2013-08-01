@@ -37,7 +37,6 @@ public:
   }
 
   void CheckForMasterUpdates();
-  void CheckNetwork();
 
   void create_table(const CreateTableRequest& req, EmptyMessage* resp, const rpc::RPCInfo& rpc);
   void get(const HashGet& get_req, TableData *get_resp,
@@ -48,12 +47,10 @@ public:
   void assign_shards(const ShardAssignmentRequest& req,
                              EmptyMessage *resp, const rpc::RPCInfo& rpc);
 
-  void handle_put_request();
+  void check_network();
 
   // Barrier: wait until all table data is transmitted.
   void flush(const EmptyMessage& req, FlushResponse *resp,
-                   const rpc::RPCInfo& rpc);
-  void apply(const EmptyMessage& req, EmptyMessage *resp,
                    const rpc::RPCInfo& rpc);
   void HandleStartCheckpointAsync(const CheckpointRequest& req,
                                   EmptyMessage* resp, const rpc::RPCInfo& rpc);

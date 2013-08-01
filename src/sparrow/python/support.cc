@@ -21,9 +21,6 @@ public:
   }
 
   void run() {
-    Table* t = get_table(table_id());
-    Shard* s = t->shard(shard_id());
-
     active_kernel = this;
     PyRun_SimpleString("import sparrow; sparrow._bootstrap_kernel()");
   }
@@ -31,10 +28,11 @@ public:
 REGISTER_KERNEL(PythonKernel);
 
 
-void map_shards(Master* m, Table* t, const std::string& fn) {
+void _map_shards(Master* m, Table* t, const std::string& fn, const std::string& args) {
   sparrow::RunDescriptor r;
   r.kernel = "PythonKernel";
   r.args["map_fn"] = fn;
+  r.args["map_args"] = args;
   r.table = t;
   r.shards = sparrow::range(0, t->num_shards());
   m->run(r);

@@ -1,5 +1,5 @@
-#ifndef KERNELREGISTRY_H_
-#define KERNELREGISTRY_H_
+#ifndef SPARROW_KERNEL_H
+#define SPARROW_KERNEL_H
 
 #include "sparrow/table.h"
 
@@ -8,6 +8,7 @@
 #include "sparrow/sparrow.pb.h"
 
 #include <map>
+#include <string>
 
 namespace sparrow {
 
@@ -17,8 +18,11 @@ class Table;
 
 class Kernel {
 public:
+  virtual ~Kernel() {
+
+  }
   typedef boost::scoped_ptr<Kernel> ScopedPtr;
-  typedef std::map<string, string> ArgMap;
+  typedef std::map<std::string, std::string> ArgMap;
 
   // The table and shard being processed.
   int shard_id() const {
@@ -61,6 +65,5 @@ private:
 #define REGISTER_KERNEL(klass)\
   static TypeRegistry<Kernel>::Helper<klass> k_helper_ ## klass(#klass);
 
-
 }
-#endif /* KERNELREGISTRY_H_ */
+#endif /* SPARROW_KERNEL_H */

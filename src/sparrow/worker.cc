@@ -65,14 +65,10 @@ Worker::Worker(const ConfigData &c) {
   rpc::RegisterCallback(MessageTypes::WORKER_FLUSH, new EmptyMessage,
       new FlushResponse, &Worker::flush, this);
 
-  rpc::RegisterCallback(MessageTypes::WORKER_APPLY, new EmptyMessage,
-      new EmptyMessage, &Worker::apply, this);
-
   rpc::RegisterCallback(MessageTypes::RESTORE, new StartRestore,
       new EmptyMessage, &Worker::restore, this);
 
   rpc::NetworkThread::Get()->SpawnThreadFor(MessageTypes::WORKER_FLUSH);
-  rpc::NetworkThread::Get()->SpawnThreadFor(MessageTypes::WORKER_APPLY);
 }
 
 int Worker::peer_for_shard(int table, int shard) const {
@@ -104,14 +100,15 @@ void Worker::KernelLoop() {
 
     while (!network_->TryRead(config_.master_id(), MessageTypes::RUN_KERNEL,
         &kreq)) {
-      CheckNetwork();
+      check_network();
       Sleep(FLAGS_sleep_time);
 
       if (!running_) {
         return;
       }
-
     }
+
+    check_network();
 
     kernel_active_ = true; //a kernel is running
     stats_["idle_time"] += idle.elapsed();
@@ -146,26 +143,10 @@ void Worker::KernelLoop() {
     kernel_active_ = false;
     network_->Send(config_.master_id(), MessageTypes::KERNEL_DONE, kd);
 
+    check_network();
+
     DumpProfile();
   }
-}
-
-void Worker::CheckNetwork() {
-  Timer net;
-  CheckForMasterUpdates();
-  handle_put_request();
-
-  // Flush any tables we no longer own.
-  for (unordered_set<Table*>::iterator i = dirty_tables_.begin();
-      i != dirty_tables_.end(); ++i) {
-    Table* mg = *i;
-    if (mg) {
-      mg->send_updates();
-    }
-  }
-
-  dirty_tables_.clear();
-  stats_["network_time"] += net.elapsed();
 }
 
 int64_t Worker::pending_writes() const {
@@ -384,8 +365,17 @@ void Worker::restore(const StartRestore& req, EmptyMessage* resp,
   LOG(INFO)<< "State restored. Current epoch is >= " << epoch << ".";
 }
 
-void Worker::handle_put_request() {
+void Worker::check_network() {
   boost::recursive_try_mutex::scoped_lock sl(state_lock_);
+
+  Timer net;
+  CheckForMasterUpdates();
+
+  for (auto i : tables_) {
+    i.second->send_updates();
+  }
+
+  dirty_tables_.clear();
 
   TableData put;
   while (network_->TryRead(rpc::ANY_SOURCE, MessageTypes::PUT_REQUEST, &put)) {
@@ -394,8 +384,8 @@ void Worker::handle_put_request() {
       continue;
     }
 
-    VLOG(2) << "Read put request of size: " << put.kv_data_size() << " for "
-               << MP(put.table(), put.shard());
+    LOG(INFO)<< "Read put request of size: " << put.kv_data_size() << " for "
+    << MP(put.table(), put.shard());
 
     Table *t = tables_[put.table()];
 
@@ -421,6 +411,8 @@ void Worker::handle_put_request() {
       t->shard_info(put.shard())->clear_tainted();
     }
   }
+
+  stats_["network_time"] += net.elapsed();
 }
 
 void Worker::get(const HashGet& get_req, TableData *get_resp,
@@ -437,11 +429,15 @@ void Worker::get(const HashGet& get_req, TableData *get_resp,
   {
     Table *t = tables_[get_req.table()];
     if (!t->contains(get_req.key())) {
+      LOG(INFO) << "Not found: " << get_req.key();
       get_resp->set_missing_key(true);
     } else {
       KV* a = get_resp->add_kv_data();
+      get_resp->set_missing_key(false);
       a->set_key(get_req.key());
       a->set_value(t->get(get_req.key()));
+
+      LOG(INFO) << "Get response: " << a->key() << " : " << a->value().size();
     }
   }
 
@@ -509,6 +505,8 @@ void Worker::flush(const EmptyMessage& req, FlushResponse *resp,
     const rpc::RPCInfo& rpc) {
   Timer net;
 
+  check_network();
+
   int updates_sent = 0;
   for (auto i : tables_) {
     Table* t = i.second;
@@ -526,18 +524,6 @@ void Worker::flush(const EmptyMessage& req, FlushResponse *resp,
   stats_["network_time"] += net.elapsed();
 }
 
-void Worker::apply(const EmptyMessage& req, EmptyMessage *resp,
-    const rpc::RPCInfo& rpc) {
-  if (kernel_active_) {
-    LOG(FATAL)<< "Received APPLY message while still running!?!";
-    return;
-  }
-
-  handle_put_request();
-
-  network_->Send(config_.master_id(), MessageTypes::WORKER_APPLY_DONE, *resp);
-}
-
 void Worker::CheckForMasterUpdates() {
   boost::recursive_mutex::scoped_lock sl(state_lock_);
 
@@ -547,7 +533,7 @@ void Worker::CheckForMasterUpdates() {
 
   if (network_->TryRead(config_.master_id(), MessageTypes::WORKER_SHUTDOWN,
       &empty)) {
-    LOG(INFO) << "Shutting down worker " << config_.worker_id();
+    LOG(INFO)<< "Shutting down worker " << config_.worker_id();
     running_ = false;
     return;
   }

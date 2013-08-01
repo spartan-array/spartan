@@ -18,11 +18,13 @@
 
 namespace sparrow {
 
+// How many entries to prefetch for remote iterators.
+// TODO(power) -- this should be changed to always fetch
+// X MB.
 static const int kDefaultIteratorFetch = 2048;
 
-class HashGet;
-class TableData;
-class TableDescriptor;
+// Flush changes after this writes.
+static const int kDefaultFlushFrequency = 1000000;
 
 typedef std::string TableKey;
 typedef std::string TableValue;
@@ -59,17 +61,14 @@ struct Sharder {
   virtual int shard_for_key(const TableKey& k, int num_shards) const = 0;
 };
 
-// This interface is used by global tables to communicate with the outside
+// This interface is used by tables to communicate with the outside
 // world and determine the current state of a computation.
 struct TableHelper {
-  virtual ~TableHelper() {
-
-  }
-
+  virtual ~TableHelper() {}
   virtual int id() const = 0;
   virtual int epoch() const = 0;
   virtual int peer_for_shard(int table, int shard) const = 0;
-  virtual void handle_put_request() = 0;
+  virtual void check_network() = 0;
 };
 
 struct Sharding {
@@ -93,6 +92,7 @@ public:
 
 class Checkpointable {
 public:
+  virtual ~Checkpointable() {}
   virtual void start_checkpoint(const string& f, bool delta) = 0;
   virtual void finish_checkpoint() = 0;
   virtual void restore(const string& f) = 0;
@@ -102,10 +102,6 @@ public:
 class Shard: public boost::unordered_map<TableKey, TableValue> {
 };
 
-// Flush changes after this writes.
-static const int kDefaultFlushFrequency = 1000000;
-
-class PartitionInfo;
 class Table {
 private:
   struct CacheEntry {
@@ -206,7 +202,6 @@ public:
   TableIterator* get_iterator(int shard);
 
   void update_partitions(const PartitionInfo& sinfo);
-  void apply_updates(const sparrow::TableData& req);
   int send_updates();
   void handle_put_requests();
   int pending_writes();

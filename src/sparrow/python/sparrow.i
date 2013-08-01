@@ -2,18 +2,52 @@
 
 %module sparrow
 
-%include <std_string.i>
 %include <std_map.i>
 %include <std_vector.i>
+%include <std_string.i>
+
 %include "numpy.i"
 
 %{
 #include "sparrow/kernel.h"
 #include "sparrow/master.h"
 #include "sparrow/worker.h"
+#include "sparrow/table.h"
 #include "sparrow/sparrow.pb.h"
 #include "sparrow/python/support.h"
 %}
+
+
+namespace std {
+  %template(ArgMap) map<string, string>;
+}
+
+%typemap(in) const std::string& {
+  if (PyObject_CheckBuffer($input)) {
+    Py_buffer view;
+    PyObject_GetBuffer($input, &view, PyBUF_ANY_CONTIGUOUS);
+    $1 = new string((char*)view.buf, view.len);
+  } else if (PyString_Check($input)) {
+    char *data; 
+    Py_ssize_t len;
+    PyString_AsStringAndSize($input, &data, &len);
+    $1 = new string(data, len);
+  } else {
+    $1 = NULL;
+    SWIG_exception(SWIG_ValueError, "Expected string or buffer.");
+  }
+
+//  LOG(INFO) << "Input: " << $1->size();
+}
+
+%typemap(freearg) const std::string& {
+  delete $1;
+}
+
+%typemap(out) const std::string& {
+//  LOG(INFO) << "Result size: " << $1->size();
+  $result = PyBuffer_FromMemory((void*)$1->data(), $1->size());
+}
 
 // Allow passing in sys.argv to init()
 %typemap(in) (int argc, char *argv[]) {
@@ -45,23 +79,15 @@ namespace sparrow {
 typedef std::string TableKey;
 typedef std::string TableValue;
 
-class Kernel;
+class TableData;
+class PartitionInfo;
 
-class Table {
-private:
-  Table();
-public:
-  int id();
+}
 
-  void put(const TableKey& k, const TableValue& v);
-  void update(const TableKey& k, const TableValue& v);
+%include "sparrow/table.h"
+%include "sparrow/kernel.h"
 
-  const TableValue& get(const TableKey& k);
-  bool contains(const TableKey& k);
-  void remove(const TableKey& k);
-  void clear();
-};
-
+namespace sparrow {
 class Master {
 private:
   Master();
@@ -77,11 +103,16 @@ public:
 
 %include "support.h"
 
-%pythoncode %{
-def _bootstrap_kernel():
-  import cPickle
-  code_str = get_kernel_code()
-  code_fn = cPickle.loads(code_str)
-  code_fn()
-%}
 
+%pythoncode %{
+import cPickle
+
+def _bootstrap_kernel():
+  kernel = get_kernel()
+  fn = cPickle.loads(kernel.args()['map_fn'])
+  args = cPickle.loads(kernel.args()['map_args'])
+  fn(*args)
+  
+def map_shards(master, table, fn, args):
+  _map_shards(master, table, cPickle.dumps(fn, -1), cPickle.dumps(args, -1))
+%}
