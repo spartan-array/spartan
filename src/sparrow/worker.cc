@@ -391,7 +391,7 @@ void Worker::check_network() {
 
     for (int i = 0; i < put.kv_data_size(); ++i) {
       const KV& kv = put.kv_data(i);
-      t->put(kv.key(), kv.value());
+      t->update(kv.key(), kv.value());
     }
 
     VLOG(3) << "Finished ApplyUpdate from handle_put_request";

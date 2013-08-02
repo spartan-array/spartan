@@ -7,6 +7,7 @@ using namespace sparrow;
 class AccumKernel: public Kernel {
 public:
   void run() {
+    LOG(INFO) << "Table: " << table_id() << " : " << shard_id();
     Table* t = get_table(this->table_id());
     for (int i = 0; i < 100; ++i) {
       t->update(prim_to_string(0), prim_to_string(i));

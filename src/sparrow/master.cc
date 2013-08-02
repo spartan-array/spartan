@@ -536,6 +536,9 @@ void Master::barrier() {
       finished_++;
     }
   }
+
+  // Force workers to flush outputs.
+  check_network();
   mstats.set_total_time(mstats.total_time() + Now() - current_run_start_);
   LOG(INFO)<< "Kernel '" << current_run_.kernel << "' finished in " << Now() - current_run_start_;
 }
