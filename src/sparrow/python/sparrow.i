@@ -76,9 +76,6 @@ namespace std {
 
 namespace sparrow {
 
-typedef std::string TableKey;
-typedef std::string TableValue;
-
 class TableData;
 class PartitionInfo;
 
@@ -93,8 +90,6 @@ private:
   Master();
 public:
   ~Master();
-  Table* create_table(std::string sharder_type = "Modulo",
-      std::string accum_type = "Replace");
 };
 
 %newobject init;

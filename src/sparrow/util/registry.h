@@ -58,7 +58,7 @@ public:
   }
 
   static T* get_by_id(int id) {
-    LOG(INFO)<< "Map size: " << get_map().size();
+    CHECK(get_map()[id] != NULL);
     return get_map()[id]->creator->create();
   }
 
@@ -101,6 +101,23 @@ typename TypeRegistry<T>::Map* TypeRegistry<T>::creator_map_ = NULL;
 } // namespace sparrow
 
 #define REGISTER_TYPE(BaseType, T)\
-  static sparrow::TypeRegistry::Helper<BaseType> register_type_<T>(#T); # T;
+  static sparrow::TypeRegistry<BaseType>::Helper<T> register_type_(#T); # T;
+
+#ifdef SWIG
+#define DECLARE_REGISTRY_HELPER(Base, Self)
+#define DEFINE_REGISTRY_HELPER(Base, Self)
+#define TMPL_DEFINE_REGISTRY_HELPER(Base, Self)
+#else
+#define DECLARE_REGISTRY_HELPER(Base, Self)\
+  static sparrow::TypeRegistry<Base>::Helper<Self> type_helper_;\
+  int type_id() { return type_helper_.id(); }
+
+#define DEFINE_REGISTRY_HELPER(Base, Self)\
+  sparrow::TypeRegistry<Base>::Helper<Self> Self::type_helper_;
+
+#define TMPL_DEFINE_REGISTRY_HELPER(Base, Self)\
+  template <class T>\
+  sparrow::TypeRegistry<Base>::Helper<Self<T> > Self<T>::type_helper_;
+#endif
 
 #endif

@@ -43,6 +43,11 @@ public:
 
   Table* get_table(int id);
 
+  template <class K, class V>
+  TableT<K, V>* get_typed(int id) {
+    return (TableT<K, V>*)get_table(id);
+  }
+
   void init(Worker *w, int t, int s, const ArgMap& args) {
     w_ = w;
     shard_ = s;

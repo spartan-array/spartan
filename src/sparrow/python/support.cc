@@ -38,10 +38,6 @@ void _map_shards(Master* m, Table* t, const std::string& fn, const std::string& 
   m->run(r);
 }
 
-PyObject* get(Table* t, const TableKey& k) {
-  const TableValue& v = t->get(k);
-  return PyBuffer_FromMemory((void*) v.data(), v.size());
-}
 
 Master* init(int argc, char* argv[]) {
   Init(argc, argv);

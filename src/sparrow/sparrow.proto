@@ -30,8 +30,9 @@ message EmptyMessage {
 }
 
 message CreateTableRequest {
-	required string accum_type = 2;
-	required string sharder_type = 3;
+	required int32 table_type = 1;
+	required int32 accum_type = 2;
+	required int32 sharder_type = 3;
 	required int32 num_shards = 4;
 	repeated int32 shards = 5;
 	required int32 id = 6;

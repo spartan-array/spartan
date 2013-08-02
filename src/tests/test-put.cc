@@ -7,7 +7,7 @@ using namespace sparrow;
 class PutKernel: public Kernel {
 public:
   void run() {
-    Table* t = get_table(0);
+    auto t = get_table(0)->cast<string, string>();
     if (shard_id() == 0) {
       std::string binary_val("WorldBinary");
       for (size_t i = 0; i < 100; ++i) {
@@ -27,7 +27,7 @@ public:
 class GetKernel: public Kernel {
 public:
   void run() {
-    Table* t = get_table(0);
+    TableT<string, string>* t = get_table(0)->cast<string, string>();
     LOG(INFO)<< shard_id() << " : " << t->get("Hello");
   }
 };
@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
   if (!StartWorker()) {
     Master m;
     LOG(INFO)<< "here.";
-    Table* t = m.create_table();
+    TableT<string, string>* t = m.create_table<string, string>();
     m.map_shards(t, "PutKernel");
     m.map_shards(t, "GetKernel");
 

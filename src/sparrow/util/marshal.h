@@ -121,16 +121,28 @@ public:
   }
 };
 
+template<>
+class Marshal<std::string> {
+public:
+  static bool read_value(Reader *r, std::string* v) {
+    return r->read_string(*v);
+  }
+
+  static void write_value(Writer *w, const std::string& v) {
+    w->write_string(v);
+  }
+};
+
 template<class T>
 bool read(T* v, StringPiece src) {
   StringReader r(src);
-  return v->read(&r);
+  return Marshal<T>::read_value(&r, v);
 }
 
 template<class T>
 void write(const T& v, string* out) {
   StringWriter w(out);
-  v.write(&w);
+  Marshal<T>::write_value(&w, v);
 }
 
 } // namespace sparrow

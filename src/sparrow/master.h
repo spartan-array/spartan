@@ -52,17 +52,23 @@ public:
     return network_->size() - 1;
   }
 
-  Table* create_table(
-      std::string sharder_type="Modulo",
-      std::string accum_type = "Replace") {
+  template<class K, class V>
+  TableT<K, V>* create_table(SharderT<K>* sharder = new Modulo<K>(),
+      AccumulatorT<V>* accum = new Replace<V>()) {
+
+    TableT<K, V>* t = new TableT<K, V>();
+
     CreateTableRequest req;
     int table_id = tables_.size();
+    req.set_table_type(t->type_id());
     req.set_id(table_id);
     req.set_num_shards(10);
-    req.set_accum_type(accum_type);
-    req.set_sharder_type(sharder_type);
+    req.set_accum_type(accum->type_id());
+    req.set_sharder_type(sharder->type_id());
 
-    Table* t = new Table(table_id, 10);
+    t->init(table_id, req.num_shards());
+    t->sharder = sharder;
+    t->accum = accum;
     t->set_helper(this);
 
     // Flush master writes immediately.

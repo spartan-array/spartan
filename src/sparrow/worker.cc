@@ -391,7 +391,7 @@ void Worker::check_network() {
 
     for (int i = 0; i < put.kv_data_size(); ++i) {
       const KV& kv = put.kv_data(i);
-      t->update(kv.key(), kv.value());
+      t->update_str(kv.key(), kv.value());
     }
 
     VLOG(3) << "Finished ApplyUpdate from handle_put_request";
@@ -428,14 +428,14 @@ void Worker::get(const HashGet& get_req, TableData *get_resp,
 
   {
     Table *t = tables_[get_req.table()];
-    if (!t->contains(get_req.key())) {
+    if (!t->contains_str(get_req.key())) {
       LOG(INFO) << "Not found: " << get_req.key();
       get_resp->set_missing_key(true);
     } else {
       KV* a = get_resp->add_kv_data();
       get_resp->set_missing_key(false);
       a->set_key(get_req.key());
-      a->set_value(t->get(get_req.key()));
+      a->set_value(t->get_str(get_req.key()));
 
       LOG(INFO) << "Get response: " << a->key() << " : " << a->value().size();
     }
@@ -485,8 +485,10 @@ void Worker::iterator_request(const IteratorRequest& iterator_req,
 
 void Worker::create_table(const CreateTableRequest& req, EmptyMessage *resp,
     const rpc::RPCInfo& rpc) {
-  Table* t = new Table(req.id(), req.num_shards());
-  t->accum = TypeRegistry<Accumulator>::get_by_name(req.accum_type());
+  Table* t = TypeRegistry<Table>::get_by_id(req.table_type());
+  t->init(req.id(), req.num_shards());
+  t->accum = TypeRegistry<Accumulator>::get_by_id(req.accum_type());
+  t->sharder = TypeRegistry<Sharder>::get_by_id(req.sharder_type());
   t->set_helper(this);
   tables_[req.id()] = t;
 }

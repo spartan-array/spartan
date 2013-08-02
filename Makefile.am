@@ -1,6 +1,6 @@
 CXX = mpic++
 LD = mpic++
-CXXFLAGS = -Wall -Wno-sign-compare -std=c++11 -O2 -fno-omit-frame-pointer
+CXXFLAGS = -Wall -Wno-sign-compare -std=c++11 -O2 -fno-omit-frame-pointer -ggdb2
 
 AM_LDFLAGS =  -Wl,--export-dynamic
 
@@ -9,8 +9,9 @@ LDFLAGS = -no-fast-install \
   -lm -ldl -lrdmacm -libverbs -lrt -lnsl -lutil -lprotobuf -lboost_thread \
   -lprofiler
 
-
 ACLOCAL_AMFLAGS = -I m4
+
+SPARROW = src/sparrow
 
 CPPFLAGS += \
   -I$(builddir)/src/ \
@@ -20,12 +21,14 @@ CPPFLAGS += \
   -I/home/power/pkg/openmpi-1.7/include \
   -I/usr/include/python2.7
 
+SWIG_INCLUDES = $(SPARROW)/table.h $(SPARROW)/master.h $(SPARROW)/worker.h
 
 BUILT_SOURCES = \
   src/sparrow/sparrow.pb.h \
   src/sparrow/python/_sparrow.cc
   
-$(builddir)/src/sparrow/python/_sparrow.cc : $(srcdir)/src/sparrow/python/sparrow.i
+$(builddir)/src/sparrow/python/_sparrow.cc : \
+  $(srcdir)/src/sparrow/python/sparrow.i $(SWIG_INCLUDES)
 	swig $(CPPFLAGS) -O -python -c++ -o $@ $< 
  
 $(builddir)/src/sparrow/sparrow.pb.cc $(builddir)/src/sparrow/sparrow.pb.h : $(srcdir)/src/sparrow/sparrow.proto

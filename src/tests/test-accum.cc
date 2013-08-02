@@ -7,10 +7,10 @@ using namespace sparrow;
 class AccumKernel: public Kernel {
 public:
   void run() {
-    LOG(INFO) << "Table: " << table_id() << " : " << shard_id();
-    Table* t = get_table(this->table_id());
+    LOG(INFO)<< "Table: " << table_id() << " : " << shard_id();
+    auto t = get_typed<int, int>(this->table_id());
     for (int i = 0; i < 100; ++i) {
-      t->update(prim_to_string(0), prim_to_string(i));
+      t->update(0, i);
     }
   }
 };
@@ -23,21 +23,21 @@ int main(int argc, char** argv) {
     Master m;
 
     {
-      Table* t = m.create_table("Modulo", "intMin");
+      auto t = m.create_table<int, int>(new Modulo<int>, new Min<int>);
       m.map_shards(t, "AccumKernel");
-      LOG(INFO)<< "Master fetch: " << string_to_prim<int>(t->get(prim_to_string(0)));
+      LOG(INFO)<< "Master fetch: " << t->get(0);
     }
 
     {
-      Table* t = m.create_table("Modulo", "intMax");
+      auto t = m.create_table<int, int>(new Modulo<int>, new Max<int>);
       m.map_shards(t, "AccumKernel");
-      LOG(INFO)<< "Master fetch: " << string_to_prim<int>(t->get(prim_to_string(0)));
+      LOG(INFO)<< "Master fetch: " << t->get(0);
     }
 
     {
-      Table* t = m.create_table("Modulo", "intSum");
+      auto t = m.create_table<int, int>(new Modulo<int>, new Sum<int>);
       m.map_shards(t, "AccumKernel");
-      LOG(INFO)<< "Master fetch: " << string_to_prim<int>(t->get(prim_to_string(0)));
+      LOG(INFO)<< "Master fetch: " << t->get(0);
     }
   }
 }

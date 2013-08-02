@@ -9,8 +9,6 @@ namespace sparrow {
 
 void _map_shards(Master* m, Table* t, const std::string& fn, const std::string& args);
 
-PyObject* get(Table* t, const TableKey& k);
-
 Master* init(int argc, char* argv[]);
 
 Kernel* get_kernel();
