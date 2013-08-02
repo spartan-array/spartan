@@ -11,28 +11,32 @@ LDFLAGS = -no-fast-install \
 
 ACLOCAL_AMFLAGS = -I m4
 
-SPARROW = src/sparrow
+SPARROW = sparrow
 
 CPPFLAGS += \
-  -I$(builddir)/src/ \
-  -I$(srcdir)/src/ \
-  -I$(srcdir)/src/external/google-flags \
-  -I$(srcdir)/src/external/google-logging \
+  -I$(builddir)/ \
+  -I$(srcdir)/ \
+  -I$(srcdir)/external/google-flags \
+  -I$(srcdir)/external/google-logging \
   -I/home/power/pkg/openmpi-1.7/include \
   -I/usr/include/python2.7
 
-SWIG_INCLUDES = $(SPARROW)/table.h $(SPARROW)/master.h $(SPARROW)/worker.h
+SWIG_INCLUDES = \
+  $(SPARROW)/table.h\
+  $(SPARROW)/master.h\
+  $(SPARROW)/worker.h\
+  $(SPARROW)/python/support.h
 
 BUILT_SOURCES = \
-  src/sparrow/sparrow.pb.h \
-  src/sparrow/python/_sparrow.cc
+  sparrow/sparrow.pb.h \
+  sparrow/python/_sparrow.cc
   
-$(builddir)/src/sparrow/python/_sparrow.cc : \
-  $(srcdir)/src/sparrow/python/sparrow.i $(SWIG_INCLUDES)
+$(builddir)/sparrow/python/_sparrow.cc : \
+  $(srcdir)/sparrow/python/sparrow.i $(SWIG_INCLUDES)
 	swig $(CPPFLAGS) -O -python -c++ -o $@ $< 
  
-$(builddir)/src/sparrow/sparrow.pb.cc $(builddir)/src/sparrow/sparrow.pb.h : $(srcdir)/src/sparrow/sparrow.proto
-	protoc --proto_path=$(srcdir)/src/sparrow --cpp_out=$(dir $@) $^
+$(builddir)/sparrow/sparrow.pb.cc $(builddir)/sparrow/sparrow.pb.h : $(srcdir)/sparrow/sparrow.proto
+	protoc --proto_path=$(srcdir)/sparrow --cpp_out=$(dir $@) $^
 
 
 noinst_LIBRARIES = _sparrow.so
@@ -43,35 +47,35 @@ LDADD = libsparrow.la libgflags.la libglog.la
 libpysparrow_la_LIBADD = libsparrow.la libgflags.la libglog.la
 
 libgflags_la_SOURCES = \
-	src/external/google-flags/gflags.cc\
-	src/external/google-flags/gflags_reporting.cc\
-	src/external/google-flags/gflags_nc.cc
+	external/google-flags/gflags.cc\
+	external/google-flags/gflags_reporting.cc\
+	external/google-flags/gflags_nc.cc
 	
 libglog_la_SOURCES = \
-	src/external/google-logging/utilities.cc\
-	src/external/google-logging/vlog_is_on.cc\
-	src/external/google-logging/demangle.cc\
-	src/external/google-logging/logging.cc\
-	src/external/google-logging/raw_logging.cc\
-	src/external/google-logging/symbolize.cc\
-	src/external/google-logging/signalhandler.cc
+	external/google-logging/utilities.cc\
+	external/google-logging/vlog_is_on.cc\
+	external/google-logging/demangle.cc\
+	external/google-logging/logging.cc\
+	external/google-logging/raw_logging.cc\
+	external/google-logging/symbolize.cc\
+	external/google-logging/signalhandler.cc
 	
 libsparrow_la_SOURCES =\
-    src/sparrow/sparrow.pb.cc\
-	src/sparrow/util/stringpiece.cc\
-	src/sparrow/util/file.cc\
-	src/sparrow/util/registry.cc\
-	src/sparrow/util/rpc.cc\
-	src/sparrow/util/common.cc\
-	src/sparrow/table.cc\
-	src/sparrow/kernel.cc\
-	src/sparrow/worker.cc\
-	src/sparrow/master.cc
+    sparrow/sparrow.pb.cc\
+	sparrow/util/stringpiece.cc\
+	sparrow/util/file.cc\
+	sparrow/util/registry.cc\
+	sparrow/util/rpc.cc\
+	sparrow/util/common.cc\
+	sparrow/table.cc\
+	sparrow/kernel.cc\
+	sparrow/worker.cc\
+	sparrow/master.cc
 
 
 libpysparrow_la_SOURCES =\
-	src/sparrow/python/_sparrow.cc \
-    src/sparrow/python/support.cc
+	sparrow/python/_sparrow.cc \
+    sparrow/python/support.cc
 
 _sparrow_so_SOURCES =
 
@@ -80,5 +84,5 @@ _sparrow.so: libpysparrow.la
 	cp .libs/libpysparrow.so _sparrow.so
 
 
-test_put_SOURCES = src/tests/test-put.cc
-test_accum_SOURCES = src/tests/test-accum.cc
+test_put_SOURCES = tests/test-put.cc
+test_accum_SOURCES = tests/test-accum.cc

@@ -489,6 +489,10 @@ void Worker::create_table(const CreateTableRequest& req, EmptyMessage *resp,
   t->init(req.id(), req.num_shards());
   t->accum = TypeRegistry<Accumulator>::get_by_id(req.accum_type());
   t->sharder = TypeRegistry<Sharder>::get_by_id(req.sharder_type());
+
+  t->sharder->init(req.sharder_opts());
+  t->accum->init(req.accum_opts());
+
   t->set_helper(this);
   tables_[req.id()] = t;
 }

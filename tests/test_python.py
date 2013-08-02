@@ -1,25 +1,30 @@
 #!/usr/bin/env python
 
+import cPickle
+import os
 import subprocess
 import sys
-import os
-import cPickle
-import numpy as np
 
 try:
   import sparrow
-except ImportError:
-  print 'Skipping sparrow import.'
+except ImportError, e:
+  print 'Skipping sparrow import.', e 
+
+def py_sharder(k, num_shards):
+  return hash(k) % num_shards
+
+def py_accum(cur, update):
+  cur = update
 
 def test_init(master):
-  table = master.create_table()
+  table = sparrow.create_table(master, py_sharder, py_accum)
   
 def put_kernel():
   t = sparrow.get_table(sparrow.current_table_id())
   t.put('123', '456')
 
 def test_put_kernel(master):
-  table = master.create_table()
+  table = sparrow.create_table(master, py_sharder, py_accum)
   sparrow.map_shards(master, table, put_kernel, tuple())
   print table.get('123')
   
@@ -34,7 +39,8 @@ def get_shard_kernel():
     it.next()
 
 def test_build_array(master):
-  table = master.create_table()
+  import numpy as np
+  table = sparrow.create_table(master, py_sharder, py_accum)
   bytes = np.ndarray((1000, 1000), dtype=np.uint8)
   for i in range(10):
     for j in range(10):
@@ -54,6 +60,7 @@ def main():
   print 'Startup: ', flags.run_test
   
   if flags.run_test:
+    import yappi
     argv = ['python'] + argv
     master = sparrow.init(argv)
     print >> sys.stderr, 'RUNNING: ', flags.run_test, ' : ', argv
@@ -66,13 +73,14 @@ def main():
   
   # setup environment, and call MPI for each test
   tests = [k for k in globals().keys() if k.startswith('test_')]
+  #tests = ['test_init']
   for t in tests:
-    p = subprocess.Popen(['mpirun',
-                          '-x', 'PYTHONPATH',
-                          '-n', '2',
-                          'python', 'src/tests/test_python.py', 
-                          '--run_test=%s' % t,
-                          ] + argv, env=env)
+    p = subprocess.Popen(env = env,
+                         args=['mpirun', '-x', 'PYTHONPATH', '-n', '2',
+                          sys.executable, 'src/tests/test_python.py', '--run_test=%s' % t])
+                          #'xterm', '-e',
+                          #'valgrind %s src/tests/test_python.py --run_test=%s' % (sys.executable, t)
+                          #'gdb -ex run --args %s src/tests/test_python.py --run_test=%s' % (sys.executable, t)
     p.wait()
   
 if __name__ == '__main__':

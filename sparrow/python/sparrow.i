@@ -18,37 +18,6 @@
 %}
 
 
-namespace std {
-  %template(ArgMap) map<string, string>;
-}
-
-%typemap(in) const std::string& {
-  if (PyObject_CheckBuffer($input)) {
-    Py_buffer view;
-    PyObject_GetBuffer($input, &view, PyBUF_ANY_CONTIGUOUS);
-    $1 = new string((char*)view.buf, view.len);
-  } else if (PyString_Check($input)) {
-    char *data; 
-    Py_ssize_t len;
-    PyString_AsStringAndSize($input, &data, &len);
-    $1 = new string(data, len);
-  } else {
-    $1 = NULL;
-    SWIG_exception(SWIG_ValueError, "Expected string or buffer.");
-  }
-
-//  LOG(INFO) << "Input: " << $1->size();
-}
-
-%typemap(freearg) const std::string& {
-  delete $1;
-}
-
-%typemap(out) const std::string& {
-//  LOG(INFO) << "Result size: " << $1->size();
-  $result = PyBuffer_FromMemory((void*)$1->data(), $1->size());
-}
-
 // Allow passing in sys.argv to init()
 %typemap(in) (int argc, char *argv[]) {
   int i;
@@ -74,17 +43,15 @@ namespace std {
   if ($2) free($2);
 }
 
+
+namespace std {
+  %template(ArgMap) map<string, string>;
+}
+
 namespace sparrow {
 
 class TableData;
 class PartitionInfo;
-
-}
-
-%include "sparrow/table.h"
-%include "sparrow/kernel.h"
-
-namespace sparrow {
 class Master {
 private:
   Master();
@@ -94,10 +61,26 @@ public:
 
 %newobject init;
 
-} // namespace sparrow
+%typemap(in) (const RefPtr&) {
+  $1 = new RefPtr($input);
+}
 
+%typemap(freearg) (const RefPtr&) {
+  delete $1;
+}
+
+%typemap(out) (RefPtr) {
+  Py_INCREF($1.get());
+  $result = $1.get();
+}
+
+}
+
+%include "sparrow/table.h"
+%include "sparrow/kernel.h"
 %include "support.h"
 
+%template(PyTable) sparrow::TableT<RefPtr, RefPtr>;
 
 %pythoncode %{
 import cPickle

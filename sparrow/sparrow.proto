@@ -36,6 +36,9 @@ message CreateTableRequest {
 	required int32 num_shards = 4;
 	repeated int32 shards = 5;
 	required int32 id = 6;
+
+	optional bytes sharder_opts = 7;
+	optional bytes accum_opts = 8;
 }
 
 message KV {

@@ -133,18 +133,6 @@ public:
   }
 };
 
-template<class T>
-bool read(T* v, StringPiece src) {
-  StringReader r(src);
-  return Marshal<T>::read_value(&r, v);
-}
-
-template<class T>
-void write(const T& v, string* out) {
-  StringWriter w(out);
-  Marshal<T>::write_value(&w, v);
-}
-
 } // namespace sparrow
 
 #endif /* MARSHAL_H_ */

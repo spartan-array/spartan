@@ -40,16 +40,28 @@ static const int kDefaultFlushFrequency = 1000000;
 #endif
 
 // An instance of Marshal must be available for key and value types.
-
 namespace val {
-template <class T>
+
+template<class T>
+bool read(T* v, StringPiece src) {
+  StringReader r(src);
+  return Marshal<T>::read_value(&r, v);
+}
+
+template<class T>
+void write(const T& v, string* out) {
+  StringWriter w(out);
+  Marshal<T>::write_value(&w, v);
+}
+
+template<class T>
 std::string to_str(const T& v) {
   std::string out;
   write(v, &out);
   return out;
 }
 
-template <class T>
+template<class T>
 T from_str(const std::string& vstr) {
   T out;
   read(&out, vstr);
@@ -59,11 +71,24 @@ T from_str(const std::string& vstr) {
 } // namespace val
 
 class Sharder {
+public:
+  virtual ~Sharder() {
 
+  }
+  virtual void init(const std::string& opts) {
+
+  }
 };
 
 class Accumulator {
+public:
+  virtual ~Accumulator() {
 
+  }
+
+  virtual void init(const std::string& opts) {
+
+  }
 };
 
 template<class T>
@@ -335,32 +360,6 @@ public:
     return is_local_shard(shard_for_key(key));
   }
 
-  int64_t shard_size(int shard);
-
-// Fill in a response from a remote worker for the given key
-  bool tainted(int shard) {
-    return shard_info_[shard].tainted();
-  }
-
-  int worker_for_shard(int shard) const {
-    return shard_info_[shard].owner();
-  }
-
-  int num_shards() const {
-    return shards_.size();
-  }
-
-  int id() const {
-    return id_;
-  }
-
-  Shard* shard(int id) {
-    return shards_[id];
-  }
-
-  PartitionInfo* shard_info(int id) {
-    return &shard_info_[id];
-  }
 
   int shard_for_key(const K& k) {
     return ((SharderT<K>*) sharder)->shard_for_key(k, this->num_shards());
@@ -373,7 +372,7 @@ public:
   V get_local(const K& k) {
     int shard = this->shard_for_key(k);
     CHECK(is_local_shard(shard)) << " non-local for shard: " << shard;
-    return (*shards_[shard])[k];
+    return typed_shard(shard)[k];
   }
 
   void put(const K& k, const V& v) {

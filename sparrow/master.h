@@ -54,7 +54,8 @@ public:
 
   template<class K, class V>
   TableT<K, V>* create_table(SharderT<K>* sharder = new Modulo<K>(),
-      AccumulatorT<V>* accum = new Replace<V>()) {
+      AccumulatorT<V>* accum = new Replace<V>(), std::string sharder_opts = "",
+      std::string accum_opts = "") {
 
     TableT<K, V>* t = new TableT<K, V>();
 
@@ -65,6 +66,11 @@ public:
     req.set_num_shards(10);
     req.set_accum_type(accum->type_id());
     req.set_sharder_type(sharder->type_id());
+    req.set_sharder_opts(sharder_opts);
+    req.set_accum_opts(accum_opts);
+
+    sharder->init(sharder_opts);
+    accum->init(accum_opts);
 
     t->init(table_id, req.num_shards());
     t->sharder = sharder;
