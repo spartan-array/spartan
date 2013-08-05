@@ -6,7 +6,6 @@
 #include "sparrow/util/common.h"
 #include "sparrow/util/rpc.h"
 #include "sparrow/util/timer.h"
-#include "sparrow/util/tuple.h"
 #include "sparrow/sparrow.pb.h"
 
 #include <vector>

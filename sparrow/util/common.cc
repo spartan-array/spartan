@@ -1,3 +1,6 @@
+#include "gflags/gflags.h"
+#include "glog/logging.h"
+
 #include "sparrow/util/common.h"
 #include "sparrow/util/file.h"
 #include "sparrow/util/rpc.h"

@@ -1,18 +1,19 @@
 #ifndef UTIL_RPC_H
 #define UTIL_RPC_H
 
+#include <boost/thread.hpp>
+#include <boost/function.hpp>
+#include <boost/unordered_set.hpp>
+#include <google/protobuf/message.h>
+
+#include <deque>
+#include <string>
+#include <vector>
+
 #include "sparrow/util/common.h"
 #include "sparrow/util/file.h"
 #include "sparrow/util/stats.h"
-#include "sparrow/sparrow.pb.h"
-
-#include <boost/thread.hpp>
-#include <boost/function.hpp>
-#include <google/protobuf/message.h>
-
-#include <boost/unordered_set.hpp>
-
-#include <deque>
+#include "sparrow/util/stringpiece.h"
 
 namespace MPI {
   class Comm;

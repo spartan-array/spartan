@@ -1,14 +1,18 @@
+#include <set>
+#include <algorithm>
+#include <boost/tuple/tuple.hpp>
+#include <boost/tuple/tuple_io.hpp>
+
+#include "gflags/gflags.h"
+
 #include "sparrow/table.h"
 #include "sparrow/master.h"
 #include "sparrow/util/registry.h"
-#include "sparrow/util/tuple.h"
-
-#include <set>
-#include <algorithm>
 
 using std::map;
 using std::vector;
 using std::set;
+using namespace boost::tuples;
 
 DEFINE_string(dead_workers, "",
     "For failure testing; comma delimited list of workers to pretend have died.");
@@ -258,7 +262,7 @@ Master::Master() {
   vector<StringPiece> bits = StringPiece::split(FLAGS_dead_workers, ",");
 //  LOG(INFO) << "dead workers: " << FLAGS_dead_workers;
   for (size_t i = 0; i < bits.size(); ++i) {
-    LOG(INFO)<< MP(i, bits[i].AsString());
+    LOG(INFO)<< make_pair(i, bits[i].AsString());
     dead_workers.insert(strtod(bits[i].AsString().c_str(), NULL));
   }
 }
@@ -317,7 +321,7 @@ WorkerState* Master::assign_worker(int table, int shard) {
   int64_t work_size = 1;
 
   if (ws) {
-    VLOG(1) << "Worker for shard: " << MP(table, shard, ws->id);
+    VLOG(1) << "Worker for shard: " << make_tuple(table, shard, ws->id);
     ws->assign_task(new TaskState(Taskid(table, shard), work_size));
     return ws;
   }
@@ -333,10 +337,10 @@ WorkerState* Master::assign_worker(int table, int shard) {
   CHECK(best != NULL)
                          << "Ran out of workers!  Increase the number of partitions per worker!";
 
-//  LOG(INFO) << "Assigned " << MP(table, shard, best->id);
+//  LOG(INFO) << "Assigned " << make_tuple(table, shard, best->id);
   CHECK(best->alive());
 
-  VLOG(1) << "Assigning " << MP(table, shard) << " to " << best->id;
+  VLOG(1) << "Assigning " << make_tuple(table, shard) << " to " << best->id;
   best->assign_shard(tables_, shard, true);
   return best;
 }
@@ -411,7 +415,7 @@ bool Master::steal_work(const RunDescriptor& r, int idle_worker,
   task->stolen = true;
 
   LOG(INFO)<< "Worker " << idle_worker << " is stealing task "
-  << MP(tid.shard, task->size) << " from worker " << src.id;
+  << make_tuple(tid.shard, task->size) << " from worker " << src.id;
   dst.assign_shard(tables_, tid.shard, true);
   src.assign_shard(tables_, tid.shard, false);
 
@@ -539,6 +543,10 @@ void Master::barrier() {
 
   // Force workers to flush outputs.
   check_network();
+
+  // Force workers to apply flushed updates.
+  check_network();
+
   mstats.set_total_time(mstats.total_time() + Now() - current_run_start_);
   LOG(INFO)<< "Kernel '" << current_run_.kernel << "' finished in " << Now() - current_run_start_;
 }

@@ -1,19 +1,23 @@
+#include <mpi.h>
+#include <signal.h>
+
+#include <boost/tuple/tuple.hpp>
+#include <boost/tuple/tuple_io.hpp>
+
+#include "glog/logging.h"
+
 #include "sparrow/util/rpc.h"
 #include "sparrow/util/common.h"
 #include "sparrow/util/hash.h"
 #include "sparrow/util/timer.h"
-#include "sparrow/util/tuple.h"
 
 #include "sparrow/sparrow.pb.h"
-
-#include <mpi.h>
-#include <signal.h>
 
 DECLARE_bool(localtest);
 DECLARE_double(sleep_time);
 
-using
-boost::unordered_set;
+using boost::unordered_set;
+using namespace boost::tuples;
 
 namespace sparrow {
 namespace rpc {
@@ -117,13 +121,16 @@ void NetworkThread::CollectActive() {
   VLOG(3) << "Pending sends: " << active_sends_.size();
   while (i != active_sends_.end()) {
     RPCRequest *r = (*i);
-    VLOG(3) << "Pending: " << MP(id(), MP(r->target, r->rpc_type));
+    VLOG(3) << "Pending: " << make_tuple(id(), make_tuple(r->target, r->rpc_type
+    ));
     if (r->finished()) {
       if (r->failures > 0) {
-        LOG(INFO)<< "Send " << MP(id(), r->target) << " of size " << r->payload.size()
-        << " succeeded after " << r->failures << " failures.";
+        LOG(INFO)<< "Send " << make_tuple(id(), r->target) << " of size "
+        << r->payload.size() << " succeeded after " << r->failures
+        << " failures.";
       }
-      VLOG(3) << "Finished send to " << r->target << " of size " << r->payload.size();
+      VLOG(3) << "Finished send to " << r->target << " of size "
+      << r->payload.size();
       delete r;
       i = active_sends_.erase(i);
       continue;
@@ -289,7 +296,7 @@ void NetworkThread::Call(int dst, int method, const Message &msg,
 // Enqueue the given request for transmission.
 void NetworkThread::Send(RPCRequest *req) {
   boost::recursive_mutex::scoped_lock sl(send_lock);
-//    LOG(INFO) << "Sending... " << MP(req->target, req->rpc_type);
+//    LOG(INFO) << "Sending... " << make_tuplereq->target, req->rpc_type);
   stats["bytes_sent"] += req->payload.size();
   stats[StringPrintf("sends.%s",
       MessageTypes::T_Name((MessageTypes::T) (req->rpc_type)).c_str())] += 1;
@@ -358,7 +365,8 @@ void NetworkThread::_RegisterCallback(int message_type, Message *req,
   cbinfo->resp = resp;
   cbinfo->call = cb;
 
-  CHECK_LT(message_type, kMaxMethods)<< "Message type: " << message_type << " over limit.";
+  CHECK_LT(message_type, kMaxMethods)<< "Message type: " << message_type
+  << " over limit.";
   callbacks_[message_type] = cbinfo;
 }
 

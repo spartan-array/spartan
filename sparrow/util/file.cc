@@ -1,8 +1,11 @@
-#include "sparrow/util/file.h"
-#include "sparrow/util/common.h"
-#include "google/protobuf/message.h"
 #include <stdio.h>
 #include <glob.h>
+
+#include "google/protobuf/message.h"
+#include "glog/logging.h"
+
+#include "sparrow/util/file.h"
+#include "sparrow/util/common.h"
 
 using std::min;
 using std::string;

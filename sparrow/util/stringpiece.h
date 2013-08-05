@@ -3,7 +3,6 @@
 
 #include <vector>
 #include <string>
-#include <memory.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdarg.h>
@@ -27,7 +26,9 @@ public:
   uint32_t hash() const;
   string AsString() const;
 
-  int size() const { return len; }
+  int size() const {
+    return len;
+  }
 
   const char* data;
   int len;
@@ -39,9 +40,8 @@ static inline bool operator==(const StringPiece& a, const StringPiece& b) {
   return a.data == b.data && a.len == b.len;
 }
 
-static inline const char* strnstr(const char* haystack,
-                                  const char* needle,
-                                  int len) {
+static inline const char* strnstr(const char* haystack, const char* needle,
+    int len) {
   int nlen = strlen(needle);
   for (int i = 0; i < len - nlen; ++i) {
     if (strncmp(haystack + i, needle, nlen) == 0) {
@@ -51,13 +51,15 @@ static inline const char* strnstr(const char* haystack,
   return NULL;
 }
 
-template <class Iterator>
-string JoinString(Iterator start, Iterator end, string delim=" ") {
+template<class Iterator>
+string JoinString(Iterator start, Iterator end, string delim = " ") {
   string out;
   while (start != end) {
     out += *start;
     ++start;
-    if (start != end) { out += delim; }
+    if (start != end) {
+      out += delim;
+    }
   }
   return out;
 }
@@ -72,19 +74,12 @@ string ToString(int64_t);
 string ToString(string);
 string ToString(StringPiece);
 
+} // namespace sparrow
+
+namespace boost {
+static inline size_t hash_value(const sparrow::StringPiece& k) {
+  return k.hash();
 }
-
-#include <tr1/functional_hash.h>
-
-namespace std { namespace tr1 {
-template <>
-struct hash<sparrow::StringPiece> : public unary_function<sparrow::StringPiece, size_t> {
-  size_t operator()(const sparrow::StringPiece& k) const {
-    return k.hash();
-  }
-};
-}}
-
-
+} // namespace boost
 
 #endif /* STRING_H_ */

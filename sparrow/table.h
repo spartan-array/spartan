@@ -1,27 +1,30 @@
 #ifndef SPARROW_TABLE_H
 #define SPARROW_TABLE_H
 
-#include "sparrow/util/common.h"
-#include "sparrow/util/file.h"
-#include "sparrow/util/marshal.h"
-#include "sparrow/util/registry.h"
-#include "sparrow/util/rpc.h"
-#include "sparrow/util/tuple.h"
-#include "sparrow/util/timer.h"
-
-#include "sparrow/val.h"
-
 #include <map>
 #include <queue>
 
 #include <boost/functional/hash.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/thread.hpp>
+#include <boost/tuple/tuple.hpp>
 #include <boost/unordered_map.hpp>
+
+#include "glog/logging.h"
+
+#include "sparrow/util/common.h"
+#include "sparrow/util/file.h"
+#include "sparrow/util/marshal.h"
+#include "sparrow/util/registry.h"
+#include "sparrow/util/rpc.h"
+#include "sparrow/util/timer.h"
 
 #include "sparrow/sparrow.pb.h"
 
 namespace sparrow {
+
+using std::make_pair;
+using boost::make_tuple;
 
 // How many entries to prefetch for remote iterators.
 // TODO(power) -- this should be changed to always fetch
@@ -125,10 +128,19 @@ private:
 public:
   virtual ~TableIterator() {
   }
-  virtual std::string key() = 0;
-  virtual std::string value() = 0;
+  virtual std::string key_str() = 0;
+  virtual std::string value_str() = 0;
   virtual bool done() = 0;
   virtual void next() = 0;
+};
+
+template<class K, class V>
+class TypedIterator: public TableIterator {
+public:
+  virtual ~TypedIterator() {
+  }
+  virtual K key() = 0;
+  virtual V value() = 0;
 };
 
 class Checkpointable {
@@ -150,6 +162,8 @@ public:
 
 template<class K, class V>
 class TableT;
+
+class Master;
 
 class Table {
 protected:
@@ -176,6 +190,12 @@ public:
 
   TableHelper* helper() const {
     return helper_;
+  }
+
+  // Convenience method for getting a handle to the master (when
+  // running on the master host!)
+  Master* master() const {
+    return reinterpret_cast<Master*>(helper_);
   }
 
   bool tainted(int shard) {
@@ -231,7 +251,8 @@ public:
   virtual void update_str(const std::string&, const std::string&) = 0;
 };
 
-class RemoteIterator: public TableIterator {
+template<class K, class V>
+class RemoteIterator: public TypedIterator<K, V> {
 public:
   RemoteIterator(Table *table, int shard, uint32_t fetch_num =
       kDefaultIteratorFetch);
@@ -239,8 +260,16 @@ public:
   bool done();
   void next();
 
-  std::string key();
-  std::string value();
+  std::string key_str();
+  std::string value_str();
+
+  K key() {
+    return val::from_str<K>(key_str());
+  }
+
+  V value() {
+    return val::from_str<V>(value_str());
+  }
 
 private:
   Table* table_;
@@ -256,69 +285,126 @@ private:
 };
 
 template<class K, class V>
+class ShardT: public Shard {
+private:
+  typedef boost::unordered_map<K, V> Map;
+  Map data_;
+public:
+  typedef typename Map::iterator iterator;
+  iterator begin() {
+    return data_.begin();
+  }
+  iterator end() {
+    return data_.end();
+  }
+
+  iterator find(const K& k) {
+    return data_.find(k);
+  }
+
+  bool empty() const {
+    return data_.empty();
+  }
+
+  void clear() {
+    data_.clear();
+  }
+
+  V& operator[](const K& k) {
+    return data_[k];
+  }
+
+  size_t size() const {
+    return data_.size();
+  }
+};
+
+template<class K, class V>
+class LocalIterator: public TypedIterator<K, V> {
+private:
+  typename ShardT<K, V>::iterator begin_;
+  typename ShardT<K, V>::iterator cur_;
+  typename ShardT<K, V>::iterator end_;
+public:
+  LocalIterator(ShardT<K, V>& m) :
+      begin_(m.begin()), cur_(m.begin()), end_(m.end()) {
+
+  }
+
+  void next() {
+    ++cur_;
+  }
+
+  bool done() {
+    return cur_ == end_;
+  }
+
+  std::string key_str() {
+    return val::to_str(cur_->first);
+  }
+
+  std::string value_str() {
+    return val::to_str(cur_->second);
+  }
+
+  K key() {
+    return cur_->first;
+  }
+
+  V value() {
+    return cur_->second;
+  }
+};
+
+template<class K, class V>
+class MergedIterator: public TypedIterator<K, V> {
+private:
+  typedef std::vector<TypedIterator<K, V>*> IterList;
+  IterList iters_;
+
+  TypedIterator<K, V>* cur() {
+    return iters_.back();
+  }
+
+public:
+  MergedIterator(IterList iters) :
+      iters_(iters) {
+    while (!iters_.empty() && cur()->done()) {
+      iters_.pop_back();
+    }
+  }
+
+  void next() {
+    cur()->next();
+    while (!iters_.empty() && cur()->done()) {
+      iters_.pop_back();
+    }
+  }
+
+  bool done() {
+    return iters_.empty();
+  }
+
+  std::string key_str() {
+    return cur()->key_str();
+  }
+
+  std::string value_str() {
+    return cur()->value_str();
+  }
+
+  K key() {
+    return cur()->key();
+  }
+
+  V value() {
+    return cur()->value();
+  }
+};
+
+template<class K, class V>
 class TableT: public Table {
 public:
-  class ShardT: public Shard {
-  private:
-    typedef boost::unordered_map<K, V> Map;
-    Map data_;
-  public:
-    typedef typename Map::iterator iterator;
-    iterator begin() {
-      return data_.begin();
-    }
-    iterator end() {
-      return data_.end();
-    }
-
-    iterator find(const K& k) {
-      return data_.find(k);
-    }
-
-    bool empty() const {
-      return data_.empty();
-    }
-
-    void clear() {
-      data_.clear();
-    }
-
-    V& operator[](const K& k) {
-      return data_[k];
-    }
-
-    size_t size() const {
-      return data_.size();
-    }
-  };
-
-  class LocalIterator: public TableIterator {
-  private:
-    typename ShardT::iterator begin_;
-    typename ShardT::iterator cur_;
-    typename ShardT::iterator end_;
-  public:
-    LocalIterator(ShardT& m) :
-        begin_(m.begin()), cur_(m.begin()), end_(m.end()) {
-
-    }
-
-    void next() {
-      ++cur_;
-    }
-
-    bool done() {
-      return cur_ == end_;
-    }
-
-    std::string key() {
-      return val::to_str(cur_->first);
-    }
-
-    std::string value() {
-      return val::to_str(cur_->second);
-    }
-  };
 
   struct CacheEntry {
     double last_read_time;
@@ -344,7 +430,7 @@ public:
 
     shards_.resize(num_shards);
     for (int i = 0; i < num_shards; ++i) {
-      shards_[i] = new ShardT;
+      shards_[i] = new ShardT<K, V>;
     }
 
     shard_info_.resize(num_shards);
@@ -360,13 +446,12 @@ public:
     return is_local_shard(shard_for_key(key));
   }
 
-
   int shard_for_key(const K& k) {
     return ((SharderT<K>*) sharder)->shard_for_key(k, this->num_shards());
   }
 
-  ShardT& typed_shard(int id) {
-    return *((ShardT*) this->shards_[id]);
+  ShardT<K, V>& typed_shard(int id) {
+    return *((ShardT<K, V>*) this->shards_[id]);
   }
 
   V get_local(const K& k) {
@@ -396,8 +481,8 @@ public:
 
     GRAB_LOCK;;
 
-    ShardT& s = typed_shard(shard_id);
-    typename ShardT::iterator i = s.find(k);
+    ShardT<K, V>& s = typed_shard(shard_id);
+    typename ShardT<K, V>::iterator i = s.find(k);
     if (i == s.end()) {
       s[k] = v;
     } else {
@@ -425,15 +510,12 @@ public:
       }
     }
 
-    if (helper()->id() == -1) {
-      LOG(INFO)<< "is_local? : " << is_local_shard(shard);
-    }
     if (is_local_shard(shard)) {
       GRAB_LOCK;
       return typed_shard(shard)[k];
     }
 
-    LOG(INFO)<< "Remote fetch...";
+//    LOG(INFO) << "Remote fetch...";
     V* v = new V;
     get_remote(shard, k, v);
     return *v;
@@ -454,7 +536,7 @@ public:
     }
 
     if (is_local_shard(shard)) {
-      ShardT& s = (ShardT&) (*shards_[shard]);
+      ShardT<K, V>& s = (ShardT<K, V>&) (*shards_[shard]);
       return s.find(k) != s.end();
     }
 
@@ -464,7 +546,7 @@ public:
   }
 
   void remove(const K& k) {
-    LOG(FATAL)<< "Not implemented!";
+    LOG(FATAL) << "Not implemented!";
   }
 
   // Untyped operations:
@@ -485,14 +567,22 @@ public:
   }
 
   Shard* create_local(int shard_id) {
-    return new ShardT();
+    return new ShardT<K, V>();
   }
 
-  TableIterator* get_iterator(int shard) {
+  TypedIterator<K, V>* get_iterator() {
+    vector<TypedIterator<K, V>*> iters;
+    for (int i = 0; i < num_shards(); ++i) {
+      iters.push_back(get_iterator(i));
+    }
+    return new MergedIterator<K, V>(iters);
+  }
+
+  TypedIterator<K, V>* get_iterator(int shard) {
     if (this->is_local_shard(shard)) {
-      return new LocalIterator((ShardT&)*(shards_[shard]));
+      return new LocalIterator<K, V>((ShardT<K, V>&) *(shards_[shard]));
     } else {
-      return new RemoteIterator(this, shard);
+      return new RemoteIterator<K, V>(this, shard);
     }
   }
 
@@ -523,14 +613,14 @@ public:
     req.set_shard(shard);
 
     if (!helper()) {
-      LOG(FATAL)<< "get_remote() failed: helper() undefined.";
+      LOG(FATAL) << "get_remote() failed: helper() undefined.";
     }
     int peer = helper()->peer_for_shard(id(), shard);
 
     DCHECK_GE(peer, 0);
     DCHECK_LT(peer, rpc::NetworkThread::Get()->size() - 1);
 
-    VLOG(2) << "Sending get request to: " << MP(peer, shard);
+    VLOG(2) << "Sending get request to: " << make_pair(peer, shard);
     rpc::NetworkThread::Get()->Call(peer + 1, MessageTypes::GET, req, &resp);
 
     if (resp.missing_key()) {
@@ -540,7 +630,7 @@ public:
     *v = val::from_str<V>(resp.kv_data(0).value());
 
     boost::recursive_mutex::scoped_lock sl(mutex());
-    CacheEntry c = {Now(), *v};
+    CacheEntry c = { Now(), *v };
     cache_[k] = c;
     return true;
   }
@@ -555,19 +645,19 @@ public:
   }
 
   void start_checkpoint(const string& f, bool deltaOnly) {
-    LOG(FATAL)<< "Not implemented.";
+    LOG(FATAL) << "Not implemented.";
   }
 
   void finish_checkpoint() {
-    LOG(FATAL)<< "Not implemented.";
+    LOG(FATAL) << "Not implemented.";
   }
 
   void write_delta(const TableData& d) {
-    LOG(FATAL)<< "Not implemented.";
+    LOG(FATAL) << "Not implemented.";
   }
 
   void restore(const string& f) {
-    LOG(FATAL)<< "Not implemented.";
+    LOG(FATAL) << "Not implemented.";
   }
 
   void handle_put_requests() {
@@ -580,7 +670,7 @@ public:
     TableData put;
     boost::recursive_mutex::scoped_lock sl(mutex());
     for (size_t i = 0; i < shards_.size(); ++i) {
-      ShardT* t = (ShardT*)shards_[i];
+      ShardT<K, V>* t = (ShardT<K, V>*) shards_[i];
       if (!is_local_shard(i) && (shard_info_[i].dirty() || !t->empty())) {
         // Always send at least one chunk, to ensure that we clear taint on
         // tables we own.
@@ -603,8 +693,9 @@ public:
           put.set_done(true);
 
           count += put.kv_data_size();
-          rpc::NetworkThread::Get()->Send(worker_for_shard(i) + 1, MessageTypes::PUT_REQUEST, put);
-        }while (!t->empty());
+          rpc::NetworkThread::Get()->Send(worker_for_shard(i) + 1,
+              MessageTypes::PUT_REQUEST, put);
+        } while (!t->empty());
 
         t->clear();
       }

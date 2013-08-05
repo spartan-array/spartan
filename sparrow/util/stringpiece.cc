@@ -1,8 +1,6 @@
 #include "sparrow/util/stringpiece.h"
 #include "sparrow/util/hash.h"
 
-#include "glog/logging.h"
-
 #include <stdarg.h>
 #include <stdio.h>
 

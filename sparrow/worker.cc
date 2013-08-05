@@ -1,12 +1,14 @@
-#include <boost/bind.hpp>
 #include <signal.h>
+
+#include <boost/bind.hpp>
+#include <boost/tuple/tuple.hpp>
+#include <boost/tuple/tuple_io.hpp>
 
 #include "sparrow/kernel.h"
 #include "sparrow/table.h"
 #include "sparrow/util/common.h"
 #include "sparrow/util/stats.h"
 #include "sparrow/util/timer.h"
-#include "sparrow/util/tuple.h"
 #include "sparrow/worker.h"
 
 DECLARE_double(sleep_time);
@@ -15,7 +17,8 @@ DEFINE_string(checkpoint_write_dir, "/var/tmp/piccolo-checkpoint", "");
 DEFINE_string(checkpoint_read_dir, "/var/tmp/piccolo-checkpoint", "");
 
 using
-boost::unordered_map;
+boost::make_tuple;
+using boost::unordered_map;
 using boost::unordered_set;
 
 namespace sparrow {
@@ -172,7 +175,8 @@ bool Worker::has_incoming_data() const {
 
 void Worker::UpdateEpoch(int peer, int peer_epoch) {
   boost::recursive_mutex::scoped_lock sl(state_lock_);
-  VLOG(1) << "Got peer marker: " << MP(peer, MP(epoch_, peer_epoch));
+  VLOG(1) << "Got peer marker: "
+             << make_tuple(peer, make_tuple(epoch_, peer_epoch));
 
   //continuous checkpointing behavior is a bit different
   if (active_checkpoint_ == CP_CONTINUOUS) {
@@ -182,7 +186,7 @@ void Worker::UpdateEpoch(int peer, int peer_epoch) {
 
   if (epoch_ < peer_epoch) {
     LOG(INFO)<< "Received new epoch marker from peer:"
-    << MP(epoch_, peer_epoch);
+    << make_tuple(epoch_, peer_epoch);
 
     checkpoint_tables_.clear();
     for (auto i : tables_) {
@@ -199,7 +203,7 @@ void Worker::UpdateEpoch(int peer, int peer_epoch) {
     if (peers_[i]->epoch != epoch_) {
       checkpoint_done = false;
       VLOG(1) << "Channel is out of date: " << i << " : "
-                 << MP(peers_[i]->epoch, epoch_);
+                 << make_tuple(peers_[i]->epoch, epoch_);
     }
   }
 
@@ -217,7 +221,7 @@ void Worker::UpdateEpochContinuous(int peer, int peer_epoch) {
     if (peers_[i]->epoch != epoch_) {
 //      checkpoint_done = false;
       VLOG(1) << "Channel is out of date: " << i << " : "
-                 << MP(peers_[i]->epoch, epoch_);
+                 << make_tuple(peers_[i]->epoch, epoch_);
     }
   }
 }
@@ -226,7 +230,7 @@ void Worker::StartCheckpoint(int epoch, CheckpointType type, bool deltaOnly) {
   boost::recursive_mutex::scoped_lock sl(state_lock_);
 
   if (epoch_ >= epoch) {
-    LOG(INFO)<< "Skipping checkpoint; " << MP(epoch_, epoch);
+    LOG(INFO)<< "Skipping checkpoint; " << make_tuple(epoch_, epoch);
     return;
   }
 
@@ -238,8 +242,8 @@ void Worker::StartCheckpoint(int epoch, CheckpointType type, bool deltaOnly) {
 
   for (auto i : tables_) {
     if (checkpoint_tables_.find(i.first) != checkpoint_tables_.end()) {
-      VLOG(1) << "Starting checkpoint... " << MP(id(), epoch_, epoch) << " : "
-                 << i.first;
+      VLOG(1) << "Starting checkpoint... " << make_tuple(id(), epoch_, epoch)
+                 << " : " << i.first;
       Checkpointable *t = dynamic_cast<Checkpointable*>(i.second);
       if (t == NULL && type == CP_INTERVAL) {
         VLOG(1) << "Removing read-only table from INTERVAL list";
@@ -275,7 +279,7 @@ void Worker::StartCheckpoint(int epoch, CheckpointType type, bool deltaOnly) {
 
   EmptyMessage req;
   network_->Send(config_.master_id(), MessageTypes::START_CHECKPOINT_DONE, req);
-  VLOG(1) << "Starting delta logging... " << MP(id(), epoch_, epoch);
+  VLOG(1) << "Starting delta logging... " << make_tuple(id(), epoch_, epoch);
 }
 
 void Worker::FinishCheckpoint(bool deltaOnly) {
@@ -384,12 +388,13 @@ void Worker::check_network() {
       continue;
     }
 
-    LOG(INFO)<< "Read put request of size: " << put.kv_data_size() << " for "
-    << MP(put.table(), put.shard());
+    VLOG(1) << "Read put request of size: " << put.kv_data_size() << " for "
+               << make_tuple(put.table(), put.shard());
 
     Table *t = tables_[put.table()];
 
     for (int i = 0; i < put.kv_data_size(); ++i) {
+//      LOG(INFO) << "Writing put to shard: " << put.shard();
       const KV& kv = put.kv_data(i);
       t->update_str(kv.key(), kv.value());
     }
@@ -407,7 +412,7 @@ void Worker::check_network() {
     }
 
     if (put.done() && t->shard_info(put.shard())->tainted()) {
-      VLOG(1) << "Clearing taint on: " << MP(put.table(), put.shard());
+      VLOG(1) << "Clearing taint on: " << make_tuple(put.table(), put.shard());
       t->shard_info(put.shard())->clear_tainted();
     }
   }
@@ -429,7 +434,7 @@ void Worker::get(const HashGet& get_req, TableData *get_resp,
   {
     Table *t = tables_[get_req.table()];
     if (!t->contains_str(get_req.key())) {
-      LOG(INFO) << "Not found: " << get_req.key();
+      VLOG(2) << "Not found: " << get_req.key();
       get_resp->set_missing_key(true);
     } else {
       KV* a = get_resp->add_kv_data();
@@ -437,11 +442,11 @@ void Worker::get(const HashGet& get_req, TableData *get_resp,
       a->set_key(get_req.key());
       a->set_value(t->get_str(get_req.key()));
 
-      LOG(INFO) << "Get response: " << a->key() << " : " << a->value().size();
+      VLOG(2) << "Get response: " << a->key() << " : " << a->value().size();
     }
   }
 
-  VLOG(2) << "Returning result for " << MP(get_req.table(), get_req.shard())
+  VLOG(2) << "Returning result for " << make_tuple(get_req.table(), get_req.shard())
   << " - found? " << !get_resp->missing_key();
 }
 
@@ -470,8 +475,8 @@ void Worker::iterator_request(const IteratorRequest& iterator_req,
   for (size_t i = 1; i <= iterator_req.row_count(); i++) {
     iterator_resp->set_done(it->done());
     if (!it->done()) {
-      iterator_resp->add_key(it->key());
-      iterator_resp->add_value(it->value());
+      iterator_resp->add_key(it->key_str());
+      iterator_resp->add_value(it->value_str());
       iterator_resp->set_row_count(i);
       if (i < iterator_req.row_count()) {
         it->next();
