@@ -1,7 +1,0 @@
-{
-   hashlittle
-   Memcheck:Addr4
-   fun:hashlittle
-   ...
-}
-
