@@ -1,0 +1,170 @@
+#!/usr/bin/env python
+
+import numpy as np
+import pytable
+
+from .. import util
+from . import extent, tile
+
+# number of elements to per dimension of a tile
+TILE_SIZE = 100
+
+def find_shape(extents):
+  return np.max([ex.lr for ex in extents])
+
+
+def get_data(data, index):
+  if isinstance(data, tuple):
+    return tuple([get_data(d, index) for d in data])
+  if not isinstance(data, np.ndarray):
+    data = np.array(data)
+  if not data.shape:
+    data = data.reshape((1,))
+  return data[index]
+
+
+def split_extent(array, tile_extent):
+#   util.log('Splitting tile %s', chunk.extent)
+  for ex in array.extents():
+    intersection = extent.intersection(ex, tile_extent)
+    if intersection is not None:
+      yield (ex, intersection)
+      
+
+def split_tile(array, tile_extent, tile_data):
+  for ex in split_extent(array, tile_extent):
+    intersection = extent.intersection(ex, tile_extent)
+    local_idx = tile_extent.local_offset(intersection)
+    yield (ex, intersection, get_data(tile_data, local_idx))
+       
+  
+def find_matching_tile(array, tile_extent):
+  for ex in array.extents():
+    ul_diff = tile_extent.ul - ex.ul
+    lr_diff = ex.lr - tile_extent.lr
+    if np.all(ul_diff >= 0) and np.all(lr_diff >= 0):
+      # util.log('%s matches %s', ex, tile_extent)
+      return array.tile_for_extent(ex)
+  
+  raise Exception, 'No matching tile_extent!' 
+
+def extent_from_slice(array, slice):
+  '''
+  :param array: Distarray
+  :param slice: A tuple of `slice` objects.
+  :rtype: `Extent`
+  '''
+  ul = []
+  sz = []
+  for dim, slc in enumerate(slice):
+    start, stop, step = slc.indices(array.shape[dim])
+    ul.append(start)
+    sz.append(stop - start)
+  
+  return extent.TileExtent(ul, sz, array.shape)
+
+
+def tile_accum(old, new_tile):
+  assert isinstance(old, tile.Tile)
+  assert isinstance(new_tile, tile.Tile)
+  
+  if old.data is None:
+    old._initialize()
+  
+  idx = old.extent.local_offset(new_tile.extent)
+  data = old.data[idx]
+  
+  invalid = old.mask[idx]
+  valid = ~old.mask[idx]
+  data[invalid] = new_tile.data[invalid]
+  old.mask[invalid] = False
+  if data[valid].size > 0:
+    data[valid] = new_tile.data[valid]
+
+def tjoin(tuple_a, tuple_b):
+  return 
+
+def compute_splits(shape):
+  my_splits = []
+  for i in range(0, shape[0], TILE_SIZE):
+    my_dim = (i, min(shape[0], i + TILE_SIZE))
+    my_splits.append([my_dim])
+
+  print shape
+  if len(shape) == 1:
+    return my_splits
+  
+  sub_splits = compute_splits(shape[1:])
+  out = []
+  
+  for i in my_splits:
+    for j in sub_splits:
+      out.append(i + j)
+  return out
+  
+class DistArray(object):
+  @staticmethod
+  def from_table(table):
+    d = DistArray()
+    d.table = table
+    d.extents = {}
+    
+    keys = pytable.keys(table)
+    it = keys.get_iterator()
+    while not it.done():
+      extent, _ = it.key(), it.value()
+      it.next()
+      
+      assert not (extent in d.extents)
+      d.extents[extent] = 1
+    
+    if not d.extents:
+      d.shape = tuple()
+    else:
+      d.shape = find_shape(d.extents.keys())
+    
+    return d
+  
+  @staticmethod
+  def create(master, shape, dtype=np.float):
+    total_elems = np.prod(shape)
+    splits = compute_splits(shape)
+    extents = []
+    for split in splits:
+      ul, lr = zip(*split)
+      sz = np.array(lr) - np.array(ul)
+      extents.append(extent.TileExtent(ul, sz, shape))
+
+    table = pytable.create_table(master, pytable.mod_sharder, tile_accum)
+    for ex in extents:
+      ex_tile = tile.make_tile(ex, None, dtype, masked=True)
+      table.put(ex, ex_tile)
+    
+    d = DistArray()
+    d.table = table
+    d.extents = extents
+    return d
+  
+  def _get(self, extent):
+    return self.table.get(extent)
+  
+  def ensure(self, region):
+    '''
+    Return a local numpy array for the given region.
+    
+    If necessary, data will be copied from remote hosts to fill the region.    
+    :param region: `Extent` indicating the region to fetch.
+    '''
+    splits = list(split_extent(self, region))
+    if len(splits) == 1:
+      ex, intersection = splits[0]
+      tile = self.get(ex)
+      return tile.data[ex.local_offset(intersection)]
+  
+  def __getitem__(self, key):
+    if isinstance(key, int):
+      return self[key:key + 1][0]
+    if not isinstance(key, tuple):
+      key = tuple(key)
+    
+    ex = extent.TileExtent.from_slice(self,)

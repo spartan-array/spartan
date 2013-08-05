@@ -14,7 +14,7 @@
 #include "sparrow/worker.h"
 #include "sparrow/table.h"
 #include "sparrow/sparrow.pb.h"
-#include "sparrow/python/support.h"
+#include "pytable/support.h"
 %}
 
 
@@ -61,6 +61,10 @@ public:
 
 %newobject init;
 
+%typemap(in) (RefPtr) {
+  $1 = RefPtr($input);
+}
+
 %typemap(in) (const RefPtr&) {
   $1 = new RefPtr($input);
 }
@@ -69,10 +73,21 @@ public:
   delete $1;
 }
 
+%typemap(out) (const RefPtr &) {
+  if ($1->get() != NULL) {
+    Py_INCREF($1->get());
+    $result = $1->get();
+  } else {
+    Py_INCREF(Py_None);
+    $result = Py_None;
+  }
+}
+
 %typemap(out) (RefPtr) {
   Py_INCREF($1.get());
   $result = $1.get();
 }
+
 
 }
 
@@ -80,17 +95,5 @@ public:
 %include "sparrow/kernel.h"
 %include "support.h"
 
-%template(PyTable) sparrow::TableT<RefPtr, RefPtr>;
-
-%pythoncode %{
-import cPickle
-
-def _bootstrap_kernel():
-  kernel = get_kernel()
-  fn = cPickle.loads(kernel.args()['map_fn'])
-  args = cPickle.loads(kernel.args()['map_args'])
-  fn(*args)
-  
-def map_shards(master, table, fn, args):
-  _map_shards(master, table, cPickle.dumps(fn, -1), cPickle.dumps(args, -1))
-%}
+%template(_PyTable) sparrow::TableT<RefPtr, RefPtr>;
+%template(_PyIterator) sparrow::TypedIterator<RefPtr, RefPtr>;

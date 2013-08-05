@@ -1,4 +1,4 @@
-#include "sparrow/python/support.h"
+#include "pytable/support.h"
 
 #include "sparrow/table.h"
 #include "sparrow/master.h"
@@ -29,7 +29,7 @@ RefPtr unpickle(const std::string& data) {
   RefPtr cPickle(check(PyImport_AddModule("cPickle")));
   RefPtr loads(check(PyObject_GetAttrString(cPickle.get(), "loads")));
   RefPtr py_str(check(PyString_FromStringAndSize(data.data(), data.size())));
-  LOG(INFO) << "Unpickle took " << t.elapsed() << " seconds.";
+//  LOG(INFO) << "Unpickle took " << t.elapsed() << " seconds.";
   return RefPtr(check(PyObject_CallFunction(loads.get(), "O", py_str.get())));
 }
 
@@ -45,7 +45,7 @@ std::string pickle(RefPtr p) {
   PyString_AsStringAndSize(py_str.get(), &v, &len);
   out.resize(len);
   memcpy(&out[0], v, len);
-  LOG(INFO) << "Pickle took " << t.elapsed() << " seconds.";
+//  LOG(INFO) << "Pickle took " << t.elapsed() << " seconds.";
   return out;
 }
 
@@ -95,33 +95,29 @@ public:
   }
 
   void accumulate(RefPtr* v, const RefPtr& update) const {
-    PyObject_CallFunction(code_.get(), "OO", v->get(), update.get());
+    RefPtr result(
+        PyObject_CallFunction(code_.get(), "OO", v->get(), update.get()));
+    *v = result;
   }
-
   DECLARE_REGISTRY_HELPER(Accumulator, PyAccum);
 };
 DEFINE_REGISTRY_HELPER(Accumulator, PyAccum);
 
 class PythonKernel: public Kernel {
 public:
-
-  std::string code() {
-    return args()["map_fn"];
-  }
-
   void run() {
-    active_kernel = this;
-    PyRun_SimpleString("import sparrow; sparrow._bootstrap_kernel()");
+    RefPtr fn(unpickle(args()["map_fn"]));
+    RefPtr fn_args(unpickle(args()["map_args"]));
+    PyObject_CallFunction(fn.get(), "lO", this, fn_args.get());
   }
 };
 REGISTER_KERNEL(PythonKernel);
 
-void _map_shards(Master* m, Table* t, const std::string& fn,
-    const std::string& args) {
+void foreach_shard(Master* m, Table* t, PyObject* fn, PyObject* args) {
   sparrow::RunDescriptor r;
   r.kernel = "PythonKernel";
-  r.args["map_fn"] = fn;
-  r.args["map_args"] = args;
+  r.args["map_fn"] = pickle(fn);
+  r.args["map_args"] = pickle(args);
   r.table = t;
   r.shards = sparrow::range(0, t->num_shards());
   m->run(r);
@@ -135,31 +131,22 @@ Master* init(int argc, char* argv[]) {
   return NULL;
 }
 
-PyTable* get_table(int id) {
-  return (PyTable*)active_kernel->get_table(id);
-}
-
-int current_table_id() {
-  return active_kernel->table_id();
-}
-
-int current_shard_id() {
-  return active_kernel->shard_id();
-}
-
-Kernel* get_kernel() {
-  return active_kernel;
-}
-
-std::string get_kernel_code() {
-  return active_kernel->code();
-}
-
-TableT<RefPtr, RefPtr>* create_table(Master* m, PyObject* sharder, PyObject* accum) {
+TableT<RefPtr, RefPtr>* create_table(Master* m, PyObject* sharder,
+    PyObject* accum) {
   Py_IncRef(sharder);
   Py_IncRef(accum);
   return m->create_table(new PySharder(), new PyAccum(), pickle(sharder),
       pickle(accum));
+}
+
+PyTable* get_table(Kernel* k, int id) {
+  return (PyTable*) ((k->get_table(id)));
+}
+
+// This is a round-about way of getting SWIG to wrap some function
+// arguments for us.
+Kernel* as_kernel(long ptr) {
+  return ((Kernel*) (ptr));
 }
 
 }

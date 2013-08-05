@@ -1,6 +1,5 @@
 import numpy as N
 
-
 class TileExtent(object):
   '''A rectangular tile of a distributed array.'''
   def __init__(self, ul, sz, array_shape):
@@ -82,7 +81,7 @@ class TileExtent(object):
   def local_offset(self, other):
     '''
     :param other: `TileExtent` into the same array.
-    :rtype: A tuple of local slices for this tile.
+    :rtype: A slice representing the local offsets of ``other`` into this tile.
     '''
     assert N.all(other.ul >= self.ul)
     assert N.all(other.sz + other.ul <= self.ul + self.sz)

@@ -1,11 +1,10 @@
 #ifndef PYTHON_SUPPORT_H
 #define PYTHON_SUPPORT_H
 
-#include "sparrow/master.h"
-#include "sparrow/worker.h"
 #include <boost/smart_ptr.hpp>
-
 #include <Python.h>
+
+#include "sparrow/table.h"
 
 #ifndef SWIG
 static inline void intrusive_ptr_add_ref(PyObject* p) {
@@ -25,24 +24,26 @@ static inline size_t hash_value(const RefPtr& p) {
 }
 
 static inline bool operator==(const RefPtr& a, const RefPtr& b) {
-  return PyObject_Compare(a.get(), b.get());
+  return PyObject_Compare(a.get(), b.get()) == 0;
 }
 #endif
 
 namespace sparrow {
+
+class Kernel;
+class Master;
+
 typedef TableT<RefPtr, RefPtr> PyTable;
 
-PyTable* create_table(Master*, PyObject* sharder, PyObject* accum);
-
-void _map_shards(Master* m, Table* t, const std::string& fn,
-    const std::string& args);
-
 Master* init(int argc, char* argv[]);
+PyTable* create_table(Master*, PyObject* sharder, PyObject* accum);
+void foreach_shard(Master* m, Table* t, PyObject* fn, PyObject* args);
 
-Kernel* get_kernel();
-PyTable* get_table(int id);
-int current_table_id();
-int current_shard_id();
+PyTable* get_table(Kernel* k, int id);
+
+// This is a round-about way of getting SWIG to wrap some function
+// arguments for us.
+Kernel* as_kernel(long ptr);
 
 } // namespace sparrow
 
