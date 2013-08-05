@@ -1,10 +1,8 @@
-CXX = mpic++
-LD = mpic++
-CXXFLAGS = -Wall -Wno-sign-compare -std=c++11 -O2 -fno-omit-frame-pointer -ggdb2
-
-AM_LDFLAGS =  -Wl,--export-dynamic
-
-LDFLAGS = -no-fast-install \
+AM_CXX = mpic++
+AM_LD = mpic++
+AM_CXXFLAGS = -Wall -Wno-sign-compare -std=c++11 -O2 -fno-omit-frame-pointer -ggdb2
+AM_LDFLAGS = \
+  -Wl,--export-dynamic -no-fast-install \
   -L/home/power/pkg/openmpi-1.7/lib -lmpi_cxx -lmpi -lopen-rte -lopen-pal \
   -lm -ldl -lrdmacm -libverbs -lrt -lnsl -lutil -lprotobuf -lboost_thread \
   -lprofiler
@@ -25,26 +23,26 @@ SWIG_INCLUDES = \
   $(SPARROW)/table.h\
   $(SPARROW)/master.h\
   $(SPARROW)/worker.h\
-  $(SPARROW)/python/support.h
+  pytable/support.h
 
 BUILT_SOURCES = \
   sparrow/sparrow.pb.h \
-  sparrow/python/_sparrow.cc
+  pytable/_sparrow.cc
   
-$(builddir)/sparrow/python/_sparrow.cc : \
-  $(srcdir)/sparrow/python/sparrow.i $(SWIG_INCLUDES)
+$(builddir)/pytable/_sparrow.cc : \
+  $(srcdir)/pytable/sparrow.i $(SWIG_INCLUDES)
 	swig $(CPPFLAGS) -O -python -c++ -o $@ $< 
  
 $(builddir)/sparrow/sparrow.pb.cc $(builddir)/sparrow/sparrow.pb.h : $(srcdir)/sparrow/sparrow.proto
 	protoc --proto_path=$(srcdir)/sparrow --cpp_out=$(dir $@) $^
 
 
-noinst_LIBRARIES = _sparrow.so
-lib_LTLIBRARIES = libsparrow.la libgflags.la libglog.la libpysparrow.la
-noinst_PROGRAMS = test-put test-accum
+lib_LTLIBRARIES = libsparrow.la libgflags.la libglog.la _sparrow.la
+noinst_PROGRAMS = test-put test-accum test-iterator
 
 LDADD = libsparrow.la libgflags.la libglog.la
-libpysparrow_la_LIBADD = libsparrow.la libgflags.la libglog.la
+_sparrow_la_LDFLAGS = -module
+_sparrow_la_LIBADD = libsparrow.la libgflags.la libglog.la
 
 libgflags_la_SOURCES = \
 	external/google-flags/gflags.cc\
@@ -73,16 +71,10 @@ libsparrow_la_SOURCES =\
 	sparrow/master.cc
 
 
-libpysparrow_la_SOURCES =\
-	sparrow/python/_sparrow.cc \
-    sparrow/python/support.cc
-
-_sparrow_so_SOURCES =
-
-
-_sparrow.so: libpysparrow.la
-	cp .libs/libpysparrow.so _sparrow.so
-
+_sparrow_la_SOURCES =\
+	pytable/_sparrow.cc \
+    pytable/support.cc
 
 test_put_SOURCES = tests/test-put.cc
 test_accum_SOURCES = tests/test-accum.cc
+test_iterator_SOURCES = tests/test-iterator.cc
