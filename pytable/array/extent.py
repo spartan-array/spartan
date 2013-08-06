@@ -13,7 +13,7 @@ class TileExtent(object):
   
   @property
   def shape(self):
-    return self.sz
+    return tuple(self.sz)
   
   def to_slice(self):
     return tuple([slice(ul, ul + sz, None) for ul, sz in zip(self.ul, self.sz)])

@@ -120,7 +120,7 @@ struct TableHelper {
   virtual int id() const = 0;
   virtual int epoch() const = 0;
   virtual int peer_for_shard(int table, int shard) const = 0;
-  virtual void check_network() = 0;
+  virtual void flush_network() = 0;
 };
 
 class TableIterator {
@@ -242,12 +242,11 @@ public:
   virtual void init(int id, int num_shards) = 0;
 
   virtual TableIterator* get_iterator(int shard_id) = 0;
-  virtual int send_updates() = 0;
+  virtual int flush() = 0;
 
   // Untyped (string, string) operations.
   virtual std::string get_str(const std::string&) = 0;
   virtual bool contains_str(const std::string&) = 0;
-  virtual void put_str(const std::string&, const std::string&) = 0;
   virtual void update_str(const std::string&, const std::string&) = 0;
 };
 
@@ -460,22 +459,6 @@ public:
     return typed_shard(shard)[k];
   }
 
-  void put(const K& k, const V& v) {
-    int shard_id = this->shard_for_key(k);
-
-    GRAB_LOCK;
-    this->typed_shard(shard_id)[k] = v;
-
-    if (!is_local_shard(shard_id)) {
-      ++pending_writes_;
-    }
-
-    if (pending_writes_ > flush_frequency) {
-      send_updates();
-      this->handle_put_requests();
-    }
-  }
-
   void update(const K& k, const V& v) {
     int shard_id = this->shard_for_key(k);
 
@@ -491,42 +474,14 @@ public:
 
     ++pending_writes_;
     if (pending_writes_ > flush_frequency) {
-      send_updates();
+      flush();
       this->handle_put_requests();
     }
   }
 
-  const V& get(const K& k) {
+  bool _get(const K& k, V* v) {
     int shard = this->shard_for_key(k);
 
-// If we received a request for this shard; but we haven't received all of the
-// data for it yet. Continue reading from other workers until we do.
-// New for triggers: be sure to not recursively apply updates.
-    if (tainted(shard)) {
-      GRAB_LOCK;
-      while (tainted(shard)) {
-        this->handle_put_requests();
-        sched_yield();
-      }
-    }
-
-    if (is_local_shard(shard)) {
-      GRAB_LOCK;
-      return typed_shard(shard)[k];
-    }
-
-//    LOG(INFO) << "Remote fetch...";
-    V* v = new V;
-    get_remote(shard, k, v);
-    return *v;
-  }
-
-  bool contains(const K& k) {
-    int shard = this->shard_for_key(k);
-
-// If we received a request for this shard; but we haven't received all of the
-// data for it yet. Continue reading from other workers until we do.
-// New for triggers: be sure to not recursively apply updates.
     if (tainted(shard)) {
       GRAB_LOCK;
       while (tainted(shard)) {
@@ -537,16 +492,38 @@ public:
 
     if (is_local_shard(shard)) {
       ShardT<K, V>& s = (ShardT<K, V>&) (*shards_[shard]);
-      return s.find(k) != s.end();
+      typename ShardT<K, V>::iterator i = s.find(k);
+      if (i == s.end()) {
+        return false;
+      }
+
+      if (v != NULL) {
+        *v = i->second;
+      }
+
+      return true;
     }
 
-    V v;
-    bool result = get_remote(shard, k, &v);
-    return result;
+    // Send any pending updates before trying to do a fetch.
+    // We could alternatively try and patch up the remote
+    // value with our local updates.
+    flush();
+
+    return get_remote(shard, k, v);
+  }
+
+  V get(const K& k) {
+    V out;
+    _get(k, &out);
+    return out;
+  }
+
+  bool contains(const K& k) {
+    return _get(k, NULL);
   }
 
   void remove(const K& k) {
-    LOG(FATAL) << "Not implemented!";
+    LOG(FATAL)<< "Not implemented!";
   }
 
   // Untyped operations:
@@ -556,10 +533,6 @@ public:
 
   std::string get_str(const std::string& k) {
     return val::to_str(get(val::from_str<K>(k)));
-  }
-
-  void put_str(const std::string& k, const std::string& v) {
-    put(val::from_str<K>(k), val::from_str<V>(v));
   }
 
   void update_str(const std::string& k, const std::string& v) {
@@ -627,10 +600,12 @@ public:
       return false;
     }
 
-    *v = val::from_str<V>(resp.kv_data(0).value());
+    if (v != NULL) {
+      *v = val::from_str<V>(resp.kv_data(0).value());
+    }
 
     boost::recursive_mutex::scoped_lock sl(mutex());
-    CacheEntry c = { Now(), *v };
+    CacheEntry c = {Now(), *v};
     cache_[k] = c;
     return true;
   }
@@ -661,10 +636,10 @@ public:
   }
 
   void handle_put_requests() {
-    helper()->check_network();
+    helper()->flush_network();
   }
 
-  int send_updates() {
+  int flush() {
     int count = 0;
 
     TableData put;
@@ -674,31 +649,30 @@ public:
       if (!is_local_shard(i) && (shard_info_[i].dirty() || !t->empty())) {
         // Always send at least one chunk, to ensure that we clear taint on
         // tables we own.
-        do {
-          put.Clear();
+        put.Clear();
 
-          for (auto j : *t) {
-            KV* put_kv = put.add_kv_data();
-            put_kv->set_key(val::to_str(j.first));
-            put_kv->set_value(val::to_str(j.second));
-          }
-          VLOG(3) << "Sending update from non-trigger table ";
-          t->clear();
-
-          put.set_shard(i);
-          put.set_source(helper()->id());
-          put.set_table(id());
-          put.set_epoch(helper()->epoch());
-
-          put.set_done(true);
-
-          count += put.kv_data_size();
-          rpc::NetworkThread::Get()->Send(worker_for_shard(i) + 1,
-              MessageTypes::PUT_REQUEST, put);
-        } while (!t->empty());
-
+        for (auto j : *t) {
+          KV* put_kv = put.add_kv_data();
+          put_kv->set_key(val::to_str(j.first));
+          put_kv->set_value(val::to_str(j.second));
+        }
         t->clear();
+
+        put.set_shard(i);
+        put.set_source(helper()->id());
+        put.set_table(id());
+        put.set_epoch(helper()->epoch());
+
+        put.set_done(true);
+
+        count += put.kv_data_size();
+        rpc::NetworkThread::Get()->Send(worker_for_shard(i) + 1,
+            MessageTypes::PUT_REQUEST, put);
       }
+    }
+
+    if (count > 0) {
+      helper()->flush_network();
     }
 
     pending_writes_ = 0;

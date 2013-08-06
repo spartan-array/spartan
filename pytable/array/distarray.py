@@ -64,25 +64,34 @@ def extent_from_slice(array, slice):
   return extent.TileExtent(ul, sz, array.shape)
 
 
-def tile_accum(old, new_tile):
-  assert isinstance(old, tile.Tile)
-  assert isinstance(new_tile, tile.Tile)
+class TileAccum(object):
+  def __init__(self, accum):
+    self.accum = accum
   
-  if old.data is None:
-    old._initialize()
-  
-  idx = old.extent.local_offset(new_tile.extent)
-  data = old.data[idx]
-  
-  invalid = old.mask[idx]
-  valid = ~old.mask[idx]
-  data[invalid] = new_tile.data[invalid]
-  old.mask[invalid] = False
-  if data[valid].size > 0:
-    data[valid] = new_tile.data[valid]
+  def __call__(self, old, new_tile):
+    assert isinstance(old, tile.Tile)
+    assert isinstance(new_tile, tile.Tile)
+    
+    if old.data is None:
+      old._initialize()
+    
+    idx = old.extent.local_offset(new_tile.extent)
+    data = old.data[idx]
+    
+    invalid = old.mask[idx]
+    valid = ~old.mask[idx]
+    data[invalid] = new_tile.data[invalid]
+    old.mask[invalid] = False
+    if data[valid].size > 0:
+      data[valid] = self.accum(data[valid], new_tile.data[valid])
+      
+def take_first(a,b):
+  return a
 
-def tjoin(tuple_a, tuple_b):
-  return 
+accum_replace = TileAccum(take_first)
+accum_min = TileAccum(np.minimum)
+accum_max = TileAccum(np.maximum)
+accum_sum = TileAccum(np.add)
 
 def compute_splits(shape):
   my_splits = []
@@ -90,7 +99,6 @@ def compute_splits(shape):
     my_dim = (i, min(shape[0], i + TILE_SIZE))
     my_splits.append([my_dim])
 
-  print shape
   if len(shape) == 1:
     return my_splits
   
@@ -101,6 +109,15 @@ def compute_splits(shape):
     for j in sub_splits:
       out.append(i + j)
   return out
+
+def create_rand(extent, data):
+  data[:] = np.random.randn(*extent.shape)
+  return []
+  
+def create_ones(extent, data):
+  data[:] = np.random.randn(*extent.shape)
+  return []
+
   
 class DistArray(object):
   @staticmethod
@@ -126,24 +143,41 @@ class DistArray(object):
     return d
   
   @staticmethod
-  def create(master, shape, dtype=np.float):
+  def create(master, shape, dtype=np.float, 
+             sharder=pytable.mod_sharder,
+             accum=accum_replace):
     total_elems = np.prod(shape)
     splits = compute_splits(shape)
+    util.log('Creating array with %d tiles', len(splits))
     extents = []
     for split in splits:
       ul, lr = zip(*split)
       sz = np.array(lr) - np.array(ul)
       extents.append(extent.TileExtent(ul, sz, shape))
 
-    table = pytable.create_table(master, pytable.mod_sharder, tile_accum)
+    table = pytable.create_table(master, sharder, accum)
     for ex in extents:
       ex_tile = tile.make_tile(ex, None, dtype, masked=True)
-      table.put(ex, ex_tile)
+      table.update(ex, ex_tile)
     
     d = DistArray()
     d.table = table
     d.extents = extents
     return d
+  
+  @staticmethod
+  def create_with(master, shape, init_fn):
+    d = DistArray.create(master, shape)
+    pytable.map_inplace(d.table, init_fn)
+    return d 
+  
+  @staticmethod
+  def randn(master, *shape):
+    return DistArray.create_with(master, shape, create_rand)
+  
+  @staticmethod
+  def ones(master, *shape):
+    return DistArray.create_with(master, shape, create_ones)
   
   def _get(self, extent):
     return self.table.get(extent)

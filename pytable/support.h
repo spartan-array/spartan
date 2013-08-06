@@ -42,7 +42,8 @@ void foreach_shard(Master* m, Table* t, PyObject* fn, PyObject* args);
 PyTable* get_table(Kernel* k, int id);
 
 // This is a round-about way of getting SWIG to wrap some function
-// arguments for us.
+// arguments for us.  (The current Kernel instance is passed into
+// Python as a long 'handle'; this lets us coerce it back to a Kernel*).
 Kernel* as_kernel(long ptr);
 
 } // namespace sparrow

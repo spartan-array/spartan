@@ -16,8 +16,7 @@ DEFINE_double(sleep_hack, 0.0, "");
 DEFINE_string(checkpoint_write_dir, "/var/tmp/piccolo-checkpoint", "");
 DEFINE_string(checkpoint_read_dir, "/var/tmp/piccolo-checkpoint", "");
 
-using
-boost::make_tuple;
+using boost::make_tuple;
 using boost::unordered_map;
 using boost::unordered_set;
 
@@ -103,7 +102,7 @@ void Worker::KernelLoop() {
 
     while (!network_->TryRead(config_.master_id(), MessageTypes::RUN_KERNEL,
         &kreq)) {
-      check_network();
+      flush_network();
       Sleep(FLAGS_sleep_time);
 
       if (!running_) {
@@ -111,7 +110,7 @@ void Worker::KernelLoop() {
       }
     }
 
-    check_network();
+    flush_network();
 
     kernel_active_ = true; //a kernel is running
     stats_["idle_time"] += idle.elapsed();
@@ -146,7 +145,7 @@ void Worker::KernelLoop() {
     kernel_active_ = false;
     network_->Send(config_.master_id(), MessageTypes::KERNEL_DONE, kd);
 
-    check_network();
+    flush_network();
 
     DumpProfile();
   }
@@ -369,14 +368,14 @@ void Worker::restore(const StartRestore& req, EmptyMessage* resp,
   LOG(INFO)<< "State restored. Current epoch is >= " << epoch << ".";
 }
 
-void Worker::check_network() {
+void Worker::flush_network() {
   boost::recursive_try_mutex::scoped_lock sl(state_lock_);
 
   Timer net;
   CheckForMasterUpdates();
 
   for (auto i : tables_) {
-    i.second->send_updates();
+    i.second->flush();
   }
 
   dirty_tables_.clear();
@@ -516,13 +515,13 @@ void Worker::flush(const EmptyMessage& req, FlushResponse *resp,
     const rpc::RPCInfo& rpc) {
   Timer net;
 
-  check_network();
+  flush_network();
 
   int updates_sent = 0;
   for (auto i : tables_) {
     Table* t = i.second;
     if (t) {
-      updates_sent += t->send_updates();
+      updates_sent += t->flush();
     }
   }
   network_->Flush();

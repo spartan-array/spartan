@@ -42,10 +42,7 @@ public:
     return tables_.find(table)->second->worker_for_shard(shard);
   }
 
-  void check_network() {
-    EmptyMessage empty;
-    network_->SyncBroadcast(MessageTypes::WORKER_FLUSH, empty);
-  }
+  void flush_network();
 
   int num_workers() const {
     return network_->size() - 1;
@@ -76,8 +73,6 @@ public:
     t->accum = accum;
     t->set_helper(this);
 
-    // Flush master writes immediately.
-    t->flush_frequency = 0;
     tables_[t->id()] = t;
 
     network_->SyncBroadcast(MessageTypes::CREATE_TABLE, req);
@@ -148,6 +143,7 @@ private:
   rpc::NetworkThread* network_;
   Timer runtime_;
 };
+
 }
 
 #endif /* MASTER_H_ */

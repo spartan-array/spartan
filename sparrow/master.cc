@@ -501,6 +501,8 @@ int Master::reap_one_task() {
 }
 
 void Master::run(RunDescriptor r) {
+  flush_network();
+
   CHECK_EQ(current_run_.shards.size(), finished_)<<
   " Cannot start kernel before previous one is finished ";
   finished_ = dispatched_ = 0;
@@ -542,13 +544,24 @@ void Master::barrier() {
   }
 
   // Force workers to flush outputs.
-  check_network();
+  flush_network();
 
   // Force workers to apply flushed updates.
-  check_network();
+  flush_network();
 
   mstats.set_total_time(mstats.total_time() + Now() - current_run_start_);
   LOG(INFO)<< "Kernel '" << current_run_.kernel << "' finished in " << Now() - current_run_start_;
 }
+
+void Master::flush_network() {
+  // Flush any pending table updates
+  for (auto i : tables_) {
+    i.second->flush();
+  }
+
+  EmptyMessage empty;
+  network_->SyncBroadcast(MessageTypes::WORKER_FLUSH, empty);
+}
+
 
 } // namespace sparrow

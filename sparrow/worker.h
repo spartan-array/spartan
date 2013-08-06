@@ -47,7 +47,7 @@ public:
   void assign_shards(const ShardAssignmentRequest& req,
                              EmptyMessage *resp, const rpc::RPCInfo& rpc);
 
-  void check_network();
+  void flush_network();
 
   // Barrier: wait until all table data is transmitted.
   void flush(const EmptyMessage& req, FlushResponse *resp,
