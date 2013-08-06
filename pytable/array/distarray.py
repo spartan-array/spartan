@@ -68,20 +68,20 @@ class TileAccum(object):
   def __init__(self, accum):
     self.accum = accum
   
-  def __call__(self, old, new_tile):
-    assert isinstance(old, tile.Tile)
-    assert isinstance(new_tile, tile.Tile)
+  def __call__(self, old_tile, new_tile):
+    assert isinstance(old_tile, tile.Tile), type(old_tile)
+    assert isinstance(new_tile, tile.Tile), type(new_tile)
     
-    if old.data is None:
-      old._initialize()
+    if old_tile.data is None:
+      old_tile._initialize()
     
-    idx = old.extent.local_offset(new_tile.extent)
-    data = old.data[idx]
+    idx = old_tile.extent.local_offset(new_tile.extent)
+    data = old_tile.data[idx]
     
-    invalid = old.mask[idx]
-    valid = ~old.mask[idx]
+    invalid = old_tile.mask[idx]
+    valid = ~old_tile.mask[idx]
     data[invalid] = new_tile.data[invalid]
-    old.mask[invalid] = False
+    old_tile.mask[invalid] = False
     if data[valid].size > 0:
       data[valid] = self.accum(data[valid], new_tile.data[valid])
       
@@ -120,6 +120,10 @@ def create_ones(extent, data):
 
   
 class DistArray(object):
+  def id(self):
+    return self.table.id()
+  
+  
   @staticmethod
   def from_table(table):
     d = DistArray()
@@ -127,11 +131,7 @@ class DistArray(object):
     d.extents = {}
     
     keys = pytable.keys(table)
-    it = keys.get_iterator()
-    while not it.done():
-      extent, _ = it.key(), it.value()
-      it.next()
-      
+    for extent, _ in keys:
       assert not (extent in d.extents)
       d.extents[extent] = 1
     
@@ -155,7 +155,7 @@ class DistArray(object):
       sz = np.array(lr) - np.array(ul)
       extents.append(extent.TileExtent(ul, sz, shape))
 
-    table = pytable.create_table(master, sharder, accum)
+    table = master.create_table(sharder, accum)
     for ex in extents:
       ex_tile = tile.make_tile(ex, None, dtype, masked=True)
       table.update(ex, ex_tile)
@@ -178,6 +178,9 @@ class DistArray(object):
   @staticmethod
   def ones(master, *shape):
     return DistArray.create_with(master, shape, create_ones)
+  
+  def map(self, fn, *args):
+    return DistArray.from_table(pytable.map_items(self.table, fn, *args))
   
   def _get(self, extent):
     return self.table.get(extent)

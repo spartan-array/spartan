@@ -9,11 +9,6 @@
 %include "numpy.i"
 
 %{
-#include "sparrow/kernel.h"
-#include "sparrow/master.h"
-#include "sparrow/worker.h"
-#include "sparrow/table.h"
-#include "sparrow/sparrow.pb.h"
 #include "pytable/support.h"
 %}
 
@@ -43,57 +38,5 @@
   if ($2) free($2);
 }
 
-
-namespace std {
-  %template(ArgMap) map<string, string>;
-}
-
-namespace sparrow {
-
-class TableData;
-class PartitionInfo;
-class Master {
-private:
-  Master();
-public:
-  ~Master();
-};
-
-%newobject init;
-
-%typemap(in) (RefPtr) {
-  $1 = RefPtr($input);
-}
-
-%typemap(in) (const RefPtr&) {
-  $1 = new RefPtr($input);
-}
-
-%typemap(freearg) (const RefPtr&) {
-  delete $1;
-}
-
-%typemap(out) (const RefPtr &) {
-  if ($1->get() != NULL) {
-    Py_INCREF($1->get());
-    $result = $1->get();
-  } else {
-    Py_INCREF(Py_None);
-    $result = Py_None;
-  }
-}
-
-%typemap(out) (RefPtr) {
-  Py_INCREF($1.get());
-  $result = $1.get();
-}
-
-
-}
-
-%include "sparrow/table.h"
-%include "sparrow/kernel.h"
 %include "support.h"
 
-%template(_PyTable) sparrow::TableT<RefPtr, RefPtr>;
-%template(_PyIterator) sparrow::TypedIterator<RefPtr, RefPtr>;

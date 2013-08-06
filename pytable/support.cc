@@ -9,7 +9,30 @@
 
 #include <Python.h>
 
+static inline void intrusive_ptr_add_ref(PyObject* p) {
+  Py_IncRef(p);
+}
+
+static inline void intrusive_ptr_release(PyObject* p) {
+  Py_DecRef(p);
+}
+
+typedef boost::intrusive_ptr<PyObject> RefPtr;
+
+namespace boost {
+static inline size_t hash_value(const RefPtr& p) {
+  return PyObject_Hash(p.get());
+}
+}
+
+static inline bool operator==(const RefPtr& a, const RefPtr& b) {
+  return PyObject_Compare(a.get(), b.get()) == 0;
+}
+
 namespace sparrow {
+
+typedef TableT<RefPtr, RefPtr> PyTable;
+
 class PythonKernel;
 
 PythonKernel* active_kernel;
@@ -113,40 +136,98 @@ public:
 };
 REGISTER_KERNEL(PythonKernel);
 
-void foreach_shard(Master* m, Table* t, PyObject* fn, PyObject* args) {
-  sparrow::RunDescriptor r;
-  r.kernel = "PythonKernel";
-  r.args["map_fn"] = pickle(fn);
-  r.args["map_args"] = pickle(args);
-  r.table = t;
-  r.shards = sparrow::range(0, t->num_shards());
-  m->run(r);
-}
-
-Master* init(int argc, char* argv[]) {
+MasterHandle init(int argc, char* argv[]) {
   Init(argc, argv);
   if (!StartWorker()) {
-    return new Master();
+    return (MasterHandle)(new Master());
   }
   return NULL;
 }
 
-TableT<RefPtr, RefPtr>* create_table(Master* m, PyObject* sharder,
-    PyObject* accum) {
+void shutdown(MasterHandle h) {
+  delete ((Master*)h);
+}
+
+MasterHandle get_master(TableHandle t) {
+  return (MasterHandle)((PyTable*)t)->master();
+}
+
+TableHandle get_table(KernelHandle k, int id) {
+  return (TableHandle)((Kernel*) k)->get_table(id);
+}
+
+TableHandle create_table(MasterHandle m, PyObject* sharder, PyObject* accum) {
   Py_IncRef(sharder);
   Py_IncRef(accum);
-  return m->create_table(new PySharder(), new PyAccum(), pickle(sharder),
-      pickle(accum));
+  return (TableHandle)((Master*) m)->create_table(new PySharder(), new PyAccum(),
+      pickle(sharder), pickle(accum));
 }
 
-PyTable* get_table(Kernel* k, int id) {
-  return (PyTable*) ((k->get_table(id)));
+void destroy_table(MasterHandle, TableHandle) {
+  LOG(FATAL)<< "Not implemented.";
 }
 
-// This is a round-about way of getting SWIG to wrap some function
-// arguments for us.
-Kernel* as_kernel(long ptr) {
-  return ((Kernel*) (ptr));
+void foreach_shard(MasterHandle m, TableHandle t, PyObject* fn,
+    PyObject* args) {
+  sparrow::RunDescriptor r;
+  r.kernel = "PythonKernel";
+  r.args["map_fn"] = pickle(fn);
+  r.args["map_args"] = pickle(args);
+  r.table = (PyTable*)t;
+  r.shards = sparrow::range(0, ((Table*)t)->num_shards());
+  ((Master*)m)->run(r);
+}
+
+int get_id(TableHandle t) {
+  return ((PyTable*)t)->id();
+}
+
+PyObject* get(TableHandle t, PyObject* k) {
+  PyObject* result = ((PyTable*)t)->get(k).get();
+  if (result == NULL) {
+    result = Py_None;
+  }
+  Py_IncRef(result);
+  return result;
+}
+
+void update(TableHandle t, PyObject* k, PyObject* v) {
+  Py_IncRef(k);
+  Py_IncRef(v);
+  ((PyTable*)t)->update(k, v);
+}
+
+IteratorHandle get_iterator(TableHandle t, int shard) {
+  if (shard != -1) {
+    return (IteratorHandle)((PyTable*)t)->get_iterator(shard);
+  }
+  return (IteratorHandle)((PyTable*)t)->get_iterator();
+}
+
+PyObject* iter_key(IteratorHandle i) {
+  Py_IncRef(((PyTable::Iterator*)i)->key().get());
+  return ((PyTable::Iterator*)i)->key().get();
+}
+
+PyObject* iter_value(IteratorHandle i) {
+  Py_IncRef(((PyTable::Iterator*)i)->value().get());
+  return ((PyTable::Iterator*)i)->value().get();
+}
+
+bool iter_done(IteratorHandle i) {
+  return ((PyTable::Iterator*)i)->done();
+}
+
+void iter_next(IteratorHandle i) {
+  ((PyTable::Iterator*)i)->next();
+}
+
+int current_table(KernelHandle k) {
+  return ((PythonKernel*)k)->table_id();
+}
+
+int current_shard(KernelHandle k) {
+  return ((PythonKernel*)k)->shard_id();
 }
 
 }

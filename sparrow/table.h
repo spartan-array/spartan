@@ -404,6 +404,7 @@ public:
 template<class K, class V>
 class TableT: public Table {
 public:
+  typedef TypedIterator<K, V> Iterator;
 
   struct CacheEntry {
     double last_read_time;

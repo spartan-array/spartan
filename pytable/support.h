@@ -1,51 +1,39 @@
 #ifndef PYTHON_SUPPORT_H
 #define PYTHON_SUPPORT_H
 
-#include <boost/smart_ptr.hpp>
 #include <Python.h>
-
-#include "sparrow/table.h"
-
-#ifndef SWIG
-static inline void intrusive_ptr_add_ref(PyObject* p) {
-  Py_IncRef(p);
-}
-
-static inline void intrusive_ptr_release(PyObject* p) {
-  Py_DecRef(p);
-}
-
-typedef boost::intrusive_ptr<PyObject> RefPtr;
-
-namespace boost {
-static inline size_t hash_value(const RefPtr& p) {
-  return PyObject_Hash(p.get());
-}
-}
-
-static inline bool operator==(const RefPtr& a, const RefPtr& b) {
-  return PyObject_Compare(a.get(), b.get()) == 0;
-}
-#endif
 
 namespace sparrow {
 
-class Kernel;
-class Master;
+typedef long MasterHandle;
+typedef long WorkerHandle;
+typedef long KernelHandle;
+typedef long TableHandle;
+typedef long IteratorHandle;
 
-typedef TableT<RefPtr, RefPtr> PyTable;
+MasterHandle init(int argc, char* argv[]);
+void shutdown(MasterHandle);
 
-Master* init(int argc, char* argv[]);
-PyTable* create_table(Master*, PyObject* sharder, PyObject* accum);
-void foreach_shard(Master* m, Table* t, PyObject* fn, PyObject* args);
+TableHandle create_table(MasterHandle, PyObject* sharder, PyObject* accum);
+void destroy_table(MasterHandle, TableHandle);
 
-PyTable* get_table(Kernel* k, int id);
+MasterHandle get_master(TableHandle h);
 
-// This is a round-about way of getting SWIG to wrap some function
-// arguments for us.  (The current Kernel instance is passed into
-// Python as a long 'handle'; this lets us coerce it back to a Kernel*).
-Kernel* as_kernel(long ptr);
+void foreach_shard(MasterHandle m, TableHandle t, PyObject* fn, PyObject* args);
+TableHandle get_table(KernelHandle k, int id);
+int current_table(KernelHandle k);
+int current_shard(KernelHandle k);
 
-} // namespace sparrow
+PyObject* get(TableHandle, PyObject* k);
+void update(TableHandle, PyObject* k, PyObject* v);
+int get_id(TableHandle t);
+
+IteratorHandle get_iterator(TableHandle, int shard);
+PyObject* iter_key(IteratorHandle);
+PyObject* iter_value(IteratorHandle);
+bool iter_done(IteratorHandle);
+void iter_next(IteratorHandle);
+
+}
 
 #endif // PYTHON_SUPPORT_H

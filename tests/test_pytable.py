@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from pytable import sum_accum
+from pytable.array import distarray
 from test_common import Assert
 import cPickle
 import numpy as np
@@ -20,75 +22,66 @@ except ImportError, e:
 
 def fetch(table):
   out = []
-  it = table.get_iterator()
-  while not it.done():
-    out.append((it.key(), it.value()))
-    it.next()
+  for k, v in table:
+    out.append((k, v))
   return out
 
 def test_init(master):
-  table = pytable.create_table(master, mod_sharder, replace_accum)
+  table = master.create_table(mod_sharder, replace_accum)
 
 def test_master(master):
-  table = pytable.create_table(master, mod_sharder, replace_accum)
+  table = master.create_table(mod_sharder, replace_accum)
   table.update('123', '456')
   Assert.eq(table.get('123'), '456')
 
 def put_kernel(kernel, args):
-  kernel = pytable.as_kernel(kernel)
-  t = pytable.get_table(kernel, kernel.table_id())
-  t.update(kernel.shard_id(), 1)
+  t = kernel.table(kernel.current_table())
+  t.update(kernel.current_shard(), 1)
  
 def test_put_kernel(master):
-  table = pytable.create_table(master, mod_sharder, replace_accum)
-  pytable.foreach_shard(master, table, put_kernel, tuple())
+  table = master.create_table(mod_sharder, replace_accum)
+  master.foreach_shard(table, put_kernel, tuple())
   for i in range(10):
     Assert.eq(table.get(i), 1)
   
-def get_shard_kernel(k_id, args):
-  kernel = pytable.as_kernel(k_id)
-  s_id = kernel.shard_id()
-  t_id = kernel.table_id()
-  it = pytable.get_table(kernel, t_id).get_iterator(s_id)
-  
-  while not it.done():
-    util.log('%s, %s', it.key(), len(it.value()))
-    it.next()
+def get_shard_kernel(kernel, args):
+  s_id = kernel.current_shard()
+  t_id = kernel.current_table()
+  for k, v in kernel.table(t_id).iter(s_id):
+    #util.log('%s, %s', k, v)
+    pass
 
 def test_fill_array(master):
-  table = pytable.create_table(master, mod_sharder, replace_accum)
+  table = master.create_table(mod_sharder, replace_accum)
   bytes = np.ndarray((1000, 1000), dtype=np.double)
   for i in range(5):
     for j in range(5):
       table.update('%d%d' % (i, j), bytes)
       
-  pytable.foreach_shard(master, table, get_shard_kernel, tuple())
+  master.foreach_shard(table, get_shard_kernel, tuple())
 
-def copy_kernel(k_id, args):
-  kernel = pytable.as_kernel(k_id)
+def copy_kernel(kernel, args):
   a, b = args
-  ta = pytable.get_table(kernel, a)
-  tb = pytable.get_table(kernel, b)
+  ta = kernel.table(a)
+  tb = kernel.table(b)
   
-  it = ta.get_iterator(kernel.shard_id())
-  while not it.done():
-    tb.update(it.key(), it.value())
-    it.next()
+  for k, v in ta.iter(kernel.current_shard()):
+    tb.update(k, v)
   
 def test_copy(master):
-  src = pytable.create_table(master, mod_sharder, replace_accum)
+  src = master.create_table(mod_sharder, replace_accum)
   for i in range(100):
     src.update(i, i)
     
-  dst = pytable.create_table(master, mod_sharder, replace_accum)
-  pytable.foreach_shard(master, src, copy_kernel, (src.id(), dst.id()))
+  dst = master.create_table(mod_sharder, replace_accum)
+  master.foreach_shard(src, copy_kernel, (src.id(), dst.id()))
   
   src_v = fetch(src)
   dst_v = fetch(dst)
   Assert.eq(sorted(src_v), sorted(dst_v))
   
 def test_distarray_empty(master):
-  table = pytable.create_table(master, mod_sharder, replace_accum)
+  table = master.create_table(mod_sharder, replace_accum)
   empty = DistArray.from_table(table)
 
 def map_array(k, v):
@@ -107,26 +100,41 @@ def test_distarray_random(master):
 #   b = DistArray.ones(master, 1000, 1000)
 #   a + b
 
-def min_dist_kernel(extent, tile, centers):
+N_PTS = 100000
+N_CENTERS = 100
+DIM = 10
+
+def min_dist(extent, tile, centers):
   dist = np.dot(centers, tile[:].T)
   min_dist = np.argmin(dist, axis=1)
 #   util.log('%s %s', extent, dist.shape)
   yield extent.drop_axis(1), min_dist
 
-def sum_centers_kernel(extent, tile):
-  pass  
+def sum_centers(kernel, args):
+  min_idx_id, pts_id, new_centers_id = args
+  
+  min_idx = kernel.table(min_idx_id)
+  tgt = kernel.table(new_centers_id)
+  
+  c_pos = np.zeros((N_CENTERS, DIM))
 
+  for extent, tile in kernel.table(pts_id).iter(kernel.current_shard()):
+    idx = min_idx.get(extent)
+    for j in range(N_CENTERS):
+      c_pos[j] = np.sum(tile[:][idx == j])
+      
+  tgt.update(0, c_pos)
+  
+  
 def test_kmeans(master):
-  N_PTS = 1000000
-  N_CENTERS = 100
-  DIM = 10
   pts = DistArray.randn(master, N_PTS, DIM)
   centers = np.random.randn(N_CENTERS, DIM)
-  min_table = pytable.map_items(pts.table, min_dist_kernel, centers)
-  min_array = DistArray.from_table(min_table)
-  util.log('%s', min_array.shape)
-  
-  
+  min_array = pts.map(min_dist, centers)
+  new_centers = master.create_table(mod_sharder, sum_accum)
+   
+  master.foreach_shard(min_array.table, sum_centers,
+                       (min_array.id(), pts.table.id(), new_centers.id()))
+
 
 def main():
   import argparse
@@ -155,7 +163,7 @@ def main():
       sys.executable, __file__, '--run_test=%s' % t
       #'xterm', '-e',
       #'valgrind %s src/tests/test_python.py --run_test=%s' % (sys.executable, t)
-      #'gdb -ex run --args %s tests/test_python.py --run_test=%s' % (sys.executable, t)
+      #'gdb -ex run --args %s tests/test_pytable.py --run_test=%s' % (sys.executable, t)
       ]
       )
     if p.wait() != 0:
