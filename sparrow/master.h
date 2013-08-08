@@ -24,7 +24,7 @@ struct RunDescriptor {
   std::vector<int> shards;
 };
 
-class Master: public TableHelper {
+class Master: public TableContext {
 public:
   Master();
   ~Master();
@@ -49,9 +49,13 @@ public:
   }
 
   template<class K, class V>
-  TableT<K, V>* create_table(SharderT<K>* sharder = new Modulo<K>(),
-      AccumulatorT<V>* accum = new Replace<V>(), std::string sharder_opts = "",
-      std::string accum_opts = "") {
+  TableT<K, V>* create_table(
+      SharderT<K>* sharder = new Modulo<K>(),
+      AccumulatorT<V>* accum = new Replace<V>(),
+      SelectorT<K, V>* selector = NULL,
+      std::string sharder_opts = "",
+      std::string accum_opts = "",
+      std::string selector_opts = "") {
 
     TableT<K, V>* t = new TableT<K, V>();
 
@@ -64,6 +68,11 @@ public:
     req.set_sharder_type(sharder->type_id());
     req.set_sharder_opts(sharder_opts);
     req.set_accum_opts(accum_opts);
+    req.set_selector_opts(selector_opts);
+
+    if (selector != NULL) {
+      req.set_selector_type(selector->type_id());
+    }
 
     sharder->init(sharder_opts);
     accum->init(accum_opts);
@@ -71,7 +80,7 @@ public:
     t->init(table_id, req.num_shards());
     t->sharder = sharder;
     t->accum = accum;
-    t->set_helper(this);
+    t->set_ctx(this);
 
     tables_[t->id()] = t;
 
@@ -112,10 +121,9 @@ private:
 // Find a worker to run a kernel on the given table and shard.  If a worker
 // already serves the given shard, return it.  Otherwise, find an eligible
 // worker and assign it to them.
-  WorkerState* assign_worker(int table, int shard);
+  WorkerState* assign_shard(int table, int shard);
 
   void send_table_assignments();
-  bool steal_work(const RunDescriptor& r, int idle_worker, double avg_time);
   void assign_shards(Table *t);
   void assign_tasks(const RunDescriptor& r, std::vector<int> shards);
   int dispatch_work(const RunDescriptor& r);

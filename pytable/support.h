@@ -14,7 +14,7 @@ typedef long IteratorHandle;
 MasterHandle init(int argc, char* argv[]);
 void shutdown(MasterHandle);
 
-TableHandle create_table(MasterHandle, PyObject* sharder, PyObject* accum);
+TableHandle create_table(MasterHandle, PyObject* sharder, PyObject* accum, PyObject* selector);
 void destroy_table(MasterHandle, TableHandle);
 
 MasterHandle get_master(TableHandle h);

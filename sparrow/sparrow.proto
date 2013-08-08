@@ -31,14 +31,18 @@ message EmptyMessage {
 
 message CreateTableRequest {
 	required int32 table_type = 1;
-	required int32 accum_type = 2;
-	required int32 sharder_type = 3;
 	required int32 num_shards = 4;
 	repeated int32 shards = 5;
 	required int32 id = 6;
 
+	required int32 sharder_type = 3;
 	optional bytes sharder_opts = 7;
+
+	required int32 accum_type = 2;
 	optional bytes accum_opts = 8;
+
+	optional int32 selector_type = 10;
+	optional bytes selector_opts = 11;
 }
 
 message KV {

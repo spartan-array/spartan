@@ -1,7 +1,10 @@
 #ifndef TIMER_H_
 #define TIMER_H_
 
+__asm__(".symver clock_gettime,clock_gettime@GLIBC_2.2.5");
+
 namespace sparrow {
+
 static uint64_t rdtsc() {
   uint32_t hi, lo;
   __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));

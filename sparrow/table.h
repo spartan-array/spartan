@@ -73,25 +73,25 @@ T from_str(const std::string& vstr) {
 
 } // namespace val
 
-class Sharder {
+class Initable {
 public:
-  virtual ~Sharder() {
+  virtual ~Initable() {
 
   }
-  virtual void init(const std::string& opts) {
-
-  }
+  virtual void init(const std::string& opts) = 0;
+  virtual int type_id() = 0;
 };
 
-class Accumulator {
+class Sharder: public Initable {
 public:
-  virtual ~Accumulator() {
+};
 
-  }
+class Accumulator: public Initable {
+public:
+};
 
-  virtual void init(const std::string& opts) {
-
-  }
+class Selector: public Initable {
+public:
 };
 
 template<class T>
@@ -100,7 +100,6 @@ public:
   virtual ~AccumulatorT() {
   }
   virtual void accumulate(T* v, const T& update) const = 0;
-  virtual int type_id() = 0;
 };
 
 template<class T>
@@ -109,13 +108,21 @@ public:
   virtual ~SharderT() {
   }
   virtual size_t shard_for_key(const T& k, int num_shards) const = 0;
-  virtual int type_id() = 0;
+};
+
+template<class K, class V>
+class SelectorT: public Selector {
+public:
+  virtual ~SelectorT() {
+  }
+
+  virtual V select(const K& k, const V& v) = 0;
 };
 
 // This interface is used by tables to communicate with the outside
 // world and determine the current state of a computation.
-struct TableHelper {
-  virtual ~TableHelper() {
+struct TableContext {
+  virtual ~TableContext() {
   }
   virtual int id() const = 0;
   virtual int epoch() const = 0;
@@ -171,10 +178,12 @@ protected:
   std::vector<Shard*> shards_;
   int id_;
   int pending_writes_;
-  TableHelper *helper_;
+  TableContext *ctx_;
 public:
   Sharder *sharder;
   Accumulator *accum;
+  Selector *selector;
+
   int flush_frequency;
 
   virtual ~Table() {
@@ -184,18 +193,18 @@ public:
     return pending_writes_;
   }
 
-  void set_helper(TableHelper* h) {
-    helper_ = h;
+  void set_ctx(TableContext* h) {
+    ctx_ = h;
   }
 
-  TableHelper* helper() const {
-    return helper_;
+  TableContext* ctx() const {
+    return ctx_;
   }
 
   // Convenience method for getting a handle to the master (when
   // running on the master host!)
   Master* master() const {
-    return reinterpret_cast<Master*>(helper_);
+    return reinterpret_cast<Master*>(ctx_);
   }
 
   bool tainted(int shard) {
@@ -207,7 +216,7 @@ public:
   }
 
   bool is_local_shard(int shard) const {
-    return worker_for_shard(shard) == helper()->id();
+    return worker_for_shard(shard) == ctx()->id();
   }
 
   int num_shards() const {
@@ -425,7 +434,7 @@ public:
     id_ = id;
     sharder = NULL;
     pending_writes_ = 0;
-    helper_ = NULL;
+    ctx_ = NULL;
     flush_frequency = kDefaultFlushFrequency;
 
     shards_.resize(num_shards);
@@ -499,7 +508,11 @@ public:
       }
 
       if (v != NULL) {
-        *v = i->second;
+        if (selector != NULL) {
+          *v = ((SelectorT<K, V>*)selector)->select(k, i->second);
+        } else {
+          *v = i->second;
+        }
       }
 
       return true;
@@ -565,8 +578,8 @@ public:
   }
 
   bool is_local_shard(int shard) {
-    if (!helper()) return false;
-    return worker_for_shard(shard) == helper()->id();
+    if (!ctx()) return false;
+    return worker_for_shard(shard) == ctx()->id();
   }
 
   bool get_remote(int shard, const K& k, V* v) {
@@ -586,10 +599,10 @@ public:
     req.set_table(id());
     req.set_shard(shard);
 
-    if (!helper()) {
+    if (!ctx()) {
       LOG(FATAL) << "get_remote() failed: helper() undefined.";
     }
-    int peer = helper()->peer_for_shard(id(), shard);
+    int peer = ctx()->peer_for_shard(id(), shard);
 
     DCHECK_GE(peer, 0);
     DCHECK_LT(peer, rpc::NetworkThread::Get()->size() - 1);
@@ -637,7 +650,7 @@ public:
   }
 
   void handle_put_requests() {
-    helper()->flush_network();
+    ctx()->flush_network();
   }
 
   int flush() {
@@ -660,9 +673,9 @@ public:
         t->clear();
 
         put.set_shard(i);
-        put.set_source(helper()->id());
+        put.set_source(ctx()->id());
         put.set_table(id());
-        put.set_epoch(helper()->epoch());
+        put.set_epoch(ctx()->epoch());
 
         put.set_done(true);
 
@@ -673,7 +686,7 @@ public:
     }
 
     if (count > 0) {
-      helper()->flush_network();
+      ctx()->flush_network();
     }
 
     pending_writes_ = 0;

@@ -1,24 +1,22 @@
 #!/usr/bin/env python
 
-from pytable import sum_accum
-from pytable.array import distarray
-from test_common import Assert
-import cPickle
-import numpy as np
 import os
 import subprocess
 import sys
 
 sys.path += ['build/.libs', 'build/pytable']
 
+import pytable
+from pytable import mod_sharder, replace_accum, util, sum_accum
+from pytable.util import Assert
 
 try:
-  import pytable
+  import numpy as np
   import pytable.array
   from pytable.array import DistArray
-  from pytable import mod_sharder, replace_accum, util
-except ImportError, e:
-  print 'Skipping sparrow import.', e 
+except:
+  pass
+
 
 def fetch(table):
   out = []
@@ -82,7 +80,8 @@ def test_copy(master):
   
 def test_distarray_empty(master):
   table = master.create_table(mod_sharder, replace_accum)
-  empty = DistArray.from_table(table)
+  DistArray.from_table(table)
+  
 
 def map_array(k, v):
   util.log('Extent: %s', k)
@@ -93,17 +92,14 @@ def test_distarray_slice(master):
   pytable.map_inplace(array.table, map_array)
   
 def test_distarray_random(master):
-  array = DistArray.randn(master, 200, 200)
+  DistArray.randn(master, 200, 200)
   
-# def test_distarray_add(master):
-#   a = DistArray.ones(master, 1000, 1000)
-#   b = DistArray.ones(master, 1000, 1000)
-#   a + b
 
-N_PTS = 100000
+N_PTS = 100 * 100
 N_CENTERS = 100
 DIM = 10
 
+# An implementation of K-means by-hand.
 def min_dist(extent, tile, centers):
   dist = np.dot(centers, tile[:].T)
   min_dist = np.argmin(dist, axis=1)
@@ -119,9 +115,9 @@ def sum_centers(kernel, args):
   c_pos = np.zeros((N_CENTERS, DIM))
 
   for extent, tile in kernel.table(pts_id).iter(kernel.current_shard()):
-    idx = min_idx.get(extent)
+    idx = min_idx.get(extent.drop_axis(1))
     for j in range(N_CENTERS):
-      c_pos[j] = np.sum(tile[:][idx == j])
+      c_pos[j] = np.sum(tile[idx == j], axis=0)
       
   tgt.update(0, c_pos)
   
@@ -134,11 +130,16 @@ def test_kmeans(master):
    
   master.foreach_shard(min_array.table, sum_centers,
                        (min_array.id(), pts.table.id(), new_centers.id()))
+  
+#   print fetch(new_centers)
 
 
 def main():
   import argparse
   parser = argparse.ArgumentParser()
+  parser.add_argument('--with_gdb', default=False, action='store_true')
+  parser.add_argument('--with_valgrind', default=False, action='store_true')
+  parser.add_argument('--use_cluster', default=False, action='store_true')
   parser.add_argument('--run_test', default='')
   flags, argv = parser.parse_known_args()
   
@@ -156,18 +157,39 @@ def main():
   # setup environment, and call MPI for each test
   tests = [k for k in globals().keys() if k.startswith('test_')]
   #tests = ['test_init']
+  
+  mpi_debug = flags.with_gdb and flags.use_cluster
+  
+  args = [ 'mpirun', '-n', '8',
+           '--mca', 'btl', 'tcp,self',
+           '--mca', 'btl_tcp_if_include', '216.165.108.0/24',
+           '-x', 'PYTHONPATH',
+        ]
+  
+  if mpi_debug:
+    args += ['-d', '--mca', 'pls_rsh_agent', 'ssh -X -n', ]
+  
+  if flags.use_cluster:
+    args += [ '-hostfile', 'conf/mpi-cluster' ]
+  else: 
+    args += [ '-hostfile', 'conf/mpi-local', ]
+   
+  if flags.with_gdb or flags.with_valgrind:
+    args += [ 'xterm', '-e', ]
+  
   for t in tests:
+    if flags.with_gdb:
+      proc_args = args + [ 'gdb -ex run --args %s tests/test_pytable.py --run_test=%s' % (sys.executable, t) ]
+    elif flags.with_valgrind:
+      proc_args = args + ['valgrind %s src/tests/test_python.py --run_test=%s' % (sys.executable, t)]
+    else:
+      proc_args = args + [sys.executable, __file__, '--run_test=%s' % t]
+
     p = subprocess.Popen(env = env,
-                         args=[
-      'mpirun', '-x', 'PYTHONPATH', '-n', '2', '-hostfile', 'conf/mpi-local',
-      sys.executable, __file__, '--run_test=%s' % t
-      #'xterm', '-e',
-      #'valgrind %s src/tests/test_python.py --run_test=%s' % (sys.executable, t)
-      #'gdb -ex run --args %s tests/test_pytable.py --run_test=%s' % (sys.executable, t)
-      ]
-      )
+                         args=proc_args)
+      
     if p.wait() != 0:
-      sys.exit(1)
+      util.log('Test %s FAILED', t)
   
 if __name__ == '__main__':
   main()

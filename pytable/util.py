@@ -260,3 +260,31 @@ def get_profile():
   if threading.Thread.stats is not None:
     stats.add(threading.Thread.stats)
   return stats
+
+
+class Assert(object):
+  @staticmethod
+  def eq(a, b): assert (a == b), 'Failed: %s == %s' % (a, b)
+  
+  @staticmethod
+  def ne(a, b): assert (a == b), 'Failed: %s != %s' % (a, b)
+  
+  @staticmethod
+  def gt(a, b): assert (a > b), 'Failed: %s > %s' % (a, b)
+  
+  @staticmethod
+  def lt(a, b): assert (a < b), 'Failed: %s < %s' % (a, b)
+  
+  @staticmethod
+  def ge(a, b): assert (a >= b), 'Failed: %s >= %s' % (a, b)
+  
+  @staticmethod
+  def le(a, b): assert (a <= b), 'Failed: %s <= %s' % (a, b)
+  
+  @staticmethod
+  def true(expr): assert expr, 'Failed: %s == True' % (expr)
+  
+  @staticmethod
+  def is_instance(expr, klass): assert isinstance(expr, klass), 'Failed: isinstance(%s, %s)' % (expr, klass)
+  
+ 

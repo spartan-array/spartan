@@ -9,6 +9,7 @@
 
 #include <Python.h>
 
+// Python utility functions/classes
 static inline void intrusive_ptr_add_ref(PyObject* p) {
   Py_IncRef(p);
 }
@@ -19,23 +20,8 @@ static inline void intrusive_ptr_release(PyObject* p) {
 
 typedef boost::intrusive_ptr<PyObject> RefPtr;
 
-namespace boost {
-static inline size_t hash_value(const RefPtr& p) {
-  return PyObject_Hash(p.get());
-}
-}
-
-static inline bool operator==(const RefPtr& a, const RefPtr& b) {
-  return PyObject_Compare(a.get(), b.get()) == 0;
-}
-
-namespace sparrow {
-
-typedef TableT<RefPtr, RefPtr> PyTable;
-
-class PythonKernel;
-
-PythonKernel* active_kernel;
+// Get rid of annoying writable string warnings.
+#define W(str) (char*)str
 
 PyObject* check(PyObject* result) {
   if (PyErr_Occurred()) {
@@ -46,31 +32,72 @@ PyObject* check(PyObject* result) {
   return result;
 }
 
-RefPtr unpickle(const std::string& data) {
-  Timer t;
-  RefPtr globals(check(PyEval_GetGlobals()));
-  RefPtr cPickle(check(PyImport_AddModule("cPickle")));
-  RefPtr loads(check(PyObject_GetAttrString(cPickle.get(), "loads")));
-  RefPtr py_str(check(PyString_FromStringAndSize(data.data(), data.size())));
-//  LOG(INFO) << "Unpickle took " << t.elapsed() << " seconds.";
-  return RefPtr(check(PyObject_CallFunction(loads.get(), "O", py_str.get())));
+struct GILHelper {
+  PyGILState_STATE gstate;
+  GILHelper()  {
+    gstate = PyGILState_Ensure();
+  }
+
+  ~GILHelper() {
+    PyGILState_Release(gstate);
+  }
+};
+
+class Pickler {
+  RefPtr cPickle;
+  RefPtr loads;
+  RefPtr dumps;
+
+public:
+  Pickler() {
+    cPickle = check(PyImport_ImportModule("cPickle"));
+    loads = check(PyObject_GetAttrString(cPickle.get(), "loads"));
+    dumps = check(PyObject_GetAttrString(cPickle.get(), "dumps"));
+  }
+
+  RefPtr load(const std::string& data) {
+    GILHelper lock;
+    RefPtr py_str(check(PyString_FromStringAndSize(data.data(), data.size())));
+  //  LOG(INFO) << "Unpickle took " << t.elapsed() << " seconds.";
+    return RefPtr(check(PyObject_CallFunction(loads.get(), W("O"), py_str.get())));
+  }
+
+  std::string store(RefPtr p) {
+    GILHelper lock;
+    RefPtr py_str(check(PyObject_CallFunction(dumps.get(), W("Oi"), p.get(), -1)));
+    std::string out;
+    char* v;
+    Py_ssize_t len;
+    PyString_AsStringAndSize(py_str.get(), &v, &len);
+    out.resize(len);
+    memcpy(&out[0], v, len);
+  //  LOG(INFO) << "Pickle took " << t.elapsed() << " seconds.";
+    return out;
+  }
+};
+
+static Pickler kPickler;
+
+
+namespace boost {
+static inline size_t hash_value(const RefPtr& p) {
+  GILHelper lock;
+  return PyObject_Hash(p.get());
+}
 }
 
-std::string pickle(RefPtr p) {
-  Timer t;
-  RefPtr globals(check(PyEval_GetGlobals()));
-  RefPtr cPickle(check(PyImport_AddModule("cPickle")));
-  RefPtr dumps(check(PyObject_GetAttrString(cPickle.get(), "dumps")));
-  RefPtr py_str(check(PyObject_CallFunction(dumps.get(), "Oi", p.get(), -1)));
-  std::string out;
-  char* v;
-  Py_ssize_t len;
-  PyString_AsStringAndSize(py_str.get(), &v, &len);
-  out.resize(len);
-  memcpy(&out[0], v, len);
-//  LOG(INFO) << "Pickle took " << t.elapsed() << " seconds.";
-  return out;
+static inline bool operator==(const RefPtr& a, const RefPtr& b) {
+  GILHelper lock;
+  return PyObject_Compare(a.get(), b.get()) == 0;
 }
+
+namespace sparrow {
+
+typedef TableT<RefPtr, RefPtr> PyTable;
+
+class PythonKernel;
+PythonKernel* active_kernel;
+
 
 template<>
 class Marshal<RefPtr> {
@@ -81,57 +108,83 @@ public:
       return false;
     }
 
-    RefPtr p = unpickle(input);
+    RefPtr p = kPickler.load(input);
     *v = p;
     return true;
   }
 
   static void write_value(Writer *w, const RefPtr& v) {
-    w->write_string(pickle(v.get()));
+    w->write_string(kPickler.store(v.get()));
   }
 };
 
-class PySharder: public SharderT<RefPtr> {
-private:
+template <class T>
+class PyInitable : public T {
+protected:
   RefPtr code_;
 
 public:
   void init(const std::string& opts) {
-    code_ = unpickle(opts);
+    code_ = kPickler.load(opts);
   }
+};
 
+class PySharder: public PyInitable<SharderT<RefPtr> > {
+public:
   size_t shard_for_key(const RefPtr& k, int num_shards) const {
+    GILHelper lock;
     RefPtr result(
-        PyObject_CallFunction(code_.get(), "Oi", k.get(), num_shards));
+        PyObject_CallFunction(code_.get(), W("Oi"), k.get(), num_shards));
     return PyInt_AsLong(result.get());
   }
   DECLARE_REGISTRY_HELPER(Sharder, PySharder);
 };
 DEFINE_REGISTRY_HELPER(Sharder, PySharder);
 
-class PyAccum: public AccumulatorT<RefPtr> {
+class PyAccum: public PyInitable<AccumulatorT<RefPtr> > {
 private:
   RefPtr code_;
 public:
   void init(const std::string& opts) {
-    code_ = unpickle(opts);
+    code_ = kPickler.load(opts);
   }
 
   void accumulate(RefPtr* v, const RefPtr& update) const {
+    GILHelper lock;
     RefPtr result(
-        PyObject_CallFunction(code_.get(), "OO", v->get(), update.get()));
+        PyObject_CallFunction(code_.get(), W("OO"), v->get(), update.get()));
     *v = result;
   }
   DECLARE_REGISTRY_HELPER(Accumulator, PyAccum);
 };
 DEFINE_REGISTRY_HELPER(Accumulator, PyAccum);
 
+class PySelector: public PyInitable< SelectorT<RefPtr, RefPtr> > {
+private:
+  RefPtr code_;
+public:
+  void init(const std::string& opts) {
+    code_ = kPickler.load(opts);
+  }
+
+  RefPtr select(const RefPtr& k, const RefPtr& v) {
+    GILHelper lock;
+    RefPtr result(
+        PyObject_CallFunction(code_.get(), W("OO"), k.get(), v.get()));
+    return result;
+  }
+
+  DECLARE_REGISTRY_HELPER(Selector, PySelector);
+};
+DEFINE_REGISTRY_HELPER(Selector, PySelector);
+
 class PythonKernel: public Kernel {
 public:
   void run() {
-    RefPtr fn(unpickle(args()["map_fn"]));
-    RefPtr fn_args(unpickle(args()["map_args"]));
-    PyObject_CallFunction(fn.get(), "lO", this, fn_args.get());
+    GILHelper lock;
+    RefPtr fn(kPickler.load(args()["map_fn"]));
+    RefPtr fn_args(kPickler.load(args()["map_args"]));
+    PyObject_CallFunction(fn.get(), W("lO"), this, fn_args.get());
   }
 };
 REGISTER_KERNEL(PythonKernel);
@@ -156,11 +209,19 @@ TableHandle get_table(KernelHandle k, int id) {
   return (TableHandle)((Kernel*) k)->get_table(id);
 }
 
-TableHandle create_table(MasterHandle m, PyObject* sharder, PyObject* accum) {
+TableHandle create_table(MasterHandle m, PyObject* sharder, PyObject* accum, PyObject* selector) {
   Py_IncRef(sharder);
   Py_IncRef(accum);
-  return (TableHandle)((Master*) m)->create_table(new PySharder(), new PyAccum(),
-      pickle(sharder), pickle(accum));
+  Py_IncRef(selector);
+
+  PySelector* sel = NULL;
+  if (selector != Py_None) {
+    sel = new PySelector;
+  }
+
+  return (TableHandle)((Master*) m)->create_table(
+      new PySharder(), new PyAccum(), sel,
+      kPickler.store(sharder), kPickler.store(accum), kPickler.store(selector));
 }
 
 void destroy_table(MasterHandle, TableHandle) {
@@ -171,8 +232,8 @@ void foreach_shard(MasterHandle m, TableHandle t, PyObject* fn,
     PyObject* args) {
   sparrow::RunDescriptor r;
   r.kernel = "PythonKernel";
-  r.args["map_fn"] = pickle(fn);
-  r.args["map_args"] = pickle(args);
+  r.args["map_fn"] = kPickler.store(fn);
+  r.args["map_args"] = kPickler.store(args);
   r.table = (PyTable*)t;
   r.shards = sparrow::range(0, ((Table*)t)->num_shards());
   ((Master*)m)->run(r);

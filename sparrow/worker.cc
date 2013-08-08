@@ -118,8 +118,10 @@ void Worker::KernelLoop() {
     VLOG(2) << "Received run request for " << kreq;
 
     if (peer_for_shard(kreq.table(), kreq.shard()) != config_.worker_id()) {
-      LOG(FATAL)<< "Received a shard I can't work on! : " << kreq.shard()
-      << " : " << peer_for_shard(kreq.table(), kreq.shard());
+      LOG(FATAL)<< "Received a shard I can't work on! : "
+          << "Worker: " << config_.worker_id() << ", "
+          << "Shard: " << make_tuple(kreq.table(), kreq.shard()) << ", "
+          << "Owner: " << peer_for_shard(kreq.table(), kreq.shard());
     }
 
     Kernel* k = TypeRegistry<Kernel>::get_by_name(kreq.kernel());
@@ -421,7 +423,7 @@ void Worker::flush_network() {
 
 void Worker::get(const HashGet& get_req, TableData *get_resp,
     const rpc::RPCInfo& rpc) {
-  LOG(INFO)<< "Get request: " << get_req;
+  VLOG(1) << "Get request: " << get_req;
 
   get_resp->Clear();
   get_resp->set_source(config_.worker_id());
@@ -494,10 +496,18 @@ void Worker::create_table(const CreateTableRequest& req, EmptyMessage *resp,
   t->accum = TypeRegistry<Accumulator>::get_by_id(req.accum_type());
   t->sharder = TypeRegistry<Sharder>::get_by_id(req.sharder_type());
 
+  if (req.has_selector_type()) {
+//    LOG(INFO) << "Worker installing selector: " << req.selector_type();
+    t->selector =  TypeRegistry<Selector>::get_by_id(req.selector_type());
+    t->selector->init(req.selector_opts());
+  } else {
+    t->selector = NULL;
+  }
+
   t->sharder->init(req.sharder_opts());
   t->accum->init(req.accum_opts());
 
-  t->set_helper(this);
+  t->set_ctx(this);
   tables_[req.id()] = t;
 }
 

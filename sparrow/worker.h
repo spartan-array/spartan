@@ -22,7 +22,7 @@ namespace sparrow {
 // start a worker and exit when the computation is finished.
 bool StartWorker();
 
-class Worker: public TableHelper, private boost::noncopyable {
+class Worker: public TableContext, private boost::noncopyable {
   struct Stub;
 public:
   Worker(const ConfigData &c);

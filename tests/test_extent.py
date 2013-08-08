@@ -1,5 +1,6 @@
-from sparrow.array import util, extent
-from test_common import Assert
+from pytable import util
+from pytable.array import extent
+from pytable.util import Assert
 
 def test_intersection():
   a = extent.TileExtent((0, 0), (10, 10), None)

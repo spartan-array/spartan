@@ -76,6 +76,7 @@ std::string RemoteIterator<K, V>::value_str() {
 
 template<class T>
 class Modulo: public SharderT<T> {
+  void init(const std::string&) {}
   size_t shard_for_key(const T& k, int num_shards) const {
     return boost::hash_value(k) % num_shards;
   }
@@ -85,6 +86,7 @@ TMPL_DEFINE_REGISTRY_HELPER(Sharder, Modulo);
 
 template<class V>
 struct Min: public AccumulatorT<V> {
+  void init(const std::string&) {}
   void accumulate(V* current, const V& update) const {
     *current = std::min(*current, update);
   }
@@ -95,6 +97,7 @@ TMPL_DEFINE_REGISTRY_HELPER(Accumulator, Min)
 
 template<class V>
 struct Max: public AccumulatorT<V> {
+  void init(const std::string&) {}
   void accumulate(V* current, const V& update) const {
     *current = std::max(*current, update);
   }
@@ -104,6 +107,7 @@ TMPL_DEFINE_REGISTRY_HELPER(Accumulator, Max);
 
 template<class V>
 struct Sum: public AccumulatorT<V> {
+  void init(const std::string&) {}
   void accumulate(V* current, const V& update) const {
     *current += update;
   }
@@ -113,6 +117,7 @@ TMPL_DEFINE_REGISTRY_HELPER(Accumulator, Sum);
 
 template<class V>
 struct Replace: public AccumulatorT<V> {
+  void init(const std::string&) {}
   void accumulate(V* current, const V& update) const {
     *current = update;
   }

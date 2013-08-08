@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
+from . import extent, tile
+from .. import util
+from ..util import Assert
 import numpy as np
 import pytable
 
-from .. import util
-from . import extent, tile
 
 # number of elements to per dimension of a tile
 TILE_SIZE = 100
@@ -93,6 +94,13 @@ accum_min = TileAccum(np.minimum)
 accum_max = TileAccum(np.maximum)
 accum_sum = TileAccum(np.add)
 
+
+class TileSelector(object):
+  def __call__(self, k, v):
+    if isinstance(k, extent.TileExtent): return v
+    raise Exception
+
+
 def compute_splits(shape):
   my_splits = []
   for i in range(0, shape[0], TILE_SIZE):
@@ -155,7 +163,7 @@ class DistArray(object):
       sz = np.array(lr) - np.array(ul)
       extents.append(extent.TileExtent(ul, sz, shape))
 
-    table = master.create_table(sharder, accum)
+    table = master.create_table(sharder, accum, TileSelector())
     for ex in extents:
       ex_tile = tile.make_tile(ex, None, dtype, masked=True)
       table.update(ex, ex_tile)
@@ -192,16 +200,22 @@ class DistArray(object):
     If necessary, data will be copied from remote hosts to fill the region.    
     :param region: `Extent` indicating the region to fetch.
     '''
+    Assert.is_instance(region, extent.TileExtent)
     splits = list(split_extent(self, region))
     if len(splits) == 1:
       ex, intersection = splits[0]
       tile = self.get(ex)
       return tile.data[ex.local_offset(intersection)]
+    
+    raise Exception
   
   def __getitem__(self, key):
     if isinstance(key, int):
       return self[key:key + 1][0]
     if not isinstance(key, tuple):
       key = tuple(key)
+    if len(key) < len(self.shape):
+      key = tuple(list(key) + [slice(None, None, None) for _ in range(len(self.shape) - len(self.key))])
     
-    ex = extent.TileExtent.from_slice(self,)
+    ex = extent.TileExtent.from_slice(self, key)
+    return self.ensure(ex)
