@@ -7,8 +7,8 @@ import numpy as np
 import pytable
 
 
-# number of elements to per dimension of a tile
-TILE_SIZE = 100
+# number of elements per tile
+TILE_SIZE = 100000
 
 def find_shape(extents):
   return np.max([ex.lr for ex in extents])
@@ -101,22 +101,33 @@ class TileSelector(object):
     raise Exception
 
 
-def compute_splits(shape):
+def _compute_splits(shape):
+  '''Split an array of shape ``shape`` into tiles containing roughly 
+  `TILE_SIZE` elements.'''
+  if len(shape) == 1:
+    weight = 1
+  else:
+    weight, sub_splits = _compute_splits(shape[1:])
+  
   my_splits = []
-  for i in range(0, shape[0], TILE_SIZE):
-    my_dim = (i, min(shape[0], i + TILE_SIZE))
+  step = max(1, TILE_SIZE / weight)
+  for i in range(0, shape[0], step):
+    my_dim = (i, min(shape[0], i + step))
     my_splits.append([my_dim])
 
   if len(shape) == 1:
-    return my_splits
+    return (shape[0], my_splits)
   
-  sub_splits = compute_splits(shape[1:])
   out = []
   
   for i in my_splits:
     for j in sub_splits:
       out.append(i + j)
-  return out
+  return (weight * shape[0], out)
+
+def compute_splits(shape):
+  return _compute_splits(shape)[1]
+
 
 def create_rand(extent, data):
   data[:] = np.random.randn(*extent.shape)

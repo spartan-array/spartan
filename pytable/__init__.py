@@ -1,9 +1,9 @@
 import traceback
+
 try:
   import sparrow
 except ImportError, e:
-  print 'Import failed:', e
-
+  print 'Native module import failed:', e
 
 class Iter(object):
   def __init__(self, handle):

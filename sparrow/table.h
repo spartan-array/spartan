@@ -485,7 +485,6 @@ public:
     ++pending_writes_;
     if (pending_writes_ > flush_frequency) {
       flush();
-      this->handle_put_requests();
     }
   }
 

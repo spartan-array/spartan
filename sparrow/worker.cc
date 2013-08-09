@@ -553,7 +553,7 @@ void Worker::CheckForMasterUpdates() {
 
   if (network_->TryRead(config_.master_id(), MessageTypes::WORKER_SHUTDOWN,
       &empty)) {
-    LOG(INFO)<< "Shutting down worker " << config_.worker_id();
+    VLOG(1) << "Shutting down worker " << config_.worker_id();
     running_ = false;
     return;
   }

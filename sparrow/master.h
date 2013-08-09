@@ -63,7 +63,7 @@ public:
     int table_id = tables_.size();
     req.set_table_type(t->type_id());
     req.set_id(table_id);
-    req.set_num_shards(10);
+    req.set_num_shards(workers_.size() * 2);
     req.set_accum_type(accum->type_id());
     req.set_sharder_type(sharder->type_id());
     req.set_sharder_opts(sharder_opts);
@@ -81,6 +81,7 @@ public:
     t->sharder = sharder;
     t->accum = accum;
     t->set_ctx(this);
+    t->flush_frequency = 100;
 
     tables_[t->id()] = t;
 

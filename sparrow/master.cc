@@ -113,12 +113,15 @@ public:
   }
 
   void clear_tasks() {
+    CHECK(active.empty());
     pending.clear();
+    active.clear();
+    finished.clear();
   }
 
   void set_finished(const ShardId& id) {
-    finished[id] = pending[id];
-    try_remove(pending, id);
+    finished[id] = active[id];
+    active.erase(active.find(id));
   }
 
   std::string str() {
@@ -306,7 +309,7 @@ void Master::assign_tasks(const RunDescriptor& r, vector<int> shards) {
   LOG(INFO)<< "Assigning workers for " << shards.size() << " shards.";
   for (auto i : shards) {
     int worker = r.table->shard_info(i)->owner();
-    LOG(INFO) << "Assigning shard: " << i << " to worker: " << worker;
+    VLOG(1) << "Assigning shard: " << i << " to worker: " << worker;
     workers_[worker]->assign_task(ShardId(r.table->id(), i));
   }
 }
@@ -317,7 +320,7 @@ int Master::dispatch_work(const RunDescriptor& r) {
   for (size_t i = 0; i < workers_.size(); ++i) {
     WorkerState& w = *workers_[i];
     if (w.get_next(r, &w_req)) {
-      LOG(INFO)<< "Dispatching: " << w.str() << " : " << w_req;
+       VLOG(1) << "Dispatching: " << w.str() << " : " << w_req;
       num_dispatched++;
       network_->Send(w.id + 1, MessageTypes::RUN_KERNEL, w_req);
     }
@@ -333,8 +336,11 @@ void Master::dump_stats() {
         workers_[k]->num_assigned());
   }
   LOG(INFO)<< StringPrintf("Running %s (%d); %s; assigned: %d done: %d",
-      current_run_.kernel.c_str(), current_run_.shards.size(),
-      status.c_str(), dispatched_, finished_);
+      current_run_.kernel.c_str(),
+      current_run_.shards.size(),
+      status.c_str(),
+      dispatched_,
+      finished_);
 
 }
 
@@ -390,7 +396,7 @@ void Master::run(RunDescriptor r) {
   VLOG(1) << "Current run: " << shards.size() << " shards";
   assign_tasks(current_run_, shards);
 
-  dispatched_ = dispatch_work(current_run_);
+  dispatched_ += dispatch_work(current_run_);
 
   barrier();
 }
@@ -401,7 +407,7 @@ void Master::barrier() {
   while (finished_ < current_run_.shards.size()) {
     PERIODIC(10, { DumpProfile(); dump_stats(); });
 
-    dispatch_work(current_run_);
+    dispatched_ += dispatch_work(current_run_);
 
     if (reap_one_task() >= 0) {
       finished_++;

@@ -1,5 +1,6 @@
 #include <mpi.h>
 #include <signal.h>
+#include <future>
 
 #include <boost/tuple/tuple.hpp>
 #include <boost/tuple/tuple_io.hpp>
@@ -16,7 +17,8 @@
 DECLARE_bool(localtest);
 DECLARE_double(sleep_time);
 
-using boost::unordered_set;
+using
+boost::unordered_set;
 using namespace boost::tuples;
 
 namespace sparrow {
@@ -55,6 +57,7 @@ RPCRequest::~RPCRequest() {
 bool RPCRequest::finished() {
   return mpi_req.Test(status);
 }
+
 double RPCRequest::elapsed() {
   return Now() - start_time;
 }
@@ -121,8 +124,8 @@ void NetworkThread::CollectActive() {
   VLOG(3) << "Pending sends: " << active_sends_.size();
   while (i != active_sends_.end()) {
     RPCRequest *r = (*i);
-    VLOG(3) << "Pending: " << make_tuple(id(), make_tuple(r->target, r->rpc_type
-    ));
+    VLOG(3) << "Pending: "
+               << make_tuple(id(), make_tuple(r->target, r->rpc_type));
     if (r->finished()) {
       if (r->failures > 0) {
         LOG(INFO)<< "Send " << make_tuple(id(), r->target) << " of size "
