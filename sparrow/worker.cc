@@ -42,9 +42,7 @@ void Worker::run_kernel(const RunKernelReq& kreq) {
   }
 
   Kernel* k = TypeRegistry<Kernel>::get_by_name(kreq.kernel);
-
   k->init(this, kreq.table, kreq.shard, kreq.args);
-
   k->run();
   flush();
 }
@@ -63,14 +61,12 @@ void Worker::get(const GetRequest& req, TableData* resp) {
   resp->shard = -1;
   resp->done = true;
 
-  {
-    Table *t = tables_[req.table];
-    if (!t->contains_str(req.key)) {
-      resp->missing_key = true;
-    } else {
-      resp->missing_key = false;
-      resp->kv_data.push_back( { req.key, t->get_str(req.key) });
-    }
+  Table *t = tables_[req.table];
+  if (!t->contains_str(req.key)) {
+    resp->missing_key = true;
+  } else {
+    resp->missing_key = false;
+    resp->kv_data.push_back( { req.key, t->get_str(req.key) });
   }
 }
 

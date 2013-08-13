@@ -129,7 +129,8 @@ int Master::dispatch_work(const RunDescriptor& r) {
         Log::info("Finished.");
         w->set_finished(ShardId(w_req.table, w_req.shard));
       };
-      running_kernels_.insert(w->proxy->async_run_kernel(w_req, rpc::FutureAttr(callback)));
+      running_kernels_.insert(
+          w->proxy->async_run_kernel(w_req, rpc::FutureAttr(callback)));
     }
   }
   return num_dispatched;
@@ -185,14 +186,15 @@ void Master::flush() {
   }
 }
 
-Master* start_master(const std::string& addr, int num_workers) {
+Master* start_master(int port, int num_workers) {
   auto poller = new rpc::PollMgr;
   auto tpool = new rpc::ThreadPool;
   auto server = new rpc::Server(poller, tpool);
 
   auto master = new Master(poller, num_workers);
   server->reg(master);
-  server->start(addr.c_str());
+  auto hostname = rpc::get_host_name();
+  server->start(StringPrintf("%s:%d", hostname.c_str(), port).c_str());
   return master;
 }
 

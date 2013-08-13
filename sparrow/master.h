@@ -150,7 +150,7 @@ public:
   }
 };
 
-Master* start_master(const std::string& addr, int num_workers);
+Master* start_master(int port, int num_workers);
 
 class Master: public TableContext, public MasterService {
 public:
