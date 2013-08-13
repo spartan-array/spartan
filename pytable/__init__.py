@@ -1,4 +1,7 @@
+from pytable import util
+import sys
 import traceback
+sys.path += ['build/.libs', 'build/pytable']
 
 try:
   import sparrow
@@ -50,6 +53,9 @@ class Table(object):
   def update(self, key, value):
     return sparrow.update(self.handle, key, value)
   
+  def num_shards(self):
+    return sparrow.num_shards(self.handle)
+  
   def __iter__(self):
     return self.iter(-1)
   
@@ -62,14 +68,15 @@ class Kernel(object):
     self.handle = handle
   
   def table(self, table_id):
-    return Table(None, sparrow.get_table(self.handle, table_id), 
+    return Table(None, 
+                 sparrow.get_table(sparrow.cast(self.handle), table_id), 
                  None, None, None)
   
   def current_shard(self):
-    return sparrow.current_shard(self.handle)
+    return sparrow.current_shard(sparrow.cast(self.handle))
   
   def current_table(self):
-    return sparrow.current_table(self.handle)
+    return sparrow.current_table(sparrow.cast(self.handle))
 
 
 def _bootstrap_kernel(handle, args):
@@ -96,9 +103,11 @@ class Master(object):
                                  (kernel, args))
 
 
-def init(argv):
-  return Master(sparrow.init(argv))
+def start_master(*args):
+  return Master(sparrow.start_master(*args))
 
+def start_worker(*args):
+  return sparrow.start_worker(*args)
 
 def mod_sharder(k, num_shards):
   return hash(k) % num_shards
@@ -117,8 +126,10 @@ def mapper_kernel(kernel, args):
   dst = kernel.table(dst_id)
   
   for sk, sv in src.iter(kernel.current_shard()):
-    for k, v in fn(sk, sv, *fn_args):
-      dst.update(k, v)
+    result = fn(sk, sv, *fn_args)
+    if result is not None:
+      for k, v in result:
+        dst.update(k, v)
 
 
 def map_items(table, fn, *args):

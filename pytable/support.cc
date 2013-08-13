@@ -11,7 +11,6 @@
 
 using rpc::Log;
 
-
 // Python utility functions/classes
 struct GILHelper {
   PyGILState_STATE gstate;
@@ -34,23 +33,21 @@ static inline void intrusive_ptr_release(PyObject* p) {
 
 typedef boost::intrusive_ptr<PyObject> RefPtr;
 
-namespace std {
-inline ostream & operator<<(ostream &out, PyObject* p) {
-  RefPtr py_str(PyObject_Str(p));
+static std::string to_string(RefPtr p) {
+  RefPtr py_str(PyObject_Str(p.get()));
 
   char* c_str;
   Py_ssize_t c_len;
 
   PyString_AsStringAndSize(py_str.get(), &c_str, &c_len);
-  out << std::string(c_str, c_len);
-  return out;
-}
+
+  return std::string(c_str, c_len);
 }
 
 // Get rid of annoying writable string warnings.
 #define W(str) (char*)str
 
-template <class T>
+template<class T>
 T check(T result) {
   if (PyErr_Occurred()) {
     PyErr_Print();
@@ -199,28 +196,29 @@ public:
     GILHelper lock;
     RefPtr fn(kPickler.load(args()["map_fn"]));
     RefPtr fn_args(kPickler.load(args()["map_args"]));
-    PyObject_CallFunction(fn.get(), W("lO"), this, fn_args.get());
+    PyObject* result(check(PyObject_CallFunction(fn.get(), W("lO"), this, fn_args.get())));
+    Py_DecRef(result);
   }
 };
 REGISTER_KERNEL(PythonKernel);
 
-MasterHandle init() {
-  return (MasterHandle)start_master("216.165.108.65:9999", 10);
-}
-
-void shutdown(MasterHandle h) {
+void shutdown(Master*h) {
   delete ((Master*) h);
 }
 
-MasterHandle get_master(TableHandle t) {
-  return (MasterHandle) ((PyTable*) t)->master();
+void wait_for_workers(Master* m) {
+  m->wait_for_workers();
 }
 
-TableHandle get_table(KernelHandle k, int id) {
-  return (TableHandle) ((Kernel*) k)->get_table(id);
+Master*get_master(Table* t) {
+  return ((PyTable*) t)->master();
 }
 
-TableHandle create_table(MasterHandle m, PyObject* sharder, PyObject* accum,
+Table* get_table(Kernel* k, int id) {
+  return ((Kernel*) k)->get_table(id);
+}
+
+Table* create_table(Master*m, PyObject* sharder, PyObject* accum,
     PyObject* selector) {
   Py_IncRef(sharder);
   Py_IncRef(accum);
@@ -231,17 +229,15 @@ TableHandle create_table(MasterHandle m, PyObject* sharder, PyObject* accum,
     sel = new PySelector;
   }
 
-  return (TableHandle) ((Master*) m)->create_table(new PySharder(),
-      new PyAccum(), sel, kPickler.store(sharder), kPickler.store(accum),
-      kPickler.store(selector));
+  return ((Master*) m)->create_table(new PySharder(), new PyAccum(), sel,
+      kPickler.store(sharder), kPickler.store(accum), kPickler.store(selector));
 }
 
-void destroy_table(MasterHandle, TableHandle) {
+void destroy_table(Master*, Table*) {
   Log::fatal("Not implemented.");
 }
 
-void foreach_shard(MasterHandle m, TableHandle t, PyObject* fn,
-    PyObject* args) {
+void foreach_shard(Master*m, Table* t, PyObject* fn, PyObject* args) {
   sparrow::RunDescriptor r;
   r.kernel = "PythonKernel";
   r.args["map_fn"] = kPickler.store(fn);
@@ -251,12 +247,13 @@ void foreach_shard(MasterHandle m, TableHandle t, PyObject* fn,
   ((Master*) m)->run(r);
 }
 
-int get_id(TableHandle t) {
+int get_id(Table* t) {
   return ((PyTable*) t)->id();
 }
 
-PyObject* get(TableHandle t, PyObject* k) {
+PyObject* get(Table* t, PyObject* k) {
   PyObject* result = ((PyTable*) t)->get(k).get();
+//  Log::info("Result: %s", to_string(result).c_str());
   if (result == NULL) {
     result = Py_None;
   }
@@ -264,42 +261,46 @@ PyObject* get(TableHandle t, PyObject* k) {
   return result;
 }
 
-void update(TableHandle t, PyObject* k, PyObject* v) {
+void update(Table* t, PyObject* k, PyObject* v) {
   Py_IncRef(k);
   Py_IncRef(v);
   ((PyTable*) t)->update(k, v);
 }
 
-IteratorHandle get_iterator(TableHandle t, int shard) {
-  if (shard != -1) {
-    return (IteratorHandle) ((PyTable*) t)->get_iterator(shard);
-  }
-  return (IteratorHandle) ((PyTable*) t)->get_iterator();
+int num_shards(Table* t) {
+  return t->num_shards();
 }
 
-PyObject* iter_key(IteratorHandle i) {
+TableIterator* get_iterator(Table* t, int shard) {
+  if (shard != -1) {
+    return ((PyTable*) t)->get_iterator(shard);
+  }
+  return ((PyTable*) t)->get_iterator();
+}
+
+PyObject* iter_key(TableIterator* i) {
   Py_IncRef(((PyTable::Iterator*) i)->key().get());
   return ((PyTable::Iterator*) i)->key().get();
 }
 
-PyObject* iter_value(IteratorHandle i) {
+PyObject* iter_value(TableIterator* i) {
   Py_IncRef(((PyTable::Iterator*) i)->value().get());
   return ((PyTable::Iterator*) i)->value().get();
 }
 
-bool iter_done(IteratorHandle i) {
+bool iter_done(TableIterator* i) {
   return ((PyTable::Iterator*) i)->done();
 }
 
-void iter_next(IteratorHandle i) {
+void iter_next(TableIterator* i) {
   ((PyTable::Iterator*) i)->next();
 }
 
-int current_table(KernelHandle k) {
+int current_table(Kernel* k) {
   return ((PythonKernel*) k)->table_id();
 }
 
-int current_shard(KernelHandle k) {
+int current_shard(Kernel* k) {
   return ((PythonKernel*) k)->shard_id();
 }
 
