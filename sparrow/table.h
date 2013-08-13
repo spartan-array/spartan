@@ -582,14 +582,14 @@ public:
   }
 
   bool get_remote(int shard, const K& k, V* v) {
-    {
-      boost::recursive_mutex::scoped_lock sl(mutex());
-      if (cache_.find(k) != cache_.end()) {
-        CacheEntry& c = cache_[k];
-        *v = c.val;
-        return true;
-      }
-    }
+//    {
+//      boost::recursive_mutex::scoped_lock sl(mutex());
+//      if (cache_.find(k) != cache_.end()) {
+//        CacheEntry& c = cache_[k];
+//        *v = c.val;
+//        return true;
+//      }
+//    }
 
     HashGet req;
     TableData resp;
@@ -617,9 +617,9 @@ public:
       *v = val::from_str<V>(resp.kv_data(0).value());
     }
 
-    boost::recursive_mutex::scoped_lock sl(mutex());
-    CacheEntry c = {Now(), *v};
-    cache_[k] = c;
+//    boost::recursive_mutex::scoped_lock sl(mutex());
+//    CacheEntry c = {Now(), *v};
+//    cache_[k] = c;
     return true;
   }
 

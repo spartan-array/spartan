@@ -55,7 +55,6 @@ inline ostream & operator<<(ostream &out, const std::pair<A, B>& p) {
   out << "(" << p.first << "," << p.second << ")";
   return out;
 }
-
 }
 
 #define COMPILE_ASSERT(x) extern int __dummy[(int)x]
