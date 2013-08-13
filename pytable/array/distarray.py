@@ -26,7 +26,7 @@ def get_data(data, index):
 
 def split_extent(array, tile_extent):
 #   util.log('Splitting tile %s', chunk.extent)
-  for ex in array.extents():
+  for ex in array.extents:
     intersection = extent.intersection(ex, tile_extent)
     if intersection is not None:
       yield (ex, intersection)
@@ -89,17 +89,41 @@ class TileAccum(object):
 def take_first(a,b):
   return a
 
+
 accum_replace = TileAccum(take_first)
 accum_min = TileAccum(np.minimum)
 accum_max = TileAccum(np.maximum)
 accum_sum = TileAccum(np.add)
 
 
+  
+class NestedSlice(object):
+  def __init__(self, extent, subslice):
+    self.extent = extent
+    self.subslice = subslice
+    
+  def __hash__(self):
+    return hash(self.extent)
+  
+  def __cmp__(self, other):
+    Assert.is_instance(other, extent.TileExtent)
+    assert isinstance(other, extent.TileExtent)
+    return cmp(self.extent, other)
+  
+  def __eq__(self, other):
+    Assert.is_instance(other, extent.TileExtent)
+    return self.extent == other 
+
+
+
 class TileSelector(object):
   def __call__(self, k, v):
-    if isinstance(k, extent.TileExtent): return v
-    raise Exception
-
+    if isinstance(k, extent.TileExtent): return v.data
+    if isinstance(k, NestedSlice):
+      result = v.data[k.subslice]
+#       print k.extent, k.subslice, result.shape
+      return result
+  
 
 def _compute_splits(shape):
   '''Split an array of shape ``shape`` into tiles containing roughly 
@@ -130,13 +154,20 @@ def compute_splits(shape):
 
 
 def create_rand(extent, data):
+  data[:] = np.random.rand(*extent.shape)
+  return []
+
+def create_randn(extent, data):
   data[:] = np.random.randn(*extent.shape)
   return []
   
 def create_ones(extent, data):
-  data[:] = np.random.randn(*extent.shape)
+  data[:] = 1
   return []
 
+def create_zeros(extent, data):
+  data[:] = 0
+  return []
   
 class DistArray(object):
   def id(self):
@@ -180,6 +211,7 @@ class DistArray(object):
       table.update(ex, ex_tile)
     
     d = DistArray()
+    d.shape = shape
     d.table = table
     d.extents = extents
     return d
@@ -192,10 +224,14 @@ class DistArray(object):
   
   @staticmethod
   def randn(master, *shape):
+    return DistArray.create_with(master, shape, create_randn)
+  
+  @staticmethod
+  def rand(master, *shape):
     return DistArray.create_with(master, shape, create_rand)
   
   @staticmethod
-  def ones(master, *shape):
+  def ones(master, shape):
     return DistArray.create_with(master, shape, create_ones)
   
   def map(self, fn, *args):
@@ -213,20 +249,30 @@ class DistArray(object):
     '''
     Assert.is_instance(region, extent.TileExtent)
     splits = list(split_extent(self, region))
+    
     if len(splits) == 1:
       ex, intersection = splits[0]
-      tile = self.get(ex)
-      return tile.data[ex.local_offset(intersection)]
+      return self.get(NestedSlice(ex, ex.local_offset(intersection)))
+
+    tgt = np.ndarray(region.shape)
+    for ex, intersection in splits:
+      dst_slice = region.local_offset(intersection)
+      src_slice = self.table.get(NestedSlice(ex, ex.local_offset(intersection)))
+      #src_slice = self.table.get(ex)
+      tgt[dst_slice] = src_slice
+    return tgt
+    #return tile.data[]
     
-    raise Exception
+  def update(self, region, data):
+    pass
   
-  def __getitem__(self, key):
-    if isinstance(key, int):
-      return self[key:key + 1][0]
-    if not isinstance(key, tuple):
-      key = tuple(key)
-    if len(key) < len(self.shape):
-      key = tuple(list(key) + [slice(None, None, None) for _ in range(len(self.shape) - len(self.key))])
+  def __getitem__(self, idx):
+    if isinstance(idx, int):
+      return self[idx:idx + 1][0]
+    if not isinstance(idx, tuple):
+      idx = tuple(idx)
+    if len(idx) < len(self.shape):
+      idx = tuple(list(idx) + [slice(None, None, None) for _ in range(len(self.shape) - len(self.key))])
     
-    ex = extent.TileExtent.from_slice(self, key)
+    ex = extent.TileExtent.from_slice(idx, self.shape)
     return self.ensure(ex)

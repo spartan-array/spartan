@@ -6,12 +6,6 @@ import sys
 import test_common
   
 
-def fetch(table):
-  out = []
-  for k, v in table:
-    out.append((k, v))
-  return out
-
 def test_init(master):
   table = master.create_table(mod_sharder, replace_accum)
 
@@ -46,8 +40,8 @@ def test_copy(master):
   dst = master.create_table(mod_sharder, replace_accum)
   master.foreach_shard(src, copy_kernel, (src.id(), dst.id()))
   
-  src_v = fetch(src)
-  dst_v = fetch(dst)
+  src_v = pytable.fetch(src)
+  dst_v = pytable.fetch(dst)
   Assert.eq(sorted(src_v), sorted(dst_v))
 
 if __name__ == '__main__':

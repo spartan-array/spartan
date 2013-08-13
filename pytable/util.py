@@ -37,7 +37,7 @@ def add_flag(name, default, *args, **kw):
 
 add_flag('profile', action='store_true', default=False)
 
-log_mutex = threading.Lock()
+log_mutex = threading.RLock()
 def log(msg, *args, **kw):
   with log_mutex:
     caller = sys._getframe(1)
@@ -263,6 +263,11 @@ def get_profile():
 
 
 class Assert(object):
+  @staticmethod
+  def all_eq(a, b):
+    import numpy
+    assert numpy.all(a == b), 'Failed: %s == %s' % (a, b)
+  
   @staticmethod
   def eq(a, b): assert (a == b), 'Failed: %s == %s' % (a, b)
   

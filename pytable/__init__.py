@@ -145,3 +145,11 @@ def key_mapper(k, v):
   
 def keys(src):
   return map_items(src, key_mapper)
+
+
+def fetch(table):
+  out = []
+  for k, v in table:
+    out.append((k, v))
+  return out
+

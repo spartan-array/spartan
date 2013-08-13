@@ -15,6 +15,20 @@ class TileExtent(object):
   def shape(self):
     return tuple(self.sz)
   
+  @staticmethod
+  def from_slice(idx, shape):
+    ul = []
+    sz = []
+    
+    for i in range(len(shape)):
+      dim = shape[i]
+      slc = idx[i]
+      indices = slc.indices(dim)
+      ul.append(indices[0])
+      sz.append(indices[1] - indices[0])
+      
+    return TileExtent(ul, sz, shape)
+  
   def to_slice(self):
     return tuple([slice(ul, ul + sz, None) for ul, sz in zip(self.ul, self.sz)])
 

@@ -30,16 +30,15 @@ class Tile(object):
     assert np.all(~self.mask[idx])
     
     return self.data[idx] 
+  
+  
   def __setitem__(self, idx, val):
     self._initialize()
-    
+
     data = self.data[idx]
-#     util.log('%s %s %s %s', self.extent, data, val, self.mask)
     invalid = self.mask[idx]
-    valid = ~self.mask[idx]
-    data[invalid] = val[invalid]
     self.mask[invalid] = False
-    data[valid] = val[valid]
+    data[idx] = val
 
 
 def make_tile(extent, data, dtype, masked):

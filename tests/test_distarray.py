@@ -1,5 +1,6 @@
 from pytable import mod_sharder, replace_accum, util, sum_accum
 from pytable.array.distarray import DistArray
+from pytable.util import Assert
 import numpy as np
 import pytable
 import test_common
@@ -38,14 +39,14 @@ def test_distarray_random(master):
   DistArray.randn(master, 200, 200)
   
 
-N_PTS = 1000 * 1000 * 1000
-N_CENTERS = 100
-DIM = 3
+N_PTS = 1000*1000
+N_CENTERS = 10
+DIM = 5
 
 # An implementation of K-means by-hand.
 def min_dist(extent, tile, centers):
   dist = np.dot(centers, tile[:].T)
-  min_dist = np.argmin(dist, axis=1)
+  min_dist = np.argmin(dist, axis=0)
 #   util.log('%s %s', extent, dist.shape)
   yield extent.drop_axis(1), min_dist
 
@@ -59,22 +60,42 @@ def sum_centers(kernel, args):
 
   for extent, tile in kernel.table(pts_id).iter(kernel.current_shard()):
     idx = min_idx.get(extent.drop_axis(1))
+    print idx
     for j in range(N_CENTERS):
       c_pos[j] = np.sum(tile[idx == j], axis=0)
-      
+     
   tgt.update(0, c_pos)
   
   
 def test_kmeans(master):
-  pts = DistArray.randn(master, N_PTS, DIM)
+  util.log('Generating points.')
+  pts = DistArray.rand(master, N_PTS, DIM)
   centers = np.random.randn(N_CENTERS, DIM)
-  min_array = pts.map(min_dist, centers)
+  
+  util.log('Generating new centers.')
   new_centers = master.create_table(mod_sharder, sum_accum)
+  
+  util.log('Finding closest')
+  min_array = pts.map(min_dist, centers)
    
+  util.log('Updating clusters.')
   master.foreach_shard(min_array.table, sum_centers,
                        (min_array.id(), pts.table.id(), new_centers.id()))
   
-#   print fetch(new_centers)
+  _, centers = pytable.fetch(new_centers)[0]
+  print centers
+  
+def test_ensure(master):
+  src = DistArray.ones(master, ((10000, 10000)))
+  x = src[100:2000, 100:2000]
+  Assert.all_eq(x, 1)
+  
+  x = src[100:200, 100:2000]
+  Assert.all_eq(x, 1)
+  
+  x = src[500:2000, 500:2000]
+  Assert.all_eq(x, 1)
+  
 
 if __name__ == '__main__':
   test_common.run_cluster_tests(__file__)
