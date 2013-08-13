@@ -53,12 +53,15 @@ class TileExtent(object):
   def __eq__(self, other):
     return N.all(self.ul == other.ul) and N.all(self.sz == other.sz)
 
-  def ravelled_pos(self, nd_pos):
+  def ravelled_pos(self, global_pos=None):
+    if global_pos is None:
+      global_pos = self.ul
+    
     pos = 0
     for i in range(len(self.array_shape) - 1):
-      pos += self.array_shape[i] * nd_pos[i]
-    return pos + nd_pos[-1]
-
+      pos += self.array_shape[i] * global_pos[i]
+    return pos + global_pos[-1]
+  
   def to_global(self, idx, axis):
     '''Convert ``idx`` from a local offset in this tile to a global offset.'''
     if axis is not None:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from pytable import mod_sharder, replace_accum
+from pytable import mod_sharder, replace_accum, fetch
 from pytable.util import Assert
 import sys
 import test_common
@@ -21,7 +21,7 @@ def put_kernel(kernel, args):
 def test_put_kernel(master):
   table = master.create_table(mod_sharder, replace_accum)
   master.foreach_shard(table, put_kernel, tuple())
-  for i in range(10):
+  for i in range(table.num_shards()):
     Assert.eq(table.get(i), 1)
 
 def copy_kernel(kernel, args):
@@ -40,8 +40,8 @@ def test_copy(master):
   dst = master.create_table(mod_sharder, replace_accum)
   master.foreach_shard(src, copy_kernel, (src.id(), dst.id()))
   
-  src_v = pytable.fetch(src)
-  dst_v = pytable.fetch(dst)
+  src_v = fetch(src)
+  dst_v = fetch(dst)
   Assert.eq(sorted(src_v), sorted(dst_v))
 
 if __name__ == '__main__':

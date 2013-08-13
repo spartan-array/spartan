@@ -86,15 +86,17 @@ def test_kmeans(master):
   print centers
   
 def test_ensure(master):
-  src = DistArray.ones(master, ((10000, 10000)))
-  x = src[100:2000, 100:2000]
-  Assert.all_eq(x, 1)
+  local = np.arange(10000 * 10000).reshape((10000, 10000))
+  dist = DistArray.arange(master, ((10000, 10000)))
   
-  x = src[100:200, 100:2000]
-  Assert.all_eq(x, 1)
-  
-  x = src[500:2000, 500:2000]
-  Assert.all_eq(x, 1)
+  Assert.all_eq(dist[100:2000, 100:2000], 
+                local[100:2000, 100:2000])
+
+  Assert.all_eq(dist[100:200, 100:2000], 
+                local[100:200, 100:2000])
+
+  Assert.all_eq(dist[500:2000, 100:2000], 
+                local[500:2000, 100:2000])
   
 
 if __name__ == '__main__':

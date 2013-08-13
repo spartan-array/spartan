@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from . import extent, tile
+from . import tile, extent
 from .. import util
 from ..util import Assert
 import numpy as np
@@ -105,11 +105,6 @@ class NestedSlice(object):
   def __hash__(self):
     return hash(self.extent)
   
-  def __cmp__(self, other):
-    Assert.is_instance(other, extent.TileExtent)
-    assert isinstance(other, extent.TileExtent)
-    return cmp(self.extent, other)
-  
   def __eq__(self, other):
     Assert.is_instance(other, extent.TileExtent)
     return self.extent == other 
@@ -118,11 +113,14 @@ class NestedSlice(object):
 
 class TileSelector(object):
   def __call__(self, k, v):
-    if isinstance(k, extent.TileExtent): return v.data
+#     util.log('Selector called for %s', k)
+    if isinstance(k, extent.TileExtent): 
+      return v[:]
     if isinstance(k, NestedSlice):
-      result = v.data[k.subslice]
+      result = v[k.subslice]
 #       print k.extent, k.subslice, result.shape
       return result
+    raise Exception, "Can't handle type %s" % type(k)
   
 
 def _compute_splits(shape):
@@ -155,19 +153,21 @@ def compute_splits(shape):
 
 def create_rand(extent, data):
   data[:] = np.random.rand(*extent.shape)
-  return []
 
 def create_randn(extent, data):
   data[:] = np.random.randn(*extent.shape)
-  return []
   
 def create_ones(extent, data):
+#   util.log('Updating %s, %s', extent, data)
   data[:] = 1
-  return []
 
 def create_zeros(extent, data):
   data[:] = 0
-  return []
+
+def create_range(extent, data):
+  pos = extent.ravelled_pos()
+  sz = np.prod(extent.shape)
+  data[:] = np.arange(pos, pos+sz).reshape(extent.shape)
   
 class DistArray(object):
   def id(self):
@@ -234,8 +234,14 @@ class DistArray(object):
   def ones(master, shape):
     return DistArray.create_with(master, shape, create_ones)
   
+  @staticmethod
+  def arange(master, shape):
+    return DistArray.create_with(master, shape, create_range)
+  
   def map(self, fn, *args):
     return DistArray.from_table(pytable.map_items(self.table, fn, *args))
+  
+  
   
   def _get(self, extent):
     return self.table.get(extent)
@@ -254,6 +260,7 @@ class DistArray(object):
       ex, intersection = splits[0]
       return self.get(NestedSlice(ex, ex.local_offset(intersection)))
 
+    util.log('Target shape: %s', region.shape)
     tgt = np.ndarray(region.shape)
     for ex, intersection in splits:
       dst_slice = region.local_offset(intersection)

@@ -28,9 +28,7 @@ class Tile(object):
   def __getitem__(self, idx):
     self._initialize()
     assert np.all(~self.mask[idx])
-    
     return self.data[idx] 
-  
   
   def __setitem__(self, idx, val):
     self._initialize()
