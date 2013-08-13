@@ -273,8 +273,6 @@ public:
   }
 
 private:
-  std::vector<WorkerProxy*> workers_;
-
   Table* table_;
   IteratorReq request_;
   IteratorResp response_;

@@ -15,10 +15,11 @@ RemoteIterator<K, V>::RemoteIterator(Table *table, int shard,
   request_.table = table->id();
   request_.shard = shard_;
   request_.count = fetch_num;
+  request_.id = -1;
   index_ = 0;
   int target_worker = table->worker_for_shard(shard);
 
-  workers_[target_worker]->get_iterator(request_, &response_);
+  table->workers[target_worker]->get_iterator(request_, &response_);
   request_.id = response_.id;
 }
 
@@ -37,7 +38,7 @@ void RemoteIterator<K, V>::next() {
       return;
     }
 
-    workers_[target_worker]->get_iterator(request_, &response_);
+    table_->workers[target_worker]->get_iterator(request_, &response_);
   }
 }
 

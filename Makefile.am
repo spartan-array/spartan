@@ -1,6 +1,6 @@
 AM_CXX = clang++
 AM_LD = clang++
-AM_CXXFLAGS = -O2 -ggdb2 -Wall -Wno-unused-result -Wno-sign-compare -std=c++11 -fno-omit-frame-pointer
+CXXFLAGS = -O0 -ggdb2 -Wall -Wno-unused-result -Wno-sign-compare -std=c++11 -fno-omit-frame-pointer
 
 AM_LDFLAGS = -lboost_thread -lpthread
 ACLOCAL_AMFLAGS = -I m4
