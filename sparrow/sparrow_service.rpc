@@ -99,6 +99,7 @@ struct RegisterReq {
 };
 
 struct WorkerInitReq {
+  i32 id
   map<i32, HostPort> workers
 };
 

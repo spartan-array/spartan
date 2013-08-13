@@ -9,7 +9,7 @@ Master* start_cluster() {
   auto master = start_master("localhost:9999", 4);
 
   for (int i = 0; i < 4; ++i) {
-    start_worker("localhost:9999");
+    start_worker("localhost:9999", 10000 + i);
   }
 
   master->wait_for_workers();

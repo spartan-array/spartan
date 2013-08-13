@@ -45,16 +45,6 @@ typedef std::set<ShardId> ShardSet;
 
 class WorkerState: private boost::noncopyable {
 public:
-  WorkerState(int w_id) :
-      id(w_id) {
-    last_ping_time = Now();
-    last_task_start = 0;
-    total_runtime = 0;
-    checkpointing = false;
-    alive = true;
-    status = 0;
-  }
-
   TaskMap pending;
   TaskMap active;
   TaskMap finished;
@@ -62,18 +52,25 @@ public:
   // Table shards this worker is responsible for serving.
   ShardSet shards;
 
-  double last_ping_time;
-
   int status;
   int id;
 
-  double last_task_start;
+  double last_ping_time;
   double total_runtime;
 
-  bool checkpointing;
   bool alive;
 
   WorkerProxy *proxy;
+  HostPort addr;
+
+  WorkerState(int w_id, HostPort addr) :
+      id(w_id) {
+    last_ping_time = Now();
+    total_runtime = 0;
+    alive = true;
+    status = 0;
+    this->addr = addr;
+  }
 
   bool is_assigned(ShardId id) {
     return pending.find(id) != pending.end();
@@ -149,8 +146,6 @@ public:
     msg->shard = state.id.second;
     msg->args = r.args;
 
-    last_task_start = Now();
-
     return true;
   }
 };
@@ -194,6 +189,8 @@ public:
     if (selector != NULL) {
       req.selector.type_id = selector->type_id();
       req.selector.opts = selector_opts;
+    } else {
+      req.selector.type_id = -1;
     }
 
     sharder->init(sharder_opts);
@@ -202,7 +199,13 @@ public:
     t->init(table_id, req.num_shards);
     t->sharder = sharder;
     t->accum = accum;
+    t->selector = selector;
     t->flush_frequency = 100;
+
+    t->workers.resize(workers_.size());
+    for (auto w : workers_) {
+      t->workers[w->id] = w->proxy;
+    }
 
     t->set_ctx(this);
 
@@ -240,15 +243,12 @@ private:
   void assign_tasks(const RunDescriptor& r, std::vector<int> shards);
   int dispatch_work(const RunDescriptor& r);
 
-  void dump_stats();
-  int reap_one_task();
-
   RunDescriptor current_run_;
   double current_run_start_;
 
   int num_workers_;
   std::vector<WorkerState*> workers_;
-  std::vector<rpc::Future*> running_kernels_;
+  std::set<rpc::Future*> running_kernels_;
 
   rpc::PollMgr *poller_;
   TableMap tables_;

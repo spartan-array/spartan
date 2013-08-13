@@ -21,6 +21,7 @@ Worker::Worker(rpc::PollMgr* poller) {
   running_ = true;
   kernel_active_ = false;
   current_iterator_id_ = 0;
+  poller_ = poller;
 }
 
 Worker::~Worker() {
@@ -32,9 +33,11 @@ Worker::~Worker() {
 }
 
 void Worker::run_kernel(const RunKernelReq& kreq) {
+  Log::info("Running kernel...");
   int owner = tables_[kreq.table]->worker_for_shard(kreq.shard);
   if (owner != id_) {
-    Log::fatal("Received a shard I can't work on! (Worker: %d, Shard: (%d, %d), Owner: %d)",
+    Log::fatal(
+        "Received a shard I can't work on! (Worker: %d, Shard: (%d, %d), Owner: %d)",
         id_, kreq.table, kreq.shard, owner);
   }
 
@@ -100,6 +103,7 @@ void Worker::get_iterator(const IteratorReq& req, IteratorResp* resp) {
 }
 
 void Worker::create_table(const CreateTableReq& req) {
+  Log::info("Creating table: %d", req.id);
   Table* t = TypeRegistry<Table>::get_by_id(req.table_type);
   t->init(req.id, req.num_shards);
   t->accum = TypeRegistry<Accumulator>::get_by_id(req.accum.type_id);
@@ -108,12 +112,13 @@ void Worker::create_table(const CreateTableReq& req) {
   t->sharder = TypeRegistry<Sharder>::get_by_id(req.sharder.type_id);
   t->sharder->init(req.sharder.opts);
   if (req.selector.type_id != -1) {
-//    LOG(INFO) << "Worker installing selector: " << req.selector_type();
     t->selector = TypeRegistry<Selector>::get_by_id(req.selector.type_id);
     t->selector->init(req.selector.opts);
   } else {
     t->selector = NULL;
   }
+
+  t->workers = peers_;
 
   t->set_ctx(this);
   tables_[req.id] = t;
@@ -143,14 +148,27 @@ void Worker::put(const TableData& req) {
 }
 
 void Worker::initialize(const WorkerInitReq& req) {
+  id_ = req.id;
 
+  Log::info("Initializing worker %d, with connections to %d peers.", id_,
+      req.workers.size());
+  peers_.resize(req.workers.size());
+  for (auto w : req.workers) {
+    if (w.first != id_) {
+      peers_[w.first] = connect<WorkerProxy>(poller_,
+          StringPrintf("%s:%d", w.second.host.c_str(), w.second.port));
+    }
+  }
 }
 
-Worker* start_worker(const std::string& master_addr) {
+Worker* start_worker(const std::string& master_addr, int port) {
   rpc::PollMgr* manager = new rpc::PollMgr;
   rpc::ThreadPool* threadpool = new rpc::ThreadPool;
 
-  int port = rpc::find_open_port();
+  if (port == -1) {
+    port = rpc::find_open_port();
+  }
+
   RegisterReq req;
   req.addr.host = rpc::get_host_name();
   req.addr.port = port;

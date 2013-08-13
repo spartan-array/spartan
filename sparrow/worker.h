@@ -12,7 +12,7 @@
 
 namespace sparrow {
 
-Worker* start_worker(const std::string& master);
+Worker* start_worker(const std::string& master, int port = -1);
 
 class Worker: public TableContext,
     public WorkerService,
@@ -53,6 +53,7 @@ private:
 
   // The status of other workers.
   std::vector<WorkerProxy*> peers_;
+  rpc::PollMgr* poller_;
 
   uint32_t current_iterator_id_;
   boost::unordered_map<uint32_t, TableIterator*> iterators_;

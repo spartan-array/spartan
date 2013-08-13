@@ -170,9 +170,9 @@ protected:
   int id_;
   int pending_writes_;
   TableContext *ctx_;
-  std::vector<WorkerProxy*> workers_;
 
 public:
+  std::vector<WorkerProxy*> workers;
   Sharder *sharder;
   Accumulator *accum;
   Selector *selector;
@@ -597,8 +597,8 @@ public:
 
     int peer = worker_for_shard(shard);
 
-    Log::debug("Sending get request to: (%s, %s)", peer, shard);
-    workers_[peer]->get(req, &resp);
+    Log::debug("Sending get request to: (%d, %d)", peer, shard);
+    workers[peer]->get(req, &resp);
 
     if (resp.missing_key) {
       return false;
@@ -649,7 +649,7 @@ public:
         put.done = true;
 
         count += put.kv_data.size();
-        workers_[worker_for_shard(i)]->put(put);
+        workers[worker_for_shard(i)]->put(put);
       }
     }
 

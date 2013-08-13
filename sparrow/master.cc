@@ -25,6 +25,16 @@ void Master::wait_for_workers() {
     Sleep(0.01);
   }
   Log::info("All workers registered; starting up.");
+
+  WorkerInitReq req;
+  for (auto w : workers_) {
+    req.workers[w->id] = w->addr;
+  }
+
+  for (auto w : workers_) {
+    req.id = w->id;
+    w->proxy->initialize(req);
+  }
 }
 
 Master::~Master() {
@@ -34,8 +44,9 @@ Master::~Master() {
 }
 
 void Master::register_worker(const RegisterReq& req) {
-  WorkerState* w = new WorkerState(workers_.size());
-  w->proxy = connect<WorkerProxy>(poller_, StringPrintf("%s:%d", req.addr.host.c_str(), req.addr.port));
+  WorkerState* w = new WorkerState(workers_.size(), req.addr);
+  w->proxy = connect<WorkerProxy>(poller_,
+      StringPrintf("%s:%d", req.addr.host.c_str(), req.addr.port));
   workers_.push_back(w);
 }
 
@@ -107,26 +118,21 @@ void Master::assign_tasks(const RunDescriptor& r, vector<int> shards) {
 
 int Master::dispatch_work(const RunDescriptor& r) {
   int num_dispatched = 0;
-  RunKernelReq w_req;
   for (size_t i = 0; i < workers_.size(); ++i) {
-    WorkerState& w = *workers_[i];
-    if (w.get_next(r, &w_req)) {
-      Log::info("Dispatching: %s", w.str().c_str());
+    WorkerState* w = workers_[i];
+    RunKernelReq w_req;
+    if (w->get_next(r, &w_req)) {
+      Log::info("Dispatching: %s", w->str().c_str());
       num_dispatched++;
-      running_kernels_.push_back(w.proxy->async_run_kernel(w_req));
+
+      auto callback = [=](rpc::Future *future) {
+        Log::info("Finished.");
+        w->set_finished(ShardId(w_req.table, w_req.shard));
+      };
+      running_kernels_.insert(w->proxy->async_run_kernel(w_req, rpc::FutureAttr(callback)));
     }
   }
   return num_dispatched;
-}
-
-void Master::dump_stats() {
-  string status;
-  for (auto w : workers_) {
-    status += StringPrintf("%d/%d ", w->finished.size(), w->num_assigned());
-  }
-  Log::info("Running %s (%d)); %s", current_run_.kernel.c_str(),
-          current_run_.shards.size(), status.c_str());
-
 }
 
 void Master::run(RunDescriptor r) {
@@ -144,8 +150,18 @@ void Master::run(RunDescriptor r) {
 
   assign_tasks(current_run_, shards);
 
-  while (1) {
+  dispatch_work(current_run_);
+  while (!running_kernels_.empty()) {
+    for (auto f : running_kernels_) {
+      if (f->ready()) {
+        f->release();
+        running_kernels_.erase(f);
+      }
+    }
+
     dispatch_work(current_run_);
+    Log::info("Dispatch loop: %d", running_kernels_.size());
+    Sleep(0.1);
   }
 
   // Force workers to flush outputs.
