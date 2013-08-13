@@ -51,6 +51,7 @@ static inline uint32_t SuperFastHash(const char * data, int len) {
     hash += *data;
     hash ^= hash << 10;
     hash += hash >> 1;
+    break;
   }
 
   /* Force "avalanching" of final 127 bits */

@@ -1,8 +1,6 @@
 #include "sparrow/table.h"
 #include "sparrow/util/registry.h"
-#include "sparrow/util/rpc.h"
 #include "sparrow/util/timer.h"
-#include "sparrow/sparrow.pb.h"
 
 using namespace sparrow;
 

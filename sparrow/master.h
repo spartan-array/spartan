@@ -4,9 +4,9 @@
 #include "sparrow/kernel.h"
 #include "sparrow/table.h"
 #include "sparrow/util/common.h"
-#include "sparrow/util/rpc.h"
 #include "sparrow/util/timer.h"
-#include "sparrow/sparrow.pb.h"
+
+#include "sparrow/sparrow_service.h"
 
 #include <vector>
 #include <map>
@@ -24,68 +24,194 @@ struct RunDescriptor {
   std::vector<int> shards;
 };
 
-class Master: public TableContext {
+typedef std::pair<int, int> ShardId;
+class TaskState {
 public:
-  Master();
+  TaskState() :
+      size(-1), stolen(false) {
+
+  }
+  TaskState(ShardId id, int64_t size) :
+      id(id), size(size), stolen(false) {
+  }
+
+  ShardId id;
+  int size;
+  bool stolen;
+};
+
+typedef std::map<ShardId, TaskState> TaskMap;
+typedef std::set<ShardId> ShardSet;
+
+class WorkerState: private boost::noncopyable {
+public:
+  WorkerState(int w_id) :
+      id(w_id) {
+    last_ping_time = Now();
+    last_task_start = 0;
+    total_runtime = 0;
+    checkpointing = false;
+    alive = true;
+    status = 0;
+  }
+
+  TaskMap pending;
+  TaskMap active;
+  TaskMap finished;
+
+  // Table shards this worker is responsible for serving.
+  ShardSet shards;
+
+  double last_ping_time;
+
+  int status;
+  int id;
+
+  double last_task_start;
+  double total_runtime;
+
+  bool checkpointing;
+  bool alive;
+
+  WorkerProxy *proxy;
+
+  bool is_assigned(ShardId id) {
+    return pending.find(id) != pending.end();
+  }
+
+  void ping() {
+    last_ping_time = Now();
+  }
+
+  double idle_time() {
+    return Now() - last_ping_time;
+  }
+
+  bool serves(ShardId id) const {
+    return shards.find(id) != shards.end();
+  }
+
+  void assign_shard(int table, int shard) {
+    ShardId t(table, shard);
+    shards.insert(t);
+  }
+
+  void assign_task(ShardId id) {
+    TaskState state(id, 1);
+    pending[id] = state;
+  }
+
+  void remove_task(ShardId id) {
+    pending.erase(pending.find(id));
+  }
+
+  void clear_tasks() {
+    CHECK(active.empty());
+    pending.clear();
+    active.clear();
+    finished.clear();
+  }
+
+  void set_finished(const ShardId& id) {
+    finished[id] = active[id];
+    active.erase(active.find(id));
+  }
+
+  std::string str() {
+    return StringPrintf("W(%d) p: %d; a: %d f: %d", id, pending.size(),
+        active.size(), finished.size());
+  }
+
+  int num_assigned() const {
+    return pending.size() + active.size() + finished.size();
+  }
+
+  int64_t total_size() const {
+    int64_t out = 0;
+    for (TaskMap::const_iterator i = pending.begin(); i != pending.end(); ++i) {
+      out += 1 + i->second.size;
+    }
+    return out;
+  }
+
+  // Order pending tasks by our guess of how large they are
+  bool get_next(const RunDescriptor& r, RunKernelReq* msg) {
+    if (pending.empty()) {
+      return false;
+    }
+
+    TaskState state = pending.begin()->second;
+    active[state.id] = state;
+    pending.erase(pending.begin());
+
+    msg->kernel = r.kernel;
+    msg->table = r.table->id();
+    msg->shard = state.id.second;
+    msg->args = r.args;
+
+    last_task_start = Now();
+
+    return true;
+  }
+};
+
+Master* start_master(const std::string& addr, int num_workers);
+
+class Master: public TableContext, public MasterService {
+public:
+  Master(rpc::PollMgr* poller, int num_workers);
   ~Master();
+
+  void wait_for_workers();
 
   // TableHelper implementation
   int id() const {
     return -1;
   }
 
-  int epoch() const {
-    return kernel_epoch_;
-  }
-
-  int peer_for_shard(int table, int shard) const {
-    return tables_.find(table)->second->worker_for_shard(shard);
-  }
-
-  void flush_network();
-
-  int num_workers() const {
-    return network_->size() - 1;
-  }
+  void flush();
 
   template<class K, class V>
-  TableT<K, V>* create_table(
-      SharderT<K>* sharder = new Modulo<K>(),
-      AccumulatorT<V>* accum = new Replace<V>(),
-      SelectorT<K, V>* selector = NULL,
-      std::string sharder_opts = "",
-      std::string accum_opts = "",
+  TableT<K, V>* create_table(SharderT<K>* sharder = new Modulo<K>(),
+      AccumulatorT<V>* accum = new Replace<V>(), SelectorT<K, V>* selector =
+          NULL, std::string sharder_opts = "", std::string accum_opts = "",
       std::string selector_opts = "") {
 
     TableT<K, V>* t = new TableT<K, V>();
 
-    CreateTableRequest req;
+    CreateTableReq req;
     int table_id = tables_.size();
-    req.set_table_type(t->type_id());
-    req.set_id(table_id);
-    req.set_num_shards(workers_.size() * 2);
-    req.set_accum_type(accum->type_id());
-    req.set_sharder_type(sharder->type_id());
-    req.set_sharder_opts(sharder_opts);
-    req.set_accum_opts(accum_opts);
-    req.set_selector_opts(selector_opts);
+    req.table_type = t->type_id();
+    req.id = table_id;
+    req.num_shards = workers_.size() * 2;
+
+    req.accum.type_id = accum->type_id();
+    req.accum.opts = accum_opts;
+
+    req.sharder.type_id = sharder->type_id();
+    req.sharder.opts = sharder_opts;
 
     if (selector != NULL) {
-      req.set_selector_type(selector->type_id());
+      req.selector.type_id = selector->type_id();
+      req.selector.opts = selector_opts;
     }
 
     sharder->init(sharder_opts);
     accum->init(accum_opts);
 
-    t->init(table_id, req.num_shards());
+    t->init(table_id, req.num_shards);
     t->sharder = sharder;
     t->accum = accum;
-    t->set_ctx(this);
     t->flush_frequency = 100;
+
+    t->set_ctx(this);
 
     tables_[t->id()] = t;
 
-    network_->SyncBroadcast(MessageTypes::CREATE_TABLE, req);
+    rpc::FutureGroup futures;
+    for (auto w : workers_) {
+      futures.add(w->proxy->async_create_table(req));
+    }
 
     assign_shards(t);
     return t;
@@ -100,24 +226,9 @@ public:
     run(r);
   }
 
+  void register_worker(const RegisterReq& req);
   void run(RunDescriptor r);
-
-  void barrier();
-
-// Blocking.  Instruct workers to save table and kernel state.
-// When this call returns, all requested tables in the system will have been
-// committed to disk.
-  void checkpoint();
-
-// Attempt restore from a previous checkpoint for this job.  If none exists,
-// the process is left in the original state, and this function returns false.
-  bool restore();
-
 private:
-  void start_checkpoint();
-  void finish_checkpoint();
-
-  WorkerState* worker_for_shard(int table, int shard);
 
 // Find a worker to run a kernel on the given table and shard.  If a worker
 // already serves the given shard, return it.  Otherwise, find an eligible
@@ -132,24 +243,15 @@ private:
   void dump_stats();
   int reap_one_task();
 
-  ConfigData config_;
-  int checkpoint_epoch_;
-  int kernel_epoch_;
-
   RunDescriptor current_run_;
   double current_run_start_;
-  size_t dispatched_; //# of dispatched tasks
-  size_t finished_; //# of finished tasks
 
-  bool shards_assigned_;
-
+  int num_workers_;
   std::vector<WorkerState*> workers_;
+  std::vector<rpc::Future*> running_kernels_;
 
-  typedef std::map<string, MethodStats> MethodStatsMap;
-  MethodStatsMap method_stats_;
-
+  rpc::PollMgr *poller_;
   TableMap tables_;
-  rpc::NetworkThread* network_;
   Timer runtime_;
 };
 

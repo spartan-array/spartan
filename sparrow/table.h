@@ -10,16 +10,11 @@
 #include <boost/tuple/tuple.hpp>
 #include <boost/unordered_map.hpp>
 
-#include "glog/logging.h"
-
 #include "sparrow/util/common.h"
-#include "sparrow/util/file.h"
 #include "sparrow/util/marshal.h"
 #include "sparrow/util/registry.h"
-#include "sparrow/util/rpc.h"
 #include "sparrow/util/timer.h"
-
-#include "sparrow/sparrow.pb.h"
+#include "sparrow/sparrow_service.h"
 
 namespace sparrow {
 
@@ -125,9 +120,6 @@ struct TableContext {
   virtual ~TableContext() {
   }
   virtual int id() const = 0;
-  virtual int epoch() const = 0;
-  virtual int peer_for_shard(int table, int shard) const = 0;
-  virtual void flush_network() = 0;
 };
 
 class TableIterator {
@@ -157,7 +149,6 @@ public:
   virtual void start_checkpoint(const string& f, bool delta) = 0;
   virtual void finish_checkpoint() = 0;
   virtual void restore(const string& f) = 0;
-  virtual void write_delta(const TableData& put) = 0;
 };
 
 class Shard {
@@ -179,6 +170,8 @@ protected:
   int id_;
   int pending_writes_;
   TableContext *ctx_;
+  std::vector<WorkerProxy*> workers_;
+
 public:
   Sharder *sharder;
   Accumulator *accum;
@@ -208,11 +201,11 @@ public:
   }
 
   bool tainted(int shard) {
-    return shard_info_[shard].tainted();
+    return shard_info_[shard].tainted;
   }
 
   int worker_for_shard(int shard) const {
-    return shard_info_[shard].owner();
+    return shard_info_[shard].owner;
   }
 
   bool is_local_shard(int shard) const {
@@ -239,7 +232,7 @@ public:
     if (is_local_shard(shard)) {
       return shards_[shard]->size();
     } else {
-      return shard_info_[shard].entries();
+      return shard_info_[shard].entries;
     }
   }
 
@@ -280,15 +273,16 @@ public:
   }
 
 private:
+  std::vector<WorkerProxy*> workers_;
+
   Table* table_;
-  IteratorRequest request_;
-  IteratorResponse response_;
+  IteratorReq request_;
+  IteratorResp response_;
 
   int shard_;
   int index_;
   bool done_;
 
-  std::queue<std::pair<std::string, std::string> > cached_results;
   size_t fetch_num_;
 };
 
@@ -465,7 +459,7 @@ public:
 
   V get_local(const K& k) {
     int shard = this->shard_for_key(k);
-    CHECK(is_local_shard(shard)) << " non-local for shard: " << shard;
+    CHECK(is_local_shard(shard));
     return typed_shard(shard)[k];
   }
 
@@ -494,7 +488,6 @@ public:
     if (tainted(shard)) {
       GRAB_LOCK;
       while (tainted(shard)) {
-        this->handle_put_requests();
         sched_yield();
       }
     }
@@ -508,7 +501,7 @@ public:
 
       if (v != NULL) {
         if (selector != NULL) {
-          *v = ((SelectorT<K, V>*)selector)->select(k, i->second);
+          *v = ((SelectorT<K, V>*) selector)->select(k, i->second);
         } else {
           *v = i->second;
         }
@@ -536,7 +529,7 @@ public:
   }
 
   void remove(const K& k) {
-    LOG(FATAL)<< "Not implemented!";
+    Log::fatal("Not implemented!");
   }
 
   // Untyped operations:
@@ -557,7 +550,7 @@ public:
   }
 
   TypedIterator<K, V>* get_iterator() {
-    vector<TypedIterator<K, V>*> iters;
+    std::vector<TypedIterator<K, V>*> iters;
     for (int i = 0; i < num_shards(); ++i) {
       iters.push_back(get_iterator(i));
     }
@@ -573,7 +566,7 @@ public:
   }
 
   void update_partitions(const PartitionInfo& info) {
-    shard_info_[info.shard()].CopyFrom(info);
+    shard_info_[info.shard] = info;
   }
 
   bool is_local_shard(int shard) {
@@ -591,30 +584,28 @@ public:
 //      }
 //    }
 
-    HashGet req;
+    GetRequest req;
     TableData resp;
 
-    req.set_key(val::to_str(k));
-    req.set_table(id());
-    req.set_shard(shard);
+    req.key = val::to_str(k);
+    req.table = id();
+    req.shard = shard;
 
     if (!ctx()) {
-      LOG(FATAL) << "get_remote() failed: helper() undefined.";
+      Log::fatal("get_remote() failed: helper() undefined.");
     }
-    int peer = ctx()->peer_for_shard(id(), shard);
 
-    DCHECK_GE(peer, 0);
-    DCHECK_LT(peer, rpc::NetworkThread::Get()->size() - 1);
+    int peer = worker_for_shard(shard);
 
-    VLOG(2) << "Sending get request to: " << make_pair(peer, shard);
-    rpc::NetworkThread::Get()->Call(peer + 1, MessageTypes::GET, req, &resp);
+    Log::debug("Sending get request to: (%s, %s)", peer, shard);
+    workers_[peer]->get(req, &resp);
 
-    if (resp.missing_key()) {
+    if (resp.missing_key) {
       return false;
     }
 
     if (v != NULL) {
-      *v = val::from_str<V>(resp.kv_data(0).value());
+      *v = val::from_str<V>(resp.kv_data[0].value);
     }
 
 //    boost::recursive_mutex::scoped_lock sl(mutex());
@@ -623,33 +614,16 @@ public:
     return true;
   }
 
-  void clear() {
-    ClearTable req;
-
-    req.set_table(this->id());
-    VLOG(2) << StringPrintf("Sending clear request (%d)", req.table());
-
-    rpc::NetworkThread::Get()->SyncBroadcast(MessageTypes::CLEAR_TABLE, req);
-  }
-
   void start_checkpoint(const string& f, bool deltaOnly) {
-    LOG(FATAL) << "Not implemented.";
+    Log::fatal("Not implemented.");
   }
 
   void finish_checkpoint() {
-    LOG(FATAL) << "Not implemented.";
-  }
-
-  void write_delta(const TableData& d) {
-    LOG(FATAL) << "Not implemented.";
+    Log::fatal("Not implemented.");
   }
 
   void restore(const string& f) {
-    LOG(FATAL) << "Not implemented.";
-  }
-
-  void handle_put_requests() {
-    ctx()->flush_network();
+    Log::fatal("Not implemented.");
   }
 
   int flush() {
@@ -659,33 +633,24 @@ public:
     boost::recursive_mutex::scoped_lock sl(mutex());
     for (size_t i = 0; i < shards_.size(); ++i) {
       ShardT<K, V>* t = (ShardT<K, V>*) shards_[i];
-      if (!is_local_shard(i) && (shard_info_[i].dirty() || !t->empty())) {
+      if (!is_local_shard(i) && (shard_info_[i].dirty || !t->empty())) {
         // Always send at least one chunk, to ensure that we clear taint on
         // tables we own.
-        put.Clear();
+        put.kv_data.clear();
 
         for (auto j : *t) {
-          KV* put_kv = put.add_kv_data();
-          put_kv->set_key(val::to_str(j.first));
-          put_kv->set_value(val::to_str(j.second));
+          put.kv_data.push_back( {val::to_str(j.first), val::to_str(j.second)});
         }
         t->clear();
 
-        put.set_shard(i);
-        put.set_source(ctx()->id());
-        put.set_table(id());
-        put.set_epoch(ctx()->epoch());
+        put.shard = i;
+        put.source = ctx()->id();
+        put.table = id();
+        put.done = true;
 
-        put.set_done(true);
-
-        count += put.kv_data_size();
-        rpc::NetworkThread::Get()->Send(worker_for_shard(i) + 1,
-            MessageTypes::PUT_REQUEST, put);
+        count += put.kv_data.size();
+        workers_[worker_for_shard(i)]->put(put);
       }
-    }
-
-    if (count > 0) {
-      ctx()->flush_network();
     }
 
     pending_writes_ = 0;

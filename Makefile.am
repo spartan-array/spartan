@@ -1,9 +1,8 @@
-AM_CXX = mpic++
-AM_LD = mpic++
+AM_CXX = clang++
+AM_LD = clang++
 AM_CXXFLAGS = -O2 -ggdb2 -Wall -Wno-unused-result -Wno-sign-compare -std=c++11 -fno-omit-frame-pointer
 
-MPI_LDFLAGS = -pthread -L/home/power/pkg/openmpi-1.7/lib -lmpi_cxx -lmpi -lopen-rte -lopen-pal -lm -ldl -lrdmacm -libverbs -lrt -lnsl -lutil -lrt -Wl,--export-dynamic
-AM_LDFLAGS = $(MPI_LDFLAGS) -lprotobuf -lboost_thread -lpthread
+AM_LDFLAGS = -lboost_thread -lpthread
 ACLOCAL_AMFLAGS = -I m4
 
 SPARROW = sparrow
@@ -11,9 +10,7 @@ SPARROW = sparrow
 CPPFLAGS += \
   -I$(builddir)/ \
   -I$(srcdir)/ \
-  -I$(srcdir)/external/google-flags \
-  -I$(srcdir)/external/google-logging \
-  -I/home/power/pkg/openmpi-1.7/include \
+  -I$(srcdir)/external/simple-rpc \
   -I/usr/include/python2.7
 
 SWIG_INCLUDES = \
@@ -23,44 +20,34 @@ SWIG_INCLUDES = \
   pytable/support.h
 
 BUILT_SOURCES = \
-  sparrow/sparrow.pb.h \
+  sparrow/sparrow_service.h \
   pytable/_sparrow.cc
   
 $(builddir)/pytable/_sparrow.cc : \
   $(srcdir)/pytable/sparrow.i $(SWIG_INCLUDES)
 	swig -threads $(CPPFLAGS) -fvirtual -O -python -c++ -o $@ $< 
  
-$(builddir)/sparrow/sparrow.pb.cc $(builddir)/sparrow/sparrow.pb.h : $(srcdir)/sparrow/sparrow.proto
-	protoc --proto_path=$(srcdir)/sparrow --cpp_out=$(dir $@) $^
+$(builddir)/sparrow/sparrow_service.h : $(srcdir)/sparrow/sparrow_service.rpc
+	$(srcdir)/external/simple-rpc/rpc/rpcgen.py $<
 
 
-lib_LTLIBRARIES = libsparrow.la libgflags.la libglog.la _sparrow.la
+lib_LTLIBRARIES = libsparrow.la librpc.la _sparrow.la
 noinst_PROGRAMS = test-accum test-iterator
 
-LDADD = libsparrow.la libgflags.la libglog.la
+LDADD = libsparrow.la librpc.la
 _sparrow_la_LDFLAGS = -module -lrt
-_sparrow_la_LIBADD = libsparrow.la libgflags.la libglog.la
+_sparrow_la_LIBADD = libsparrow.la librpc.la
 
-libgflags_la_SOURCES = \
-	external/google-flags/gflags.cc\
-	external/google-flags/gflags_reporting.cc\
-	external/google-flags/gflags_nc.cc
-	
-libglog_la_SOURCES = \
-	external/google-logging/utilities.cc\
-	external/google-logging/vlog_is_on.cc\
-	external/google-logging/demangle.cc\
-	external/google-logging/logging.cc\
-	external/google-logging/raw_logging.cc\
-	external/google-logging/symbolize.cc\
-	external/google-logging/signalhandler.cc
+librpc_la_SOURCES = \
+    external/simple-rpc/rpc/client.cc \
+    external/simple-rpc/rpc/marshal.cc \
+    external/simple-rpc/rpc/polling.cc \
+    external/simple-rpc/rpc/server.cc \
+    external/simple-rpc/rpc/utils.cc
 	
 libsparrow_la_SOURCES =\
-    sparrow/sparrow.pb.cc\
 	sparrow/util/stringpiece.cc\
-	sparrow/util/file.cc\
 	sparrow/util/registry.cc\
-	sparrow/util/rpc.cc\
 	sparrow/util/common.cc\
 	sparrow/table.cc\
 	sparrow/kernel.cc\

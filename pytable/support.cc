@@ -9,8 +9,10 @@
 
 #include <Python.h>
 
-// Python utility functions/classes
+using rpc::Log;
 
+
+// Python utility functions/classes
 struct GILHelper {
   PyGILState_STATE gstate;
   GILHelper() {
@@ -52,7 +54,7 @@ template <class T>
 T check(T result) {
   if (PyErr_Occurred()) {
     PyErr_Print();
-    LOG(FATAL)<< "Python error, aborting.";
+    Log::fatal("Python error, aborting.");
   }
   return result;
 }
@@ -84,7 +86,6 @@ public:
   RefPtr load(const std::string& data) {
     GILHelper lock;
     RefPtr py_str(check(PyString_FromStringAndSize(data.data(), data.size())));
-    //  LOG(INFO) << "Unpickle took " << t.elapsed() << " seconds.";
     return RefPtr(
         check(PyObject_CallFunction(loads.get(), W("O"), py_str.get())));
   }
@@ -99,7 +100,6 @@ public:
     PyString_AsStringAndSize(py_str.get(), &v, &len);
     out.resize(len);
     memcpy(&out[0], v, len);
-    //  LOG(INFO) << "Pickle took " << t.elapsed() << " seconds.";
     return out;
   }
 };
@@ -204,12 +204,8 @@ public:
 };
 REGISTER_KERNEL(PythonKernel);
 
-MasterHandle init(int argc, char* argv[]) {
-  Init(argc, argv);
-  if (!StartWorker()) {
-    return (MasterHandle) (new Master());
-  }
-  return 0;
+MasterHandle init() {
+  return (MasterHandle)start_master("216.165.108.65:9999", 10);
 }
 
 void shutdown(MasterHandle h) {
@@ -241,7 +237,7 @@ TableHandle create_table(MasterHandle m, PyObject* sharder, PyObject* accum,
 }
 
 void destroy_table(MasterHandle, TableHandle) {
-  LOG(FATAL)<< "Not implemented.";
+  Log::fatal("Not implemented.");
 }
 
 void foreach_shard(MasterHandle m, TableHandle t, PyObject* fn,

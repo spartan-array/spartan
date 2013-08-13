@@ -1,11 +1,8 @@
-#include "sparrow/master.h"
-#include "sparrow/worker.h"
-#include "sparrow/util/common.h"
-
+#include "test-common.h"
 #include <vector>
 
-using namespace sparrow;
-using namespace std;
+using std::vector;
+using std::pair;
 
 class IterKernel: public Kernel {
 public:
@@ -19,28 +16,24 @@ public:
 REGISTER_KERNEL(IterKernel);
 
 int main(int argc, char** argv) {
-  sparrow::Init(argc, argv);
+  Master* m = start_cluster();
 
-  if (!StartWorker()) {
-    Master m;
+  auto t = m->create_table<int, int>(new Modulo<int>, new Replace<int>);
+  m->map_shards(t, "IterKernel");
 
-    auto t = m.create_table<int, int>(new Modulo<int>, new Replace<int>);
-    m.map_shards(t, "IterKernel");
+  // Merged iterator.
+  auto i = t->get_iterator();
+  vector < pair<int, int> > results;
 
-    // Merged iterator.
-    auto i = t->get_iterator();
-    vector<pair<int, int> > results;
+  while (!i->done()) {
+    results.push_back(make_pair(i->key(), i->value()));
+    i->next();
+  }
 
-    while (!i->done()) {
-      results.push_back(make_pair(i->key(), i->value()));
-      i->next();
-    }
+  sort(results.begin(), results.end());
 
-    sort(results.begin(), results.end());
-
-    for (int i = 0; i < 100; ++i) {
-      CHECK_EQ(results[i].first, i);
-      CHECK_EQ(results[i].second, i);
-    }
+  for (int i = 0; i < 100; ++i) {
+    CHECK(results[i].first == i);
+    CHECK(results[i].second == i);
   }
 }

@@ -1,7 +1,7 @@
 ## Sparrow
 
 Sparrow is a distributed array engine, built on top of a Piccolo-style
-updateable key-value store.
+key-value store.
 
 ### Installation
 
@@ -13,14 +13,16 @@ Dependencies:
 * Protocol buffers
 * Boost threading library
 
-On Debian-based systems, dependencies can be installed via:
 
-	sudo apt-get install build-essential libboost-dev libboost-thread-dev \
-    libopenmpi-dev libprotobuf-dev openmpi-bin protobuf-compiler  
-    
 Fetch the source:
 
     git clone https://github.com/rjpower/sparrow
+    
+
+On Debian-based systems, dependencies can be installed via:
+
+	sudo apt-get install build-essential libboost-dev libboost-thread-dev \
+    libopenmpi-dev libprotobuf-dev openmpi-bin protobuf-compiler
     
 Build:
 

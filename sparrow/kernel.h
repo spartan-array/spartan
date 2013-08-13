@@ -5,7 +5,6 @@
 
 #include "sparrow/util/common.h"
 #include "sparrow/util/registry.h"
-#include "sparrow/sparrow.pb.h"
 
 #include <map>
 #include <string>

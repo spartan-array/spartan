@@ -3,9 +3,7 @@
 
 #include <string>
 #include <map>
-#include "glog/logging.h"
-
-using namespace std;
+#include "common.h"
 
 namespace sparrow {
 
@@ -23,7 +21,7 @@ public:
     Creator<T>* creator;
   };
 
-  typedef map<int, CreatorInfo*> Map;
+  typedef std::map<int, CreatorInfo*> Map;
 
   static int put(std::string type, Creator<T>* creator) {
     Map& m = get_map();
@@ -34,23 +32,23 @@ public:
     info->creator = creator;
     m[new_id] = info;
 
-//    LOG(INFO)<< "Registered " << type << " : " << new_id;
+//    Log::info("Registered " << type << " : " << new_id);
 
     return new_id;
   }
 
-  static CreatorInfo* info_by_name(const string& type) {
+  static CreatorInfo* info_by_name(const std::string& type) {
     for (auto i : get_map()) {
       if (i.second->name == type) {
         return i.second;
       }
     }
 
-    LOG(FATAL) << "Failed to lookup type: " << type;
+    Log::fatal("Failed to lookup type: %s", type.c_str());
     return NULL;
   }
 
-  static T* get_by_name(const string& type) {
+  static T* get_by_name(const std::string& type) {
     if (info_by_name(type) != NULL) {
       return info_by_name(type)->creator->create();
     }
@@ -78,7 +76,7 @@ public:
       id_ = TypeRegistry<T>::put("anonymous type", this);
     }
 
-    Helper(const string& k) {
+    Helper(const std::string& k) {
       id_ = TypeRegistry<T>::put(k, this);
     }
 

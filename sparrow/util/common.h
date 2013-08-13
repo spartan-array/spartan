@@ -2,18 +2,25 @@
 #define COMMON_H_
 
 #include <ostream>
-#include <google/protobuf/message.h>
 #include <vector>
+#include "rpc/client.h"
+#include "rpc/utils.h"
 
 namespace sparrow {
 
-void Init(int argc, char** argv);
+using rpc::Log;
 
-uint64_t get_memory_rss();
-uint64_t get_memory_total();
+template<class T>
+T* connect(rpc::PollMgr* poller, std::string addr) {
+  auto client = new rpc::Client(poller);
+  client->connect(addr.c_str());
+  return new T(client);
+}
+
+#define CHECK(expr) if (!(expr)) { Log::fatal("Check failed: %s, %s", #expr); }
+#define CHECK_NE(a, b) CHECK((a != b))
 
 void Sleep(double t);
-void DumpProfile();
 
 class SpinLock {
 public:
@@ -42,15 +49,8 @@ inline std::vector<int> range(int to) {
 
 } // namespace sparrow
 
-// operator<< overload to allow protocol buffers to be output from the logging methods.
 namespace std {
-inline ostream & operator<<(ostream &out, const google::protobuf::Message &q) {
-  string s = q.ShortDebugString();
-  out << s;
-  return out;
-}
-
-template <class A, class B>
+template<class A, class B>
 inline ostream & operator<<(ostream &out, const std::pair<A, B>& p) {
   out << "(" << p.first << "," << p.second << ")";
   return out;
