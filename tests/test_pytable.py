@@ -5,7 +5,6 @@ from pytable.util import Assert
 import sys
 import test_common
   
-
 def test_init(master):
   table = master.create_table(mod_sharder, replace_accum)
 

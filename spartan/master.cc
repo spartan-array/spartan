@@ -126,7 +126,7 @@ int Master::dispatch_work(const RunDescriptor& r) {
       num_dispatched++;
 
       auto callback = [=](rpc::Future *future) {
-        Log::info("Finished.");
+        Log::info("Kernel %d finished", w_req.shard);
         w->set_finished(ShardId(w_req.table, w_req.shard));
       };
       running_kernels_.insert(
@@ -161,8 +161,8 @@ void Master::run(RunDescriptor r) {
     }
 
     dispatch_work(current_run_);
-    Log::info("Dispatch loop: %d", running_kernels_.size());
-    Sleep(0.1);
+//    Log::info("Dispatch loop: %d", running_kernels_.size());
+    Sleep(0.001);
   }
 
   // Force workers to flush outputs.

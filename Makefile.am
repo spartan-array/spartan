@@ -1,11 +1,16 @@
 AM_CXX = clang++
 AM_LD = clang++
-CXXFLAGS = -O0 -ggdb2 -Wall -Wno-unused-result -Wno-sign-compare -std=c++11 -fno-omit-frame-pointer
+CXXFLAGS = -std=c++11\
+ -O3\
+ -Wall\
+ -Wno-unused-result\
+ -Wno-sign-compare\
+ -fno-omit-frame-pointer\
+ -ffunction-sections\
+ -fdata-sections
 
-AM_LDFLAGS = -lboost_thread -lpthread
+AM_LDFLAGS = -lboost_thread -lpthread -Wl,--gc-sections
 ACLOCAL_AMFLAGS = -I m4
-
-SPARROW = sparrow
 
 CPPFLAGS += \
   -I$(builddir)/ \
@@ -20,23 +25,23 @@ SWIG_INCLUDES = \
   pytable/support.h
 
 BUILT_SOURCES = \
-  sparrow/sparrow_service.h \
-  pytable/_sparrow.cc
+  spartan/spartan_service.h \
+  pytable/_spartan.cc
   
-$(builddir)/pytable/_sparrow.cc : \
-  $(srcdir)/pytable/sparrow.i $(SWIG_INCLUDES)
+$(builddir)/pytable/_spartan.cc : \
+  $(srcdir)/pytable/spartan.i $(SWIG_INCLUDES)
 	swig -threads $(CPPFLAGS) -fvirtual -O -python -c++ -o $@ $< 
  
-$(builddir)/sparrow/sparrow_service.h : $(srcdir)/sparrow/sparrow_service.rpc
+$(builddir)/spartan/spartan_service.h : $(srcdir)/spartan/spartan_service.rpc
 	$(srcdir)/external/simple-rpc/rpc/rpcgen.py $<
 
 
-lib_LTLIBRARIES = libsparrow.la librpc.la _sparrow.la
+lib_LTLIBRARIES = libspartan.la librpc.la _spartan.la
 noinst_PROGRAMS = test-accum test-iterator
 
-LDADD = libsparrow.la librpc.la
-_sparrow_la_LDFLAGS = -module -lrt
-_sparrow_la_LIBADD = libsparrow.la librpc.la
+LDADD = libspartan.la librpc.la
+_spartan_la_LDFLAGS = -module -lrt
+_spartan_la_LIBADD = libspartan.la librpc.la
 
 librpc_la_SOURCES = \
     external/simple-rpc/rpc/client.cc \
@@ -45,18 +50,18 @@ librpc_la_SOURCES = \
     external/simple-rpc/rpc/server.cc \
     external/simple-rpc/rpc/utils.cc
 	
-libsparrow_la_SOURCES =\
-	sparrow/util/stringpiece.cc\
-	sparrow/util/registry.cc\
-	sparrow/util/common.cc\
-	sparrow/table.cc\
-	sparrow/kernel.cc\
-	sparrow/worker.cc\
-	sparrow/master.cc
+libspartan_la_SOURCES =\
+	spartan/util/stringpiece.cc\
+	spartan/util/registry.cc\
+	spartan/util/common.cc\
+	spartan/table.cc\
+	spartan/kernel.cc\
+	spartan/worker.cc\
+	spartan/master.cc
 
 
-_sparrow_la_SOURCES =\
-	pytable/_sparrow.cc \
+_spartan_la_SOURCES =\
+	pytable/_spartan.cc \
     pytable/support.cc
 
 test_accum_SOURCES = tests/test-accum.cc
