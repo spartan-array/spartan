@@ -1,47 +1,47 @@
 AM_CXX = clang++
 AM_LD = clang++
 CXXFLAGS = -std=c++11\
- -O3\
+ -O0\
+ -ggdb3\
  -Wall\
  -Wno-unused-result\
  -Wno-sign-compare\
- -fno-omit-frame-pointer\
- -ffunction-sections\
- -fdata-sections
+ -fno-omit-frame-pointer
 
-AM_LDFLAGS = -lboost_thread -lpthread -Wl,--gc-sections
+AM_LDFLAGS = -lpthread
 ACLOCAL_AMFLAGS = -I m4
 
 CPPFLAGS += \
   -I$(builddir)/ \
   -I$(srcdir)/ \
+  -I$(srcdir)/python \
   -I$(srcdir)/external/simple-rpc \
   -I/usr/include/python2.7
 
 SWIG_INCLUDES = \
-  $(SPARROW)/table.h\
-  $(SPARROW)/master.h\
-  $(SPARROW)/worker.h\
-  pytable/support.h
+  spartan/table.h\
+  spartan/master.h\
+  spartan/worker.h\
+  python/spartan/pytable/support.h
 
 BUILT_SOURCES = \
   spartan/spartan_service.h \
-  pytable/_spartan.cc
+  python/spartan/pytable/_spartan_wrap.cc
   
-$(builddir)/pytable/_spartan.cc : \
-  $(srcdir)/pytable/spartan.i $(SWIG_INCLUDES)
+$(builddir)/python/spartan/pytable/_spartan_wrap.cc : \
+  $(srcdir)/python/spartan/pytable/spartan.i $(SWIG_INCLUDES)
 	swig -threads $(CPPFLAGS) -fvirtual -O -python -c++ -o $@ $< 
  
 $(builddir)/spartan/spartan_service.h : $(srcdir)/spartan/spartan_service.rpc
 	$(srcdir)/external/simple-rpc/rpc/rpcgen.py $<
 
 
-lib_LTLIBRARIES = libspartan.la librpc.la _spartan.la
+lib_LTLIBRARIES = libspartan.la librpc.la _spartan_wrap.la
 noinst_PROGRAMS = test-accum test-iterator
 
 LDADD = libspartan.la librpc.la
-_spartan_la_LDFLAGS = -module -lrt
-_spartan_la_LIBADD = libspartan.la librpc.la
+_spartan_wrap_la_LDFLAGS = -module -lrt
+_spartan_wrap_la_LIBADD = libspartan.la librpc.la
 
 librpc_la_SOURCES = \
     external/simple-rpc/rpc/client.cc \
@@ -60,9 +60,9 @@ libspartan_la_SOURCES =\
 	spartan/master.cc
 
 
-_spartan_la_SOURCES =\
-	pytable/_spartan.cc \
-    pytable/support.cc
+_spartan_wrap_la_SOURCES =\
+	python/spartan/pytable/_spartan_wrap.cc \
+    python/spartan/pytable/support.cc
 
 test_accum_SOURCES = tests/test-accum.cc
 test_iterator_SOURCES = tests/test-iterator.cc

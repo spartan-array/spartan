@@ -1,9 +1,9 @@
-AC_INIT([sparrow], [0.1])
+AC_INIT([spartan], [0.1])
 LT_INIT
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([configure.ac])
-AC_CONFIG_HEADERS([sparrow-config.h])
+AC_CONFIG_HEADERS([spartan-config.h])
 
 AM_INIT_AUTOMAKE([foreign subdir-objects no-define silent-rules])
 AM_PATH_PYTHON
