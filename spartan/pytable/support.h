@@ -4,7 +4,7 @@
 #include <Python.h>
 #include <string>
 
-namespace sparrow {
+namespace spartan {
 
 class Master;
 class Worker;

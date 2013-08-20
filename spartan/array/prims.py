@@ -1,21 +1,8 @@
 '''Primitives that backends must support.'''
 
-from .. import util
-import pprint
-
 class Primitive(object):
-  def __init__(self):
-    pass
-  
-  def to_str(self, indent):
-    return self.__class__.__name__ + ' : ' + pprint.pformat(self.__dict__)
-  
-  def __repr__(self):
-    return self.to_str(indent=0)
-  
-  def __str__(self):
-    return self.to_str(indent=0)
-
+  cached_value = None
+    
 
 class Value(Primitive):
   def __init__(self, value):
@@ -61,3 +48,4 @@ class Index(Primitive):
   def __init__(self, base, idx):
     self.base = base
     self.idx = idx
+

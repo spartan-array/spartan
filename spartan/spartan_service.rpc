@@ -1,0 +1,125 @@
+namespace spartan
+
+struct TypeConstructor {
+  i32 type_id;
+  string opts;
+};
+
+struct CreateTableReq {
+  i32 table_type;
+  i32 num_shards;
+  vector<i32> shards;
+  i32 id;
+
+  TypeConstructor sharder;
+  TypeConstructor accum;
+  TypeConstructor selector;
+}
+
+struct DeleteTableReq {
+  i32 id; 
+}
+
+struct RunKernelReq {
+  string kernel;
+  i32 table;
+  i32 shard;
+  map<string, string> args;
+}
+
+
+struct KV {
+  string key;
+  string value;
+}
+
+struct IteratorReq {
+  i32 table;
+  i32 shard;
+  i32 id;
+  i32 count;
+}
+
+struct IteratorResp {
+  i32 id;
+  i32 done;
+  vector<KV> results;
+  i32 row_count;
+}
+
+struct PartitionInfo {
+  i32 table;
+  i32 shard;
+  i64 entries;
+  i32 owner;
+  i32 dirty;
+  i32 tainted;
+}
+
+struct TableData {
+  i32 source;
+  i32 table;
+  i32 shard;
+  i32 done;
+  string table_data;
+  vector<KV> kv_data;
+  i32 marker;
+  i32 missing_key;
+};
+
+struct GetRequest {
+  string key;
+  i32 table;
+  i32 shard;
+};
+
+struct HostPort {
+  string host;
+  i32 port;
+};
+
+struct ConfigData {
+  HostPort master;
+  vector<HostPort> workers;
+};
+
+struct ShardAssignment {
+  i32 table;
+  i32 shard;
+  i32 old_worker;
+  i32 new_worker;
+};
+
+struct ShardAssignmentReq {
+  vector<ShardAssignment> assign;
+};
+
+struct RegisterReq {
+  HostPort addr
+};
+
+struct WorkerInitReq {
+  i32 id
+  map<i32, HostPort> workers
+};
+
+service Worker {
+  fast initialize(WorkerInitReq req)
+  fast create_table(CreateTableReq req |)
+  fast delete_table(DeleteTableReq req |)
+  fast get(GetRequest req|TableData resp)
+  fast assign_shards(ShardAssignmentReq req)
+  
+  run_kernel(RunKernelReq req|)
+  get_iterator(IteratorReq req| IteratorResp resp)
+  put(TableData req|)
+  flush()
+  shutdown()
+}
+
+service Master {
+  fast register_worker(RegisterReq req|)
+}
+
+
+%%

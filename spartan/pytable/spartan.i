@@ -1,6 +1,6 @@
 // Swig definitions for Sparrow
 
-%module sparrow
+%module spartan_wrap
 
 %include <std_map.i>
 %include <std_vector.i>
@@ -9,7 +9,7 @@
 %include "numpy.i"
 
 %{
-#include "pytable/support.h"
+#include "spartan/pytable/support.h"
 %}
 
 

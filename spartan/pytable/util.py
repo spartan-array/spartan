@@ -229,7 +229,7 @@ def dump_profile():
   yappi.stop()
   yappi.get_func_stats().save('/tmp/prof.out.%d' % os.getpid(), type='callgrind')
 
-  from sparrow.rpc import zeromq
+  from spartan.rpc import zeromq
   zeromq.shutdown()
   stats = get_profile()
   if stats is None:

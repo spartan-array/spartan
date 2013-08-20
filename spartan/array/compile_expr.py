@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 '''Convert from numpy expression trees to the lower-level
-operations supported by the backends (see `sparrow.prims`).
+operations supported by the backends (see `spartan.prims`).
 
 '''
 
@@ -52,16 +52,16 @@ def argmin_local(index, value, axis):
   assert shapes_match(new_idx, new_value), (new_idx, new_value.shape)
   return [(new_idx, new_value)]
 
-def argmin_merge(a, b):
+def argmin_reducer(a, b):
   return N.where(a['f1'] < b['f1'], a, b)
 
 def sum_local(index, value, axis):
   return [(index_for_reduction(index, axis), N.sum(value, axis))]
 
+def sum_reducer(a, b):
+  return a + b
+
 def binary_op(fn, inputs, kw):
-#   print fn
-#   print inputs
-#   print kw
   if kw is not None:
     return fn(*inputs, **kw)
   return fn(*inputs)
@@ -78,19 +78,34 @@ def compile_op(op):
                            lambda inputs, kw: binary_op(op.op, inputs, kw),
                            op.kwargs)
   elif op.op == N.sum:
-    tiled_sum = prims.MapTiles(children[0], sum_local, op.kwargs['axis'])
+    tiled_sum = prims.MapTiles(
+                      children[0], 
+                      sum_local, 
+                      op.kwargs['axis'])
+    
     output = prims.NewArray(
                       basis=children[0],
                       shape=lambda basis: shape_for_reduction(basis.shape, op.kwargs['axis']),
                       dtype=lambda basis: basis.dtype)
     
-    return prims.ReduceInto(tiled_sum, output, N.add, {})
+    return prims.ReduceInto(src=tiled_sum, 
+                            dst=output, 
+                            reducer=sum_reducer, 
+                            args=None)
   elif op.op == N.argmin:
-    tiled_min = prims.MapTiles(children[0], argmin_local, op.kwargs['axis'])
-    output = prims.NewArray(basis=children[0],
+    tiled_min = prims.MapTiles(
+                      children[0], 
+                      argmin_local, 
+                      op.kwargs['axis'])
+    output = prims.NewArray(
+                      basis=children[0],
                       shape=lambda basis: shape_for_reduction(basis.shape, op.kwargs['axis']),
                       dtype=lambda basis: 'i8,f8')
-    reduced = prims.ReduceInto(tiled_min, output, argmin_merge, None)
+    reduced = prims.ReduceInto(
+                      src=tiled_min, 
+                      dst=output, 
+                      reducer=argmin_reducer, 
+                      args=None)
     return prims.MapValues(reduced, lambda v, args: v['f0'], None)
   else:
-    raise Exception, op
+    raise NotImplementedError, 'Compilation of %s not implemented yet.' % op.op

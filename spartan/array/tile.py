@@ -1,4 +1,4 @@
-from .. import util
+from spartan.pytable import util
 import numpy as np
 
 

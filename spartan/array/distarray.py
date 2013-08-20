@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 from . import tile, extent
-from .. import util
-from ..util import Assert
+from spartan import pytable
+from spartan.pytable import util
+from spartan.pytable.util import Assert
 import numpy as np
-import pytable
 
 
 # number of elements per tile
@@ -173,14 +173,13 @@ class DistArray(object):
   def id(self):
     return self.table.id()
   
-  
   @staticmethod
   def from_table(table):
     d = DistArray()
     d.table = table
     d.extents = {}
     
-    keys = pytable.keys(table)
+    keys = table.keys()
     for extent, _ in keys:
       assert not (extent in d.extents)
       d.extents[extent] = 1
@@ -241,7 +240,8 @@ class DistArray(object):
   def map(self, fn, *args):
     return DistArray.from_table(pytable.map_items(self.table, fn, *args))
   
-  
+  def map_tiles(self, fn, kw):
+    return pytable.map_items(self.table, fn, kw)  
   
   def _get(self, extent):
     return self.table.get(extent)

@@ -1,10 +1,10 @@
-from pytable import util
+from . import util
 import sys
 import traceback
-sys.path += ['build/.libs', 'build/pytable']
+sys.path += ['build/.libs', 'build/spartan/pytable']
 
 try:
-  import sparrow
+  import spartan_wrap
 except ImportError, e:
   print 'Native module import failed:', e
 
@@ -12,8 +12,8 @@ class Iter(object):
   def __init__(self, handle):
     self.handle = handle
     self._val = None
-    if not sparrow.iter_done(self.handle):
-      self._val = (sparrow.iter_key(self.handle), sparrow.iter_value(self.handle)) 
+    if not spartan_wrap.iter_done(self.handle):
+      self._val = (spartan_wrap.iter_key(self.handle), spartan_wrap.iter_value(self.handle)) 
     
   def __iter__(self):
     return self
@@ -24,10 +24,17 @@ class Iter(object):
     
     result = self._val
     self._val = None
-    sparrow.iter_next(self.handle)
-    if not sparrow.iter_done(self.handle):
-      self._val = (sparrow.iter_key(self.handle), sparrow.iter_value(self.handle))
+    spartan_wrap.iter_next(self.handle)
+    if not spartan_wrap.iter_done(self.handle):
+      self._val = (spartan_wrap.iter_key(self.handle), spartan_wrap.iter_value(self.handle))
     return result 
+
+  
+def key_mapper(k, v):
+  yield k, 1
+  
+def keys(src):
+  return map_items(src, key_mapper)
   
 
 class Table(object):
@@ -39,28 +46,31 @@ class Table(object):
     self.selector = selector
     
   def id(self):
-    return sparrow.get_id(self.handle)
+    return spartan_wrap.get_id(self.handle)
     
   def __getitem__(self, key):
-    return sparrow.get(self.handle, key)
+    return spartan_wrap.get(self.handle, key)
   
   def __setitem__(self, key, value):
-    return sparrow.update(self.handle, key, value)
+    return spartan_wrap.update(self.handle, key, value)
+  
+  def keys(self):
+    return keys(self)    
   
   def get(self, key):
-    return sparrow.get(self.handle, key)
+    return spartan_wrap.get(self.handle, key)
   
   def update(self, key, value):
-    return sparrow.update(self.handle, key, value)
+    return spartan_wrap.update(self.handle, key, value)
   
   def num_shards(self):
-    return sparrow.num_shards(self.handle)
+    return spartan_wrap.num_shards(self.handle)
   
   def __iter__(self):
     return self.iter(-1)
   
   def iter(self, shard):
-    return Iter(sparrow.get_iterator(self.handle, shard))
+    return Iter(spartan_wrap.get_iterator(self.handle, shard))
   
 
 class Kernel(object):
@@ -69,14 +79,14 @@ class Kernel(object):
   
   def table(self, table_id):
     return Table(None, 
-                 sparrow.get_table(sparrow.cast(self.handle), table_id), 
+                 spartan_wrap.get_table(spartan_wrap.cast(self.handle), table_id), 
                  None, None, None)
   
   def current_shard(self):
-    return sparrow.current_shard(sparrow.cast(self.handle))
+    return spartan_wrap.current_shard(spartan_wrap.cast(self.handle))
   
   def current_table(self):
-    return sparrow.current_table(sparrow.cast(self.handle))
+    return spartan_wrap.current_table(spartan_wrap.cast(self.handle))
 
 
 def _bootstrap_kernel(handle, args):
@@ -92,22 +102,22 @@ class Master(object):
   def __del__(self):
     #print 'Shutting down!'
     #traceback.print_stack()
-    sparrow.shutdown(self.handle)
+    spartan_wrap.shutdown(self.handle)
     
   def create_table(self, sharder, accum, selector=None):
-    return Table(self, sparrow.create_table(self.handle, sharder, accum, selector),
+    return Table(self, spartan_wrap.create_table(self.handle, sharder, accum, selector),
                  sharder, accum, selector)
   
   def foreach_shard(self, table, kernel, args):
-    return sparrow.foreach_shard(self.handle, table.handle, _bootstrap_kernel, 
+    return spartan_wrap.foreach_shard(self.handle, table.handle, _bootstrap_kernel, 
                                  (kernel, args))
 
 
 def start_master(*args):
-  return Master(sparrow.start_master(*args))
+  return Master(spartan_wrap.start_master(*args))
 
 def start_worker(*args):
-  return sparrow.start_worker(*args)
+  return spartan_wrap.start_worker(*args)
 
 def mod_sharder(k, num_shards):
   return hash(k) % num_shards
@@ -117,7 +127,6 @@ def replace_accum(cur, update):
 
 def sum_accum(cur, update):
   return cur + update
-
 
 def mapper_kernel(kernel, args):
   src_id, dst_id, fn, fn_args = args
@@ -150,13 +159,6 @@ def map_inplace(table, fn, *args):
   dst = src
   table.master.foreach_shard(table, mapper_kernel, (src.id(), dst.id(), fn, args))
   return dst
-  
-def key_mapper(k, v):
-  yield k, 1
-  
-def keys(src):
-  return map_items(src, key_mapper)
-
 
 def fetch(table):
   out = []

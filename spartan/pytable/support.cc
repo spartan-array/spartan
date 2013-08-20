@@ -1,11 +1,11 @@
-#include "pytable/support.h"
+#include "spartan/pytable/support.h"
 
-#include "sparrow/table.h"
-#include "sparrow/master.h"
-#include "sparrow/kernel.h"
-#include "sparrow/worker.h"
+#include "spartan/table.h"
+#include "spartan/master.h"
+#include "spartan/kernel.h"
+#include "spartan/worker.h"
 
-#include "sparrow/util/marshal.h"
+#include "spartan/util/marshal.h"
 
 #include <Python.h>
 
@@ -23,12 +23,21 @@ struct GILHelper {
   }
 };
 
+// Manage Python reference counts.  If Python is shutting
+// down, then the GIL is no longer valid so we don't do
+// anything (and we don't care about ref counts at that point anyway).
 static inline void intrusive_ptr_add_ref(PyObject* p) {
-  Py_IncRef(p);
+  if (Py_IsInitialized()) {
+    GILHelper h;
+    Py_IncRef(p);
+  }
 }
 
 static inline void intrusive_ptr_release(PyObject* p) {
-  Py_DecRef(p);
+  if (Py_IsInitialized()) {
+    GILHelper h;
+    Py_DecRef(p);
+  }
 }
 
 typedef boost::intrusive_ptr<PyObject> RefPtr;
@@ -103,7 +112,7 @@ public:
 
 static Pickler kPickler;
 
-namespace sparrow {
+namespace spartan {
 
 typedef TableT<RefPtr, RefPtr> PyTable;
 
@@ -196,7 +205,8 @@ public:
     GILHelper lock;
     RefPtr fn(kPickler.load(args()["map_fn"]));
     RefPtr fn_args(kPickler.load(args()["map_args"]));
-    PyObject* result(check(PyObject_CallFunction(fn.get(), W("lO"), this, fn_args.get())));
+    PyObject* result(
+        check(PyObject_CallFunction(fn.get(), W("lO"), this, fn_args.get())));
     Py_DecRef(result);
   }
 };
@@ -238,12 +248,12 @@ void destroy_table(Master*, Table*) {
 }
 
 void foreach_shard(Master*m, Table* t, PyObject* fn, PyObject* args) {
-  sparrow::RunDescriptor r;
+  spartan::RunDescriptor r;
   r.kernel = "PythonKernel";
   r.args["map_fn"] = kPickler.store(fn);
   r.args["map_args"] = kPickler.store(args);
   r.table = (PyTable*) t;
-  r.shards = sparrow::range(0, ((Table*) t)->num_shards());
+  r.shards = spartan::range(0, ((Table*) t)->num_shards());
   ((Master*) m)->run(r);
 }
 
@@ -257,13 +267,19 @@ PyObject* get(Table* t, PyObject* k) {
   if (result == NULL) {
     result = Py_None;
   }
-  Py_IncRef(result);
+  {
+    GILHelper lock;
+    Py_IncRef(result);
+  }
   return result;
 }
 
 void update(Table* t, PyObject* k, PyObject* v) {
-  Py_IncRef(k);
-  Py_IncRef(v);
+  {
+    GILHelper lock;
+    Py_IncRef(k);
+    Py_IncRef(v);
+  }
   ((PyTable*) t)->update(k, v);
 }
 
@@ -279,12 +295,18 @@ TableIterator* get_iterator(Table* t, int shard) {
 }
 
 PyObject* iter_key(TableIterator* i) {
-  Py_IncRef(((PyTable::Iterator*) i)->key().get());
+  {
+    GILHelper lock;
+    Py_IncRef(((PyTable::Iterator*) i)->key().get());
+  }
   return ((PyTable::Iterator*) i)->key().get();
 }
 
 PyObject* iter_value(TableIterator* i) {
-  Py_IncRef(((PyTable::Iterator*) i)->value().get());
+  {
+    GILHelper lock;
+    Py_IncRef(((PyTable::Iterator*) i)->value().get());
+  }
   return ((PyTable::Iterator*) i)->value().get();
 }
 
