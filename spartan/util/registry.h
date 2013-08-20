@@ -5,7 +5,7 @@
 #include <map>
 #include "common.h"
 
-namespace sparrow {
+namespace spartan {
 
 template<class T>
 class Creator {
@@ -96,10 +96,10 @@ private:
 template<class T>
 typename TypeRegistry<T>::Map* TypeRegistry<T>::creator_map_ = NULL;
 
-} // namespace sparrow
+} // namespace spartan
 
 #define REGISTER_TYPE(BaseType, T)\
-  static sparrow::TypeRegistry<BaseType>::Helper<T> register_type_(#T); # T;
+  static spartan::TypeRegistry<BaseType>::Helper<T> register_type_(#T); # T;
 
 #ifdef SWIG
 #define DECLARE_REGISTRY_HELPER(Base, Self)
@@ -107,15 +107,15 @@ typename TypeRegistry<T>::Map* TypeRegistry<T>::creator_map_ = NULL;
 #define TMPL_DEFINE_REGISTRY_HELPER(Base, Self)
 #else
 #define DECLARE_REGISTRY_HELPER(Base, Self)\
-  static sparrow::TypeRegistry<Base>::Helper<Self> type_helper_;\
+  static spartan::TypeRegistry<Base>::Helper<Self> type_helper_;\
   int type_id() { return type_helper_.id(); }
 
 #define DEFINE_REGISTRY_HELPER(Base, Self)\
-  sparrow::TypeRegistry<Base>::Helper<Self> Self::type_helper_;
+  spartan::TypeRegistry<Base>::Helper<Self> Self::type_helper_;
 
 #define TMPL_DEFINE_REGISTRY_HELPER(Base, Self)\
   template <class T>\
-  sparrow::TypeRegistry<Base>::Helper<Self<T> > Self<T>::type_helper_;
+  spartan::TypeRegistry<Base>::Helper<Self<T> > Self<T>::type_helper_;
 #endif
 
 #endif

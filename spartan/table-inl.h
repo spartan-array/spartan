@@ -6,7 +6,7 @@
 
 #include <boost/utility/enable_if.hpp>
 
-namespace sparrow {
+namespace spartan {
 
 template<class K, class V>
 RemoteIterator<K, V>::RemoteIterator(Table *table, int shard,
@@ -108,6 +108,6 @@ struct Replace: public AccumulatorT<V> {
 TMPL_DEFINE_REGISTRY_HELPER(Accumulator, Replace);
 
 }
- // namespace sparrow
+ // namespace spartan
 
 #endif /* TABLE_INL_H_ */

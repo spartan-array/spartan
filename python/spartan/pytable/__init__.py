@@ -1,7 +1,8 @@
-from . import util
+from .. import util
 import sys
 import traceback
-sys.path += ['build/.libs', 'build/spartan/pytable']
+
+sys.path += ['../build/.libs', '../build/spartan/pytable']
 
 try:
   import spartan_wrap

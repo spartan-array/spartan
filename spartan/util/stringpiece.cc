@@ -1,12 +1,12 @@
-#include "sparrow/util/stringpiece.h"
-#include "sparrow/util/hash.h"
+#include "spartan/util/stringpiece.h"
+#include "spartan/util/hash.h"
 
 #include <stdarg.h>
 #include <stdio.h>
 
 using std::vector;
 
-namespace sparrow {
+namespace spartan {
 StringPiece::StringPiece() :
     data(NULL), len(0) {
 }

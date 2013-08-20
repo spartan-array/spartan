@@ -1,8 +1,8 @@
-#include "sparrow/master.h"
-#include "sparrow/worker.h"
-#include "sparrow/util/common.h"
+#include "spartan/master.h"
+#include "spartan/worker.h"
+#include "spartan/util/common.h"
 
-using namespace sparrow;
+using namespace spartan;
 using namespace rpc;
 
 Master* start_cluster() {

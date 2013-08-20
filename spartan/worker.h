@@ -3,14 +3,15 @@
 
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
+#include <boost/noncopyable.hpp>
 #include <map>
 
-#include "sparrow/util/common.h"
-#include "sparrow/kernel.h"
-#include "sparrow/table.h"
-#include "sparrow/sparrow_service.h"
+#include "spartan/util/common.h"
+#include "spartan/kernel.h"
+#include "spartan/table.h"
+#include "spartan/spartan_service.h"
 
-namespace sparrow {
+namespace spartan {
 
 Worker* start_worker(const std::string& master, int port = -1);
 
@@ -42,12 +43,10 @@ public:
   }
 
 private:
-  mutable boost::recursive_mutex state_lock_;
+  rpc::Mutex lock_;
 
   int id_;
   bool running_;
-  bool kernel_active_;
-  bool handling_putreqs_;
 
   ConfigData config_;
 

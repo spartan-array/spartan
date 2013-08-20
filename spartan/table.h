@@ -1,22 +1,21 @@
-#ifndef SPARROW_TABLE_H
-#define SPARROW_TABLE_H
+#ifndef SPARTAN_TABLE_H
+#define SPARTAN_TABLE_H
 
 #include <map>
 #include <queue>
 
 #include <boost/functional/hash.hpp>
 #include <boost/smart_ptr.hpp>
-#include <boost/thread.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/unordered_map.hpp>
 
-#include "sparrow/util/common.h"
-#include "sparrow/util/marshal.h"
-#include "sparrow/util/registry.h"
-#include "sparrow/util/timer.h"
-#include "sparrow/sparrow_service.h"
+#include "spartan/util/common.h"
+#include "spartan/util/marshal.h"
+#include "spartan/util/registry.h"
+#include "spartan/util/timer.h"
+#include "spartan/spartan_service.h"
 
-namespace sparrow {
+namespace spartan {
 
 using std::make_pair;
 using boost::make_tuple;
@@ -29,12 +28,12 @@ static const int kDefaultIteratorFetch = 2048;
 // Flush changes after this writes.
 static const int kDefaultFlushFrequency = 1000000;
 
-#define GLOBAL_TABLE_USE_SCOPEDLOCK 0
+#define GLOBAL_TABLE_USE_SCOPEDLOCK 1
 
 #if GLOBAL_TABLE_USE_SCOPEDLOCK == 0
 #define GRAB_LOCK do { } while(0)
 #else
-#define GRAB_LOCK boost::recursive_mutex::scoped_lock sl(mutex())
+#define GRAB_LOCK rpc::ScopedLock sl(mutex())
 #endif
 
 // An instance of Marshal must be available for key and value types.
@@ -414,7 +413,7 @@ public:
 
 private:
   boost::unordered_map<K, CacheEntry> cache_;
-  boost::recursive_mutex m_;
+  rpc::Mutex m_;
   static TypeRegistry<Table>::Helper<TableT<K, V> > register_me_;
 
 public:
@@ -464,18 +463,18 @@ public:
   void update(const K& k, const V& v) {
     int shard_id = this->shard_for_key(k);
 
-    GRAB_LOCK;;
-
     ShardT<K, V>& s = typed_shard(shard_id);
-    typename ShardT<K, V>::iterator i = s.find(k);
-    if (i == s.end()) {
-      s[k] = v;
-    } else {
-      ((AccumulatorT<K>*) accum)->accumulate(&i->second, v);
+    {
+      GRAB_LOCK;
+      typename ShardT<K, V>::iterator i = s.find(k);
+      if (i == s.end()) {
+        s[k] = v;
+      } else {
+        ((AccumulatorT<K>*) accum)->accumulate(&i->second, v);
+      }
     }
 
-    ++pending_writes_;
-    if (pending_writes_ > flush_frequency) {
+    if (__sync_add_and_fetch(&pending_writes_, 1) > flush_frequency) {
       flush();
     }
   }
@@ -484,13 +483,13 @@ public:
     int shard = this->shard_for_key(k);
 
     if (tainted(shard)) {
-      GRAB_LOCK;
       while (tainted(shard)) {
         sched_yield();
       }
     }
 
     if (is_local_shard(shard)) {
+      GRAB_LOCK;
       ShardT<K, V>& s = (ShardT<K, V>&) (*shards_[shard]);
       typename ShardT<K, V>::iterator i = s.find(k);
       if (i == s.end()) {
@@ -574,7 +573,7 @@ public:
 
   bool get_remote(int shard, const K& k, V* v) {
 //    {
-//      boost::recursive_mutex::scoped_lock sl(mutex());
+//      GRAB_LOCK;
 //      if (cache_.find(k) != cache_.end()) {
 //        CacheEntry& c = cache_[k];
 //        *v = c.val;
@@ -595,7 +594,7 @@ public:
 
     int peer = worker_for_shard(shard);
 
-    Log::debug("Sending get request to: (%d, %d)", peer, shard);
+//    Log::debug("Sending get request to: (%d, %d)", peer, shard);
     workers[peer]->get(req, &resp);
 
     if (resp.missing_key) {
@@ -606,7 +605,7 @@ public:
       *v = val::from_str<V>(resp.kv_data[0].value);
     }
 
-//    boost::recursive_mutex::scoped_lock sl(mutex());
+//    GRAB_LOCK;
 //    CacheEntry c = {Now(), *v};
 //    cache_[k] = c;
     return true;
@@ -626,9 +625,10 @@ public:
 
   int flush() {
     int count = 0;
-
     TableData put;
-    boost::recursive_mutex::scoped_lock sl(mutex());
+
+    GRAB_LOCK;
+
     for (size_t i = 0; i < shards_.size(); ++i) {
       ShardT<K, V>* t = (ShardT<K, V>*) shards_[i];
       if (!is_local_shard(i) && (shard_info_[i].dirty || !t->empty())) {
@@ -656,8 +656,8 @@ public:
   }
 
 protected:
-  boost::recursive_mutex& mutex() {
-    return m_;
+  rpc::Mutex* mutex() {
+    return &m_;
   }
 };
 

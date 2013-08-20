@@ -27,7 +27,6 @@ struct RunKernelReq {
   map<string, string> args;
 }
 
-
 struct KV {
   string key;
   string value;
@@ -103,7 +102,7 @@ struct WorkerInitReq {
   map<i32, HostPort> workers
 };
 
-service Worker {
+abstract service Worker {
   fast initialize(WorkerInitReq req)
   fast create_table(CreateTableReq req |)
   fast delete_table(DeleteTableReq req |)
@@ -117,7 +116,7 @@ service Worker {
   shutdown()
 }
 
-service Master {
+abstract service Master {
   fast register_worker(RegisterReq req|)
 }
 

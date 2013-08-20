@@ -9,7 +9,6 @@ from . import expr, prims
 from .. import util
 import numpy as N
 
-
 binary_ops = set([N.add, N.subtract, N.multiply, N.divide, N.mod, N.power,
                   N.equal, N.less, N.less_equal, N.greater, N.greater_equal])
 

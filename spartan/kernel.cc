@@ -1,7 +1,7 @@
-#include "sparrow/worker.h"
-#include "sparrow/kernel.h"
+#include "spartan/worker.h"
+#include "spartan/kernel.h"
 
-namespace sparrow {
+namespace spartan {
 Table* Kernel::get_table(int id) {
   return w_->tables()[id];
 }

@@ -1,8 +1,8 @@
-#include "sparrow/table.h"
-#include "sparrow/util/registry.h"
-#include "sparrow/util/timer.h"
+#include "spartan/table.h"
+#include "spartan/util/registry.h"
+#include "spartan/util/timer.h"
 
-using namespace sparrow;
+using namespace spartan;
 
 #define _PASTE(x, y) x ## y
 #define PASTE(x, y) _PASTE(x, y)
@@ -20,7 +20,7 @@ static TypeRegistry<Accumulator>::Helper<Accum_ ## AccumType ## _ ## ValueType>\
   MAKE_ACCUMULATOR(Sum, ValueType);\
   MAKE_ACCUMULATOR(Replace, ValueType)
 
-namespace sparrow {
+namespace spartan {
 
 
 }

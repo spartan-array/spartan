@@ -1,8 +1,8 @@
-from pytable import util
+from spartan import pytable
+from spartan.pytable import util
 import imp
-import pytable
-import types
 import socket
+import types
 
 def start_cluster():
   master = pytable.start_master(9999, 4)

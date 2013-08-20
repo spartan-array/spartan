@@ -1,17 +1,19 @@
 #ifndef MASTER_H_
 #define MASTER_H_
 
-#include "sparrow/kernel.h"
-#include "sparrow/table.h"
-#include "sparrow/util/common.h"
-#include "sparrow/util/timer.h"
+#include "spartan/kernel.h"
+#include "spartan/table.h"
+#include "spartan/util/common.h"
+#include "spartan/util/timer.h"
+#include "spartan/spartan_service.h"
 
-#include "sparrow/sparrow_service.h"
+#include "rpc/utils.h"
 
 #include <vector>
 #include <map>
+#include <boost/noncopyable.hpp>
 
-namespace sparrow {
+namespace spartan {
 
 class WorkerState;
 class TaskState;
@@ -63,6 +65,8 @@ public:
   WorkerProxy *proxy;
   HostPort addr;
 
+  mutable rpc::Mutex lock;
+
   WorkerState(int w_id, HostPort addr) :
       id(w_id) {
     last_ping_time = Now();
@@ -73,6 +77,8 @@ public:
   }
 
   bool is_assigned(ShardId id) {
+    rpc::ScopedLock sl(&lock);
+
     return pending.find(id) != pending.end();
   }
 
@@ -85,24 +91,34 @@ public:
   }
 
   bool serves(ShardId id) const {
+    rpc::ScopedLock sl(&lock);
+
     return shards.find(id) != shards.end();
   }
 
   void assign_shard(int table, int shard) {
+    rpc::ScopedLock sl(&lock);
+
     ShardId t(table, shard);
     shards.insert(t);
   }
 
   void assign_task(ShardId id) {
+    rpc::ScopedLock sl(&lock);
+
     TaskState state(id, 1);
     pending[id] = state;
   }
 
   void remove_task(ShardId id) {
+    rpc::ScopedLock sl(&lock);
+
     pending.erase(pending.find(id));
   }
 
   void clear_tasks() {
+    rpc::ScopedLock sl(&lock);
+
     CHECK(active.empty());
     pending.clear();
     active.clear();
@@ -110,29 +126,32 @@ public:
   }
 
   void set_finished(const ShardId& id) {
+    rpc::ScopedLock sl(&lock);
+
     finished[id] = active[id];
     active.erase(active.find(id));
   }
 
   std::string str() {
+    rpc::ScopedLock sl(&lock);
+
     return StringPrintf("W(%d) p: %d; a: %d f: %d", id, pending.size(),
         active.size(), finished.size());
   }
 
   int num_assigned() const {
+    rpc::ScopedLock sl(&lock);
     return pending.size() + active.size() + finished.size();
   }
 
-  int64_t total_size() const {
-    int64_t out = 0;
-    for (TaskMap::const_iterator i = pending.begin(); i != pending.end(); ++i) {
-      out += 1 + i->second.size;
-    }
-    return out;
+  int num_pending() const {
+    return pending.size();
   }
 
   // Order pending tasks by our guess of how large they are
   bool get_next(const RunDescriptor& r, RunKernelReq* msg) {
+    rpc::ScopedLock sl(&lock);
+
     if (pending.empty()) {
       return false;
     }
@@ -171,6 +190,7 @@ public:
       AccumulatorT<V>* accum = new Replace<V>(), SelectorT<K, V>* selector =
           NULL, std::string sharder_opts = "", std::string accum_opts = "",
       std::string selector_opts = "") {
+    wait_for_workers();
 
     TableT<K, V>* t = new TableT<K, V>();
 
@@ -211,9 +231,10 @@ public:
 
     tables_[t->id()] = t;
 
-    rpc::FutureGroup futures;
+//    rpc::FutureGroup futures;
     for (auto w : workers_) {
-      futures.add(w->proxy->async_create_table(req));
+      w->proxy->create_table(req);
+//      futures.add(w->proxy->async_create_table(req));
     }
 
     assign_shards(t);
@@ -229,9 +250,10 @@ public:
     run(r);
   }
 
-  void register_worker(const RegisterReq& req);
   void run(RunDescriptor r);
+
 private:
+  void register_worker(const RegisterReq& req);
 
 // Find a worker to run a kernel on the given table and shard.  If a worker
 // already serves the given shard, return it.  Otherwise, find an eligible
@@ -242,17 +264,22 @@ private:
   void assign_shards(Table *t);
   void assign_tasks(const RunDescriptor& r, std::vector<int> shards);
   int dispatch_work(const RunDescriptor& r);
+  int num_pending(const RunDescriptor& r);
 
   RunDescriptor current_run_;
   double current_run_start_;
 
   int num_workers_;
   std::vector<WorkerState*> workers_;
-  std::set<rpc::Future*> running_kernels_;
+
+  rpc::Mutex lock_;
+  std::map<int, rpc::Future*> running_kernels_;
 
   rpc::PollMgr *poller_;
   TableMap tables_;
   Timer runtime_;
+
+  bool initialized_;
 };
 
 }

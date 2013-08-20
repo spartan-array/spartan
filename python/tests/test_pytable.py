@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-from pytable import mod_sharder, replace_accum, fetch
-from pytable.util import Assert
+from spartan.pytable import mod_sharder, replace_accum, fetch
+from spartan.util import Assert
 import sys
 import test_common
   

@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 
-namespace sparrow {
+namespace spartan {
 
 using std::string;
 
@@ -74,10 +74,10 @@ string ToString(int64_t);
 string ToString(string);
 string ToString(StringPiece);
 
-} // namespace sparrow
+} // namespace spartan
 
 namespace boost {
-static inline size_t hash_value(const sparrow::StringPiece& k) {
+static inline size_t hash_value(const spartan::StringPiece& k) {
   return k.hash();
 }
 } // namespace boost

@@ -1,10 +1,10 @@
-#include "sparrow/util/registry.h"
+#include "spartan/util/registry.h"
 
 #include <stdio.h>
 
 using namespace std;
 
-namespace sparrow {
+namespace spartan {
 
 
 }

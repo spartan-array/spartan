@@ -1,5 +1,5 @@
-#include "sparrow/util/common.h"
-#include "sparrow/util/stats.h"
+#include "spartan/util/common.h"
+#include "spartan/util/stats.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -15,13 +15,13 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "sparrow-config.h"
+#include "spartan-config.h"
 
 #ifdef HAVE_LZO
 #include <lzo/lzo1x.h>
 #endif
 
-namespace sparrow {
+namespace spartan {
 
 const double Histogram::kMinVal = 1e-9;
 const double Histogram::kLogBase = 1.1;

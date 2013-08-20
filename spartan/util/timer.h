@@ -1,7 +1,7 @@
 #ifndef TIMER_H_
 #define TIMER_H_
 
-namespace sparrow {
+namespace spartan {
 
 static uint64_t rdtsc() {
   uint32_t hi, lo;

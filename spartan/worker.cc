@@ -4,24 +4,24 @@
 #include <boost/tuple/tuple.hpp>
 #include <boost/tuple/tuple_io.hpp>
 
-#include "sparrow/kernel.h"
-#include "sparrow/table.h"
-#include "sparrow/util/common.h"
-#include "sparrow/util/stats.h"
-#include "sparrow/util/timer.h"
-#include "sparrow/worker.h"
+#include "spartan/kernel.h"
+#include "spartan/table.h"
+#include "spartan/util/common.h"
+#include "spartan/util/stats.h"
+#include "spartan/util/timer.h"
+#include "spartan/worker.h"
 
 using boost::make_tuple;
 using boost::unordered_map;
 using boost::unordered_set;
 
-namespace sparrow {
+namespace spartan {
 
 Worker::Worker(rpc::PollMgr* poller) {
   running_ = true;
-  kernel_active_ = false;
   current_iterator_id_ = 0;
   poller_ = poller;
+  id_ = -1;
 }
 
 Worker::~Worker() {
@@ -33,8 +33,14 @@ Worker::~Worker() {
 }
 
 void Worker::run_kernel(const RunKernelReq& kreq) {
-  Log::info("Running kernel...");
-  int owner = tables_[kreq.table]->worker_for_shard(kreq.shard);
+  CHECK(id_ != -1);
+  Log::info("WORKER: Running kernel: %d:%d", kreq.table, kreq.shard);
+  int owner = -1;
+  {
+    rpc::ScopedLock sl(lock_);
+    owner = tables_[kreq.table]->worker_for_shard(kreq.shard);
+  }
+
   if (owner != id_) {
     Log::fatal(
         "Received a shard I can't work on! (Worker: %d, Shard: (%d, %d), Owner: %d)",
@@ -45,11 +51,12 @@ void Worker::run_kernel(const RunKernelReq& kreq) {
   k->init(this, kreq.table, kreq.shard, kreq.args);
   k->run();
   flush();
+
+  Log::info("WORKER: Finished kernel: %d:%d", kreq.table, kreq.shard);
 }
 
 void Worker::flush() {
-  boost::recursive_try_mutex::scoped_lock sl(state_lock_);
-
+  rpc::ScopedLock sl(lock_);
   for (auto i : tables_) {
     i.second->flush();
   }
@@ -61,6 +68,7 @@ void Worker::get(const GetRequest& req, TableData* resp) {
   resp->shard = -1;
   resp->done = true;
 
+  rpc::ScopedLock sl(lock_);
   Table *t = tables_[req.table];
   if (!t->contains_str(req.key)) {
     resp->missing_key = true;
@@ -71,6 +79,7 @@ void Worker::get(const GetRequest& req, TableData* resp) {
 }
 
 void Worker::get_iterator(const IteratorReq& req, IteratorResp* resp) {
+  rpc::ScopedLock sl(lock_);
   int table = req.table;
   int shard = req.shard;
 
@@ -99,6 +108,8 @@ void Worker::get_iterator(const IteratorReq& req, IteratorResp* resp) {
 }
 
 void Worker::create_table(const CreateTableReq& req) {
+  CHECK(id_ != -1);
+  rpc::ScopedLock sl(lock_);
   Log::info("Creating table: %d", req.id);
   Table* t = TypeRegistry<Table>::get_by_id(req.table_type);
   t->init(req.id, req.num_shards);
@@ -122,6 +133,7 @@ void Worker::create_table(const CreateTableReq& req) {
 
 void Worker::assign_shards(const ShardAssignmentReq& shard_req) {
 //  Log::info("Shard assignment: " << shard_req.DebugString());
+  rpc::ScopedLock sl(lock_);
   for (auto a : shard_req.assign) {
     Table *t = tables_[a.table];
     t->shard_info(a.shard)->owner = a.new_worker;
@@ -133,11 +145,16 @@ void Worker::shutdown() {
 }
 
 void Worker::delete_table(const DeleteTableReq& req) {
+  rpc::ScopedLock sl(lock_);
   tables_.erase(tables_.find(req.id));
 }
 
 void Worker::put(const TableData& req) {
-  Table* t = tables_[req.table];
+  Table* t;
+  {
+    rpc::ScopedLock sl(lock_);
+    t = tables_[req.table];
+  }
   for (auto p : req.kv_data) {
     t->update_str(p.key, p.value);
   }
@@ -159,7 +176,7 @@ void Worker::initialize(const WorkerInitReq& req) {
 
 Worker* start_worker(const std::string& master_addr, int port) {
   rpc::PollMgr* manager = new rpc::PollMgr;
-  rpc::ThreadPool* threadpool = new rpc::ThreadPool;
+  rpc::ThreadPool* threadpool = new rpc::ThreadPool(8);
 
   if (port == -1) {
     port = rpc::find_open_port();

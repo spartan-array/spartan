@@ -3,24 +3,29 @@
 #include <boost/tuple/tuple.hpp>
 #include <boost/tuple/tuple_io.hpp>
 
-#include "sparrow/table.h"
-#include "sparrow/master.h"
-#include "sparrow/util/registry.h"
+#include "spartan/table.h"
+#include "spartan/master.h"
+#include "spartan/util/registry.h"
 
 using std::map;
 using std::vector;
 using std::set;
 using namespace boost::tuples;
 
-namespace sparrow {
+namespace spartan {
 
 Master::Master(rpc::PollMgr* poller, int num_workers) {
   num_workers_ = num_workers;
   current_run_start_ = 0;
   poller_ = poller;
+  initialized_ = false;
 }
 
 void Master::wait_for_workers() {
+  if (initialized_) {
+    return;
+  }
+
   while (workers_.size() < num_workers_) {
     Sleep(0.01);
   }
@@ -35,6 +40,8 @@ void Master::wait_for_workers() {
     req.id = w->id;
     w->proxy->initialize(req);
   }
+
+  initialized_ = true;
 }
 
 Master::~Master() {
@@ -44,7 +51,10 @@ Master::~Master() {
 }
 
 void Master::register_worker(const RegisterReq& req) {
-  WorkerState* w = new WorkerState(workers_.size(), req.addr);
+  rpc::ScopedLock sl(&lock_);
+  int worker_id = workers_.size();
+  WorkerState* w = new WorkerState(worker_id, req.addr);
+
   w->proxy = connect<WorkerProxy>(poller_,
       StringPrintf("%s:%d", req.addr.host.c_str(), req.addr.port));
   workers_.push_back(w);
@@ -121,22 +131,34 @@ int Master::dispatch_work(const RunDescriptor& r) {
   for (size_t i = 0; i < workers_.size(); ++i) {
     WorkerState* w = workers_[i];
     RunKernelReq w_req;
-    if (w->get_next(r, &w_req)) {
-      Log::info("Dispatching: %s", w->str().c_str());
-      num_dispatched++;
-
-      auto callback = [=](rpc::Future *future) {
-        Log::info("Kernel %d finished", w_req.shard);
-        w->set_finished(ShardId(w_req.table, w_req.shard));
-      };
-      running_kernels_.insert(
-          w->proxy->async_run_kernel(w_req, rpc::FutureAttr(callback)));
+    if (!w->get_next(r, &w_req)) {
+      continue;
     }
+
+    auto callback = [=](rpc::Future *future) {
+      Log::info("MASTER: Kernel %d:%d finished", w_req.table, w_req.shard);
+      w->set_finished(ShardId(w_req.table, w_req.shard));
+    };
+
+    rpc::Future *f = w->proxy->async_run_kernel(w_req, rpc::FutureAttr(callback));
+    running_kernels_[w_req.shard] = f;
+//    assert(w->proxy->run_kernel(w_req)== 0);
+    Log::info("MASTER: Kernel %d:%d dispatched as request %p", w_req.table, w_req.shard, f);
+    num_dispatched++;
   }
   return num_dispatched;
 }
 
+int Master::num_pending(const RunDescriptor& r) {
+  int t = 0;
+  for (auto w : workers_) {
+    t += w->num_pending();
+  }
+  return t;
+}
+
 void Master::run(RunDescriptor r) {
+  wait_for_workers();
   flush();
 
   Kernel::ScopedPtr k(TypeRegistry<Kernel>::get_by_name(r.kernel));
@@ -152,18 +174,21 @@ void Master::run(RunDescriptor r) {
   assign_tasks(current_run_, shards);
 
   dispatch_work(current_run_);
-  while (!running_kernels_.empty()) {
-    for (auto f : running_kernels_) {
-      if (f->ready()) {
-        f->release();
-        running_kernels_.erase(f);
-      }
-    }
-
+  while (num_pending(r) > 0) {
     dispatch_work(current_run_);
 //    Log::info("Dispatch loop: %d", running_kernels_.size());
-    Sleep(0.001);
+    Sleep(0);
   }
+
+  int count = 0;
+  for (auto f : running_kernels_) {
+    Log::info("Waiting for kernel %d/%d to finish...", count, running_kernels_.size());
+    f.second->wait();
+    f.second->release();
+    ++count;
+  }
+
+  running_kernels_.clear();
 
   // Force workers to flush outputs.
   flush();
@@ -188,7 +213,7 @@ void Master::flush() {
 
 Master* start_master(int port, int num_workers) {
   auto poller = new rpc::PollMgr;
-  auto tpool = new rpc::ThreadPool;
+  auto tpool = new rpc::ThreadPool(8);
   auto server = new rpc::Server(poller, tpool);
 
   auto master = new Master(poller, num_workers);
@@ -198,4 +223,4 @@ Master* start_master(int port, int num_workers) {
   return master;
 }
 
-} // namespace sparrow
+} // namespace spartan

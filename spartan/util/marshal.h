@@ -1,7 +1,7 @@
 #ifndef UTIL_MARSHAL_H_
 #define UTIL_MARSHAL_H_
 
-#include "sparrow/util/stringpiece.h"
+#include "spartan/util/stringpiece.h"
 
 #include <boost/utility/enable_if.hpp>
 #include <boost/type_traits/is_fundamental.hpp>
@@ -10,7 +10,7 @@ using boost::enable_if;
 using boost::is_arithmetic;
 using boost::is_fundamental;
 
-namespace sparrow {
+namespace spartan {
 
 struct Writer {
   virtual ~Writer() {
@@ -133,6 +133,6 @@ public:
   }
 };
 
-} // namespace sparrow
+} // namespace spartan
 
 #endif /* MARSHAL_H_ */

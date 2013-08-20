@@ -3,7 +3,7 @@
 from . import tile, extent
 from spartan import pytable
 from spartan.pytable import util
-from spartan.pytable.util import Assert
+from spartan.util import Assert
 import numpy as np
 
 

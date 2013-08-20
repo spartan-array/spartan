@@ -1,15 +1,15 @@
-#ifndef SPARROW_KERNEL_H
-#define SPARROW_KERNEL_H
+#ifndef SPARTAN_KERNEL_H
+#define SPARTAN_KERNEL_H
 
-#include "sparrow/table.h"
+#include "spartan/table.h"
 
-#include "sparrow/util/common.h"
-#include "sparrow/util/registry.h"
+#include "spartan/util/common.h"
+#include "spartan/util/registry.h"
 
 #include <map>
 #include <string>
 
-namespace sparrow {
+namespace spartan {
 
 class TableBase;
 class Worker;
@@ -70,4 +70,4 @@ private:
   static TypeRegistry<Kernel>::Helper<klass> k_helper_ ## klass(#klass);
 
 }
-#endif /* SPARROW_KERNEL_H */
+#endif /* SPARTAN_KERNEL_H */

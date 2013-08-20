@@ -1,8 +1,8 @@
-from pytable import mod_sharder, replace_accum, util, sum_accum
-from pytable.array.distarray import DistArray
-from pytable.util import Assert
+from spartan import pytable
+from spartan.array.distarray import DistArray
+from spartan.pytable import mod_sharder, replace_accum, util, sum_accum
+from spartan.util import Assert
 import numpy as np
-import pytable
 import test_common
   
 def get_shard_kernel(kernel, args):
@@ -60,7 +60,6 @@ def sum_centers(kernel, args):
 
   for extent, tile in kernel.table(pts_id).iter(kernel.current_shard()):
     idx = min_idx.get(extent.drop_axis(1))
-    print idx
     for j in range(N_CENTERS):
       c_pos[j] = np.sum(tile[idx == j], axis=0)
      
@@ -88,13 +87,13 @@ def test_kmeans(master):
 def test_ensure(master):
   local = np.arange(10000 * 10000).reshape((10000, 10000))
   dist = DistArray.arange(master, ((10000, 10000)))
-  
+   
   Assert.all_eq(dist[100:2000, 100:2000], 
                 local[100:2000, 100:2000])
-
+ 
   Assert.all_eq(dist[100:200, 100:2000], 
                 local[100:200, 100:2000])
-
+ 
   Assert.all_eq(dist[500:2000, 100:2000], 
                 local[500:2000, 100:2000])
   

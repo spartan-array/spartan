@@ -6,7 +6,7 @@
 #include "rpc/client.h"
 #include "rpc/utils.h"
 
-namespace sparrow {
+namespace spartan {
 
 using rpc::Log;
 
@@ -17,7 +17,8 @@ T* connect(rpc::PollMgr* poller, std::string addr) {
   return new T(client);
 }
 
-#define CHECK(expr) if (!(expr)) { Log::fatal("Check failed: %s, %s", #expr); }
+#define CHECK(expr) if (!(expr)) { Log::fatal("Check failed: %s.", #expr); }
+#define CHECK_EQ(a, b) CHECK((a == b))
 #define CHECK_NE(a, b) CHECK((a != b))
 
 void Sleep(double t);
@@ -47,7 +48,7 @@ inline std::vector<int> range(int to) {
   return range(0, to);
 }
 
-} // namespace sparrow
+} // namespace spartan
 
 namespace std {
 template<class A, class B>

@@ -6,7 +6,7 @@
 #include <vector>
 #include "stringpiece.h"
 
-namespace sparrow {
+namespace spartan {
 
 // Simple wrapper around a string->double map.
 struct Stats {
