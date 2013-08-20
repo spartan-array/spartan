@@ -33,13 +33,14 @@ void ServerConnection::end_reply() {
     if (bmark_ != NULL) {
         i32 reply_size = out_.get_and_reset_write_cnt();
         out_.write_bookmark(bmark_, &reply_size);
+        out_.update_read_barrier();
         delete bmark_;
         bmark_ = NULL;
     }
 
-    if (!out_.empty()) {
-        server_->pollmgr_->update_mode(this, Pollable::READ | Pollable::WRITE);
-    }
+    // always enable write events since the code above gauranteed there
+    // will be some data to send
+    server_->pollmgr_->update_mode(this, Pollable::READ | Pollable::WRITE);
 
     out_l_.unlock();
 }
@@ -117,11 +118,11 @@ void ServerConnection::handle_write(const io_ratelimit& rate) {
 
     out_l_.lock();
     Marshal::read_barrier barrier = out_.get_read_barrier();
-    out_l_.unlock();
+//    out_l_.unlock();
 
     out_.write_to_fd(socket_, barrier, rate);
 
-    out_l_.lock();
+//    out_l_.lock();
     if (out_.empty()) {
         server_->pollmgr_->update_mode(this, Pollable::READ);
     }

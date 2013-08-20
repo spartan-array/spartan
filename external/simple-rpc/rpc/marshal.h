@@ -208,11 +208,6 @@ class FastMarshal: public NoCopy {
         }
     };
 
-    chunk* head_;
-    chunk* tail_;
-    i32 write_cnt_;
-    double last_write_fd_tm_;
-
 public:
 
     struct read_barrier {
@@ -230,6 +225,16 @@ public:
             delete[] ptr;
         }
     };
+
+private:
+
+    chunk* head_;
+    chunk* tail_;
+    i32 write_cnt_;
+    double last_write_fd_tm_;
+    read_barrier rb_;
+
+public:
 
     FastMarshal(): head_(nullptr), tail_(nullptr), write_cnt_(0), last_write_fd_tm_(-1) {}
     ~FastMarshal();
@@ -251,7 +256,10 @@ public:
 
     // write content to fd with a read_barrier, which avoid modification on tail_ by
     // output thread, thus does not require locking on tail_
-    read_barrier get_read_barrier();
+    read_barrier get_read_barrier() {
+        return rb_;
+    }
+    void update_read_barrier();
     size_t write_to_fd(int fd, const read_barrier& rb, const io_ratelimit& rate);
 
     bookmark* set_bookmark(size_t n);

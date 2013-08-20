@@ -238,10 +238,10 @@ size_t FastMarshal::read_from_marshal(FastMarshal& m, size_t n) {
     return n_fetch;
 }
 
-FastMarshal::read_barrier FastMarshal::get_read_barrier() {
+
+void FastMarshal::update_read_barrier() {
     assert(empty() || (head_ != nullptr && !head_->fully_read()));
 
-    read_barrier rb;
     if (tail_ != nullptr) {
         // advance tail_ if it's fully written
         // this ensures that reading till read_barrier will not update tail_
@@ -252,12 +252,14 @@ FastMarshal::read_barrier FastMarshal::get_read_barrier() {
             tail_ = tail_->next;
         }
 
-        rb.rb_data = tail_->data;
-        rb.rb_idx = tail_->write_idx;
+        rb_.rb_data = tail_->data;
+        rb_.rb_idx = tail_->write_idx;
+    } else {
+        rb_.rb_data = nullptr;
+        rb_.rb_idx = 0;
     }
 
     assert(empty() || (head_ != nullptr && !head_->fully_read()));
-    return rb;
 }
 
 size_t FastMarshal::write_to_fd(int fd, const FastMarshal::read_barrier& rb, const io_ratelimit& rate) {

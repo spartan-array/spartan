@@ -2,13 +2,8 @@
 
 #pragma once
 
-#ifndef RPC_SERVER_H_
-#error please include server.h before including this file
-#endif // RPC_SERVER_H_
-
-#ifndef RPC_CLIENT_H_
-#error please include client.h before including this file
-#endif // RPC_CLIENT_H_
+#include "rpc/server.h"
+#include "rpc/client.h"
 
 #include <errno.h>
 
