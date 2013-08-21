@@ -2,7 +2,7 @@ from .. import util
 import sys
 import traceback
 
-sys.path += ['../build/.libs', '../build/spartan/pytable']
+sys.path += ['../build/.libs', '../build/python/spartan/pytable']
 
 try:
   import spartan_wrap
@@ -35,16 +35,26 @@ def key_mapper(k, v):
   yield k, 1
   
 def keys(src):
-  return map_items(src, key_mapper)
-  
+  key_table = map_items(src, key_mapper)
+  result = [k for k, _ in key_table]
+  key_table.destroy()
+  return result
+        
 
 class Table(object):
-  def __init__(self, master, handle, sharder, accum, selector):
-    self.master = master
-    self.handle = handle
-    self.sharder = sharder
-    self.accum = accum
-    self.selector = selector
+  def __init__(self, master, ptr_or_id):
+    if master is not None:
+      self.ctx = master
+    else:
+      self.ctx = spartan_wrap.get_context()
+    
+    if isinstance(ptr_or_id, int):
+      self.handle = spartan_wrap.get_table(self.ctx, ptr_or_id)
+    else:
+      self.handle = ptr_or_id
+          
+  def __reduce__(self):
+    return (Table, (None, self.id()))
     
   def id(self):
     return spartan_wrap.get_id(self.handle)
@@ -55,8 +65,11 @@ class Table(object):
   def __setitem__(self, key, value):
     return spartan_wrap.update(self.handle, key, value)
   
+  def destroy(self):
+    util.log('TODO(power) -- destroy tables impl.')
+  
   def keys(self):
-    return keys(self)    
+    return keys(self)
   
   def get(self, key):
     return spartan_wrap.get(self.handle, key)
@@ -73,6 +86,15 @@ class Table(object):
   def iter(self, shard):
     return Iter(spartan_wrap.get_iterator(self.handle, shard))
   
+  def sharder(self):
+    return spartan_wrap.get_sharder(self.handle)
+  
+  def accum(self):
+    return spartan_wrap.get_accum(self.handle)
+  
+  def selector(self):
+    return spartan_wrap.get_selector(self.handle)
+  
 
 class Kernel(object):
   def __init__(self, handle):
@@ -80,8 +102,7 @@ class Kernel(object):
   
   def table(self, table_id):
     return Table(None, 
-                 spartan_wrap.get_table(spartan_wrap.cast(self.handle), table_id), 
-                 None, None, None)
+                 spartan_wrap.get_table(spartan_wrap.cast(self.handle), table_id))
   
   def current_shard(self):
     return spartan_wrap.current_shard(spartan_wrap.cast(self.handle))
@@ -106,12 +127,12 @@ class Master(object):
     spartan_wrap.shutdown(self.handle)
     
   def create_table(self, sharder, accum, selector=None):
-    return Table(self, spartan_wrap.create_table(self.handle, sharder, accum, selector),
-                 sharder, accum, selector)
+    return Table(self, 
+                 spartan_wrap.create_table(self.handle, sharder, accum, selector))
   
   def foreach_shard(self, table, kernel, args):
-    return spartan_wrap.foreach_shard(self.handle, table.handle, _bootstrap_kernel, 
-                                 (kernel, args))
+    return spartan_wrap.foreach_shard(
+                          self.handle, table.handle, _bootstrap_kernel, (kernel, args))
 
 
 def start_master(*args):
@@ -135,6 +156,9 @@ def mapper_kernel(kernel, args):
   src = kernel.table(src_id)
   dst = kernel.table(dst_id)
   
+  util.log('Function: %s, args: %s',
+           fn, fn_args)
+  
   for sk, sv in src.iter(kernel.current_shard()):
     result = fn(sk, sv, *fn_args)
     if result is not None:
@@ -144,11 +168,11 @@ def mapper_kernel(kernel, args):
 
 def map_items(table, fn, *args):
   src = table
-  master = src.master
+  master = src.ctx
   
-  sharder = table.sharder
-  accum = table.accum
-  selector = table.selector
+  sharder = table.sharder()
+  accum = table.accum()
+  selector = table.selector()
   
   dst = master.create_table(sharder, accum, selector)
   master.foreach_shard(table, mapper_kernel, (src.id(), dst.id(), fn, args))
@@ -158,7 +182,7 @@ def map_items(table, fn, *args):
 def map_inplace(table, fn, *args):
   src = table
   dst = src
-  table.master.foreach_shard(table, mapper_kernel, (src.id(), dst.id(), fn, args))
+  table.ctx.foreach_shard(table, mapper_kernel, (src.id(), dst.id(), fn, args))
   return dst
 
 def fetch(table):

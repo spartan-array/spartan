@@ -1,51 +1,72 @@
 '''Primitives that backends must support.'''
 
+from . import distarray, extent
+import collections
+import numpy as np
+
+class NotShapeable(Exception):
+  pass
+
 class Primitive(object):
   cached_value = None
+  def shape(self):
+    try:
+      return self._shape()
+    except NotShapeable:
+      return None
     
-
+  def typename(self):
+    return self.__class__.__name__
+    
 class Value(Primitive):
   def __init__(self, value):
     self.value = value
     
+  def _shape(self):
+    if isinstance(self.value, np.ndarray) or \
+       isinstance(self.value, distarray.DistArray):
+      return self.value.shape
+    
+    # Promote primitives to having a 0-d shape.
+    return tuple()
+    
 
-class MapTiles(Primitive):
-  def __init__(self, array, fn, args):
-    self.array = array
-    self.fn = fn
-    self.args = args
-
-
-class MapValues(Primitive):
-  def __init__(self, array, fn, args):
-    assert isinstance(array, Primitive)
-    self.array = array
-    self.fn = fn
-    self.args = args
-
-
-class NewArray(Primitive):
-  def __init__(self, basis, shape, dtype):
-    self.basis = basis
-    self.shape = shape
-    self.dtype = dtype
-
-
-class ReduceInto(Primitive):
-  def __init__(self, src, dst, reducer, args):
-    self.args = args
-    self.src = src
-    self.dst = dst
-    self.reducer = reducer
-
-
-class Join(Primitive):
-  def __init__(self, inputs):
+class Map(Primitive):
+  def __init__(self, inputs, map_fn):
     self.inputs = inputs
+    self.map_fn = map_fn
+    
+  def _shape(self):
+    '''Maps retain the shape of inputs.
+    
+    Broadcasting results in a map taking the shape of the largest input.
+    '''
+    shapes = [i._shape() for i in self.inputs]
+    output_shape = collections.defaultdict(int)
+    for s in shapes:
+      for i, v in enumerate(s):
+        output_shape[i] = max(output_shape[i], v)
+    return tuple([output_shape[i] for i in len(output_shape)])
+    
+    
+class Slice(Primitive):
+  def __init__(self, input, slc):
+    self.input = input
+    self.slc = slc
+  
+  def _shape(self):
+    return extent.shape_for_slice(self.input._shape(), self.slc)  
 
 
-class Index(Primitive):
-  def __init__(self, base, idx):
-    self.base = base
-    self.idx = idx
+class Reduce(Primitive):
+  def __init__(self, input, axis, dtype_fn, local_reducer_fn, combiner_fn):
+    self.input = input
+    self.axis = axis
+    self.dtype_fn = dtype_fn
+    self.local_reducer_fn = local_reducer_fn
+    self.combiner_fn = combiner_fn
+    
+  def _shape(self):
+    return extent.shape_for_reduction(self.input._shape(), self.axis)
 
+  

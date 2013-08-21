@@ -4,9 +4,11 @@ import imp
 import socket
 import types
 
+NUM_WORKERS = 4
+
 def start_cluster():
-  master = pytable.start_master(9999, 4)
-  for i in range(4):
+  master = pytable.start_master(9999, NUM_WORKERS)
+  for i in range(NUM_WORKERS):
     pytable.start_worker('%s:9999' % socket.gethostname(),  10000 + i)
   return master
 

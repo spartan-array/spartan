@@ -11,7 +11,8 @@ import numpy as np
 TILE_SIZE = 100000
 
 def find_shape(extents):
-  return np.max([ex.lr for ex in extents])
+  util.log('Finding shape... %s', extents)
+  return np.max([ex.lr for ex in extents], axis=0)
 
 
 def get_data(data, index):
@@ -151,20 +152,20 @@ def compute_splits(shape):
   return _compute_splits(shape)[1]
 
 
-def create_rand(extent, data):
+def _create_rand(extent, data):
   data[:] = np.random.rand(*extent.shape)
 
-def create_randn(extent, data):
+def _create_randn(extent, data):
   data[:] = np.random.randn(*extent.shape)
   
-def create_ones(extent, data):
+def _create_ones(extent, data):
 #   util.log('Updating %s, %s', extent, data)
   data[:] = 1
 
-def create_zeros(extent, data):
+def _create_zeros(extent, data):
   data[:] = 0
 
-def create_range(extent, data):
+def _create_range(extent, data):
   pos = extent.ravelled_pos()
   sz = np.prod(extent.shape)
   data[:] = np.arange(pos, pos+sz).reshape(extent.shape)
@@ -175,19 +176,38 @@ class DistArray(object):
   
   @staticmethod
   def from_table(table):
+    '''
+    Construct a distarray from an existing table.
+    Keys must be of type `Extent`, values of type `Tile`.
+    
+    Shape is computed as the maximum range of all extents.
+    
+    Dtype is taken from the dtype of the tiles.
+    
+    :param table:
+    '''
     d = DistArray()
     d.table = table
     d.extents = {}
     
     keys = table.keys()
-    for extent, _ in keys:
+    util.log('KEYS: %s', keys)
+    for extent in keys:
       assert not (extent in d.extents)
       d.extents[extent] = 1
     
     if not d.extents:
       d.shape = tuple()
     else:
-      d.shape = find_shape(d.extents.keys())
+      d.shape = find_shape(keys)
+    
+    
+    if len(keys) > 0:
+      tile = table[keys[0]]
+      d.dtype = tile.dtype
+    else:
+      # empty table; default dtype.
+      d.dtype = np.float
     
     return d
   
@@ -223,19 +243,19 @@ class DistArray(object):
   
   @staticmethod
   def randn(master, *shape):
-    return DistArray.create_with(master, shape, create_randn)
+    return DistArray.create_with(master, shape, _create_randn)
   
   @staticmethod
   def rand(master, *shape):
-    return DistArray.create_with(master, shape, create_rand)
+    return DistArray.create_with(master, shape, _create_rand)
   
   @staticmethod
   def ones(master, shape):
-    return DistArray.create_with(master, shape, create_ones)
+    return DistArray.create_with(master, shape, _create_ones)
   
   @staticmethod
   def arange(master, shape):
-    return DistArray.create_with(master, shape, create_range)
+    return DistArray.create_with(master, shape, _create_range)
   
   def map(self, fn, *args):
     return DistArray.from_table(pytable.map_items(self.table, fn, *args))
@@ -258,7 +278,7 @@ class DistArray(object):
     
     if len(splits) == 1:
       ex, intersection = splits[0]
-      return self.get(NestedSlice(ex, ex.local_offset(intersection)))
+      return self.table.get(NestedSlice(ex, ex.local_offset(intersection)))
 
     util.log('Target shape: %s', region.shape)
     tgt = np.ndarray(region.shape)
@@ -283,3 +303,9 @@ class DistArray(object):
     
     ex = extent.TileExtent.from_slice(idx, self.shape)
     return self.ensure(ex)
+  
+  def glom(self):
+    print self.shape
+    ex = extent.TileExtent([0] * len(self.shape), self.shape, self.shape)
+    return self.ensure(ex)
+

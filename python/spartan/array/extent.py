@@ -1,11 +1,11 @@
-import numpy as N
+import numpy as np
 
 class TileExtent(object):
   '''A rectangular tile of a distributed array.'''
   def __init__(self, ul, sz, array_shape):
-    self.ul = N.array(ul)
-    self.sz = N.array(sz)
-    self.array_shape = N.array(array_shape)
+    self.ul = np.array(ul)
+    self.sz = np.array(sz)
+    self.array_shape = np.array(array_shape)
   
   @property
   def lr(self):
@@ -33,7 +33,7 @@ class TileExtent(object):
     return tuple([slice(ul, ul + sz, None) for ul, sz in zip(self.ul, self.sz)])
 
   def __repr__(self):
-    return ','.join('%s:%s' % (a, b) for a, b in zip(self.ul, self.lr))
+    return 'extent(' + ','.join('%s:%s' % (a, b) for a, b in zip(self.ul, self.lr)) + ')'
 
   def drop_axis(self, axis):
     if axis is None: return TileExtent((0,), (1,), (1,))
@@ -51,7 +51,7 @@ class TileExtent(object):
     return hash((tuple(self.ul), tuple(self.sz)))
 
   def __eq__(self, other):
-    return N.all(self.ul == other.ul) and N.all(self.sz == other.sz)
+    return np.all(self.ul == other.ul) and np.all(self.sz == other.sz)
 
   def ravelled_pos(self, global_pos=None):
     if global_pos is None:
@@ -74,7 +74,7 @@ class TileExtent(object):
       unravelled.append(local_idx % self.sz[i])
       local_idx /= self.sz[i]
     
-    unravelled = N.array(list(reversed(unravelled)))
+    unravelled = np.array(list(reversed(unravelled)))
     unravelled += self.ul
 #    util.log('%s, %s, %s, %s %s',
 #             self.ul, idx, unravelled, self.ravelled_pos(unravelled), self.array_shape)
@@ -92,7 +92,7 @@ class TileExtent(object):
 
   def size(self, axis):
     if axis is None:
-      return N.prod(self.sz)
+      return np.prod(self.sz)
     return self.sz[axis]
   
   def local_offset(self, other):
@@ -100,22 +100,40 @@ class TileExtent(object):
     :param other: `TileExtent` into the same array.
     :rtype: A slice representing the local offsets of ``other`` into this tile.
     '''
-    assert N.all(other.ul >= self.ul)
-    assert N.all(other.sz + other.ul <= self.ul + self.sz)
+    assert np.all(other.ul >= self.ul)
+    assert np.all(other.sz + other.ul <= self.ul + self.sz)
     return tuple([slice(p, p + s, None) for (p, s) in zip(other.ul - self.ul, other.sz)])
   
   def create_array(self):
-    return N.ndarray(self.shape)
+    return np.ndarray(self.shape)
 
 
 def intersection(a, b):
   '''
   :rtype: The intersection of the 2 extents as a `TileExtent`, or None if the intersection is empty.  
   '''
-  if N.any(b.lr <= a.ul): return None
-  if N.any(a.lr <= b.ul): return None
-  return TileExtent(N.maximum(b.ul, a.ul),
-                    N.minimum(b.lr, a.lr) - N.maximum(b.ul, a.ul),
+  if np.any(b.lr <= a.ul): return None
+  if np.any(a.lr <= b.ul): return None
+  return TileExtent(np.maximum(b.ul, a.ul),
+                    np.minimum(b.lr, a.lr) - np.maximum(b.ul, a.ul),
                     a.array_shape)
 
 TileExtent.intersection = intersection
+
+
+def shape_for_reduction(input_shape, axis):
+  if axis == None: return (1,)
+  input_shape = list(input_shape)
+  del input_shape[axis]
+  return input_shape
+
+
+def shapes_match(offset, data):
+  return np.all(offset.sz == data.shape)
+
+
+def index_for_reduction(index, axis):
+  return index.drop_axis(axis)
+
+def shape_for_slice(input_shape, slc):
+  raise NotImplementedError
