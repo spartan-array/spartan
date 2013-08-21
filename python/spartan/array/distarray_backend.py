@@ -15,10 +15,13 @@ def eval_Map(ctx, prim):
   largest = largest_value(inputs)
   map_fn = prim.map_fn
   
+  #@util.trace_fn
   def mapper(ex, tile):
     slc = ex.to_slice()
     local_values = [input[slc] for input in inputs]
-    return [(ex, map_fn(*local_values))]
+    result = map_fn(*local_values)
+    assert isinstance(result, np.ndarray), result
+    return [(ex, result)]
   
   return largest.map(mapper)
 

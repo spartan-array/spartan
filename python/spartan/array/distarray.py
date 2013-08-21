@@ -2,10 +2,9 @@
 
 from . import tile, extent
 from spartan import pytable
-from spartan.pytable import util
+from spartan import util
 from spartan.util import Assert
 import numpy as np
-
 
 # number of elements per tile
 TILE_SIZE = 100000
@@ -256,10 +255,12 @@ class DistArray(object):
   @staticmethod
   def arange(master, shape):
     return DistArray.create_with(master, shape, _create_range)
-  
+
+  @util.trace_fn  
   def map(self, fn, *args):
     return DistArray.from_table(pytable.map_items(self.table, fn, *args))
   
+  @util.trace_fn
   def map_tiles(self, fn, kw):
     return pytable.map_items(self.table, fn, kw)  
   

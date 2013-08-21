@@ -156,8 +156,7 @@ def mapper_kernel(kernel, args):
   src = kernel.table(src_id)
   dst = kernel.table(dst_id)
   
-  util.log('Function: %s, args: %s',
-           fn, fn_args)
+#   util.log('MAPPING: Function: %s, args: %s', fn, fn_args)
   
   for sk, sv in src.iter(kernel.current_shard()):
     result = fn(sk, sv, *fn_args)

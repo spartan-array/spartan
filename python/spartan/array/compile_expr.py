@@ -66,7 +66,7 @@ def compile_op(op):
 
   if op.op in binary_ops:
     return prims.Map(children, 
-                     lambda a, b: lambda: op.op(a, b))
+                     lambda a, b: op.op(a, b))
   elif op.op == N.sum:
     return prims.Reduce(children[0],
                         op.kwargs['axis'],

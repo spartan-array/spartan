@@ -293,3 +293,11 @@ class Assert(object):
   def is_instance(expr, klass): assert isinstance(expr, klass), 'Failed: isinstance(%s, %s)' % (expr, klass)
   
  
+def trace_fn(fn):
+  def tracer(*args, **kw):
+    log('TRACE: >> %s with args: %s %s', fn, args, kw)
+    result = fn(*args, **kw)
+    log('TRACE: << %s (%s)', fn, result)
+    return result
+  return tracer
+   
