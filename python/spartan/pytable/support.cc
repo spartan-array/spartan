@@ -5,6 +5,7 @@
 #include "spartan/kernel.h"
 #include "spartan/worker.h"
 
+#include "spartan/util/common.h"
 #include "spartan/util/marshal.h"
 
 #include <Python.h>
@@ -60,6 +61,7 @@ template<class T>
 T check(T result) {
   if (PyErr_Occurred()) {
     PyErr_Print();
+    spartan::print_backtrace();
     Log::fatal("Python error, aborting.");
   }
   return result;
@@ -79,14 +81,19 @@ static inline bool operator==(const RefPtr& a, const RefPtr& b) {
 
 class Pickler {
   RefPtr cPickle;
+  RefPtr cloudpickle;
   RefPtr loads;
   RefPtr dumps;
 
 public:
   Pickler() {
     cPickle = check(PyImport_ImportModule("cPickle"));
+    cloudpickle = check(
+        PyImport_ImportModule("cloud.serialization.cloudpickle"));
     loads = check(PyObject_GetAttrString(cPickle.get(), "loads"));
-    dumps = check(PyObject_GetAttrString(cPickle.get(), "dumps"));
+
+//    dumps = check(PyObject_GetAttrString(cPickle.get(), "dumps"));
+    dumps = check(PyObject_GetAttrString(cloudpickle.get(), "dumps"));
   }
 
   RefPtr load(const std::string& data) {
@@ -116,8 +123,8 @@ namespace spartan {
 
 typedef TableT<RefPtr, RefPtr> PyTable;
 
-class PythonKernel;
-PythonKernel* active_kernel;
+class PyKernel;
+PyKernel* active_kernel;
 
 template<>
 class Marshal<RefPtr> {
@@ -139,59 +146,45 @@ public:
 };
 
 template<class T>
-class PyInitable: public T {
-protected:
-  RefPtr code_;
-
+class PyInitableT: public T {
 public:
+  RefPtr code;
+
   void init(const std::string& opts) {
-    code_ = kPickler.load(opts);
+    code = kPickler.load(opts);
   }
 };
 
-class PySharder: public PyInitable<SharderT<RefPtr> > {
+class PySharder: public PyInitableT<SharderT<RefPtr> > {
 public:
   size_t shard_for_key(const RefPtr& k, int num_shards) const {
     GILHelper lock;
     RefPtr result(
-        PyObject_CallFunction(code_.get(), W("Oi"), k.get(), num_shards));
+        check(PyObject_CallFunction(code.get(), W("Oi"), k.get(), num_shards)));
     return PyInt_AsLong(result.get());
   }
   DECLARE_REGISTRY_HELPER(Sharder, PySharder);
 };
 DEFINE_REGISTRY_HELPER(Sharder, PySharder);
 
-class PyAccum: public PyInitable<AccumulatorT<RefPtr> > {
-private:
-  RefPtr code_;
+class PyAccum: public PyInitableT<AccumulatorT<RefPtr> > {
 public:
-  void init(const std::string& opts) {
-    code_ = kPickler.load(opts);
-  }
-
   void accumulate(RefPtr* v, const RefPtr& update) const {
     GILHelper lock;
     RefPtr result(
-        PyObject_CallFunction(code_.get(), W("OO"), v->get(), update.get()));
+        check(PyObject_CallFunction(code.get(), W("OO"), v->get(), update.get())));
     *v = result;
   }
   DECLARE_REGISTRY_HELPER(Accumulator, PyAccum);
 };
 DEFINE_REGISTRY_HELPER(Accumulator, PyAccum);
 
-class PySelector: public PyInitable<SelectorT<RefPtr, RefPtr> > {
-private:
-  RefPtr code_;
-public:
-  void init(const std::string& opts) {
-    code_ = kPickler.load(opts);
-  }
-
+class PySelector: public PyInitableT<SelectorT<RefPtr, RefPtr> > {
   RefPtr select(const RefPtr& k, const RefPtr& v) {
     GILHelper lock;
 
     RefPtr result(
-        check(PyObject_CallFunction(code_.get(), W("OO"), k.get(), v.get())));
+        check(PyObject_CallFunction(code.get(), W("OO"), k.get(), v.get())));
     return result;
   }
 
@@ -199,7 +192,7 @@ public:
 };
 DEFINE_REGISTRY_HELPER(Selector, PySelector);
 
-class PythonKernel: public Kernel {
+class PyKernel: public Kernel {
 public:
   void run() {
     GILHelper lock;
@@ -210,7 +203,7 @@ public:
     Py_DecRef(result);
   }
 };
-REGISTER_KERNEL(PythonKernel);
+REGISTER_KERNEL(PyKernel);
 
 void shutdown(Master*h) {
   delete ((Master*) h);
@@ -239,7 +232,8 @@ Table* create_table(Master*m, PyObject* sharder, PyObject* accum,
     sel = new PySelector;
   }
 
-  return ((Master*) m)->create_table(new PySharder(), new PyAccum(), sel,
+  return ((Master*) m)->create_table(
+      new PySharder(), new PyAccum(), sel,
       kPickler.store(sharder), kPickler.store(accum), kPickler.store(selector));
 }
 
@@ -249,7 +243,7 @@ void destroy_table(Master*, Table*) {
 
 void foreach_shard(Master*m, Table* t, PyObject* fn, PyObject* args) {
   spartan::RunDescriptor r;
-  r.kernel = "PythonKernel";
+  r.kernel = "PyKernel";
   r.args["map_fn"] = kPickler.store(fn);
   r.args["map_args"] = kPickler.store(args);
   r.table = (PyTable*) t;
@@ -319,11 +313,46 @@ void iter_next(TableIterator* i) {
 }
 
 int current_table(Kernel* k) {
-  return ((PythonKernel*) k)->table_id();
+  return ((PyKernel*) k)->table_id();
 }
 
 int current_shard(Kernel* k) {
-  return ((PythonKernel*) k)->shard_id();
+  return ((PyKernel*) k)->shard_id();
+}
+
+TableContext* get_context() {
+  return TableContext::get_context();
+}
+
+Table* get_table(TableContext* t, int id) {
+  return t->get_table(id);
+}
+
+int get_table_id(Table* t) {
+  return t->id();
+}
+
+PyObject* get_sharder(Table* t) {
+  RefPtr p = ((PySharder*) t->sharder)->code;
+  Py_IncRef(p.get());
+  return p.get();
+}
+
+PyObject* get_accum(Table* t) {
+  RefPtr p = ((PyAccum*) t->accum)->code;
+  Py_IncRef(p.get());
+  return p.get();
+}
+
+PyObject* get_selector(Table* t) {
+  if (t->selector == NULL) {
+    Py_IncRef(Py_None);
+    return Py_None;
+  }
+
+  RefPtr p = ((PySelector*) t->selector)->code;
+  Py_IncRef(p.get());
+  return p.get();
 }
 
 }
