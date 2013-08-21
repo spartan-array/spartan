@@ -1,5 +1,4 @@
 #include "spartan/util/common.h"
-#include "spartan/util/stats.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -23,64 +22,10 @@
 
 namespace spartan {
 
-const double Histogram::kMinVal = 1e-9;
-const double Histogram::kLogBase = 1.1;
-
 double rand_double() {
   return double(random()) / RAND_MAX;
 }
 
-int Histogram::bucketForVal(double v) {
-  if (v < kMinVal) {
-    return 0;
-  }
-
-  v /= kMinVal;
-  v += kLogBase;
-
-  return 1 + static_cast<int>(log(v) / log(kLogBase));
-}
-
-double Histogram::valForBucket(int b) {
-  if (b == 0) {
-    return 0;
-  }
-  return exp(log(kLogBase) * (b - 1)) * kMinVal;
-}
-
-void Histogram::add(double val) {
-  int b = bucketForVal(val);
-//  LOG_EVERY_N(INFO, 1000) << "Adding... " << val << " : " << b;
-  if (buckets.size() <= b) {
-    buckets.resize(b + 1);
-  }
-  ++buckets[b];
-  ++count;
-}
-
-void DumpProfile() {
-#ifdef HAVE_GOOGLE_PROFILER_H
-  ProfilerFlush();
-#endif
-}
-
-string Histogram::summary() {
-  string out;
-  int total = 0;
-  for (int i = 0; i < buckets.size(); ++i) {
-    total += buckets[i];
-  }
-  string hashes = string(100, '#');
-
-  for (int i = 0; i < buckets.size(); ++i) {
-    if (buckets[i] == 0) {
-      continue;
-    }
-    out += StringPrintf("%-20.3g %6d %.*s\n", valForBucket(i), buckets[i],
-        buckets[i] * 80 / total, hashes.c_str());
-  }
-  return out;
-}
 
 void Sleep(double t) {
   timespec req;
@@ -105,4 +50,12 @@ void Init(int argc, char** argv) {
 
   srandom(time(NULL));
 }
+
+void print_backtrace() {
+  Log::error("Stack: ");
+  void* stack[32];
+  backtrace(stack, 32);
+  backtrace_symbols_fd(stack, 32, STDERR_FILENO);
 }
+
+} // namespace spartan
