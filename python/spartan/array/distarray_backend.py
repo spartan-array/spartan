@@ -39,4 +39,4 @@ def evaluate(ctx, prim):
   if prim.cached_value is None:
     prim.cached_value = _evaluate(ctx, prim)
   
-  return prim.cached_value    
+  return prim.cached_value

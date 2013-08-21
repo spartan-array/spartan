@@ -266,6 +266,9 @@ class Assert(object):
   @staticmethod
   def all_eq(a, b):
     import numpy
+    if hasattr(a, 'shape') and hasattr(b, 'shape'):
+      assert a.shape == b.shape, 'Mismatched shapes: %s %s' % (a.shape, b.shape)
+      
     assert numpy.all(a == b), 'Failed: %s == %s' % (a, b)
   
   @staticmethod

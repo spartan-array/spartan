@@ -1,9 +1,12 @@
 from spartan import pytable
+from spartan.array import distarray
 from spartan.array.distarray import DistArray
 from spartan.pytable import mod_sharder, replace_accum, util, sum_accum
 from spartan.util import Assert
 import numpy as np
 import test_common
+
+distarray.TILE_SIZE = 10
   
 def get_shard_kernel(kernel, args):
   s_id = kernel.current_shard()
@@ -14,7 +17,7 @@ def get_shard_kernel(kernel, args):
 
 def test_fill_array(master):
   table = master.create_table(mod_sharder, replace_accum)
-  bytes = np.ndarray((1000, 1000), dtype=np.double)
+  bytes = np.ndarray((10, 10), dtype=np.double)
   for i in range(5):
     for j in range(5):
       table.update('%d%d' % (i, j), bytes)
@@ -39,7 +42,7 @@ def test_distarray_random(master):
   DistArray.randn(master, 200, 200)
   
 
-N_PTS = 1000*1000
+N_PTS = 10*10
 N_CENTERS = 10
 DIM = 5
 
@@ -85,17 +88,17 @@ def test_kmeans(master):
   print centers
   
 def test_ensure(master):
-  local = np.arange(10000 * 10000).reshape((10000, 10000))
-  dist = DistArray.arange(master, ((10000, 10000)))
+  local = np.arange(100 * 100).reshape((100, 100))
+  dist = DistArray.arange(master, ((100, 100)))
    
-  Assert.all_eq(dist[100:2000, 100:2000], 
-                local[100:2000, 100:2000])
+  Assert.all_eq(dist[20:40, 1:20], 
+                local[20:40, 1:20])
  
-  Assert.all_eq(dist[100:200, 100:2000], 
-                local[100:200, 100:2000])
+  Assert.all_eq(dist[1:2, 1:20], 
+                local[1:2, 1:20])
  
-  Assert.all_eq(dist[500:2000, 100:2000], 
-                local[500:2000, 100:2000])
+  Assert.all_eq(dist[5:20, 1:20], 
+                local[5:20, 1:20])
   
 
 if __name__ == '__main__':

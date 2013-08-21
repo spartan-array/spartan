@@ -194,6 +194,10 @@ public:
 
     TableT<K, V>* t = new TableT<K, V>();
 
+    // Crash here if we can't find the sharder/accumulators.
+    delete TypeRegistry<Sharder>::get_by_id(sharder->type_id());
+    delete TypeRegistry<Accumulator>::get_by_id(accum->type_id());
+
     CreateTableReq req;
     int table_id = tables_.size();
     req.table_type = t->type_id();
@@ -213,9 +217,6 @@ public:
       req.selector.type_id = -1;
     }
 
-    sharder->init(sharder_opts);
-    accum->init(accum_opts);
-
     t->init(table_id, req.num_shards);
     t->sharder = sharder;
     t->sharder->init(sharder_opts);
@@ -224,7 +225,9 @@ public:
     t->accum->init(accum_opts);
 
     t->selector = selector;
-    t->selector->init(selector_opts);
+    if (t->selector != NULL) {
+      t->selector->init(selector_opts);
+    }
 
     t->flush_frequency = 100;
 
