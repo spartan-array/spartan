@@ -42,6 +42,10 @@ public:
     return tables_;
   }
 
+  Table* get_table(int id) const {
+    return tables_.find(id)->second;
+  }
+
 private:
   rpc::Mutex lock_;
 

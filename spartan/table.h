@@ -64,8 +64,9 @@ T from_str(const std::string& vstr) {
   read(&out, vstr);
   return out;
 }
-
 } // namespace val
+
+class Table;
 
 class Initable {
 public:
@@ -113,12 +114,20 @@ public:
   virtual V select(const K& k, const V& v) = 0;
 };
 
-// This interface is used by tables to communicate with the outside
-// world and determine the current state of a computation.
 struct TableContext {
+private:
+public:
   virtual ~TableContext() {
   }
+
   virtual int id() const = 0;
+  virtual Table* get_table(int id) const = 0;
+
+  // Return the current table-context.  Thread-local.
+  static TableContext* get_context();
+
+  // Assign the given context for this thread.
+  static void set_context(TableContext* ctx);
 };
 
 class TableIterator {
@@ -661,10 +670,8 @@ protected:
   }
 };
 
-#ifndef SWIG
 template<class K, class V>
 TypeRegistry<Table>::Helper<TableT<K, V>> TableT<K, V>::register_me_;
-#endif
 
 typedef std::map<int, Table*> TableMap;
 

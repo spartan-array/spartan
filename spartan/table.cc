@@ -4,23 +4,25 @@
 
 using namespace spartan;
 
-#define _PASTE(x, y) x ## y
-#define PASTE(x, y) _PASTE(x, y)
-
-#define MAKE_ACCUMULATOR(AccumType, ValueType)\
-  struct Accum_ ## AccumType ## _ ## ValueType : public AccumType<ValueType> {\
-  const char* name() const { return #ValueType #AccumType; }\
-};\
-static TypeRegistry<Accumulator>::Helper<Accum_ ## AccumType ## _ ## ValueType>\
-    k_helper ## AccumType ## ValueType(#ValueType #AccumType)
-
-#define MAKE_ACCUMULATORS(ValueType)\
-  MAKE_ACCUMULATOR(Max, ValueType);\
-  MAKE_ACCUMULATOR(Min, ValueType);\
-  MAKE_ACCUMULATOR(Sum, ValueType);\
-  MAKE_ACCUMULATOR(Replace, ValueType)
-
 namespace spartan {
 
+static pthread_key_t ctx_key_ = 0;
+static rpc::Mutex ctx_lock_;
+
+TableContext* TableContext::get_context() {
+  rpc::ScopedLock l(&ctx_lock_);
+  CHECK(ctx_key_ != 0);
+  auto result = (TableContext*)pthread_getspecific(ctx_key_);
+  CHECK(result != NULL);
+  return result;
+}
+
+void TableContext::set_context(TableContext* ctx) {
+  rpc::ScopedLock l(&ctx_lock_);
+  if (ctx_key_ == 0) {
+    pthread_key_create(&ctx_key_, NULL);
+  }
+  pthread_setspecific(ctx_key_, ctx);
+}
 
 }

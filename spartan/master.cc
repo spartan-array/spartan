@@ -42,6 +42,8 @@ void Master::wait_for_workers() {
   }
 
   initialized_ = true;
+
+  TableContext::set_context(this);
 }
 
 Master::~Master() {

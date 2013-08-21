@@ -218,8 +218,14 @@ public:
 
     t->init(table_id, req.num_shards);
     t->sharder = sharder;
+    t->sharder->init(sharder_opts);
+
     t->accum = accum;
+    t->accum->init(accum_opts);
+
     t->selector = selector;
+    t->selector->init(selector_opts);
+
     t->flush_frequency = 100;
 
     t->workers.resize(workers_.size());
@@ -251,6 +257,10 @@ public:
   }
 
   void run(RunDescriptor r);
+
+  Table* get_table(int id) const {
+    return tables_.find(id)->second;
+  }
 
 private:
   void register_worker(const RegisterReq& req);

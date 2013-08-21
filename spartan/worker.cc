@@ -7,7 +7,6 @@
 #include "spartan/kernel.h"
 #include "spartan/table.h"
 #include "spartan/util/common.h"
-#include "spartan/util/stats.h"
 #include "spartan/util/timer.h"
 #include "spartan/worker.h"
 
@@ -33,6 +32,8 @@ Worker::~Worker() {
 }
 
 void Worker::run_kernel(const RunKernelReq& kreq) {
+  TableContext::set_context(this);
+
   CHECK(id_ != -1);
   Log::info("WORKER: Running kernel: %d:%d", kreq.table, kreq.shard);
   int owner = -1;
