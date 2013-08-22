@@ -15,6 +15,10 @@ class TileExtent(object):
   def shape(self):
     return tuple(self.sz)
   
+  @property
+  def ndim(self):
+    return len(self.sz)
+  
   @staticmethod
   def from_slice(idx, shape):
     ul = []
@@ -36,7 +40,7 @@ class TileExtent(object):
     return 'extent(' + ','.join('%s:%s' % (a, b) for a, b in zip(self.ul, self.lr)) + ')'
 
   def drop_axis(self, axis):
-    if axis is None: return TileExtent((0,), (1,), (1,))
+    if axis is None: return TileExtent((), (), ())
     ul = list(self.ul)
     sz = list(self.sz)
     shape = list(self.array_shape)
@@ -122,7 +126,7 @@ TileExtent.intersection = intersection
 
 
 def shape_for_reduction(input_shape, axis):
-  if axis == None: return (1,)
+  if axis == None: return ()
   input_shape = list(input_shape)
   del input_shape[axis]
   return input_shape
@@ -130,7 +134,6 @@ def shape_for_reduction(input_shape, axis):
 
 def shapes_match(offset, data):
   return np.all(offset.sz == data.shape)
-
 
 def index_for_reduction(index, axis):
   return index.drop_axis(axis)

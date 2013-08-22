@@ -272,7 +272,7 @@ class Assert(object):
     if hasattr(a, 'shape') and hasattr(b, 'shape'):
       assert a.shape == b.shape, 'Mismatched shapes: %s %s' % (a.shape, b.shape)
       
-    assert numpy.all(a == b), 'Failed: %s == %s' % (a, b)
+    assert numpy.all(a == b), 'Failed: \n%s\n ==\n%s' % (a, b)
   
   @staticmethod
   def eq(a, b): assert (a == b), 'Failed: %s == %s' % (a, b)
@@ -297,6 +297,15 @@ class Assert(object):
   
   @staticmethod
   def is_instance(expr, klass): assert isinstance(expr, klass), 'Failed: isinstance(%s, %s)' % (expr, klass)
+  
+  @staticmethod
+  def no_duplicates(collection):
+    d = collections.defaultdict(int)
+    for item in collection:
+      d[item] += 1
+    
+    bad = [(k,v) for k, v in d.iteritems() if v > 1]
+    assert len(bad) == 0, 'Duplicates found: %s' % bad
   
  
 def trace_fn(fn):

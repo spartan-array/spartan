@@ -5,6 +5,7 @@ import spartan
 from spartan import util
 from spartan.util import Assert
 import numpy as np
+import itertools
 
 # number of elements per tile
 TILE_SIZE = 100000
@@ -65,38 +66,14 @@ def extent_from_slice(array, slice):
   return extent.TileExtent(ul, sz, array.shape)
 
 
-class TileAccum(object):
-  def __init__(self, accum):
-    self.accum = accum
-  
-  def __call__(self, old_tile, new_tile):
-    Assert.is_instance(old_tile, tile.Tile)
-    Assert.is_instance(new_tile, tile.Tile)
-    
-    if old_tile.data is None:
-      old_tile._initialize()
-    
-    idx = old_tile.extent.local_offset(new_tile.extent)
-    data = old_tile.data[idx]
-    
-    invalid = old_tile.mask[idx]
-    valid = ~old_tile.mask[idx]
-    
-    data[invalid] = new_tile.data[invalid]
-    old_tile.mask[invalid] = False
-    if data[valid].size > 0:
-      data[valid] = self.accum(data[valid], new_tile.data[valid])
-      
-    return old_tile
-
  
 def take_first(a,b):
   return a
 
-accum_replace = TileAccum(take_first)
-accum_min = TileAccum(np.minimum)
-accum_max = TileAccum(np.maximum)
-accum_sum = TileAccum(np.add)
+accum_replace = tile.TileAccum(take_first)
+accum_min = tile.TileAccum(np.minimum)
+accum_max = tile.TileAccum(np.maximum)
+accum_sum = tile.TileAccum(np.add)
 
 
   
@@ -126,34 +103,37 @@ class TileSelector(object):
     raise Exception, "Can't handle type %s" % type(k)
   
 
-def _compute_splits(shape):
-  '''Split an array of shape ``shape`` into tiles containing roughly 
-  `TILE_SIZE` elements.'''
-  if len(shape) == 1:
-    weight = 1
-  else:
-    weight, sub_splits = _compute_splits(shape[1:])
-  
-  my_splits = []
-  step = max(1, TILE_SIZE / weight)
-  for i in range(0, shape[0], step):
-    my_dim = (i, min(shape[0], i + step))
-    my_splits.append([my_dim])
-
-  if len(shape) == 1:
-    return (shape[0], my_splits)
-  
-  out = []
-  
-  for i in my_splits:
-    for j in sub_splits:
-      out.append(i + j)
-  return (weight * shape[0], out)
 
 def compute_splits(shape):
-  return _compute_splits(shape)[1]
-
-
+  '''Split an array of shape ``shape`` into `Extent`s containing roughly `TILE_SIZE` elements.
+  
+  :rtype: list of `Extent`
+  '''
+    
+  if len(shape) == 0:
+    return [extent.TileExtent([], [], ())]
+ 
+  weight = 1
+  splits = [None] * len(shape)
+  
+  # split each dimension into tiles.  the first dimension
+  # is kept contiguous if possible.
+  for dim in reversed(range(len(shape))):
+    step = max(1, TILE_SIZE / weight)
+    dim_splits = []
+    for i in range(0, shape[dim], step):
+      dim_splits.append((i, min(shape[dim] - i,  step)))
+      
+    splits[dim] = dim_splits
+    weight *= shape[dim]
+ 
+  result = []
+  for slc in itertools.product(*splits):
+    ul, lr = zip(*slc)
+    ex = extent.TileExtent(ul, lr, shape)
+    result.append(ex)
+  return result
+    
 def _create_rand(extent, data):
   data[:] = np.random.rand(*extent.shape)
 
@@ -168,101 +148,90 @@ def _create_zeros(extent, data):
   data[:] = 0
 
 def _create_range(extent, data):
+  Assert.eq(extent.shape, data.shape)
   pos = extent.ravelled_pos()
   sz = np.prod(extent.shape)
   data[:] = np.arange(pos, pos+sz).reshape(extent.shape)
   
+def randn(master, *shape):
+  return create_with(master, shape, _create_randn)
+
+def rand(master, *shape):
+  return create_with(master, shape, _create_rand)
+
+def ones(master, shape):
+  return create_with(master, shape, _create_ones)
+
+def arange(master, shape):
+  return create_with(master, shape, _create_range)
+
+
+def from_table(table):
+  '''
+  Construct a distarray from an existing table.
+  Keys must be of type `Extent`, values of type `Tile`.
+  
+  Shape is computed as the maximum range of all extents.
+  
+  Dtype is taken from the dtype of the tiles.
+  
+  :param table:
+  '''
+  d = DistArray()
+  d.table = table
+  d.extents = table.keys()
+  
+  Assert.no_duplicates(d.extents)
+  
+  if not d.extents:
+    d.shape = tuple()
+  else:
+    d.shape = find_shape(d.extents)
+  
+  if len(d.extents) > 0:
+    tile = table[d.extents[0]]
+    d.dtype = tile.dtype
+  else:
+    # empty table; default dtype.
+    d.dtype = np.float
+  
+  return d
+
+def create(master, shape, dtype=np.float, 
+           sharder=spartan.mod_sharder,
+           accum=accum_replace):
+  total_elems = np.prod(shape)
+  extents = compute_splits(shape)
+  
+  util.log('Creating array of shape %s with %d tiles', 
+           shape, len(extents))
+
+  table = master.create_table(sharder, accum, TileSelector())
+  for ex in extents:
+    ex_tile = tile.Tile(ex, data=None, dtype=dtype)
+    #util.log('Writing to %s: %s', ex, ex_tile)
+    table.update(ex, ex_tile)
+  
+  d = DistArray()
+  d.dtype = dtype
+  d.shape = shape
+  d.table = table
+  d.extents = extents
+  return d
+
+def create_with(master, shape, init_fn):
+  d = create(master, shape)
+  spartan.map_inplace(d.table, init_fn)
+  return d 
+
+
 class DistArray(object):
   def id(self):
     return self.table.id()
   
-  @staticmethod
-  def from_table(table):
-    '''
-    Construct a distarray from an existing table.
-    Keys must be of type `Extent`, values of type `Tile`.
-    
-    Shape is computed as the maximum range of all extents.
-    
-    Dtype is taken from the dtype of the tiles.
-    
-    :param table:
-    '''
-    d = DistArray()
-    d.table = table
-    d.extents = {}
-    
-    keys = table.keys()
-    util.log('KEYS: %s', keys)
-    for extent in keys:
-      assert not (extent in d.extents)
-      d.extents[extent] = 1
-    
-    if not d.extents:
-      d.shape = tuple()
-    else:
-      d.shape = find_shape(keys)
-    
-    
-    if len(keys) > 0:
-      tile = table[keys[0]]
-      d.dtype = tile.dtype
-    else:
-      # empty table; default dtype.
-      d.dtype = np.float
-    
-    return d
-  
-  @staticmethod
-  def create(master, shape, dtype=np.float, 
-             sharder=spartan.mod_sharder,
-             accum=accum_replace):
-    total_elems = np.prod(shape)
-    splits = compute_splits(shape)
-    util.log('Creating array with %d tiles', len(splits))
-    extents = []
-    for split in splits:
-      ul, lr = zip(*split)
-      sz = np.array(lr) - np.array(ul)
-      extents.append(extent.TileExtent(ul, sz, shape))
-
-    table = master.create_table(sharder, accum, TileSelector())
-    for ex in extents:
-      ex_tile = tile.Tile(ex, data=None, dtype=dtype)
-      util.log('Writing to %s: %s', ex, ex_tile)
-      table.update(ex, ex_tile)
-    
-    d = DistArray()
-    d.shape = shape
-    d.table = table
-    d.extents = extents
-    return d
-  
-  @staticmethod
-  def create_with(master, shape, init_fn):
-    d = DistArray.create(master, shape)
-    spartan.map_inplace(d.table, init_fn)
-    return d 
-  
-  @staticmethod
-  def randn(master, *shape):
-    return DistArray.create_with(master, shape, _create_randn)
-  
-  @staticmethod
-  def rand(master, *shape):
-    return DistArray.create_with(master, shape, _create_rand)
-  
-  @staticmethod
-  def ones(master, shape):
-    return DistArray.create_with(master, shape, _create_ones)
-  
-  @staticmethod
-  def arange(master, shape):
-    return DistArray.create_with(master, shape, _create_range)
-
   @util.trace_fn  
   def map(self, fn, *args):
-    return DistArray.from_table(spartan.map_items(self.table, fn, *args))
+    return from_table(spartan.map_items(self.table, fn, *args))
   
   def foreach(self, fn):
     return spartan.foreach(self.table, fn)
@@ -294,20 +263,19 @@ class DistArray(object):
     for ex, intersection in splits:
       dst_slice = region.local_offset(intersection)
       src_slice = self.table.get(NestedSlice(ex, ex.local_offset(intersection)))
-      #src_slice = self.table.get(ex)
       tgt[dst_slice] = src_slice
     return tgt
     #return tile.data[]
     
   def update(self, region, data):
     Assert.is_instance(region, extent.TileExtent)
+    Assert.eq(region.shape, data.shape)
     
     splits = list(split_extent(self, region))
-    for r, intersection in splits:
-      src_slice = r.local_offset(intersection)
+    for dst_key, intersection in splits:
+      src_slice = region.local_offset(intersection)
       update_tile = tile.make_tile(intersection, data[src_slice])
-      util.log('Updating extent: %s', r)
-      self.table.update(r, update_tile)
+      self.table.update(dst_key, update_tile)
     
   
   def __getitem__(self, idx):
@@ -322,7 +290,7 @@ class DistArray(object):
     return self.ensure(ex)
   
   def glom(self):
-    print self.shape
+    util.log('Glomming: %s', self.shape)
     ex = extent.TileExtent([0] * len(self.shape), self.shape, self.shape)
     return self.ensure(ex)
 

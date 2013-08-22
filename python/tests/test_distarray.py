@@ -27,19 +27,19 @@ def test_fill_array(master):
   
 def test_distarray_empty(master):
   table = master.create_table(mod_sharder, replace_accum)
-  DistArray.from_table(table)
+  distarray.from_table(table)
   
 
 def map_array(k, v):
-  util.log('Extent: %s', k)
+  # util.log('Extent: %s', k)
   return []
   
 def test_distarray_slice(master):
-  array = DistArray.create(master, (200, 200))
+  array = distarray.create(master, (200, 200))
   spartan.map_inplace(array.table, map_array)
   
 def test_distarray_random(master):
-  DistArray.randn(master, 200, 200)
+  distarray.randn(master, 200, 200)
   
 
 N_PTS = 10*10
@@ -48,6 +48,7 @@ DIM = 5
 
 # An implementation of K-means by-hand.
 def min_dist(extent, tile, centers):
+  #util.log('%s %s', centers.shape, tile.shape)
   dist = np.dot(centers, tile[:].T)
   min_dist = np.argmin(dist, axis=0)
 #   util.log('%s %s', extent, dist.shape)
@@ -71,7 +72,7 @@ def sum_centers(kernel, args):
   
 def test_kmeans(master):
   util.log('Generating points.')
-  pts = DistArray.rand(master, N_PTS, DIM)
+  pts = distarray.rand(master, N_PTS, DIM)
   centers = np.random.randn(N_CENTERS, DIM)
   
   util.log('Generating new centers.')
@@ -88,17 +89,12 @@ def test_kmeans(master):
   print centers
   
 def test_ensure(master):
-  local = np.arange(100 * 100).reshape((100, 100))
-  dist = DistArray.arange(master, ((100, 100)))
+  local = np.arange(100 * 100, dtype=np.float).reshape((100, 100))
+  dist = distarray.arange(master, ((100, 100)))
    
-  Assert.all_eq(dist[20:40, 1:20], 
-                local[20:40, 1:20])
- 
-  Assert.all_eq(dist[1:2, 1:20], 
-                local[1:2, 1:20])
- 
-  Assert.all_eq(dist[5:20, 1:20], 
-                local[5:20, 1:20])
+  Assert.all_eq(dist[0:10, 0:20], local[0:10, 0:20])
+  Assert.all_eq(dist[1:2, 1:20], local[1:2, 1:20])
+  Assert.all_eq(dist[5:20, 1:20], local[5:20, 1:20])
   
 
 if __name__ == '__main__':

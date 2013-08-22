@@ -88,6 +88,9 @@ class Op(Expr):
 
     self.op = op
     self.children = [lazify(child) for child in children]
+    if kwargs is None:
+      kwargs = {}
+      
     self.kwargs = kwargs
 
   def __repr__(self):

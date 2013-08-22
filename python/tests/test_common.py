@@ -4,7 +4,7 @@ import imp
 import socket
 import types
 
-NUM_WORKERS = 4
+NUM_WORKERS = 1
 
 def start_cluster():
   spartan.set_log_level(spartan.INFO)
