@@ -16,10 +16,6 @@ struct CreateTableReq {
   TypeConstructor selector;
 }
 
-struct DeleteTableReq {
-  i32 id; 
-}
-
 struct RunKernelReq {
   string kernel;
   i32 table;
@@ -105,7 +101,7 @@ struct WorkerInitReq {
 abstract service Worker {
   fast initialize(WorkerInitReq req)
   fast create_table(CreateTableReq req |)
-  fast delete_table(DeleteTableReq req |)
+  fast destroy_table(i32 table_id |)
   fast get(GetRequest req|TableData resp)
   fast assign_shards(ShardAssignmentReq req)
   

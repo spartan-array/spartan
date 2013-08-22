@@ -185,6 +185,12 @@ public:
 
   void flush();
 
+  void destroy_table(int table_id);
+
+  void destroy_table(Table* t) {
+    destroy_table(t->id());
+  }
+
   template<class K, class V>
   TableT<K, V>* create_table(SharderT<K>* sharder = new Modulo<K>(),
       AccumulatorT<V>* accum = new Replace<V>(), SelectorT<K, V>* selector =
@@ -199,7 +205,7 @@ public:
     delete TypeRegistry<Accumulator>::get_by_id(accum->type_id());
 
     CreateTableReq req;
-    int table_id = tables_.size();
+    int table_id = table_id_counter_++;
     req.table_type = t->type_id();
     req.id = table_id;
     req.num_shards = workers_.size() * 2;
@@ -293,6 +299,7 @@ private:
   Timer runtime_;
 
   bool initialized_;
+  int table_id_counter_;
 };
 
 }

@@ -145,9 +145,9 @@ void Worker::shutdown() {
   running_ = false;
 }
 
-void Worker::delete_table(const DeleteTableReq& req) {
+void Worker::destroy_table(const rpc::i32& id) {
   rpc::ScopedLock sl(lock_);
-  tables_.erase(tables_.find(req.id));
+  tables_.erase(tables_.find(id));
 }
 
 void Worker::put(const TableData& req) {

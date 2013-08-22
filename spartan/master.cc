@@ -19,6 +19,7 @@ Master::Master(rpc::PollMgr* poller, int num_workers) {
   current_run_start_ = 0;
   poller_ = poller;
   initialized_ = false;
+  table_id_counter_ = 0;
 }
 
 void Master::wait_for_workers() {
@@ -157,6 +158,14 @@ int Master::num_pending(const RunDescriptor& r) {
     t += w->num_pending();
   }
   return t;
+}
+
+void Master::destroy_table(int table_id) {
+  for (auto w : workers_) {
+    w->proxy->destroy_table(table_id);
+  }
+
+  tables_.erase(tables_.find(table_id));
 }
 
 void Master::run(RunDescriptor r) {

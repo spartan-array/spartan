@@ -25,7 +25,7 @@ public:
 
   void initialize(const WorkerInitReq& req);
   void create_table(const CreateTableReq& req);
-  void delete_table(const DeleteTableReq& req);
+  void destroy_table(const rpc::i32& id);
   void get(const GetRequest& req, TableData* resp);
   void assign_shards(const ShardAssignmentReq& req);
   void run_kernel(const RunKernelReq& req);
