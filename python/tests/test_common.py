@@ -1,5 +1,5 @@
-from spartan import pytable
-from spartan.pytable import util
+import spartan
+from spartan import util
 import imp
 import socket
 import types
@@ -7,9 +7,10 @@ import types
 NUM_WORKERS = 4
 
 def start_cluster():
-  master = pytable.start_master(9999, NUM_WORKERS)
+  spartan.set_log_level(spartan.INFO)
+  master = spartan.start_master(9999, NUM_WORKERS)
   for i in range(NUM_WORKERS):
-    pytable.start_worker('%s:9999' % socket.gethostname(),  10000 + i)
+    spartan.start_worker('%s:9999' % socket.gethostname(),  10000 + i)
   return master
 
 def run_cluster_tests(filename):

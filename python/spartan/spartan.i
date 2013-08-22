@@ -9,7 +9,7 @@
 %include "numpy.i"
 
 %{
-#include "spartan/pytable/support.h"
+#include "spartan/support.h"
 %}
 
 

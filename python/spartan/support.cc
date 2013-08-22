@@ -1,4 +1,4 @@
-#include "spartan/pytable/support.h"
+#include "spartan/support.h"
 
 #include "spartan/table.h"
 #include "spartan/master.h"
@@ -62,7 +62,7 @@ T check(T result) {
   if (PyErr_Occurred()) {
     PyErr_Print();
     spartan::print_backtrace();
-    Log::fatal("Python error, aborting.");
+    Log_fatal("Python error, aborting.");
   }
   return result;
 }
@@ -161,6 +161,7 @@ public:
     GILHelper lock;
     RefPtr result(
         check(PyObject_CallFunction(code.get(), W("Oi"), k.get(), num_shards)));
+    CHECK(PyInt_Check(result.get()));
     return PyInt_AsLong(result.get());
   }
   DECLARE_REGISTRY_HELPER(Sharder, PySharder);
@@ -173,6 +174,8 @@ public:
     GILHelper lock;
     RefPtr result(
         check(PyObject_CallFunction(code.get(), W("OO"), v->get(), update.get())));
+    CHECK(result.get() != Py_None);
+
     *v = result;
   }
   DECLARE_REGISTRY_HELPER(Accumulator, PyAccum);
@@ -213,10 +216,6 @@ void wait_for_workers(Master* m) {
   m->wait_for_workers();
 }
 
-Master*get_master(Table* t) {
-  return ((PyTable*) t)->master();
-}
-
 Table* get_table(Kernel* k, int id) {
   return ((Kernel*) k)->get_table(id);
 }
@@ -237,8 +236,8 @@ Table* create_table(Master*m, PyObject* sharder, PyObject* accum,
       kPickler.store(sharder), kPickler.store(accum), kPickler.store(selector));
 }
 
-void destroy_table(Master*, Table*) {
-  Log::fatal("Not implemented.");
+void destroy_table(Master* m, Table* t) {
+  m->destroy_table(t);
 }
 
 void foreach_shard(Master*m, Table* t, PyObject* fn, PyObject* args) {
@@ -257,7 +256,7 @@ int get_id(Table* t) {
 
 PyObject* get(Table* t, PyObject* k) {
   PyObject* result = ((PyTable*) t)->get(k).get();
-//  Log::info("Result: %s", to_string(result).c_str());
+//  Log_info("Result: %s", to_string(result).c_str());
   if (result == NULL) {
     result = Py_None;
   }
@@ -353,6 +352,14 @@ PyObject* get_selector(Table* t) {
   RefPtr p = ((PySelector*) t->selector)->code;
   Py_IncRef(p.get());
   return p.get();
+}
+
+void set_log_level(LogLevel l) {
+  rpc::Log::set_level(l);
+}
+
+void log(const char* file, int line, const char* msg) {
+  rpc::Log::log(rpc::Log::INFO, file, line, msg);
 }
 
 }

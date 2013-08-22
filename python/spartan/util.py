@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 import atexit
 
 from contextlib import contextmanager
@@ -17,6 +18,8 @@ import threading
 import time
 import traceback
 import cStringIO
+
+from . import wrap
 
 parser = argparse.ArgumentParser()
 flags = argparse.Namespace()
@@ -43,7 +46,6 @@ def log(msg, *args, **kw):
     caller = sys._getframe(1)
     filename = caller.f_code.co_filename
     lineno = caller.f_lineno
-    now = time.time() - program_start
     if 'exc_info' in kw:
       exc = ''.join(traceback.format_exc())
     else:
@@ -53,9 +55,10 @@ def log(msg, *args, **kw):
       msg = msg % args
     else:
       msg = repr(msg)
-    print '%s:%s:%d: %s' % (now, os.path.basename(filename), lineno, msg)
-    if exc:
-      print exc
+    
+    wrap.log(filename, lineno, msg)
+    if exc is not None:
+      wrap.log(filename, lineno, exc)
 
 
 class Watchdog(threading.Thread):

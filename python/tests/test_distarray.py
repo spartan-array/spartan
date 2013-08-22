@@ -1,7 +1,7 @@
-from spartan import pytable
+import spartan
 from spartan.array import distarray
 from spartan.array.distarray import DistArray
-from spartan.pytable import mod_sharder, replace_accum, util, sum_accum
+from spartan import mod_sharder, replace_accum, util, sum_accum
 from spartan.util import Assert
 import numpy as np
 import test_common
@@ -36,7 +36,7 @@ def map_array(k, v):
   
 def test_distarray_slice(master):
   array = DistArray.create(master, (200, 200))
-  pytable.map_inplace(array.table, map_array)
+  spartan.map_inplace(array.table, map_array)
   
 def test_distarray_random(master):
   DistArray.randn(master, 200, 200)
@@ -84,7 +84,7 @@ def test_kmeans(master):
   master.foreach_shard(min_array.table, sum_centers,
                        (min_array.id(), pts.table.id(), new_centers.id()))
   
-  _, centers = pytable.fetch(new_centers)[0]
+  _, centers = spartan.fetch(new_centers)[0]
   print centers
   
 def test_ensure(master):

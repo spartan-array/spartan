@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
 from . import prims, distarray
-from spartan.pytable import util
+from spartan import util
 import numpy as np
+from spartan.array import extent
 
 def largest_value(vals):
   return sorted(vals, key=lambda v: np.prod(v.shape))[-1]
@@ -27,7 +28,23 @@ def eval_Map(ctx, prim):
 
 
 def eval_Reduce(ctx, prim):
-  pass
+  input_array = evaluate(ctx, prim.input)
+  dtype = prim.dtype_fn(input_array)
+  axis = prim.axis
+  shape = extent.shape_for_reduction(input_array.shape, prim.axis)
+  output_array = distarray.DistArray.create(ctx, shape, dtype, accum=prim.combiner_fn)
+  local_reducer = prim.local_reducer_fn
+  
+  def mapper(ex, tile):
+    reduced = local_reducer(ex, tile)
+    dst_extent = extent.index_for_reduction(ex, axis)
+    util.log('Reduced shape: %s', reduced.shape)
+    output_array.update(dst_extent, reduced)
+  
+  input_array.foreach(mapper)
+  
+  return output_array
+  
 
 def _evaluate(ctx, prim):
   return globals()['eval_' + prim.typename()](ctx, prim)    

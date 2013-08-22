@@ -1,6 +1,6 @@
-from pytable import util
-from pytable.array import extent
-from pytable.util import Assert
+from spartan import util
+from spartan.array import extent
+from spartan.util import Assert
 
 def test_intersection():
   a = extent.TileExtent((0, 0), (10, 10), None)

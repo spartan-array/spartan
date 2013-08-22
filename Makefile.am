@@ -22,14 +22,14 @@ SWIG_INCLUDES = \
   spartan/table.h\
   spartan/master.h\
   spartan/worker.h\
-  python/spartan/pytable/support.h
+  python/spartan/support.h
 
 BUILT_SOURCES = \
   spartan/spartan_service.h \
-  python/spartan/pytable/_spartan_wrap.cc
+  python/spartan/_spartan_wrap.cc
   
-$(builddir)/python/spartan/pytable/_spartan_wrap.cc : \
-  $(srcdir)/python/spartan/pytable/spartan.i $(SWIG_INCLUDES)
+$(builddir)/python/spartan/_spartan_wrap.cc : \
+  $(srcdir)/python/spartan/spartan.i $(SWIG_INCLUDES)
 	swig -threads $(CPPFLAGS) -fvirtual -O -python -c++ -o $@ $< 
  
 $(builddir)/spartan/spartan_service.h : $(srcdir)/spartan/spartan_service.rpc
@@ -61,8 +61,8 @@ libspartan_la_SOURCES =\
 
 
 _spartan_wrap_la_SOURCES =\
-	python/spartan/pytable/_spartan_wrap.cc \
-    python/spartan/pytable/support.cc
+	python/spartan/_spartan_wrap.cc \
+    python/spartan/support.cc
 
 test_accum_SOURCES = tests/test-accum.cc
 test_iterator_SOURCES = tests/test-iterator.cc

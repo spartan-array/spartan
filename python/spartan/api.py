@@ -1,20 +1,16 @@
-from .. import util
+from . import util, wrap
 import sys
 import traceback
 
-sys.path += ['../build/.libs', '../build/python/spartan/pytable']
-
-try:
-  import spartan_wrap
-except ImportError, e:
-  print 'Native module import failed:', e
+from wrap import set_log_level
+from wrap import DEBUG, INFO, WARN, ERROR, FATAL
 
 class Iter(object):
   def __init__(self, handle):
     self.handle = handle
     self._val = None
-    if not spartan_wrap.iter_done(self.handle):
-      self._val = (spartan_wrap.iter_key(self.handle), spartan_wrap.iter_value(self.handle)) 
+    if not wrap.iter_done(self.handle):
+      self._val = (wrap.iter_key(self.handle), wrap.iter_value(self.handle)) 
     
   def __iter__(self):
     return self
@@ -25,9 +21,9 @@ class Iter(object):
     
     result = self._val
     self._val = None
-    spartan_wrap.iter_next(self.handle)
-    if not spartan_wrap.iter_done(self.handle):
-      self._val = (spartan_wrap.iter_key(self.handle), spartan_wrap.iter_value(self.handle))
+    wrap.iter_next(self.handle)
+    if not wrap.iter_done(self.handle):
+      self._val = (wrap.iter_key(self.handle), wrap.iter_value(self.handle))
     return result 
 
   
@@ -46,10 +42,10 @@ class Table(object):
     if master is not None:
       self.ctx = master
     else:
-      self.ctx = spartan_wrap.get_context()
+      self.ctx = wrap.get_context()
     
     if isinstance(ptr_or_id, int):
-      self.handle = spartan_wrap.get_table(self.ctx, ptr_or_id)
+      self.handle = wrap.get_table(self.ctx, ptr_or_id)
     else:
       self.handle = ptr_or_id
           
@@ -57,58 +53,59 @@ class Table(object):
     return (Table, (None, self.id()))
     
   def id(self):
-    return spartan_wrap.get_id(self.handle)
+    return wrap.get_id(self.handle)
     
   def __getitem__(self, key):
-    return spartan_wrap.get(self.handle, key)
+    return wrap.get(self.handle, key)
   
   def __setitem__(self, key, value):
-    return spartan_wrap.update(self.handle, key, value)
+    return wrap.update(self.handle, key, value)
   
   def destroy(self):
-    util.log('TODO(power) -- destroy tables impl.')
+    assert isinstance(self.ctx, Master) 
+    return self.ctx.destroy_table(self.handle)
   
   def keys(self):
     return keys(self)
   
   def get(self, key):
-    return spartan_wrap.get(self.handle, key)
+    return wrap.get(self.handle, key)
   
   def update(self, key, value):
-    return spartan_wrap.update(self.handle, key, value)
+    return wrap.update(self.handle, key, value)
   
   def num_shards(self):
-    return spartan_wrap.num_shards(self.handle)
+    return wrap.num_shards(self.handle)
   
   def __iter__(self):
     return self.iter(-1)
   
   def iter(self, shard):
-    return Iter(spartan_wrap.get_iterator(self.handle, shard))
+    return Iter(wrap.get_iterator(self.handle, shard))
   
   def sharder(self):
-    return spartan_wrap.get_sharder(self.handle)
+    return wrap.get_sharder(self.handle)
   
   def accum(self):
-    return spartan_wrap.get_accum(self.handle)
+    return wrap.get_accum(self.handle)
   
   def selector(self):
-    return spartan_wrap.get_selector(self.handle)
+    return wrap.get_selector(self.handle)
   
 
 class Kernel(object):
-  def __init__(self, handle):
-    self.handle = handle
+  def __init__(self, kernel_id):
+    self.handle = wrap.kernel_cast(kernel_id)
   
   def table(self, table_id):
     return Table(None, 
-                 spartan_wrap.get_table(spartan_wrap.cast(self.handle), table_id))
+                 wrap.get_table(self.handle, table_id))
   
   def current_shard(self):
-    return spartan_wrap.current_shard(spartan_wrap.cast(self.handle))
+    return wrap.current_shard(self.handle)
   
   def current_table(self):
-    return spartan_wrap.current_table(spartan_wrap.cast(self.handle))
+    return wrap.current_table(self.handle)
 
 
 def _bootstrap_kernel(handle, args):
@@ -124,22 +121,25 @@ class Master(object):
   def __del__(self):
     #print 'Shutting down!'
     #traceback.print_stack()
-    spartan_wrap.shutdown(self.handle)
+    wrap.shutdown(self.handle)
+    
+  def destroy_table(self, table_handle):
+    wrap.destroy_table(self.handle, table_handle)
     
   def create_table(self, sharder, accum, selector=None):
     return Table(self, 
-                 spartan_wrap.create_table(self.handle, sharder, accum, selector))
+                 wrap.create_table(self.handle, sharder, accum, selector))
   
   def foreach_shard(self, table, kernel, args):
-    return spartan_wrap.foreach_shard(
+    return wrap.foreach_shard(
                           self.handle, table.handle, _bootstrap_kernel, (kernel, args))
 
 
 def start_master(*args):
-  return Master(spartan_wrap.start_master(*args))
+  return Master(wrap.start_master(*args))
 
 def start_worker(*args):
-  return spartan_wrap.start_worker(*args)
+  return wrap.start_worker(*args)
 
 def mod_sharder(k, num_shards):
   return hash(k) % num_shards
@@ -164,6 +164,12 @@ def mapper_kernel(kernel, args):
       for k, v in result:
         dst.update(k, v)
 
+def foreach_kernel(kernel, args):
+  src_id, fn = args
+  src = kernel.table(src_id)
+  for sk, sv in src.iter(kernel.current_shard()):
+    fn(sk, sv)
+
 
 def map_items(table, fn, *args):
   src = table
@@ -183,6 +189,13 @@ def map_inplace(table, fn, *args):
   dst = src
   table.ctx.foreach_shard(table, mapper_kernel, (src.id(), dst.id(), fn, args))
   return dst
+
+
+def foreach(table, fn):
+  src = table
+  master = src.ctx
+  master.foreach_shard(table, foreach_kernel, (src.id(), fn))
+
 
 def fetch(table):
   out = []

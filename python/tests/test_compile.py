@@ -1,5 +1,5 @@
-from pytable import util
-from pytable.array import expr, compile_expr
+from spartan import util
+from spartan.array import expr, compile_expr
 
 y = expr.LazyVal(0)
 z = y * y + y

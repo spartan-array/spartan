@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from . import tile, extent
-from spartan import pytable
+import spartan
 from spartan import util
 from spartan.util import Assert
 import numpy as np
@@ -215,7 +215,7 @@ class DistArray(object):
   
   @staticmethod
   def create(master, shape, dtype=np.float, 
-             sharder=pytable.mod_sharder,
+             sharder=spartan.mod_sharder,
              accum=accum_replace):
     total_elems = np.prod(shape)
     splits = compute_splits(shape)
@@ -228,7 +228,8 @@ class DistArray(object):
 
     table = master.create_table(sharder, accum, TileSelector())
     for ex in extents:
-      ex_tile = tile.make_tile(ex, None, dtype, masked=True)
+      ex_tile = tile.Tile(ex, data=None, dtype=dtype)
+      util.log('Writing to %s: %s', ex, ex_tile)
       table.update(ex, ex_tile)
     
     d = DistArray()
@@ -240,7 +241,7 @@ class DistArray(object):
   @staticmethod
   def create_with(master, shape, init_fn):
     d = DistArray.create(master, shape)
-    pytable.map_inplace(d.table, init_fn)
+    spartan.map_inplace(d.table, init_fn)
     return d 
   
   @staticmethod
@@ -261,11 +262,15 @@ class DistArray(object):
 
   @util.trace_fn  
   def map(self, fn, *args):
-    return DistArray.from_table(pytable.map_items(self.table, fn, *args))
+    return DistArray.from_table(spartan.map_items(self.table, fn, *args))
+  
+  def foreach(self, fn):
+    return spartan.foreach(self.table, fn)
+  
   
   @util.trace_fn
   def map_tiles(self, fn, kw):
-    return pytable.map_items(self.table, fn, kw)  
+    return spartan.map_items(self.table, fn, kw)  
   
   def _get(self, extent):
     return self.table.get(extent)

@@ -57,5 +57,16 @@ def test_compile_add3(master):
   dval = distarray_backend.evaluate(master, compiled_expr)
   Assert.all_eq(dval.glom(), np.ones((10, 10)) * 3)
 
+def test_sum(master):
+  a = distarray.DistArray.ones(master, (10, 10))
+  a = prims.Value(a)
+  b = prims.Reduce(a, 0, 
+                   lambda _: np.float, 
+                   lambda ex, tile: np.sum(tile[:], axis=0), 
+                   distarray.accum_sum)
+  c = distarray_backend.evaluate(master, b)
+  lc = c.glom()
+  Assert.all_eq(lc, np.ones((10,)) * 10)
+  
 if __name__ == '__main__':
   test_common.run_cluster_tests(__file__)

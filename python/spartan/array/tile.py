@@ -1,4 +1,4 @@
-from spartan.pytable import util
+from spartan import util
 import numpy as np
 
 
@@ -6,14 +6,20 @@ class Tile(object):
   '''
   A tile of an array: an extent (offset + size) and data for that extent.
   '''
-  def __init__(self, extent, data, dtype):
+  def __init__(self, extent, data=None, dtype=None):
     self.extent = extent
-    self.data = data
-    self.dtype = dtype
-
-    # mask will be initialized when data is first requested
-    # or updated
-    self.mask = None
+    
+    if data is not None:
+      self.data = data
+      self.mask = np.zeros(self.data.shape, dtype=np.bool)
+      self.dtype = data.dtype
+      assert dtype is None or dtype == data.dtype, 'Datatype mismatch.'
+    else:
+      # mask and data will be initialized on demand.
+      self.mask = None
+      self.data = None
+      assert dtype is not None
+      self.dtype = dtype
     
   def _initialize(self):
     if self.mask is None:
@@ -24,6 +30,10 @@ class Tile(object):
 
   def get(self, slc):
     self._initialize()
+    
+  @property
+  def shape(self):
+    return self.extent.shape
     
   def __getitem__(self, idx):
     self._initialize()
@@ -39,5 +49,5 @@ class Tile(object):
     data[idx] = val
 
 
-def make_tile(extent, data, dtype, masked):
-    return Tile(extent, data, dtype)
+def make_tile(extent, data):
+    return Tile(extent, data=data)
