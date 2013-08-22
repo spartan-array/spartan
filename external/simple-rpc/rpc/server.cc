@@ -68,7 +68,7 @@ void ServerConnection::handle_read() {
             verify(req->m.read_from_marshal(in_, packet_size) == (size_t) packet_size);
 
             if (packet_size < (int) sizeof(i64)) {
-                Log::warn("rpc::ServerConnection: got an incomplete packet, xid not included");
+                Log_warn("rpc::ServerConnection: got an incomplete packet, xid not included");
 
                 // Since we don't have xid, we don't know how to notify client about the failure.
                 // All we can do is simply cleanup resource.
@@ -103,7 +103,7 @@ void ServerConnection::handle_read() {
             // the handler should delete req, and release server_connection refcopy.
             it->second->handle(req, (ServerConnection *) this->ref_copy());
         } else {
-            Log::error("rpc::ServerConnection: no handler for rpc_id=%d", rpc_id);
+            Log_error("rpc::ServerConnection: no handler for rpc_id=%d", rpc_id);
             begin_reply(req, ENOENT);
             end_reply();
             delete req;
@@ -152,7 +152,7 @@ void ServerConnection::close() {
         server_->pollmgr_->remove(this);
         server_->sconns_l_.unlock();
 
-        Log::debug("rpc::ServerConnection: closed on fd=%d", socket_);
+        Log_debug("rpc::ServerConnection: closed on fd=%d", socket_);
 
         status_ = CLOSED;
         ::close(socket_);
@@ -220,7 +220,7 @@ Server::~Server() {
         delete it.second;
     }
 
-    //Log::debug("rpc::Server: destroyed");
+    //Log_debug("rpc::Server: destroyed");
 }
 
 struct start_server_loop_args_type {
@@ -263,7 +263,7 @@ void Server::server_loop(struct addrinfo* svr_addr) {
 
         int clnt_socket = accept(server_sock_, svr_addr->ai_addr, &svr_addr->ai_addrlen);
         if (clnt_socket >= 0 && status_ == RUNNING) {
-            Log::debug("rpc::Server: got new client, fd=%d", clnt_socket);
+            Log_debug("rpc::Server: got new client, fd=%d", clnt_socket);
             verify(set_nonblocking(clnt_socket, true) == 0);
 
             sconns_l_.lock();
@@ -283,7 +283,7 @@ int Server::start(const char* bind_addr) {
     string addr(bind_addr);
     size_t idx = addr.find(":");
     if (idx == string::npos) {
-        Log::error("rpc::Server: bad bind address: %s", bind_addr);
+        Log_error("rpc::Server: bad bind address: %s", bind_addr);
         errno = EINVAL;
         return -1;
     }
@@ -299,7 +299,7 @@ int Server::start(const char* bind_addr) {
 
     int r = getaddrinfo((host == "0.0.0.0") ? NULL : host.c_str(), port.c_str(), &hints, &result);
     if (r != 0) {
-        Log::error("rpc::Server: getaddrinfo(): %s", gai_strerror(r));
+        Log_error("rpc::Server: getaddrinfo(): %s", gai_strerror(r));
         return -1;
     }
 
@@ -322,7 +322,7 @@ int Server::start(const char* bind_addr) {
 
     if (rp == NULL) {
         // failed to bind
-        Log::error("rpc::Server: bind(): %s", strerror(errno));
+        Log_error("rpc::Server: bind(): %s", strerror(errno));
         freeaddrinfo(result);
         return -1;
     }
@@ -333,7 +333,7 @@ int Server::start(const char* bind_addr) {
     verify(set_nonblocking(server_sock_, true) == 0);
 
     status_ = RUNNING;
-    Log::info("rpc::Server: started on %s", bind_addr);
+    Log_info("rpc::Server: started on %s", bind_addr);
 
     start_server_loop_args_type* start_server_loop_args = new start_server_loop_args_type();
     start_server_loop_args->server = this;

@@ -92,12 +92,14 @@ void Log::set_file(FILE* fp) {
     Pthread_mutex_unlock(&Log::m);
 }
 
-void Log::log_v(int level, const char* fmt, va_list args) {
+void Log::log_v(int level, const char* file, int line, const char* fmt, va_list args) {
     static char indicator[] = { 'F', 'E', 'W', 'I', 'D' };
     assert(level <= Log::DEBUG);
     if (level <= Log::level) {
         Pthread_mutex_lock(&Log::m);
-        fprintf(Log::fp, "%c: ", indicator[level]);
+        const char* filebase = basename(file);
+        fprintf(Log::fp, "%c ", indicator[level]);
+        fprintf(Log::fp, "%s:%3d ", filebase, line);
         vfprintf(Log::fp, fmt, args);
         fprintf(Log::fp, "\n");
         fflush(Log::fp);
@@ -105,49 +107,50 @@ void Log::log_v(int level, const char* fmt, va_list args) {
     }
 }
 
-void Log::log(int level, const char* fmt, ...) {
+void Log::log(int level, const char* file, int line, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    log_v(level, fmt, args);
+    log_v(level, file, line, fmt, args);
     va_end(args);
 }
 
-void Log::fatal(const char* fmt, ...) {
+void Log::fatal(const char* file, int line, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    log_v(Log::FATAL, fmt, args);
+    log_v(Log::FATAL, file, line, fmt, args);
     va_end(args);
 
     abort();
 }
 
-void Log::error(const char* fmt, ...) {
+void Log::error(const char* file, int line, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    log_v(Log::ERROR, fmt, args);
+    log_v(Log::ERROR, file, line, fmt, args);
     va_end(args);
 }
 
-void Log::warn(const char* fmt, ...) {
+void Log::warn(const char* file, int line, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    log_v(Log::WARN, fmt, args);
+    log_v(Log::WARN, file, line, fmt, args);
     va_end(args);
 }
 
-void Log::info(const char* fmt, ...) {
+void Log::info(const char* file, int line, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    log_v(Log::INFO, fmt, args);
+    log_v(Log::INFO, file, line, fmt, args);
     va_end(args);
 }
 
-void Log::debug(const char* fmt, ...) {
+void Log::debug(const char* file, int line, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    log_v(Log::DEBUG, fmt, args);
+    log_v(Log::DEBUG, file, line, fmt, args);
     va_end(args);
 }
+
 
 int set_nonblocking(int fd, bool nonblocking) {
     int ret = fcntl(fd, F_GETFL, 0);
@@ -207,7 +210,7 @@ int find_open_port() {
   hints.ai_flags = AI_PASSIVE;
 
   if (getaddrinfo("localhost", NULL, NULL, &local_addr) != 0) {
-    Log::fatal("Failed to getaddrinfo");
+    Log_fatal("Failed to getaddrinfo");
   }
 
   int port = -1;
@@ -221,7 +224,7 @@ int find_open_port() {
     sockaddr_in addr;
     socklen_t addrlen;
     if (getsockname(fd, (sockaddr*)&addr, &addrlen) != 0) {
-      Log::fatal("Failed to get socket address");
+      Log_fatal("Failed to get socket address");
     }
 
     port = i;
@@ -232,18 +235,18 @@ int find_open_port() {
   ::close(fd);
 
   if (port != -1) {
-    Log::info("Found open port: %d", port);
+    Log_info("Found open port: %d", port);
     return port;
   }
 
-  Log::fatal("Failed to find open port.");
+  Log_fatal("Failed to find open port.");
   return -1;
 }
 
 std::string get_host_name() {
   char buffer[1024];
   if (gethostname(buffer, 1024) != 0) {
-    Log::fatal("Failed to get hostname.");
+    Log_fatal("Failed to get hostname.");
   }
 
   return std::string(buffer);

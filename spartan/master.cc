@@ -29,7 +29,7 @@ void Master::wait_for_workers() {
   while (workers_.size() < num_workers_) {
     Sleep(0.01);
   }
-  Log::info("All workers registered; starting up.");
+  Log_info("All workers registered; starting up.");
 
   WorkerInitReq req;
   for (auto w : workers_) {
@@ -105,7 +105,7 @@ void Master::send_table_assignments() {
   for (auto w : workers_) {
     w->proxy->assign_shards(req);
   }
-  Log::info("Sent table assignments.");
+  Log_info("Sent table assignments.");
 }
 
 void Master::assign_shards(Table* t) {
@@ -121,7 +121,7 @@ void Master::assign_tasks(const RunDescriptor& r, vector<int> shards) {
     w->clear_tasks();
   }
 
-  Log::info("Assigning workers for %d shards.", shards.size());
+  Log_info("Assigning workers for %d shards.", shards.size());
   for (auto i : shards) {
     int worker = r.table->shard_info(i)->owner;
     workers_[worker]->assign_task(ShardId(r.table->id(), i));
@@ -138,14 +138,14 @@ int Master::dispatch_work(const RunDescriptor& r) {
     }
 
     auto callback = [=](rpc::Future *future) {
-      Log::info("MASTER: Kernel %d:%d finished", w_req.table, w_req.shard);
+      Log_debug("MASTER: Kernel %d:%d finished", w_req.table, w_req.shard);
       w->set_finished(ShardId(w_req.table, w_req.shard));
     };
 
     rpc::Future *f = w->proxy->async_run_kernel(w_req, rpc::FutureAttr(callback));
     running_kernels_[w_req.shard] = f;
 //    assert(w->proxy->run_kernel(w_req)== 0);
-    Log::info("MASTER: Kernel %d:%d dispatched as request %p", w_req.table, w_req.shard, f);
+    Log_debug("MASTER: Kernel %d:%d dispatched as request %p", w_req.table, w_req.shard, f);
     num_dispatched++;
   }
   return num_dispatched;
@@ -166,7 +166,7 @@ void Master::run(RunDescriptor r) {
   Kernel::ScopedPtr k(TypeRegistry<Kernel>::get_by_name(r.kernel));
   CHECK_NE(k.get(), (void*)NULL);
 
-  Log::info("Running: %s on %d", r.kernel.c_str(), r.table->id());
+  Log_info("Running: %s on %d", r.kernel.c_str(), r.table->id());
 
   vector<int> shards = r.shards;
 
@@ -178,13 +178,13 @@ void Master::run(RunDescriptor r) {
   dispatch_work(current_run_);
   while (num_pending(r) > 0) {
     dispatch_work(current_run_);
-//    Log::info("Dispatch loop: %d", running_kernels_.size());
+//    Log_info("Dispatch loop: %d", running_kernels_.size());
     Sleep(0);
   }
 
   int count = 0;
   for (auto f : running_kernels_) {
-    Log::info("Waiting for kernel %d/%d to finish...", count, running_kernels_.size());
+    Log_debug("Waiting for kernel %d/%d to finish...", count, running_kernels_.size());
     f.second->wait();
     f.second->release();
     ++count;
@@ -198,7 +198,7 @@ void Master::run(RunDescriptor r) {
   // Force workers to apply flushed updates.
   flush();
 
-  Log::info("Kernel %s finished in %f", current_run_.kernel.c_str(),
+  Log_info("Kernel %s finished in %f", current_run_.kernel.c_str(),
       Now() - current_run_start_);
 }
 

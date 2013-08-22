@@ -16,7 +16,7 @@ RLogService *g_ls = NULL;
 Server *g_server = NULL;
 
 static void signal_handler(int sig) {
-    Log::info("caught signal %d, stopping server now", sig);
+    Log_info("caught signal %d, stopping server now", sig);
     delete g_server;
     delete g_ls;
     exit(0);

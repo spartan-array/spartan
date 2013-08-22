@@ -12,7 +12,7 @@ using namespace demo;
 bool g_stop_flag = false;
 
 static void signal_handler(int sig) {
-    Log::info("caught signal %d, stopping server now", sig);
+    Log_info("caught signal %d, stopping server now", sig);
     g_stop_flag = true;
 }
 

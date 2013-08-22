@@ -66,7 +66,7 @@ protected:
 
     // Protected destructor as required by RefCounted.
     ~ServerConnection() {
-        //Log::debug("rpc::ServerConnection: destroyed");
+        //Log_debug("rpc::ServerConnection: destroyed");
     }
 
 public:

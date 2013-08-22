@@ -26,14 +26,14 @@ static void _pkt_sampling_report() {
                 for (int i = 0; i < PKT_SAMPLE_SIZE; i++) {
                     ostr << " " << _pkt_sample_in_size[i];
                 }
-                Log::info("PKT_SAMPLE_IN: %s", ostr.str().c_str());
+                Log_info("PKT_SAMPLE_IN: %s", ostr.str().c_str());
             }
             {
                 ostringstream ostr;
                 for (int i = 0; i < PKT_SAMPLE_SIZE; i++) {
                     ostr << " " << _pkt_sample_out_size[i];
                 }
-                Log::info("PKT_SAMPLE_OUT:%s", ostr.str().c_str());
+                Log_info("PKT_SAMPLE_OUT:%s", ostr.str().c_str());
             }
             last_report_tm = now.tv_sec;
         }

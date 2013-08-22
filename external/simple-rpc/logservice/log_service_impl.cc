@@ -33,7 +33,7 @@ void RLogServiceImpl::log(const i32& level, const std::string& source, const i64
     i64& done = done_[source];
 
     while (!buffer.empty() && buffer.begin()->msg_id <= done + 1) {
-        Log::log(buffer.begin()->level, "%s.%03d %s: %s", tm_str, tv.tv_usec / 1000, source.c_str(), buffer.begin()->message.c_str());
+        Log::log(buffer.begin()->level, "remote", -1, "%s.%03d %s: %s", tm_str, tv.tv_usec / 1000, source.c_str(), buffer.begin()->message.c_str());
         done = max(done, buffer.begin()->msg_id);
         buffer.erase(buffer.begin());
     }
@@ -82,7 +82,7 @@ void RLogServiceImpl::aggregate_qps(const std::string& metric_name, const rpc::i
         }
         last_qps_report_tm_ = now;
         if (qps_ostr.str().length() > 0) {
-            Log::info("qps '%s':%s", metric_name.c_str(), qps_ostr.str().c_str());
+            Log_info("qps '%s':%s", metric_name.c_str(), qps_ostr.str().c_str());
         }
     }
 

@@ -535,7 +535,7 @@ public:
   }
 
   void remove(const K& k) {
-    Log::fatal("Not implemented!");
+    Log_fatal("Not implemented!");
   }
 
   // Untyped operations:
@@ -598,12 +598,12 @@ public:
     req.shard = shard;
 
     if (!ctx()) {
-      Log::fatal("get_remote() failed: helper() undefined.");
+      Log_fatal("get_remote() failed: helper() undefined.");
     }
 
     int peer = worker_for_shard(shard);
 
-//    Log::debug("Sending get request to: (%d, %d)", peer, shard);
+//    Log_debug("Sending get request to: (%d, %d)", peer, shard);
     workers[peer]->get(req, &resp);
 
     if (resp.missing_key) {
@@ -621,15 +621,15 @@ public:
   }
 
   void start_checkpoint(const string& f, bool deltaOnly) {
-    Log::fatal("Not implemented.");
+    Log_fatal("Not implemented.");
   }
 
   void finish_checkpoint() {
-    Log::fatal("Not implemented.");
+    Log_fatal("Not implemented.");
   }
 
   void restore(const string& f) {
-    Log::fatal("Not implemented.");
+    Log_fatal("Not implemented.");
   }
 
   int flush() {

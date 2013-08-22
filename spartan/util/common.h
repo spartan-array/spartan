@@ -19,7 +19,7 @@ T* connect(rpc::PollMgr* poller, std::string addr) {
 
 void print_backtrace();
 
-#define CHECK(expr) if (!(expr)) { Log::fatal("Check failed: %s.", #expr); }
+#define CHECK(expr) if (!(expr)) { Log_fatal("Check failed: %s.", #expr); }
 #define CHECK_EQ(a, b) CHECK((a == b))
 #define CHECK_NE(a, b) CHECK((a != b))
 

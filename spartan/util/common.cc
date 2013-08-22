@@ -52,7 +52,7 @@ void Init(int argc, char** argv) {
 }
 
 void print_backtrace() {
-  Log::error("Stack: ");
+  Log_error("Stack: ");
   void* stack[32];
   backtrace(stack, 32);
   backtrace_symbols_fd(stack, 32, STDERR_FILENO);

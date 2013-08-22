@@ -68,7 +68,7 @@ int Client::connect(const char* addr) {
     string addr_str(addr);
     size_t idx = addr_str.find(":");
     if (idx == string::npos) {
-        Log::error("rpc::Client: bad connect address: %s", addr);
+        Log_error("rpc::Client: bad connect address: %s", addr);
         errno = EINVAL;
         return -1;
     }
@@ -83,7 +83,7 @@ int Client::connect(const char* addr) {
 
     int r = getaddrinfo(host.c_str(), port.c_str(), &hints, &result);
     if (r != 0) {
-        Log::error("rpc::Client: getaddrinfo(): %s", gai_strerror(r));
+        Log_error("rpc::Client: getaddrinfo(): %s", gai_strerror(r));
         return -1;
     }
 
@@ -107,12 +107,12 @@ int Client::connect(const char* addr) {
 
     if (rp == NULL) {
         // failed to connect
-        Log::error("rpc::Client: connect(%s): %s", addr, strerror(errno));
+        Log_error("rpc::Client: connect(%s): %s", addr, strerror(errno));
         return -1;
     }
 
     verify(set_nonblocking(sock_, true) == 0);
-    Log::info("rpc::Client: connected to %s", addr);
+    Log_info("rpc::Client: connected to %s", addr);
 
     status_ = CONNECTED;
     pollmgr_->add(this);

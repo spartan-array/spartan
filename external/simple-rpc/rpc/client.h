@@ -86,7 +86,7 @@ private:
 public:
   void add(Future* f) {
     if (f == NULL) {
-      Log::fatal("Null future passed to FutureGroup");
+      Log_fatal("Null future passed to FutureGroup");
     }
     futures_.push_back(f);
   }

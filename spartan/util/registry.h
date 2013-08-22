@@ -32,7 +32,7 @@ public:
     info->creator = creator;
     m[new_id] = info;
 
-//    Log::info("Registered " << type << " : " << new_id);
+//    Log_info("Registered " << type << " : " << new_id);
 
     return new_id;
   }
@@ -44,7 +44,7 @@ public:
       }
     }
 
-    Log::fatal("Failed to lookup type: %s", type.c_str());
+    Log_fatal("Failed to lookup type: %s", type.c_str());
     return NULL;
   }
 

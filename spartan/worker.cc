@@ -35,7 +35,7 @@ void Worker::run_kernel(const RunKernelReq& kreq) {
   TableContext::set_context(this);
 
   CHECK(id_ != -1);
-  Log::info("WORKER: Running kernel: %d:%d", kreq.table, kreq.shard);
+  Log_info("WORKER: Running kernel: %d:%d", kreq.table, kreq.shard);
   int owner = -1;
   {
     rpc::ScopedLock sl(lock_);
@@ -43,7 +43,7 @@ void Worker::run_kernel(const RunKernelReq& kreq) {
   }
 
   if (owner != id_) {
-    Log::fatal(
+    Log_fatal(
         "Received a shard I can't work on! (Worker: %d, Shard: (%d, %d), Owner: %d)",
         id_, kreq.table, kreq.shard, owner);
   }
@@ -53,7 +53,7 @@ void Worker::run_kernel(const RunKernelReq& kreq) {
   k->run();
   flush();
 
-  Log::info("WORKER: Finished kernel: %d:%d", kreq.table, kreq.shard);
+  Log_info("WORKER: Finished kernel: %d:%d", kreq.table, kreq.shard);
 }
 
 void Worker::flush() {
@@ -111,7 +111,7 @@ void Worker::get_iterator(const IteratorReq& req, IteratorResp* resp) {
 void Worker::create_table(const CreateTableReq& req) {
   CHECK(id_ != -1);
   rpc::ScopedLock sl(lock_);
-  Log::info("Creating table: %d", req.id);
+  Log_info("Creating table: %d", req.id);
   Table* t = TypeRegistry<Table>::get_by_id(req.table_type);
   t->init(req.id, req.num_shards);
   t->accum = TypeRegistry<Accumulator>::get_by_id(req.accum.type_id);
@@ -133,7 +133,7 @@ void Worker::create_table(const CreateTableReq& req) {
 }
 
 void Worker::assign_shards(const ShardAssignmentReq& shard_req) {
-//  Log::info("Shard assignment: " << shard_req.DebugString());
+//  Log_info("Shard assignment: " << shard_req.DebugString());
   rpc::ScopedLock sl(lock_);
   for (auto a : shard_req.assign) {
     Table *t = tables_[a.table];
@@ -164,7 +164,7 @@ void Worker::put(const TableData& req) {
 void Worker::initialize(const WorkerInitReq& req) {
   id_ = req.id;
 
-  Log::info("Initializing worker %d, with connections to %d peers.", id_,
+  Log_info("Initializing worker %d, with connections to %d peers.", id_,
       req.workers.size());
   peers_.resize(req.workers.size());
   for (auto w : req.workers) {

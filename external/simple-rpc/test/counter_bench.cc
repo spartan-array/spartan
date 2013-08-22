@@ -79,7 +79,7 @@ static void* worker_thread(void* f) {
 }
 
 int main(int argc, char* argv[]) {
-    Log::info("This shall be done!");
+    Log_info("This shall be done!");
     Timer tm;
     volatile int j = 0;
     int n = 1000 * 1000;
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
     }
     tm.end();
     double base = n / tm.elapsed();
-    Log::info("i++ 1 thread: %.2lf/s", base);
+    Log_info("i++ 1 thread: %.2lf/s", base);
     Counter ctr;
     tm.reset();
     tm.start();
@@ -98,7 +98,7 @@ int main(int argc, char* argv[]) {
         ctr.next();
     }
     tm.end();
-    Log::info("Counter 1 thread: %.2lf/s (%.4lf)", n / tm.elapsed(), n / tm.elapsed() / base);
+    Log_info("Counter 1 thread: %.2lf/s (%.4lf)", n / tm.elapsed(), n / tm.elapsed() / base);
     ShortLockCounter s_ctr;
     tm.reset();
     tm.start();
@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) {
         s_ctr.next();
     }
     tm.end();
-    Log::info("ShortLockCounter 1 thread: %.2lf/s (%.4lf)", n / tm.elapsed(), n / tm.elapsed() / base);
+    Log_info("ShortLockCounter 1 thread: %.2lf/s (%.4lf)", n / tm.elapsed(), n / tm.elapsed() / base);
     LongLockCounter l_ctr;
     tm.reset();
     tm.start();
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
         l_ctr.next();
     }
     tm.end();
-    Log::info("LongLockCounter 1 thread: %.2lf/s (%.4lf)", n / tm.elapsed(), n / tm.elapsed() / base);
+    Log_info("LongLockCounter 1 thread: %.2lf/s (%.4lf)", n / tm.elapsed(), n / tm.elapsed() / base);
     AtomicCounter a_ctr;
     tm.reset();
     tm.start();
@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
         a_ctr.next();
     }
     tm.end();
-    Log::info("AtomicCounter 1 thread: %.2lf/s (%.4lf)", n / tm.elapsed(), n / tm.elapsed() / base);
+    Log_info("AtomicCounter 1 thread: %.2lf/s (%.4lf)", n / tm.elapsed(), n / tm.elapsed() / base);
     pthread_t* th = new pthread_t[t];
     function<void()> worker1 = [&ctr, n] {
         while (ctr.next() < 2 * n)
@@ -137,7 +137,7 @@ int main(int argc, char* argv[]) {
         Pthread_join(th[i], nullptr);
     }
     tm.end();
-    Log::info("Counter %d thread: %.2lf/s (%.4lf)", t, n / tm.elapsed(), n / tm.elapsed() / base);
+    Log_info("Counter %d thread: %.2lf/s (%.4lf)", t, n / tm.elapsed(), n / tm.elapsed() / base);
     function<void()> worker2 = [&s_ctr, n] {
         while (s_ctr.next() < 2 * n)
             ;
@@ -151,7 +151,7 @@ int main(int argc, char* argv[]) {
         Pthread_join(th[i], nullptr);
     }
     tm.end();
-    Log::info("ShortLockCounter %d thread: %.2lf/s (%.4lf)", t, n / tm.elapsed(), n / tm.elapsed() / base);
+    Log_info("ShortLockCounter %d thread: %.2lf/s (%.4lf)", t, n / tm.elapsed(), n / tm.elapsed() / base);
     function<void()> worker3 = [&l_ctr, n] {
         while (l_ctr.next() < 2 * n)
             ;
@@ -165,7 +165,7 @@ int main(int argc, char* argv[]) {
         Pthread_join(th[i], nullptr);
     }
     tm.end();
-    Log::info("LongLockCounter %d thread: %.2lf/s (%.4lf)", t, n / tm.elapsed(), n / tm.elapsed() / base);
+    Log_info("LongLockCounter %d thread: %.2lf/s (%.4lf)", t, n / tm.elapsed(), n / tm.elapsed() / base);
     function<void()> worker4 = [&a_ctr, n] {
         while (a_ctr.next() < 2 * n)
             ;
@@ -179,7 +179,7 @@ int main(int argc, char* argv[]) {
         Pthread_join(th[i], nullptr);
     }
     tm.end();
-    Log::info("AtomicCounter %d thread: %.2lf/s (%.4lf)", t, n / tm.elapsed(), n / tm.elapsed() / base);
+    Log_info("AtomicCounter %d thread: %.2lf/s (%.4lf)", t, n / tm.elapsed(), n / tm.elapsed() / base);
     delete[] th;
     return 0;
 }

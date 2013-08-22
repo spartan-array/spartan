@@ -41,14 +41,14 @@ void RLog::init(const char* my_ident /* =? */, const char* rlog_addr /* =? */) {
         }
         cl_s = new Client(poll_s);
         if (rlog_addr == NULL || cl_s->connect(rlog_addr) != 0) {
-            Log::info("RLog working in local mode");
+            Log_info("RLog working in local mode");
             do_finalize();
         } else {
             rp_s = new RLogProxy(cl_s);
             msg_counter_s.reset(0);
         }
     } else {
-        Log::warn("called RLog::init() multiple times without calling RLog::finalize() first");
+        Log_warn("called RLog::init() multiple times without calling RLog::finalize() first");
     }
     lock_s.unlock();
 }
@@ -68,7 +68,7 @@ void RLog::log_v(int level, const char* fmt, va_list args) {
         verify(cnt < buf_len_s - 1);
     }
     buf_s[cnt] = '\0';
-    Log::log(level, "%s", buf_s);
+    Log::log(level, "remote", -1, "%s", buf_s);
     if (rp_s) {
         // always use async rpc
         string message = buf_s;
@@ -76,7 +76,7 @@ void RLog::log_v(int level, const char* fmt, va_list args) {
         if (fu != NULL) {
             fu->release();
         } else {
-            Log::error("RLog connection failed, fall back to local mode");
+            Log_error("RLog connection failed, fall back to local mode");
             do_finalize();
         }
     }
@@ -91,11 +91,11 @@ void RLog::aggregate_qps(const std::string& metric_name, const rpc::i32 incremen
         if (fu != NULL) {
             fu->release();
         } else {
-//            Log::error("RLog connection failed, cannot report qps");
+//            Log_error("RLog connection failed, cannot report qps");
             do_finalize();
         }
 //    } else {
-//        Log::error("RLog not initialized, cannot report qps");
+//        Log_error("RLog not initialized, cannot report qps");
     }
     lock_s.unlock();
 }

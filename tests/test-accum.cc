@@ -17,24 +17,24 @@ int main(int argc, char** argv) {
   {
     auto t = m->create_table<int, int>(new Modulo<int>, new Min<int>);
     m->map_shards(t, "AccumKernel");
-    Log::info("Master fetch: %d", t->get(0));
+    Log_info("Master fetch: %d", t->get(0));
   }
 
   {
     auto t = m->create_table<int, int>(new Modulo<int>, new Max<int>);
     m->map_shards(t, "AccumKernel");
-    Log::info("Master fetch: %d", t->get(0));
+    Log_info("Master fetch: %d", t->get(0));
   }
 
   {
     auto t = m->create_table<int, int>(new Modulo<int>, new Sum<int>);
     m->map_shards(t, "AccumKernel");
-    Log::info("Master fetch: %d", t->get(0));
+    Log_info("Master fetch: %d", t->get(0));
   }
 
   {
     auto t = m->create_table<int, int>(new Modulo<int>, new Sum<int>);
     m->map_shards(t, "AccumKernel");
-    Log::info("Master fetch: %d", t->get(0));
+    Log_info("Master fetch: %d", t->get(0));
   }
 }

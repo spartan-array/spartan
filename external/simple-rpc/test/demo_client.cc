@@ -66,7 +66,7 @@ inline void do_work(ClientPool* cl_pool, const char* svr_addr, FutureAttr& fu_at
         fu = DemoProxy(cl).async_large_str_nop(long_str, fu_attr);
         break;
     default:
-        Log::fatal("unexpected code reached!");
+        Log_fatal("unexpected code reached!");
         verify(0);
     }
     if (fu != NULL) {
@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
     } else if (streq(argv[2], "large_str_nop")) {
         eval_case = LARGE_STR_NOP;
     } else {
-        Log::fatal("eval case not supported: %s", argv[2]);
+        Log_fatal("eval case not supported: %s", argv[2]);
         exit(1);
     }
 
@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
     }
 
     for (int i = 0; i < 20; i++) {
-        Log::debug("clock tick, about %d rpc done", rpc_counter.peek_next());
+        Log_debug("clock tick, about %d rpc done", rpc_counter.peek_next());
         if (g_rpc_issued.peek_next() > g_n_rpc) {
             break;
         }

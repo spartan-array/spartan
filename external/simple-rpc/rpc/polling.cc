@@ -85,19 +85,19 @@ public:
 
 PollMgr::PollMgr(const poll_options& opts /* =... */): opts_(opts) {
     if (opts_.rate.min_size > 0 && opts_.rate.interval <= 0.0) {
-        Log::warn("rpc batching size set but wait time not set, will use 1ms");
+        Log_warn("rpc batching size set but wait time not set, will use 1ms");
         opts_.rate.interval = 0.001;
     }
     poll_threads_ = new PollThread[opts_.n_threads];
     for (int i = 0; i < opts_.n_threads; i++) {
         poll_threads_[i].start(this);
     }
-    //Log::debug("rpc::PollMgr: start with %d thread", opts_.n_threads);
+    //Log_debug("rpc::PollMgr: start with %d thread", opts_.n_threads);
 }
 
 PollMgr::~PollMgr() {
     delete[] poll_threads_;
-    //Log::debug("rpc::PollMgr: destroyed");
+    //Log_debug("rpc::PollMgr: destroyed");
 }
 
 void PollMgr::PollThread::poll_loop() {
