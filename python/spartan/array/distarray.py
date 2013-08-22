@@ -70,8 +70,8 @@ class TileAccum(object):
     self.accum = accum
   
   def __call__(self, old_tile, new_tile):
-    assert isinstance(old_tile, tile.Tile), type(old_tile)
-    assert isinstance(new_tile, tile.Tile), type(new_tile)
+    Assert.is_instance(old_tile, tile.Tile)
+    Assert.is_instance(new_tile, tile.Tile)
     
     if old_tile.data is None:
       old_tile._initialize()
@@ -81,14 +81,17 @@ class TileAccum(object):
     
     invalid = old_tile.mask[idx]
     valid = ~old_tile.mask[idx]
+    
     data[invalid] = new_tile.data[invalid]
     old_tile.mask[invalid] = False
     if data[valid].size > 0:
       data[valid] = self.accum(data[valid], new_tile.data[valid])
       
+    return old_tile
+
+ 
 def take_first(a,b):
   return a
-
 
 accum_replace = TileAccum(take_first)
 accum_min = TileAccum(np.minimum)
@@ -292,7 +295,15 @@ class DistArray(object):
     #return tile.data[]
     
   def update(self, region, data):
-    pass
+    Assert.is_instance(region, extent.TileExtent)
+    
+    splits = list(split_extent(self, region))
+    for r, intersection in splits:
+      src_slice = r.local_offset(intersection)
+      update_tile = tile.make_tile(intersection, data[src_slice])
+      util.log('Updating extent: %s', r)
+      self.table.update(r, update_tile)
+    
   
   def __getitem__(self, idx):
     if isinstance(idx, int):
