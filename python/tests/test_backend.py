@@ -81,7 +81,28 @@ def test_compile_sum(master):
   _(axis=0)
   _(axis=1)
   _(axis=None)
+ 
+ 
+def test_compile_index(master):
+  x = expr.lazify(distarray.arange(master, (10, 10)))
+  y = expr.lazify(distarray.ones(master, (10,)))
+  z = x[y]
+  zc = compile_expr.compile_op(z)
+  val = backend.evaluate(master, zc)
   
+  nx = np.arange(100).reshape(10, 10)
+  ny = np.ones((10,), dtype=np.int)
+  
+  Assert.all_eq(val.glom(), nx[ny])
+  
+def test_slice(master):
+  x = expr.lazify(distarray.arange(master, (10, 10)))
+  z = x[5:8, 5:8]
+  zc = compile_expr.compile_op(z)
+  val = backend.evaluate(master, zc)
+  nx = np.arange(100).reshape(10, 10)
+  
+  Assert.all_eq(val.glom(), nx[5:8, 5:8])
   
 if __name__ == '__main__':
   test_common.run_cluster_tests(__file__)

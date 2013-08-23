@@ -25,19 +25,18 @@ def get_data(data, index):
   return data[index]
 
 
-def split_extent(array, tile_extent):
-#   util.log('Splitting tile %s', chunk.extent)
+def extents_for_region(array, tile_extent):
   for ex in array.extents:
     intersection = extent.intersection(ex, tile_extent)
     if intersection is not None:
       yield (ex, intersection)
       
 
-def split_tile(array, tile_extent, tile_data):
-  for ex in split_extent(array, tile_extent):
-    intersection = extent.intersection(ex, tile_extent)
-    local_idx = tile_extent.local_offset(intersection)
-    yield (ex, intersection, get_data(tile_data, local_idx))
+# def split_tile(array, tile_extent, tile_data):
+#   for ex in extents_for_region(array, tile_extent):
+#     intersection = extent.intersection(ex, tile_extent)
+#     local_idx = tile_extent.local_offset(intersection)
+#     yield (ex, intersection, get_data(tile_data, local_idx))
        
   
 def find_matching_tile(array, tile_extent):
@@ -49,22 +48,6 @@ def find_matching_tile(array, tile_extent):
       return array.tile_for_extent(ex)
   
   raise Exception, 'No matching tile_extent!' 
-
-def extent_from_slice(array, slice):
-  '''
-  :param array: Distarray
-  :param slice: A tuple of `slice` objects.
-  :rtype: `Extent`
-  '''
-  ul = []
-  sz = []
-  for dim, slc in enumerate(slice):
-    start, stop, step = slc.indices(array.shape[dim])
-    ul.append(start)
-    sz.append(stop - start)
-  
-  return extent.TileExtent(ul, sz, array.shape)
-
 
  
 def take_first(a,b):
@@ -189,8 +172,11 @@ def from_table(table):
     d.shape = find_shape(d.extents)
   
   if len(d.extents) > 0:
-    tile = table[d.extents[0]]
-    d.dtype = tile.dtype
+    t = table[d.extents[0]]
+    # (We're not actually returning a tile, as the selector instead
+    #  is returning just the underlying array.  Sigh).  
+    # Assert.is_instance(t, tile.Tile)
+    d.dtype = t.dtype
   else:
     # empty table; default dtype.
     d.dtype = np.float
@@ -200,6 +186,7 @@ def from_table(table):
 def create(master, shape, dtype=np.float, 
            sharder=spartan.mod_sharder,
            accum=accum_replace):
+  shape = tuple(shape)
   total_elems = np.prod(shape)
   extents = compute_splits(shape)
   
@@ -228,18 +215,22 @@ def create_with(master, shape, init_fn):
 class DistArray(object):
   def id(self):
     return self.table.id()
+   
+  def map_to_table(self, fn):
+    return spartan.map_items(self.table, fn)
   
-  @util.trace_fn  
-  def map(self, fn, *args):
-    return from_table(spartan.map_items(self.table, fn, *args))
+  def map_tiles(self, fn):
+    return spartan.map_items(self.table, fn)
+  
+  def map_to_array(self, fn):
+    return from_table(self.map_to_table(fn))
+  
+  def map_inplace(self, fn):
+    spartan.map_inplace(self.table, fn)
+    return self
   
   def foreach(self, fn):
     return spartan.foreach(self.table, fn)
-  
-  
-  @util.trace_fn
-  def map_tiles(self, fn, kw):
-    return spartan.map_items(self.table, fn, kw)  
   
   def _get(self, extent):
     return self.table.get(extent)
@@ -252,17 +243,17 @@ class DistArray(object):
     :param region: `Extent` indicating the region to fetch.
     '''
     Assert.is_instance(region, extent.TileExtent)
-    splits = list(split_extent(self, region))
+    splits = list(extents_for_region(self, region))
     
     if len(splits) == 1:
       ex, intersection = splits[0]
-      return self.table.get(NestedSlice(ex, ex.local_offset(intersection)))
+      return self.table.get(NestedSlice(ex, extent.offset_slice(ex, intersection)))
 
     util.log('Target shape: %s', region.shape)
     tgt = np.ndarray(region.shape)
     for ex, intersection in splits:
-      dst_slice = region.local_offset(intersection)
-      src_slice = self.table.get(NestedSlice(ex, ex.local_offset(intersection)))
+      dst_slice = extent.offset_slice(region, intersection)
+      src_slice = self.table.get(NestedSlice(ex, extent.offset_slice(ex, intersection)))
       tgt[dst_slice] = src_slice
     return tgt
     #return tile.data[]
@@ -271,26 +262,34 @@ class DistArray(object):
     Assert.is_instance(region, extent.TileExtent)
     Assert.eq(region.shape, data.shape)
     
-    splits = list(split_extent(self, region))
+    splits = list(extents_for_region(self, region))
     for dst_key, intersection in splits:
-      src_slice = region.local_offset(intersection)
+      src_slice = extent.offset_slice(region, intersection)
       update_tile = tile.make_tile(intersection, data[src_slice])
       self.table.update(dst_key, update_tile)
     
   
   def __getitem__(self, idx):
-    if isinstance(idx, int):
-      return self[idx:idx + 1][0]
-    if not isinstance(idx, tuple):
-      idx = tuple(idx)
-    if len(idx) < len(self.shape):
-      idx = tuple(list(idx) + [slice(None, None, None) for _ in range(len(self.shape) - len(self.key))])
+    if np.isscalar(idx):
+      return self[idx:idx+1][0]
     
-    ex = extent.TileExtent.from_slice(idx, self.shape)
+    ex = extent.from_slice(idx, self.shape)
     return self.ensure(ex)
   
   def glom(self):
     util.log('Glomming: %s', self.shape)
     ex = extent.TileExtent([0] * len(self.shape), self.shape, self.shape)
     return self.ensure(ex)
+
+
+class Slice(object):
+  def __init__(self, darray, idx):
+    self.darray = darray
+    self.idx = idx
+    
+  def map_tiles(self, fn):
+    pass
+  
+  def map_to_array(self, fn):
+    pass
 

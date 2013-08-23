@@ -55,10 +55,11 @@ def sum_reducer(a, b):
 def binary_op(fn, inputs, kw):
   return fn(*inputs)
 
-
-
 def compile_op(op):
-  '''Convert a numpy expression tree in an Op tree.'''
+  '''Convert a numpy expression tree in an Op tree.
+  :param op:
+  :rval: DAG of `Primitive` operations.
+  '''
   if isinstance(op, expr.LazyVal):
     return prims.Value(op._val)
   else:
@@ -69,6 +70,17 @@ def compile_op(op):
   if op.op in binary_ops:
     return prims.Map(children, 
                      lambda a, b: op.op(a, b))
+  elif op.op == 'index':
+    src, idx = children
+    
+    
+    # differentiate between slices (cheap) and index/boolean arrays (expensive)
+    if isinstance(idx, prims.Value) and\
+       (isinstance(idx.value, tuple) or 
+        isinstance(idx.value, slice)):
+      return prims.Slice(src, idx)
+    else:
+      return prims.Index(src, idx)
   elif op.op == np.sum:
     return prims.Reduce(children[0],
                         axis,

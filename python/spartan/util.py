@@ -296,7 +296,8 @@ class Assert(object):
   def true(expr): assert expr, 'Failed: %s == True' % (expr)
   
   @staticmethod
-  def is_instance(expr, klass): assert isinstance(expr, klass), 'Failed: isinstance(%s, %s)' % (expr, klass)
+  def is_instance(expr, klass): 
+    assert isinstance(expr, klass), 'Failed: isinstance(%s, %s) [type = %s]' % (expr, klass, type(expr))
   
   @staticmethod
   def no_duplicates(collection):
@@ -316,3 +317,18 @@ def trace_fn(fn):
     return result
   return tracer
    
+   
+def rtype_check(typeclass):
+  def wrap(fn):
+    def checked_fn(*args, **kw):  
+      result = fn(*args, **kw)
+      Assert.is_instance(result, typeclass)
+      return result
+    checked_fn.__name__ = 'checked_' + fn.__name__
+    checked_fn.__doc__ = fn.__doc__
+    return checked_fn
+  return wrap
+  
+
+def join_tuple(tuple_a, tuple_b):
+  return tuple(list(tuple_a) + list(tuple_b))

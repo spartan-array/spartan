@@ -1,3 +1,4 @@
+from spartan import util
 import numpy as np
 
 class TileExtent(object):
@@ -18,20 +19,6 @@ class TileExtent(object):
   @property
   def ndim(self):
     return len(self.sz)
-  
-  @staticmethod
-  def from_slice(idx, shape):
-    ul = []
-    sz = []
-    
-    for i in range(len(shape)):
-      dim = shape[i]
-      slc = idx[i]
-      indices = slc.indices(dim)
-      ul.append(indices[0])
-      sz.append(indices[1] - indices[0])
-      
-    return TileExtent(ul, sz, shape)
   
   def to_slice(self):
     return tuple([slice(ul, ul + sz, None) for ul, sz in zip(self.ul, self.sz)])
@@ -99,22 +86,57 @@ class TileExtent(object):
       return np.prod(self.sz)
     return self.sz[axis]
   
-  def local_offset(self, other):
-    '''
-    :param other: `TileExtent` into the same array.
-    :rtype: A slice representing the local offsets of ``other`` into this tile.
-    '''
-    assert np.all(other.ul >= self.ul)
-    assert np.all(other.sz + other.ul <= self.ul + self.sz)
-    return tuple([slice(p, p + s, None) for (p, s) in zip(other.ul - self.ul, other.sz)])
-  
   def create_array(self):
     return np.ndarray(self.shape)
+  
+
+def offset_from(base, other):
+  '''
+  :param base: `TileExtent` to use as basis
+  :param other: `TileExtent` into the same array.
+  :rtype: A new extent using this extent as a basis, instead of (0,0,0...) 
+  '''
+  assert np.all(other.ul >= base.ul)
+  assert np.all(other.sz + other.ul <= base.ul + base.sz)
+  return TileExtent(other.ul - base.ul, other.sz, other.shape)
+
+def offset_slice(base, other):
+  '''
+  :param base: `TileExtent` to use as basis
+  :param other: `TileExtent` into the same array.
+  :rtype: A slice representing the local offsets of ``other`` into this tile.
+  '''
+  return offset_from(base, other).to_slice()
+  #return tuple([slice(p, p + s, None) for (p, s) in zip(other.ul - self.ul, other.sz)])
+  
+
+def from_slice(idx, shape):
+  if np.isscalar(idx):
+    idx = int(idx)
+    idx = slice(idx, idx + 1, None)
+  if not isinstance(idx, tuple):
+    idx = (idx,)
+  if len(idx) < len(shape):
+    idx = tuple(list(idx) + [slice(None, None, None) 
+                             for _ in range(len(shape) - len(idx))])
+    
+  ul = []
+  sz = []
+  
+  for i in range(len(shape)):
+    dim = shape[i]
+    slc = idx[i]
+    indices = slc.indices(dim)
+    ul.append(indices[0])
+    sz.append(indices[1] - indices[0])
+    
+  return TileExtent(ul, sz, shape)
 
 
 def intersection(a, b):
   '''
-  :rtype: The intersection of the 2 extents as a `TileExtent`, or None if the intersection is empty.  
+  :rtype: The intersection of the 2 extents as a `TileExtent`, 
+          or None if the intersection is empty.  
   '''
   if np.any(b.lr <= a.ul): return None
   if np.any(a.lr <= b.ul): return None

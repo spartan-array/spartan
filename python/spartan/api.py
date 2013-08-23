@@ -1,9 +1,23 @@
 from . import util, wrap
+from wrap import DEBUG, INFO, WARN, ERROR, FATAL, set_log_level
 import sys
 import traceback
 
-from wrap import set_log_level
-from wrap import DEBUG, INFO, WARN, ERROR, FATAL
+
+def start_master(*args):
+  return Master(wrap.start_master(*args))
+
+def start_worker(*args):
+  return wrap.start_worker(*args)
+
+def mod_sharder(k, num_shards):
+  return hash(k) % num_shards
+
+def replace_accum(cur, update):
+  return update
+
+def sum_accum(cur, update):
+  return cur + update
 
 class Iter(object):
   def __init__(self, handle):
@@ -66,7 +80,14 @@ class Table(object):
     return self.ctx.destroy_table(self.handle)
   
   def keys(self):
+    # Don't create an iterator directly; this would have us 
+    # copy all the values locally.  First construct a key-only
+    # table
     return keys(self)
+  
+  def values(self):
+    for _, v in iter(self):
+      yield v
   
   def get(self, key):
     return wrap.get(self.handle, key)
@@ -126,7 +147,10 @@ class Master(object):
   def destroy_table(self, table_handle):
     wrap.destroy_table(self.handle, table_handle)
     
-  def create_table(self, sharder, accum, selector=None):
+  def create_table(self, 
+                   sharder=mod_sharder, 
+                   accum=replace_accum, 
+                   selector=None):
     return Table(self, 
                  wrap.create_table(self.handle, sharder, accum, selector))
   
@@ -135,23 +159,8 @@ class Master(object):
                           self.handle, table.handle, _bootstrap_kernel, (kernel, args))
 
 
-def start_master(*args):
-  return Master(wrap.start_master(*args))
-
-def start_worker(*args):
-  return wrap.start_worker(*args)
-
-def mod_sharder(k, num_shards):
-  return hash(k) % num_shards
-
-def replace_accum(cur, update):
-  return update
-
-def sum_accum(cur, update):
-  return cur + update
-
 def mapper_kernel(kernel, args):
-  src_id, dst_id, fn, fn_args = args
+  src_id, dst_id, fn = args
   
   src = kernel.table(src_id)
   dst = kernel.table(dst_id)
@@ -159,7 +168,7 @@ def mapper_kernel(kernel, args):
 #   util.log('MAPPING: Function: %s, args: %s', fn, fn_args)
   
   for sk, sv in src.iter(kernel.current_shard()):
-    result = fn(sk, sv, *fn_args)
+    result = fn(sk, sv)
     if result is not None:
       for k, v in result:
         dst.update(k, v)
@@ -171,7 +180,7 @@ def foreach_kernel(kernel, args):
     fn(sk, sv)
 
 
-def map_items(table, fn, *args):
+def map_items(table, fn):
   src = table
   master = src.ctx
   
@@ -180,14 +189,14 @@ def map_items(table, fn, *args):
   selector = table.selector()
   
   dst = master.create_table(sharder, accum, selector)
-  master.foreach_shard(table, mapper_kernel, (src.id(), dst.id(), fn, args))
+  master.foreach_shard(table, mapper_kernel, (src.id(), dst.id(), fn))
   return dst
 
 
-def map_inplace(table, fn, *args):
+def map_inplace(table, fn):
   src = table
   dst = src
-  table.ctx.foreach_shard(table, mapper_kernel, (src.id(), dst.id(), fn, args))
+  table.ctx.foreach_shard(table, mapper_kernel, (src.id(), dst.id(), fn))
   return dst
 
 

@@ -9,7 +9,15 @@ class NotShapeable(Exception):
 
 class Primitive(object):
   cached_value = None
+  
   def shape(self):
+    '''Try to compute the shape of this DAG.
+    
+    If the value has been computed already this always succeeds.
+    '''
+    if self.cached_value is not None:
+      return self.cached_value.shape
+    
     try:
       return self._shape()
     except NotShapeable:
@@ -18,6 +26,7 @@ class Primitive(object):
   def typename(self):
     return self.__class__.__name__
     
+
 class Value(Primitive):
   def __init__(self, value):
     self.value = value
@@ -27,7 +36,7 @@ class Value(Primitive):
        isinstance(self.value, distarray.DistArray):
       return self.value.shape
     
-    # Promote primitives to having a 0-d shape.
+    # Promote scalars to 0-d array
     return tuple()
     
 
@@ -50,12 +59,21 @@ class Map(Primitive):
     
     
 class Slice(Primitive):
-  def __init__(self, input, slc):
+  def __init__(self, input, idx):
     self.input = input
-    self.slc = slc
+    self.idx = idx
   
   def _shape(self):
     return extent.shape_for_slice(self.input._shape(), self.slc)  
+
+
+class Index(Primitive):
+  def __init__(self, input, idx):
+    self.input = input
+    self.idx = idx
+  
+  def _shape(self):
+    raise NotShapeable
 
 
 class Reduce(Primitive):

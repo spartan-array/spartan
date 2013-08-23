@@ -79,7 +79,7 @@ def test_kmeans(master):
   new_centers = master.create_table(mod_sharder, sum_accum)
   
   util.log('Finding closest')
-  min_array = pts.map(min_dist, centers)
+  min_array = pts.map_to_array(lambda ex, tile: min_dist(ex, tile, centers))
    
   util.log('Updating clusters.')
   master.foreach_shard(min_array.table, sum_centers,

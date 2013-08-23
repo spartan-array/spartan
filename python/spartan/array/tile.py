@@ -1,4 +1,5 @@
 from spartan import util
+from spartan.array import extent
 from spartan.util import Assert
 import numpy as np
 
@@ -50,11 +51,8 @@ class Tile(object):
   
   def __setitem__(self, idx, val):
     self._initialize()
-
-    data = self.data[idx]
-    invalid = self.mask[idx]
-    self.mask[invalid] = False
-    data[idx] = val
+    self.mask[idx] = False
+    self.data[idx] = val
 
 
 def make_tile(extent, data):
@@ -80,7 +78,7 @@ class TileAccum(object):
         old_tile.data = self.accum(old_tile.data, new_tile.data)
       return old_tile
     
-    idx = old_tile.extent.local_offset(new_tile.extent)
+    idx = extent.offset_slice(old_tile.extent, new_tile.extent)
     data = old_tile.data[idx]
     
     invalid = old_tile.mask[idx]
