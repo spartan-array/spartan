@@ -108,7 +108,6 @@ def compile_op(op):
   :param op:
   :rval: DAG of `Primitive` operations.
   '''
-  util.log('COMPILE: %s', op)
   if isinstance(op, expr.LazyVal):
     return prims.Value(op.val)
   else:
@@ -121,3 +120,79 @@ def compile_op(op):
     return globals()['compile_' + op.op](op, children)
   else:
     return globals()['compile_' + op.op.__name__](op, children)
+
+def optimize(dag):
+  folder = FoldMapPass()
+  util.log('Before: %s' % dag) 
+  result = folder.visit(dag)
+  #result = folder.visit(result)
+  #result = folder.visit(result)
+  util.log('After: %s', result)
+  return result
+
+class OptimizePass(object):
+  def visit(self, op):
+    if isinstance(op, prims.Primitive):
+      return getattr(self, 'visit_%s' % op.node_type())(op)
+    return op
+  
+  def visit_Reduce(self, op):
+    return prims.Reduce(input = self.visit(op.input),
+                        axis = op.axis,
+                        dtype_fn = op.dtype_fn,
+                        local_reducer_fn = op.local_reducer_fn,
+                        combiner_fn = op.combiner_fn)
+                        
+  def visit_MapExtents(self, op):
+    return prims.MapExtents(inputs = [self.visit(v) for v in op.inputs],
+                            map_fn = op.map_fn)  
+  
+  def visit_MapTiles(self, op):
+    return prims.MapTiles(inputs = [self.visit(v) for v in op.inputs],
+                          map_fn = op.map_fn)
+  
+  def visit_NewArray(self, op):
+    return prims.NewArray(array_shape = self.visit(op.shape()),
+                          dtype = self.visit(op.dtype))
+  
+  def visit_Value(self, op):
+    return prims.Value(op.value)
+  
+
+
+class FoldMapPass(OptimizePass):
+  def visit_MapTiles(self, op):
+    map_inputs = [self.visit(v) for v in op.inputs]
+    
+    all_maps = np.all([isinstance(v, (prims.Map, prims.NewArray, prims.Value)) 
+                       for v in map_inputs])
+    if not all_maps:
+      return super(FoldMapPass, self).visit_MapTiles(op)
+    
+    # construct a mapper function which first evaluates inputs locally: [i_0... i_n]
+    inputs = []
+    ranges = []
+    fns = []
+    for v in map_inputs:
+      op_st = len(inputs)
+      if isinstance(v, (prims.Value, prims.NewArray, prims.MapExtents)):
+        inputs.append(v)
+        map_fn = lambda v: v
+      else:
+        op_in = [self.visit(child) for child in v.inputs]
+        inputs.extend(op_in)
+        map_fn = v.map_fn
+      
+      op_ed = len(inputs)
+      fns.append(map_fn)
+      ranges.append((op_st, op_ed))
+    
+    map_fn = op.map_fn
+    def fold_mapper(*local_tiles):
+      inputs = []
+      for fn, (st, ed) in zip(fns, ranges):
+        inputs.append(fn(*local_tiles[st:ed]))
+      return map_fn(*inputs)
+    
+    util.log('Created fold mapper with %d inputs', len(inputs))
+    return prims.MapTiles(inputs=inputs, map_fn = fold_mapper)

@@ -44,6 +44,11 @@ def test_compile_add3(master):
   c = expr.ones((10, 10))
   Assert.all_eq((a + b + c).evaluate().glom(), np.ones((10, 10)) * 3)
 
+def test_compile_add_many(master):
+  a = expr.ones((10, 10))
+  b = expr.ones((10, 10))
+  Assert.all_eq((a + b + a + b + a + b + a + b + a + b).evaluate().glom(), np.ones((10, 10)) * 10)
+  
 
 def test_sum(master):
   a = distarray.ones(master, (10, 10))

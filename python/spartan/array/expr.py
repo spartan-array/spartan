@@ -51,7 +51,8 @@ class Expr(Node):
   
   def dag(self):
     from . import compile_expr
-    return compile_expr.compile_op(self)
+    dag = compile_expr.compile_op(self)
+    return compile_expr.optimize(dag)
 
   def evaluate(self):
     from . import backend
@@ -141,6 +142,9 @@ Expr.argmin = argmin
 
 def map_extents(v, fn):
   return Op('map_extents', (v,), kwargs={'map_fn' : fn})
+
+def map_tiles(v, fn):
+  return Op('map_tiles', (v,), kwargs={'map_fn' : fn})
 
 def ndarray(shape, dtype=np.float):
   return Op('ndarray', kwargs = { 'shape' : shape, 'dtype' : dtype })

@@ -1,7 +1,7 @@
 '''Primitives that backends must support.'''
 
 from . import distarray, extent
-from spartan.node import Node
+from spartan.node import node
 from spartan.util import Assert
 import collections
 import numpy as np
@@ -9,7 +9,7 @@ import numpy as np
 class NotShapeable(Exception):
   pass
 
-class Primitive(Node):
+class Primitive(object):
   _members = []
   cached_value = None
   
@@ -29,7 +29,7 @@ class Primitive(Node):
   def typename(self):
     return self.__class__.__name__
     
-
+@node
 class Value(Primitive):
   _members = ['value']
   
@@ -43,11 +43,11 @@ class Value(Primitive):
     
     # Promote scalars to 0-d array
     return tuple()
-    
-
-class MapTiles(Primitive):
-  _members = ['inputs', 'map_fn']
   
+@node
+class Map(Primitive):
+  _members = ['inputs', 'map_fn']
+   
   def dependencies(self):
     return self.inputs
   
@@ -64,9 +64,16 @@ class MapTiles(Primitive):
     return tuple([output_shape[i] for i in len(output_shape)])
 
 
-class MapExtents(MapTiles):
-  pass    
-    
+@node
+class MapTiles(Map):
+  pass
+
+@node
+class MapExtents(Map):
+  pass
+
+
+@node
 class Slice(Primitive):
   _members = ['src', 'idx']
   
@@ -76,7 +83,7 @@ class Slice(Primitive):
   def _shape(self):
     return extent.shape_for_slice(self.input._shape(), self.slc)  
 
-
+@node
 class Index(Primitive):
   _members = ['src', 'idx']
   
@@ -87,6 +94,7 @@ class Index(Primitive):
     raise NotShapeable
 
 
+@node
 class Reduce(Primitive):
   _members = ['input', 'axis', 'dtype_fn', 'local_reducer_fn', 'combiner_fn']
     
@@ -96,7 +104,8 @@ class Reduce(Primitive):
   def _shape(self):
     return extent.shape_for_reduction(self.input._shape(), self.axis)
 
-  
+
+@node
 class NewArray(Primitive):
   _members = ['array_shape', 'dtype']
   
