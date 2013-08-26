@@ -362,4 +362,13 @@ void log(const char* file, int line, const char* msg) {
   rpc::Log::log(rpc::Log::INFO, file, line, msg);
 }
 
+Master* cast_to_master(TableContext* ctx) {
+  Master* m = dynamic_cast<Master*>(ctx);
+  if (m == NULL) {
+    Log_fatal("Tried to cast %p to Master, but not of Master type.");
+  }
+
+  return m;
+}
+
 }

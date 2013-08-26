@@ -69,7 +69,7 @@ class NestedSlice(object):
     return hash(self.extent)
   
   def __eq__(self, other):
-    Assert.is_instance(other, extent.TileExtent)
+    Assert.isinstance(other, extent.TileExtent)
     return self.extent == other 
 
 
@@ -175,7 +175,7 @@ def from_table(table):
     t = table[d.extents[0]]
     # (We're not actually returning a tile, as the selector instead
     #  is returning just the underlying array.  Sigh).  
-    # Assert.is_instance(t, tile.Tile)
+    # Assert.isinstance(t, tile.Tile)
     d.dtype = t.dtype
   else:
     # empty table; default dtype.
@@ -232,6 +232,9 @@ class DistArray(object):
   def foreach(self, fn):
     return spartan.foreach(self.table, fn)
   
+  def __repr__(self):
+    return 'DistArray(shape=%s, dtype=%s)' % (self.shape, self.dtype)
+  
   def _get(self, extent):
     return self.table.get(extent)
   
@@ -242,7 +245,7 @@ class DistArray(object):
     If necessary, data will be copied from remote hosts to fill the region.    
     :param region: `Extent` indicating the region to fetch.
     '''
-    Assert.is_instance(region, extent.TileExtent)
+    Assert.isinstance(region, extent.TileExtent)
     splits = list(extents_for_region(self, region))
     
     if len(splits) == 1:
@@ -259,7 +262,7 @@ class DistArray(object):
     #return tile.data[]
     
   def update(self, region, data):
-    Assert.is_instance(region, extent.TileExtent)
+    Assert.isinstance(region, extent.TileExtent)
     Assert.eq(region.shape, data.shape)
     
     splits = list(extents_for_region(self, region))

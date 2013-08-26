@@ -8,6 +8,8 @@ operations supported by the backends (see `prims`).
 from . import expr, prims
 from .. import util
 from .extent import index_for_reduction, shapes_match
+from spartan.array import distarray
+from spartan.util import Assert
 import numpy as np
 
 
@@ -55,46 +57,67 @@ def sum_reducer(a, b):
 def binary_op(fn, inputs, kw):
   return fn(*inputs)
 
+
+def compile_index(op, children):
+  src, idx = children
+  
+  # differentiate between slices (cheap) and index/boolean arrays (expensive)
+  if isinstance(idx, prims.Value) and\
+     (isinstance(idx.value, tuple) or 
+      isinstance(idx.value, slice)):
+    return prims.Slice(src, idx)
+  else:
+    return prims.Index(src, idx)
+
+
+def compile_sum(op, children):
+  axis = op.kwargs.get('axis', None)
+  return prims.Reduce(children[0],
+                      axis,
+                      dtype_fn = lambda input: input.dtype,
+                      local_reducer_fn = lambda ex, v: sum_local(ex, v, axis),
+                      combiner_fn = lambda a, b: a + b)
+  
+
+def compile_argmin(op, children):
+  axis = op.kwargs.get('axis', None)
+  compute_min = prims.Reduce(children[0],
+                             axis,
+                             dtype_fn = lambda input: 'i8,f8',
+                             local_reducer_fn = argmin_local,
+                             combiner_fn = argmin_reducer)
+  take_indices = prims.MapTiles([compute_min], lambda tile: tile['idx'])
+  
+  return take_indices
+
+
+def compile_map_extents(op, children):
+  Assert.eq(len(children), 1)
+  child = children[0]
+  return prims.MapExtents([child], map_fn = op.kwargs['map_fn'])  
+
+
+def compile_ndarray(op, children):
+  shape = op.kwargs['shape']
+  dtype = op.kwargs['dtype']
+  return prims.NewArray(array_shape=shape, dtype=dtype)
+  
+  
 def compile_op(op):
   '''Convert a numpy expression tree in an Op tree.
   :param op:
   :rval: DAG of `Primitive` operations.
   '''
+  util.log('COMPILE: %s', op)
   if isinstance(op, expr.LazyVal):
-    return prims.Value(op._val)
+    return prims.Value(op.val)
   else:
     children = [compile_op(c) for c in op.children]
-
-  axis = op.kwargs.get('axis', None)
   
   if op.op in binary_ops:
-    return prims.Map(children, 
-                     lambda a, b: op.op(a, b))
-  elif op.op == 'index':
-    src, idx = children
-    
-    
-    # differentiate between slices (cheap) and index/boolean arrays (expensive)
-    if isinstance(idx, prims.Value) and\
-       (isinstance(idx.value, tuple) or 
-        isinstance(idx.value, slice)):
-      return prims.Slice(src, idx)
-    else:
-      return prims.Index(src, idx)
-  elif op.op == np.sum:
-    return prims.Reduce(children[0],
-                        axis,
-                        dtype_fn = lambda input: input.dtype,
-                        local_reducer_fn = lambda ex, v: sum_local(ex, v, axis),
-                        combiner_fn = lambda a, b: a + b)
-  elif op.op == np.argmin:
-    compute_min = prims.Reduce(children[0],
-                               axis,
-                               dtype_fn = lambda input: 'i8,f8',
-                               local_reducer_fn = argmin_local,
-                               combiner_fn = argmin_reducer)
-    take_indices = prims.Map(compute_min,
-                             lambda tile: tile['idx'])
-    return take_indices
+    return prims.MapTiles(children, lambda a, b: op.op(a, b))
+  
+  if isinstance(op.op, str):
+    return globals()['compile_' + op.op](op, children)
   else:
-    raise NotImplementedError, 'Compilation of %s not implemented yet.' % op.op
+    return globals()['compile_' + op.op.__name__](op, children)

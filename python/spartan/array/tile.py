@@ -64,8 +64,8 @@ class TileAccum(object):
     self.accum = accum
   
   def __call__(self, old_tile, new_tile):
-    Assert.is_instance(old_tile, Tile)
-    Assert.is_instance(new_tile, Tile)
+    Assert.isinstance(old_tile, Tile)
+    Assert.isinstance(new_tile, Tile)
     
     old_tile._initialize()
  

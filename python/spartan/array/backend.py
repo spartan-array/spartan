@@ -9,11 +9,11 @@ import numpy as np
 def largest_value(vals):
   return sorted(vals, key=lambda v: np.prod(v.shape))[-1]
 
-def eval_Value(ctx, prim):
+def eval_Value(ctx, prim, inputs):
   return prim.value
 
-def eval_Map(ctx, prim):
-  inputs = [evaluate(ctx, v) for v in prim.inputs]
+
+def eval_MapTiles(ctx, prim, inputs):
   largest = largest_value(inputs)
   map_fn = prim.map_fn
   
@@ -24,11 +24,29 @@ def eval_Map(ctx, prim):
     assert isinstance(result, np.ndarray), result
     return [(ex, Tile(ex, result))]
   
-  return largest.map_to_array(mapper)
+  
+  result = largest.map_to_array(mapper)
+  return result
+
+def eval_MapExtents(ctx, prim, inputs):
+  Assert.eq(len(inputs), 1)
+  map_fn = prim.map_fn
+  
+  def mapper(ex, tile):
+    result = map_fn(ex)
+    return [(ex, Tile(ex, map_fn(ex)))]
+  
+  return inputs[0].map_to_array(mapper)
 
 
-def eval_Reduce(ctx, prim):
-  input_array = evaluate(ctx, prim.input)
+def eval_NewArray(ctx, prim, inputs):
+  shape = prim.array_shape
+  dtype = prim.dtype
+  
+  return distarray.create(ctx, shape, dtype)
+
+def eval_Reduce(ctx, prim, inputs):
+  input_array = inputs[0]
   dtype = prim.dtype_fn(input_array)
   axis = prim.axis
   shape = extent.shape_for_reduction(input_array.shape, prim.axis)
@@ -52,9 +70,9 @@ def slice_mapper(ex, tile, region, matching_extents):
     output_ex = extent.offset_from(region, intersection)
     return [(output_ex, Tile(intersection, tile[local_slc]))]
 
-def eval_Slice(ctx, prim):
-  src = evaluate(ctx, prim.input)
-  idx = evaluate(ctx, prim.idx)
+def eval_Slice(ctx, prim, inputs):
+  src = inputs[0]
+  idx = inputs[1]
   
   slice_region = extent.from_slice(idx, src.shape)
   matching_extents = dict(distarray.extents_for_region(src, slice_region))
@@ -83,10 +101,10 @@ def bool_index_mapper(ex, tile, src, idx):
   return [(ex, local_val[local_idx])]
 
 
-def eval_Index(ctx, prim):
+def eval_Index(ctx, prim, inputs):
   dst = ctx.create_table()
-  src = evaluate(ctx, prim.input)
-  idx = evaluate(ctx, prim.idx)
+  src = inputs[0]
+  idx = inputs[1]
   
   if idx.dtype == np.bool:
     dst = src.map_to_array(bool_index_mapper)
@@ -107,12 +125,13 @@ def eval_Index(ctx, prim):
 
 
 def _evaluate(ctx, prim):
-  return globals()['eval_' + prim.typename()](ctx, prim)    
+  inputs = [evaluate(ctx, v) for v in prim.dependencies()]
+  util.log('Evaluating: %s', prim)
+  return globals()['eval_' + prim.typename()](ctx, prim, inputs)    
     
 
 def evaluate(ctx, prim):
-  Assert.is_instance(prim, prims.Primitive) 
-  util.log('Evaluating: %s', prim)
+  Assert.isinstance(prim, prims.Primitive) 
   if prim.cached_value is None:
     prim.cached_value = _evaluate(ctx, prim)
   

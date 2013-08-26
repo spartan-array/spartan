@@ -54,9 +54,11 @@ bool iter_done(TableIterator*);
 void iter_next(TableIterator*);
 
 // Hack to allow passing Kernel* to user functions.
-static inline Kernel* kernel_cast(long kernel_handle) {
+static inline Kernel* cast_to_kernel(long kernel_handle) {
   return (Kernel*)kernel_handle;
 }
+
+Master* cast_to_master(TableContext* ctx);
 
 }
 

@@ -1,14 +1,9 @@
 from . import util, wrap
+from spartan.util import Assert
 from wrap import DEBUG, INFO, WARN, ERROR, FATAL, set_log_level
 import sys
 import traceback
 
-
-def start_master(*args):
-  return Master(wrap.start_master(*args))
-
-def start_worker(*args):
-  return wrap.start_worker(*args)
 
 def mod_sharder(k, num_shards):
   return hash(k) % num_shards
@@ -76,7 +71,7 @@ class Table(object):
     return wrap.update(self.handle, key, value)
   
   def destroy(self):
-    assert isinstance(self.ctx, Master) 
+    Assert.isinstance(self.ctx, Master) 
     return self.ctx.destroy_table(self.handle)
   
   def keys(self):
@@ -116,7 +111,7 @@ class Table(object):
 
 class Kernel(object):
   def __init__(self, kernel_id):
-    self.handle = wrap.kernel_cast(kernel_id)
+    self.handle = wrap.cast_to_kernel(kernel_id)
   
   def table(self, table_id):
     return Table(None, 
@@ -136,13 +131,13 @@ def _bootstrap_kernel(handle, args):
   return fn(kernel, rest)
 
 class Master(object):
-  def __init__(self, handle):
+  def __init__(self, handle, shutdown_on_del=False):
     self.handle = handle
+    self.shutdown_on_del = shutdown_on_del
     
   def __del__(self):
-    #print 'Shutting down!'
-    #traceback.print_stack()
-    wrap.shutdown(self.handle)
+    if self.shutdown_on_del:
+      wrap.shutdown(self.handle)
     
   def destroy_table(self, table_handle):
     wrap.destroy_table(self.handle, table_handle)
@@ -211,4 +206,15 @@ def fetch(table):
   for k, v in table:
     out.append((k, v))
   return out
+
+
+def get_master():
+  return Master(wrap.cast_to_master(wrap.get_context()),
+                shutdown_on_del = False)
+  
+def start_master(*args):
+  return Master(wrap.start_master(*args), shutdown_on_del=True)
+
+def start_worker(*args):
+  return wrap.start_worker(*args)
 

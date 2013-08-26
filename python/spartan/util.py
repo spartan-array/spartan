@@ -296,7 +296,7 @@ class Assert(object):
   def true(expr): assert expr, 'Failed: %s == True' % (expr)
   
   @staticmethod
-  def is_instance(expr, klass): 
+  def isinstance(expr, klass): 
     assert isinstance(expr, klass), 'Failed: isinstance(%s, %s) [type = %s]' % (expr, klass, type(expr))
   
   @staticmethod
@@ -322,7 +322,7 @@ def rtype_check(typeclass):
   def wrap(fn):
     def checked_fn(*args, **kw):  
       result = fn(*args, **kw)
-      Assert.is_instance(result, typeclass)
+      Assert.isinstance(result, typeclass)
       return result
     checked_fn.__name__ = 'checked_' + fn.__name__
     checked_fn.__doc__ = fn.__doc__

@@ -5,45 +5,59 @@ and built into a control flow graph, which is then compiled
 into a series of primitive array operations.
 '''
 
-import numpy as N
+from spartan import util
+from spartan.node import Node
+from spartan.util import Assert
+import numpy as np
+import spartan
 import types
 
-class Expr(object):
+class Expr(Node):
   def __add__(self, other):
-    return Op(op=N.add, children=(self, other))
+    return Op(op=np.add, children=(self, other))
 
   def __sub__(self, other):
-    return Op(op=N.subtract, children=(self, other))
+    return Op(op=np.subtract, children=(self, other))
 
   def __mul__(self, other):
-    return Op(op=N.multiply, children=(self, other))
+    return Op(op=np.multiply, children=(self, other))
 
   def __mod__(self, other):
-    return Op(op=N.mod, children=(self, other))
+    return Op(op=np.mod, children=(self, other))
 
   def __div__(self, other):
-    return Op(op=N.divide, children=(self, other))
+    return Op(op=np.divide, children=(self, other))
 
   def __eq__(self, other):
-    return Op(op=N.equal, children=(self, other))
+    return Op(op=np.equal, children=(self, other))
 
   def __ne__(self, other):
-    return Op(op=N.not_equal, children=(self, other))
+    return Op(op=np.not_equal, children=(self, other))
 
   def __lt__(self, other):
-    return Op(op=N.less, children=(self, other))
+    return Op(op=np.less, children=(self, other))
 
   def __gt__(self, other):
-    return Op(op=N.greater, children=(self, other))
+    return Op(op=np.greater, children=(self, other))
 
   def __pow__(self, other):
-    return Op(op=N.power, children=(self, other))
+    return Op(op=np.power, children=(self, other))
 
   def __getitem__(self, idx):
     return Op('index', children=(self, idx))
 
   def __setitem__(self, k, val):
     raise Exception, '__setitem__ not supported.'
+  
+  def dag(self):
+    from . import compile_expr
+    return compile_expr.compile_op(self)
+
+  def evaluate(self):
+    from . import backend
+    return backend.evaluate(spartan.get_master(), self.dag())
+    
+
 
 Expr.__rsub__ = Expr.__sub__
 Expr.__radd__ = Expr.__add__
@@ -51,12 +65,7 @@ Expr.__rmul__ = Expr.__mul__
 Expr.__rdiv__ = Expr.__div__
 
 class LazyVal(Expr):
-  def __init__(self, val):
-    self._val = val
-
-  def __repr__(self):
-    return 'Lazy(%s)' % id(self._val)
-
+  _members = ['val']
 
 def lazify(val):
   if isinstance(val, Expr): return val
@@ -74,44 +83,31 @@ def pretty(op):
   return repr(op)
 
 class Op(Expr):
-  def __init__(self, op, children, kwargs=None):
-    """Represents a numpy expression.
-
-    :param op: The operation to perform.
-    :param children: Child expressions which will become arguments to ``op``.
-    :param args:
-    :param kwargs:
-    """
-
-    if not isinstance(children, tuple):
-      children = (children,)
-
-    self.op = op
-    self.children = [lazify(child) for child in children]
-    if kwargs is None:
-      kwargs = {}
-      
-    self.kwargs = kwargs
-
-  def __repr__(self):
-    return '%s(%s){%s}' % (self.__class__.__name__,
-                           pretty(self.op),
-                           ','.join([repr(c) for c in self.children]))
-
+  _members = ['op', 'children', 'kwargs']
+  
+  def node_init(self):
+    if self.kwargs is None: self.kwargs = {}
+    if self.children is None: self.children = tuple()
+    
+    Assert.isinstance(self.children, tuple)
+    
+    #util.log('%s', self.children)
+    self.children = [lazify(c) for c in self.children]
+  
   def _dtype(self):
     return self.args[0].dtype
 
 def outer(a, b):
-  return Op(N.outer, (a, b))
+  return Op(np.outer, (a, b))
 
 def dot(a, b):
-  return Op(N.dot, (a, b))
+  return Op(np.dot, (a, b))
 
 def sum(x, axis=None):
-  return Op(N.sum, (x,), kwargs={'axis' : axis })
+  return Op(np.sum, (x,), kwargs={'axis' : axis })
 
 def argmin(x, axis=None):
-  return Op(N.argmin, (x,), kwargs={'axis' : axis })
+  return Op(np.argmin, (x,), kwargs={'axis' : axis })
 
 def size(x, axis=None):
   return Op('size', (x,), kwargs={'axis' : axis })
@@ -124,10 +120,10 @@ def astype(x, dtype):
   return Op('astype', (x,), kwargs={ 'dtype' : dtype })
 
 def ravel(v):
-  return Op(N.ravel, (v,))
+  return Op(np.ravel, (v,))
 
 def diag(v):
-  return Op(N.diag, (v,))
+  return Op(np.diag, (v,))
 
 def diagflat(v):
   return diag(ravel(v))
@@ -141,3 +137,36 @@ Expr.diag = diag
 Expr.diagflat = diagflat
 Expr.ravel = ravel
 Expr.argmin = argmin
+
+
+def map_extents(v, fn):
+  return Op('map_extents', (v,), kwargs={'map_fn' : fn})
+
+def ndarray(shape, dtype=np.float):
+  return Op('ndarray', kwargs = { 'shape' : shape, 'dtype' : dtype })
+
+def rand(*shape):
+  return map_extents(ndarray(shape, dtype=np.float), 
+                     fn = lambda ex: np.random.rand(ex.shape))
+  
+def randn(*shape):
+  return map_extents(ndarray(shape, dtype=np.float), 
+                     fn = lambda ex: np.random.randn(ex.shape))
+
+def zeros(shape, dtype=np.float):
+  return map_extents(ndarray(shape, dtype=np.float), 
+                     fn = lambda ex: np.zeros(ex.shape, dtype))
+
+def ones(shape, dtype=np.float):
+  return map_extents(ndarray(shape, dtype=np.float), 
+                     fn = lambda ex: np.ones(ex.shape, dtype))
+
+def _arange_mapper(ex):
+  pos = ex.ravelled_pos()
+  sz = np.prod(ex.shape)
+  return np.arange(pos, pos+sz).reshape(ex.shape)
+
+def arange(shape, dtype=np.float):
+  return map_extents(ndarray(shape, dtype=np.float), 
+                     fn = _arange_mapper)
+
