@@ -1,4 +1,4 @@
-// Swig definitions for Sparrow
+// Swig definitions for Sparrow 
 
 %module spartan_wrap
 
@@ -9,34 +9,66 @@
 %include "numpy.i"
 
 %{
-#include "spartan/support.h"
+#include "Python.h"
+#include <string>
 %}
 
+%inline %{
+  
+namespace spartan {
+  
+class Master;
+class Worker;
+class Table;
+class TableIterator;
+class Kernel;
+class TableContext;
 
-// Allow passing in sys.argv to init()
-%typemap(in) (int argc, char *argv[]) {
-  int i;
-  if (!PyList_Check($input)) {
-    PyErr_SetString(PyExc_ValueError, "Expecting a list");
-    return NULL;
-  }
-  $1 = PyList_Size($input);
-  $2 = (char **) malloc(($1+1)*sizeof(char *));
-  for (i = 0; i < $1; i++) {
-    PyObject *s = PyList_GetItem($input,i);
-    if (!PyString_Check(s)) {
-      free($2);
-      PyErr_SetString(PyExc_ValueError, "List items must be strings");
-      return NULL;
-    }
-    $2[i] = PyString_AsString(s);
-  }
-  $2[i] = 0;
+enum LogLevel {
+    FATAL = 0, ERROR = 1, WARN = 2, INFO = 3, DEBUG = 4
+};
+
+void set_log_level(int level);
+void log(const char* file, int line, const char* msg);
+
+Master* start_master(int port, int num_workers);
+Worker* start_worker(const std::string& master, int port);
+
+void shutdown(Master*);
+void wait_for_workers(Master*);
+Table* create_table(Master*, PyObject* sharder, PyObject* accum, PyObject* selector);
+void destroy_table(Master*, Table*);
+
+TableContext* get_context();
+
+void foreach_shard(Master* m, Table* t, PyObject* fn, PyObject* args);
+Table* get_table(Kernel* k, int id);
+int current_table(Kernel* k);
+int current_shard(Kernel* k);
+
+// Table operations
+Table* get_table(TableContext*, int table_id);
+PyObject* get_sharder(Table*);
+PyObject* get_accum(Table*);
+PyObject* get_selector(Table*);
+PyObject* get(Table*, PyObject* k);
+void update(Table*, PyObject* k, PyObject* v);
+int get_id(Table* t);
+int num_shards(Table* t);
+
+// Iterators
+TableIterator* get_iterator(Table*, int shard);
+PyObject* iter_key(TableIterator*);
+PyObject* iter_value(TableIterator*);
+bool iter_done(TableIterator*);
+void iter_next(TableIterator*);
+
+// Hack to allow passing Kernel* to user functions.
+static inline Kernel* cast_to_kernel(long kernel_handle) {
+  return (Kernel*)kernel_handle;
 }
 
-%typemap(freearg) (int argc, char *argv[]) {
-  if ($2) free($2);
+Master* cast_to_master(TableContext* ctx);
+
 }
-
-%include "support.h"
-
+%} // inline

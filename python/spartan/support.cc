@@ -1,5 +1,3 @@
-#include "spartan/support.h"
-
 #include "spartan/table.h"
 #include "spartan/master.h"
 #include "spartan/kernel.h"
@@ -43,7 +41,7 @@ static inline void intrusive_ptr_release(PyObject* p) {
 
 typedef boost::intrusive_ptr<PyObject> RefPtr;
 
-static std::string to_string(RefPtr p) {
+static inline std::string to_string(RefPtr p) {
   RefPtr py_str(PyObject_Str(p.get()));
 
   char* c_str;
@@ -102,30 +100,47 @@ public:
     cloud_dumps = to_ref(PyObject_GetAttrString(cloudpickle.get(), "dumps"));
   }
 
-  RefPtr load(const std::string& data) {
+  RefPtr load(const RefPtr& py_str) {
     GILHelper lock;
-    RefPtr py_str = to_ref(PyString_FromStringAndSize(data.data(), data.size()));
+    //Log_info("Loading %d bytes", PyString_Size(py_str.get()));
     return to_ref(PyObject_CallFunction(loads.get(), W("O"), py_str.get()));
   }
 
-  std::string store(const RefPtr& p) {
+  RefPtr load(const std::string& data) {
     GILHelper lock;
-    PyObject* py_str =
-        PyObject_CallFunction(cpickle_dumps.get(), W("Oi"), p.get(), -1);
+    RefPtr py_str = to_ref(PyString_FromStringAndSize(data.data(), data.size()));
+    return load(py_str);
+  }
+
+  void store(spartan::Writer* w, const RefPtr& p) {
+    GILHelper lock;
+
+    // cPickle is faster, but will fail when trying to serialize lambdas/closures
+    // try it first and fall back to cloudpickle.
+    PyObject* py_str = PyObject_CallFunction(cpickle_dumps.get(), W("Oi"), p.get(), -1);
 
     if (py_str == NULL) {
       PyErr_Clear();
       py_str = check(PyObject_CallFunction(cloud_dumps.get(), W("Oi"), p.get(), -1));
     }
 
-    std::string out;
     char* v;
     Py_ssize_t len;
     PyString_AsStringAndSize(py_str, &v, &len);
-    out.resize(len);
-    memcpy(&out[0], v, len);
+    w->write_bytes(v, len);
 
-    Py_XDECREF(py_str);
+    Py_DECREF(py_str);
+
+    if (len > 1e6) {
+      Log_info("Large update: %d", len);
+      //abort();
+    }
+  }
+
+  std::string store(const RefPtr& p) {
+    std::string out;
+    spartan::StringWriter w(&out);
+    store(&w, p);
     return out;
   }
 };
@@ -143,18 +158,22 @@ template<>
 class Marshal<RefPtr> {
 public:
   static bool read_value(Reader *r, RefPtr* v) {
-    std::string input;
-    if (!r->read_string(input)) {
+    RefPtr py_str;
+    {
+      GILHelper lock;
+      py_str = to_ref(PyString_FromStringAndSize(NULL, r->bytes_left()));
+    }
+
+    if (!r->read_bytes(PyString_AsString(py_str.get()), r->bytes_left())) {
       return false;
     }
 
-    *v = kPickler.load(input);
+    *v = kPickler.load(py_str);
     return true;
   }
 
   static void write_value(Writer *w, const RefPtr& v) {
-    std::string str = kPickler.store(v.get());
-    w->write_string(str);
+    kPickler.store(w, v);
   }
 };
 
@@ -221,7 +240,7 @@ public:
 REGISTER_KERNEL(PyKernel);
 
 void shutdown(Master*h) {
-  delete ((Master*) h);
+  ((Master*) h)->shutdown();
 }
 
 void wait_for_workers(Master* m) {
@@ -356,7 +375,7 @@ PyObject* get_selector(Table* t) {
   return p.get();
 }
 
-void set_log_level(LogLevel l) {
+void set_log_level(int l) {
   rpc::Log::set_level(l);
 }
 
