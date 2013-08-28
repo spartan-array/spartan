@@ -99,8 +99,8 @@ def offset_from(base, other):
   :param other: `TileExtent` into the same array.
   :rtype: A new extent using this extent as a basis, instead of (0,0,0...) 
   '''
-  assert np.all(other.ul >= base.ul)
-  assert np.all(other.lr <= base.lr)
+  assert np.all(other.ul >= base.ul), (other, base)
+  assert np.all(other.lr <= base.lr), (other, base)
   return TileExtent(np.array(other.ul) - np.array(base.ul), other.sz, other.shape)
 
 def offset_slice(base, other):
@@ -147,8 +147,7 @@ def intersection(a, b):
   #if np.any(b.lr_array <= a.ul_array): return None
   #if np.any(a.lr_array <= b.ul_array): return None
   return TileExtent(np.maximum(b.ul_array, a.ul_array),
-                    np.minimum(b.lr_array, a.lr_array) - 
-                    np.maximum(b.ul_array, a.ul_array),
+                    np.minimum(b.lr_array, a.lr_array) - np.maximum(b.ul_array, a.ul_array),
                     a.array_shape)
 
 TileExtent.intersection = intersection

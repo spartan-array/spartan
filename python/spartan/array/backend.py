@@ -19,6 +19,8 @@ def eval_MapTiles(ctx, prim, inputs):
   largest = largest_value(inputs)
   map_fn = prim.map_fn
   
+  util.log('Mapping over %d inputs; largest = %s', len(inputs), largest.shape)
+  
   def mapper(ex, tile):
     #util.log('%s : Running %s', threading.current_thread().getName(), map_fn)
     slc = ex.to_slice()
@@ -37,8 +39,8 @@ def eval_MapExtents(ctx, prim, inputs):
   map_fn = prim.map_fn
   
   def mapper(ex, tile):
-    # util.log('%s : Running %s', threading.current_thread().getName(), map_fn)
     new_extent, result = map_fn(inputs, ex)
+    # util.log('MapExtents: %s, %s', ex, new_extent)
     return [(new_extent, Tile(new_extent, result))]
   
   return inputs[0].map_to_array(mapper)
@@ -131,7 +133,7 @@ def eval_Index(ctx, prim, inputs):
 
 def _evaluate(ctx, prim):
   inputs = [evaluate(ctx, v) for v in prim.dependencies()]
-  util.log('Evaluating: %s', prim.typename())
+  #util.log('Evaluating: %s', prim.typename())
   return globals()['eval_' + prim.typename()](ctx, prim, inputs)    
     
 

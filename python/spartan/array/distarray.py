@@ -25,8 +25,8 @@ def get_data(data, index):
   return data[index]
 
 
-def extents_for_region(array, tile_extent):
-  for ex in array.extents:
+def extents_for_region(extents, tile_extent):
+  for ex in extents:
     intersection = extent.intersection(ex, tile_extent)
     if intersection is not None:
       yield (ex, intersection)
@@ -109,7 +109,8 @@ def compute_splits(shape):
     ul, lr = zip(*slc)
     ex = extent.TileExtent(ul, lr, shape)
     result.append(ex)
-  return result
+  
+  return set(result)
     
 def _create_rand(extent, data):
   data[:] = np.random.rand(*extent.shape)
@@ -172,6 +173,7 @@ def from_table(table):
     # empty table; default dtype.
     dtype = np.float
   
+  extents = set(extents)
   return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
 
 def create(master, shape, 
@@ -190,7 +192,6 @@ def create(master, shape,
   table = master.create_table(sharder, accum, TileSelector())
   for ex in extents:
     ex_tile = tile.Tile(ex, data=None, dtype=dtype)
-    #util.log('Writing to %s: %s', ex, ex_tile)
     table.update(ex, ex_tile)
   
   return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
@@ -241,12 +242,15 @@ class DistArray(object):
     :param region: `Extent` indicating the region to fetch.
     '''
     Assert.isinstance(region, extent.TileExtent)
-    splits = list(extents_for_region(self, region))
     
-    if len(splits) == 1:
-      ex, intersection = splits[0]
+    # special case exact match against a tile 
+    if region in self.extents:
+      #util.log('Exact match.')
+      ex, intersection = region, region
       return self.table.get(NestedSlice(ex, extent.offset_slice(ex, intersection)))
 
+    splits = list(extents_for_region(self.extents, region))
+    
     #util.log('Target shape: %s, %d splits', region.shape, len(splits))
     tgt = np.ndarray(region.shape)
     for ex, intersection in splits:
@@ -259,9 +263,17 @@ class DistArray(object):
   def update(self, region, data):
     Assert.isinstance(region, extent.TileExtent)
     Assert.eq(region.shape, data.shape)
+
+    #util.log('%s %s', self.table.id(), self.extents)
+    # exact match
+    if region in self.extents:
+      #util.log('EXACT: %d %s ', self.table.id(), region)
+      self.table.update(region, tile.make_tile(region, data))
+      return
     
-    splits = list(extents_for_region(self, region))
+    splits = list(extents_for_region(self.extents, region))
     for dst_key, intersection in splits:
+      #util.log('%d %s %s %s', self.table.id(), region, dst_key, intersection)
       src_slice = extent.offset_slice(region, intersection)
       update_tile = tile.make_tile(intersection, data[src_slice])
       self.table.update(dst_key, update_tile)

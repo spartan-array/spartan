@@ -183,10 +183,10 @@ def ones(shape, dtype=np.float):
   return map_extents(ndarray(shape, dtype=np.float), 
                      fn = lambda inputs, ex: (ex, np.ones(ex.shape, dtype)))
 
-def _arange_mapper(ex):
+def _arange_mapper(inputs, ex):
   pos = ex.ravelled_pos()
   sz = np.prod(ex.shape)
-  return np.arange(pos, pos+sz).reshape(ex.shape)
+  return (ex, np.arange(pos, pos+sz).reshape(ex.shape))
 
 def arange(shape, dtype=np.float):
   return map_extents(ndarray(shape, dtype=np.float), 

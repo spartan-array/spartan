@@ -53,6 +53,9 @@ class Tile(object):
     self._initialize()
     self.mask[idx] = False
     self.data[idx] = val
+    
+  def __repr__(self):
+    return 'tile(%s)' % self.extent
 
 
 def make_tile(extent, data):
@@ -89,4 +92,5 @@ class TileAccum(object):
       data[valid] = self.accum(data[valid], new_tile.data[valid])
     old_tile.mask[idx] = False
 #     util.log('%s, %s', old_tile.mask, idx)
+
     return old_tile
