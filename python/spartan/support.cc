@@ -30,14 +30,14 @@ struct GILHelper {
 static inline void intrusive_ptr_add_ref(PyObject* p) {
   if (Py_IsInitialized()) {
     GILHelper h;
-    Py_IncRef(p);
+    Py_XINCREF(p);
   }
 }
 
 static inline void intrusive_ptr_release(PyObject* p) {
   if (Py_IsInitialized()) {
     GILHelper h;
-    Py_DecRef(p);
+    Py_XDECREF(p);
   }
 }
 
@@ -67,6 +67,12 @@ T check(T result) {
   return result;
 }
 
+// Most python functions return 'new' references; we don't need
+// to incref these when turning them into a RefPtr.
+RefPtr to_ref(PyObject* o) {
+  return RefPtr(check(o), false);
+}
+
 namespace boost {
 static inline size_t hash_value(const RefPtr& p) {
   GILHelper lock;
@@ -83,36 +89,43 @@ class Pickler {
   RefPtr cPickle;
   RefPtr cloudpickle;
   RefPtr loads;
-  RefPtr dumps;
+  RefPtr cloud_dumps;
+  RefPtr cpickle_dumps;
 
 public:
   Pickler() {
-    cPickle = check(PyImport_ImportModule("cPickle"));
-    cloudpickle = check(
+    cPickle = to_ref(PyImport_ImportModule("cPickle"));
+    cloudpickle = to_ref(
         PyImport_ImportModule("cloud.serialization.cloudpickle"));
-    loads = check(PyObject_GetAttrString(cPickle.get(), "loads"));
-
-//    dumps = check(PyObject_GetAttrString(cPickle.get(), "dumps"));
-    dumps = check(PyObject_GetAttrString(cloudpickle.get(), "dumps"));
+    loads = to_ref(PyObject_GetAttrString(cPickle.get(), "loads"));
+    cpickle_dumps = to_ref(PyObject_GetAttrString(cPickle.get(), "dumps"));
+    cloud_dumps = to_ref(PyObject_GetAttrString(cloudpickle.get(), "dumps"));
   }
 
   RefPtr load(const std::string& data) {
     GILHelper lock;
-    RefPtr py_str(check(PyString_FromStringAndSize(data.data(), data.size())));
-    return RefPtr(
-        check(PyObject_CallFunction(loads.get(), W("O"), py_str.get())));
+    RefPtr py_str = to_ref(PyString_FromStringAndSize(data.data(), data.size()));
+    return to_ref(PyObject_CallFunction(loads.get(), W("O"), py_str.get()));
   }
 
-  std::string store(RefPtr p) {
+  std::string store(const RefPtr& p) {
     GILHelper lock;
-    RefPtr py_str(
-        check(PyObject_CallFunction(dumps.get(), W("Oi"), p.get(), -1)));
+    PyObject* py_str =
+        PyObject_CallFunction(cpickle_dumps.get(), W("Oi"), p.get(), -1);
+
+    if (py_str == NULL) {
+      PyErr_Clear();
+      py_str = check(PyObject_CallFunction(cloud_dumps.get(), W("Oi"), p.get(), -1));
+    }
+
     std::string out;
     char* v;
     Py_ssize_t len;
-    PyString_AsStringAndSize(py_str.get(), &v, &len);
+    PyString_AsStringAndSize(py_str, &v, &len);
     out.resize(len);
     memcpy(&out[0], v, len);
+
+    Py_XDECREF(py_str);
     return out;
   }
 };
@@ -135,13 +148,13 @@ public:
       return false;
     }
 
-    RefPtr p = kPickler.load(input);
-    *v = p;
+    *v = kPickler.load(input);
     return true;
   }
 
   static void write_value(Writer *w, const RefPtr& v) {
-    w->write_string(kPickler.store(v.get()));
+    std::string str = kPickler.store(v.get());
+    w->write_string(str);
   }
 };
 
@@ -159,8 +172,9 @@ class PySharder: public PyInitableT<SharderT<RefPtr> > {
 public:
   size_t shard_for_key(const RefPtr& k, int num_shards) const {
     GILHelper lock;
-    RefPtr result(
-        check(PyObject_CallFunction(code.get(), W("Oi"), k.get(), num_shards)));
+    RefPtr result =
+        to_ref(PyObject_CallFunction(code.get(), W("Oi"), k.get(), num_shards));
+
     CHECK(PyInt_Check(result.get()));
     return PyInt_AsLong(result.get());
   }
@@ -172,8 +186,8 @@ class PyAccum: public PyInitableT<AccumulatorT<RefPtr> > {
 public:
   void accumulate(RefPtr* v, const RefPtr& update) const {
     GILHelper lock;
-    RefPtr result(
-        check(PyObject_CallFunction(code.get(), W("OO"), v->get(), update.get())));
+    RefPtr result =
+        to_ref(PyObject_CallFunction(code.get(), W("OO"), v->get(), update.get()));
     CHECK(result.get() != Py_None);
 
     *v = result;
@@ -186,8 +200,8 @@ class PySelector: public PyInitableT<SelectorT<RefPtr, RefPtr> > {
   RefPtr select(const RefPtr& k, const RefPtr& v) {
     GILHelper lock;
 
-    RefPtr result(
-        check(PyObject_CallFunction(code.get(), W("OO"), k.get(), v.get())));
+    RefPtr result =
+        to_ref(PyObject_CallFunction(code.get(), W("OO"), k.get(), v.get()));
     return result;
   }
 
@@ -199,11 +213,9 @@ class PyKernel: public Kernel {
 public:
   void run() {
     GILHelper lock;
-    RefPtr fn(kPickler.load(args()["map_fn"]));
-    RefPtr fn_args(kPickler.load(args()["map_args"]));
-    PyObject* result(
-        check(PyObject_CallFunction(fn.get(), W("lO"), this, fn_args.get())));
-    Py_DecRef(result);
+    RefPtr fn = kPickler.load(args()["map_fn"]);
+    RefPtr fn_args = kPickler.load(args()["map_args"]);
+    to_ref(PyObject_CallFunction(fn.get(), W("lO"), this, fn_args.get()));
   }
 };
 REGISTER_KERNEL(PyKernel);
@@ -222,9 +234,9 @@ Table* get_table(Kernel* k, int id) {
 
 Table* create_table(Master*m, PyObject* sharder, PyObject* accum,
     PyObject* selector) {
-  Py_IncRef(sharder);
-  Py_IncRef(accum);
-  Py_IncRef(selector);
+  Py_XINCREF(sharder);
+  Py_XINCREF(accum);
+  Py_XINCREF(selector);
 
   PySelector* sel = NULL;
   if (selector != Py_None) {
@@ -240,7 +252,8 @@ void destroy_table(Master* m, Table* t) {
   m->destroy_table(t);
 }
 
-void foreach_shard(Master*m, Table* t, PyObject* fn, PyObject* args) {
+void foreach_shard(Master*m, Table* t,
+                   PyObject* fn, PyObject* args) {
   spartan::RunDescriptor r;
   r.kernel = "PyKernel";
   r.args["map_fn"] = kPickler.store(fn);
@@ -255,24 +268,17 @@ int get_id(Table* t) {
 }
 
 PyObject* get(Table* t, PyObject* k) {
-  PyObject* result = ((PyTable*) t)->get(k).get();
+  RefPtr result = ((PyTable*) t)->get(k);
 //  Log_info("Result: %s", to_string(result).c_str());
-  if (result == NULL) {
+  if (result.get() == NULL) {
     result = Py_None;
   }
-  {
-    GILHelper lock;
-    Py_IncRef(result);
-  }
-  return result;
+
+  Py_XINCREF(result.get());
+  return result.get();
 }
 
 void update(Table* t, PyObject* k, PyObject* v) {
-  {
-    GILHelper lock;
-    Py_IncRef(k);
-    Py_IncRef(v);
-  }
   ((PyTable*) t)->update(k, v);
 }
 
@@ -288,19 +294,15 @@ TableIterator* get_iterator(Table* t, int shard) {
 }
 
 PyObject* iter_key(TableIterator* i) {
-  {
-    GILHelper lock;
-    Py_IncRef(((PyTable::Iterator*) i)->key().get());
-  }
-  return ((PyTable::Iterator*) i)->key().get();
+  RefPtr k = ((PyTable::Iterator*) i)->key();
+  Py_XINCREF(k.get());
+  return k.get();
 }
 
 PyObject* iter_value(TableIterator* i) {
-  {
-    GILHelper lock;
-    Py_IncRef(((PyTable::Iterator*) i)->value().get());
-  }
-  return ((PyTable::Iterator*) i)->value().get();
+  RefPtr v = ((PyTable::Iterator*) i)->value();
+  Py_XINCREF(v.get());
+  return v.get();
 }
 
 bool iter_done(TableIterator* i) {
@@ -333,24 +335,24 @@ int get_table_id(Table* t) {
 
 PyObject* get_sharder(Table* t) {
   RefPtr p = ((PySharder*) t->sharder)->code;
-  Py_IncRef(p.get());
+  Py_XINCREF(p.get());
   return p.get();
 }
 
 PyObject* get_accum(Table* t) {
   RefPtr p = ((PyAccum*) t->accum)->code;
-  Py_IncRef(p.get());
+  Py_XINCREF(p.get());
   return p.get();
 }
 
 PyObject* get_selector(Table* t) {
   if (t->selector == NULL) {
-    Py_IncRef(Py_None);
+    Py_INCREF(Py_None);
     return Py_None;
   }
 
   RefPtr p = ((PySelector*) t->selector)->code;
-  Py_IncRef(p.get());
+  Py_XINCREF(p.get());
   return p.get();
 }
 
