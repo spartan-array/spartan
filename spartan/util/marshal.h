@@ -65,6 +65,7 @@ struct Reader {
     return true;
   }
 
+  virtual int bytes_left() const = 0;
   virtual int read_bytes(void* v, int num_bytes) = 0;
 };
 
@@ -85,6 +86,10 @@ public:
     int bytes_read = end - pos_;
     pos_ = end;
     return bytes_read;
+  }
+
+  int bytes_left() const {
+    return src_.len - pos_;
   }
 };
 

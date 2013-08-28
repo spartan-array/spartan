@@ -72,6 +72,7 @@ public:
     total_runtime = 0;
     alive = true;
     status = 0;
+    proxy = NULL;
     this->addr = addr;
   }
 
@@ -79,6 +80,15 @@ public:
     rpc::ScopedLock sl(&lock);
 
     return pending.find(id) != pending.end();
+  }
+
+  bool serves_shard(int shard) {
+    for (auto sid : shards) {
+      if (sid.second == shard) {
+        return true;
+      }
+    }
+    return false;
   }
 
   void ping() {
@@ -169,6 +179,8 @@ public:
     return -1;
   }
 
+  void shutdown();
+
   void flush();
 
   void destroy_table(int table_id);
@@ -182,7 +194,6 @@ public:
       AccumulatorT<V>* accum = new Replace<V>(), SelectorT<K, V>* selector =
           NULL, std::string sharder_opts = "", std::string accum_opts = "",
       std::string selector_opts = "") {
-    Log_info("Creating table...");
     wait_for_workers();
 
     TableT<K, V>* t = new TableT<K, V>();
@@ -193,6 +204,8 @@ public:
 
     CreateTableReq req;
     int table_id = table_id_counter_++;
+
+    Log_debug("Creating table %d", table_id);
     req.table_type = t->type_id();
     req.id = table_id;
     req.num_shards = workers_.size() * 2 + 1;
@@ -238,7 +251,6 @@ public:
     }
 
     assign_shards(t);
-    Log_info("New table %d", table_id);
     return t;
   }
 

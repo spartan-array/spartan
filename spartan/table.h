@@ -479,6 +479,10 @@ public:
         ((AccumulatorT<K>*) accum)->accumulate(&i->second, v);
       }
     }
+
+//    if (!is_local_shard(shard_id)) {
+//      flush();
+//    }
   }
 
   bool _get(const K& k, V* v) {
@@ -508,11 +512,6 @@ public:
 
       return true;
     }
-
-    // Send any pending updates before trying to do a fetch.
-    // We could alternatively try and patch up the remote
-    // value with our local updates.
-    flush();
 
     return get_remote(shard, k, v);
   }

@@ -49,13 +49,22 @@ void Master::wait_for_workers() {
 }
 
 Master::~Master() {
+  shutdown();
+}
+
+void Master::shutdown() {
+  for (auto t : tables_) {
+    destroy_table(t.second);
+  }
+
+  CHECK(tables_.empty());
+
   for (auto w : workers_) {
     w->proxy->shutdown();
   }
 
-  for (auto t : tables_) {
-    delete t.second;
-  }
+  workers_.clear();
+  tables_.clear();
 }
 
 void Master::register_worker(const RegisterReq& req) {
@@ -79,17 +88,24 @@ WorkerState* Master::assign_shard(int table, int shard) {
   WorkerState* best = NULL;
   for (size_t i = 0; i < workers_.size(); ++i) {
     WorkerState& w = *workers_[i];
-    if (w.alive && (best == NULL ||
-        w.shards.size() < best->shards.size())) {
-      best = workers_[i];
+    if (!w.alive) {
+      continue;
+    }
+
+    if (w.serves_shard(shard)) {
+      best = &w;
+      break;
+    }
+
+    if (best == NULL || w.shards.size() < best->shards.size()) {
+      best = &w;
     }
   }
 
   CHECK(best != NULL);
   CHECK(best->alive);
 
-  Log_debug("Assigned shard (%d, %d) to worker %d",
-      table, shard, best->id);
+  Log_info("Assigned shard (%d, %d) to worker %d", table, shard, best->id);
 
   // Update local partition information, for performing put/fetches
   // on the master.
@@ -170,7 +186,12 @@ int Master::num_pending(const RunDescriptor& r) {
 }
 
 void Master::destroy_table(int table_id) {
+  if (tables_.find(table_id) == tables_.end()) {
+    return;
+  }
+
   CHECK(tables_.find(table_id) != tables_.end());
+  Log_debug("Destroying table %d", table_id);
   for (auto w : workers_) {
     w->proxy->destroy_table(table_id);
     for (auto s = w->shards.begin(); s != w->shards.end(); ) {
@@ -182,6 +203,8 @@ void Master::destroy_table(int table_id) {
     }
   }
 
+  Table* t = tables_[table_id];
+  delete t;
   tables_.erase(tables_.find(table_id));
 }
 
