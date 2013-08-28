@@ -1,7 +1,7 @@
 AM_CXX = clang++
 AM_LD = clang++
 CXXFLAGS = -std=c++11\
- -O0\
+ -O2\
  -ggdb3\
  -Wall\
  -Wno-unused-result\
@@ -21,12 +21,11 @@ CPPFLAGS += \
 SWIG_INCLUDES = \
   spartan/table.h\
   spartan/master.h\
-  spartan/worker.h\
-  python/spartan/support.h
+  spartan/worker.h
 
 BUILT_SOURCES = \
   spartan/spartan_service.h \
-  python/spartan/_spartan_wrap.cc
+  $(builddir)/python/spartan/_spartan_wrap.cc
   
 $(builddir)/python/spartan/_spartan_wrap.cc : \
   $(srcdir)/python/spartan/spartan.i $(SWIG_INCLUDES)

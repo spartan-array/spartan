@@ -44,12 +44,12 @@ def log(msg, *args, **kw):
 
 
 class FileWatchdog(threading.Thread):
-  """Watchdog for a file (typically `sys.stdin`).
+  """Watchdog for a file (typically `sys.stdin` or `sys.stdout`).
 
   When the file closes, terminate the process.
   (This occurs when an ssh connection is terminated, for example.)
   """
-  def __init__(self, file_handle):
+  def __init__(self, file_handle=sys.stdout):
     threading.Thread.__init__(self, name='WatchdogThread')
     self.setDaemon(True)
     self.file_handle = file_handle

@@ -13,6 +13,8 @@ config.add_flag('num_workers', default=4, type=int)
 config.add_bool_flag('multiprocess', default=False)
 
 def worker_loop(port): 
+  watchdog = util.FileWatchdog()
+  watchdog.start()
   spartan.start_worker('%s:9999' % socket.gethostname(), port)
   while 1:
     time.sleep(1)

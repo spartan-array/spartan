@@ -61,7 +61,7 @@ def test_sum(ctx):
                    lambda a, b: a + b)
   c = backend.evaluate(ctx, b)
   lc = c.glom()
-  Assert.all_eq(lc, np.ones((10,)) * 10)
+  Assert.all_eq(lc, np.ones((DIM,)) * DIM)
   
 def test_compile_sum(ctx):
   def _(axis):
@@ -69,7 +69,7 @@ def test_compile_sum(ctx):
     a = expr.ones((DIM, DIM))
     b = a.sum(axis=axis)
     val = b.evaluate()
-    Assert.all_eq(val.glom(), np.ones((10,10)).sum(axis))
+    Assert.all_eq(val.glom(), np.ones((DIM,DIM)).sum(axis))
 
   _(axis=0)
   _(axis=1)
@@ -82,7 +82,7 @@ def test_compile_index(ctx):
   z = a[b]  
   val = z.evaluate()
   
-  nx = np.arange(100).reshape(DIM, DIM)
+  nx = np.arange(DIM * DIM).reshape(DIM, DIM)
   ny = np.ones((10,), dtype=np.int)
   
   Assert.all_eq(val.glom(), nx[ny])
@@ -97,13 +97,13 @@ def test_slice(ctx):
   Assert.all_eq(val.glom(), nx[5:8, 5:8])
   
 def test_linear_regression(ctx):
-  N_EXAMPLES = 1000 * 1000 
+  N_EXAMPLES = 1000 * 1000 * 10
   N_DIM = 10
   x = expr.rand(N_EXAMPLES, N_DIM)
   y = expr.rand(N_EXAMPLES, 1)
   w = np.random.rand(N_DIM, 1)
   
-  for i in range(2):
+  for i in range(10):
     def _dot(inputs, ex):
       t = inputs[0][ex.to_slice()]
       out = extent.TileExtent(list(ex.ul[0:1]) + [0],

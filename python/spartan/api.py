@@ -79,7 +79,6 @@ class Table(object):
     return wrap.update(self.handle, key, value)
   
   def destroy(self):
-    util.log('Destroying table... %s %d', id(self), self.id())
     Assert.isinstance(self.ctx, Master) 
     return self.ctx.destroy_table(self.handle)
   
@@ -160,9 +159,10 @@ class Master(object):
   def __init__(self, handle, shutdown_on_del=False):
     self.handle = handle
     self.shutdown_on_del = shutdown_on_del
-    
+     
   def __del__(self):
     if self.shutdown_on_del:
+      util.log('Shutting down master.')
       wrap.shutdown(self.handle)
     
   def destroy_table(self, table_handle):

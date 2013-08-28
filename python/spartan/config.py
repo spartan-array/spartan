@@ -18,6 +18,7 @@ def add_flag(name, default, *args, **kw):
   
 def add_bool_flag(name, default):
   _names.add(name)
+  parser.add_argument('--' + name, default=default, action='store', dest=name, type=bool)
   parser.add_argument('--enable_' + name, default=default, action='store_true', dest=name)
   parser.add_argument('--disable_' + name, default=default, action='store_false', dest=name)
 
