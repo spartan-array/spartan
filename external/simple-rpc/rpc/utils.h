@@ -257,7 +257,12 @@ public:
 
 class Mutex : public Lockable {
 public:
-    Mutex()         { Pthread_mutex_init(&m_, NULL); }
+    Mutex()         {
+      pthread_mutexattr_t attr;
+      pthread_mutexattr_init(&attr);
+      pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+      Pthread_mutex_init(&m_, &attr);
+    }
     ~Mutex()        { Pthread_mutex_destroy(&m_); }
 
     void lock()     { Pthread_mutex_lock(&m_); }

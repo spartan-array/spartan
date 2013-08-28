@@ -98,7 +98,11 @@ void Log::log_v(int level, const char* file, int line, const char* fmt, va_list 
     if (level <= Log::level) {
         Pthread_mutex_lock(&Log::m);
         const char* filebase = basename(file);
-        fprintf(Log::fp, "%c ", indicator[level]);
+        struct timeval now;
+        gettimeofday(&now, NULL);
+        fprintf(Log::fp, "%c", indicator[level]);
+        //fprintf(Log::fp, "%d ", getpid());
+        fprintf(Log::fp, "%ld.%ld ", now.tv_sec, now.tv_usec / 1000);
         fprintf(Log::fp, "%s:%3d ", filebase, line);
         vfprintf(Log::fp, fmt, args);
         fprintf(Log::fp, "\n");
