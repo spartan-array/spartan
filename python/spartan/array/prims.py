@@ -20,11 +20,7 @@ class Primitive(object):
     '''
     if self.cached_value is not None:
       return self.cached_value.shape
-    
-    try:
-      return self._shape()
-    except NotShapeable:
-      return None
+    return self._shape()
     
   def typename(self):
     return self.__class__.__name__
@@ -51,8 +47,11 @@ class Map(Primitive):
   def dependencies(self):
     return self.inputs
   
+
+@node
+class MapTiles(Map):
   def _shape(self):
-    '''Maps retain the shape of inputs.
+    '''MapTiles retains the shape of inputs.
     
     Broadcasting results in a map taking the shape of the largest input.
     '''
@@ -65,12 +64,9 @@ class Map(Primitive):
 
 
 @node
-class MapTiles(Map):
-  pass
-
-@node
 class MapExtents(Map):
-  pass
+  def _shape(self):
+    raise NotShapeable
 
 
 @node

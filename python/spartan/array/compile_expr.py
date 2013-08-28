@@ -5,13 +5,12 @@ operations supported by the backends (see `prims`).
 
 '''
 
-from . import expr, prims
+from . import expr, prims, distarray
 from .. import util
+from ..util import Assert
+from spartan.config import flags
 from .extent import index_for_reduction, shapes_match
-from spartan.array import distarray
-from spartan.util import Assert
 import numpy as np
-
 
 binary_ops = set([np.add, np.subtract, np.multiply, np.divide, np.mod, np.power,
                   np.equal, np.less, np.less_equal, np.greater, np.greater_equal])
@@ -97,6 +96,12 @@ def compile_map_extents(op, children):
   return prims.MapExtents([child], map_fn = op.kwargs['map_fn'])  
 
 
+def compile_map_tiles(op, children):
+  Assert.eq(len(children), 1)
+  child = children[0]
+  return prims.MapTiles([child], map_fn = op.kwargs['map_fn'])  
+ 
+  
 def compile_ndarray(op, children):
   shape = op.kwargs['shape']
   dtype = op.kwargs['dtype']
@@ -122,13 +127,17 @@ def compile_op(op):
     return globals()['compile_' + op.op.__name__](op, children)
 
 def optimize(dag):
-  folder = FoldMapPass()
-  util.log('Before: %s' % dag) 
-  result = folder.visit(dag)
-  #result = folder.visit(result)
-  #result = folder.visit(result)
-  util.log('After: %s', result)
-  return result
+  if not flags.optimization:
+    util.log('Optimizations disabled')
+    return dag
+  
+  if flags.folding:
+    folder = FoldMapPass()
+    dag = folder.visit(dag)
+  else:
+    util.log('Folding disabled')
+  
+  return dag
 
 class OptimizePass(object):
   def visit(self, op):
@@ -158,6 +167,11 @@ class OptimizePass(object):
   def visit_Value(self, op):
     return prims.Value(op.value)
   
+  def visit_Index(self, op):
+    return prims.Index(self.visit(op.src), self.visit(op.idx))
+  
+  def visit_Slice(self, op):
+    return prims.Index(self.visit(op.src), self.visit(op.idx))
 
 
 class FoldMapPass(OptimizePass):

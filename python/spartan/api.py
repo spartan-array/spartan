@@ -1,6 +1,9 @@
 from . import util, wrap
+from spartan.config import flags
 from spartan.util import Assert
 from wrap import DEBUG, INFO, WARN, ERROR, FATAL, set_log_level
+import cProfile
+import pstats
 import sys
 import traceback
 
@@ -42,7 +45,6 @@ def key_mapper(k, v):
 def keys(src):
   key_table = map_items(src, key_mapper)
   result = [k for k, _ in key_table]
-  key_table.destroy()
   return result
         
 
@@ -50,13 +52,19 @@ class Table(object):
   def __init__(self, master, ptr_or_id):
     if master is not None:
       self.ctx = master
+      self.destroy_on_del = True
     else:
+      self.destroy_on_del = False
       self.ctx = wrap.get_context()
     
     if isinstance(ptr_or_id, int):
       self.handle = wrap.get_table(self.ctx, ptr_or_id)
     else:
       self.handle = ptr_or_id
+      
+  def __del__(self):
+    if self.destroy_on_del:
+      self.destroy()
           
   def __reduce__(self):
     return (Table, (None, self.id()))
@@ -71,6 +79,7 @@ class Table(object):
     return wrap.update(self.handle, key, value)
   
   def destroy(self):
+    util.log('Destroying table... %s %d', id(self), self.id())
     Assert.isinstance(self.ctx, Master) 
     return self.ctx.destroy_table(self.handle)
   
@@ -124,11 +133,28 @@ class Kernel(object):
     return wrap.current_table(self.handle)
 
 
+PROF = None
+
 def _bootstrap_kernel(handle, args):
   kernel = Kernel(handle)
   fn = args[0]
   rest = args[1]
-  return fn(kernel, rest)
+  
+  if not flags.profile_kernels:
+    return fn(kernel, rest)
+  
+  p = cProfile.Profile()
+  p.enable()  
+  result = fn(kernel, rest)
+  p.disable()
+  stats = pstats.Stats(p)
+  global PROF
+  if PROF is None:
+    PROF = stats
+  else:
+    PROF.add(stats)
+  
+  return result
 
 class Master(object):
   def __init__(self, handle, shutdown_on_del=False):

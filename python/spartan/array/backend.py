@@ -5,6 +5,8 @@ from .tile import Tile
 from spartan import util
 from spartan.util import join_tuple, Assert
 import numpy as np
+import cPickle
+import threading
 
 def largest_value(vals):
   return sorted(vals, key=lambda v: np.prod(v.shape))[-1]
@@ -18,23 +20,26 @@ def eval_MapTiles(ctx, prim, inputs):
   map_fn = prim.map_fn
   
   def mapper(ex, tile):
+    #util.log('%s : Running %s', threading.current_thread().getName(), map_fn)
     slc = ex.to_slice()
+    #util.log('Fetching %d inputs', len(inputs))
     local_values = [input[slc] for input in inputs]
+    #util.log('Mapping...')
     result = map_fn(*local_values)
+    #util.log('Done.')
     assert isinstance(result, np.ndarray), result
     return [(ex, Tile(ex, result))]
-  
   
   result = largest.map_to_array(mapper)
   return result
 
 def eval_MapExtents(ctx, prim, inputs):
-  Assert.eq(len(inputs), 1)
   map_fn = prim.map_fn
   
   def mapper(ex, tile):
-    result = map_fn(ex)
-    return [(ex, Tile(ex, map_fn(ex)))]
+    # util.log('%s : Running %s', threading.current_thread().getName(), map_fn)
+    new_extent, result = map_fn(inputs, ex)
+    return [(new_extent, Tile(new_extent, result))]
   
   return inputs[0].map_to_array(mapper)
 
@@ -126,7 +131,7 @@ def eval_Index(ctx, prim, inputs):
 
 def _evaluate(ctx, prim):
   inputs = [evaluate(ctx, v) for v in prim.dependencies()]
-  util.log('Evaluating: %s', prim)
+  util.log('Evaluating: %s', prim.typename())
   return globals()['eval_' + prim.typename()](ctx, prim, inputs)    
     
 

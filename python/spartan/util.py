@@ -20,25 +20,7 @@ import traceback
 import cStringIO
 
 from . import wrap
-
-parser = argparse.ArgumentParser()
-flags = argparse.Namespace()
-program_start = time.time()
-
-def parse_args(argv):
-  global flags
-  flags, rest = parser.parse_known_args(argv)
-  return flags, rest
-
-def add_flag(name, default, *args, **kw):
-  if name in flags:
-    # util.log('Duplicate flag definition (%s) ignored.', name)
-    return
-
-  setattr(flags, name, default)
-  parser.add_argument('--' + name, default=default, *args, **kw)
-
-add_flag('profile', action='store_true', default=False)
+from .config import flags
 
 log_mutex = threading.RLock()
 def log(msg, *args, **kw):
@@ -59,23 +41,6 @@ def log(msg, *args, **kw):
     wrap.log(filename, lineno, msg)
     if exc is not None:
       wrap.log(filename, lineno, exc)
-
-
-class Watchdog(threading.Thread):
-  def __init__(self, max_delay=10):
-    threading.Thread.__init__(self, name='WatchdogThread')
-    self.max_delay = max_delay
-    self._last_tick = time.time()
-    self.setDaemon(True)
-
-  def ping(self):
-    self._last_tick = time.time()
-
-  def run(self):
-    while 1:
-      if time.time() - self._last_tick > self.max_delay:
-        sys.exit(0)
-        os._exit(1)
 
 
 class FileWatchdog(threading.Thread):
@@ -171,6 +136,7 @@ class Timer(object):
     print('%3.5f:: %s' % (time.time() - self.st, self.name))
 
 def dump_stacks(out):
+  '''Dump the stacks of all threads.'''
   id_to_name = dict([(th.ident, th.name) for th in threading.enumerate()])
   thread_stacks = collections.defaultdict(list)
 
@@ -195,74 +161,8 @@ def stack_signal():
   with open('/tmp/%d.stacks' % os.getpid(), 'w') as f:
     print >> f, out.getvalue()
 
-QUIT_HANDLERS = {}
-def _quit_handler(signal, frame):
-  for h in QUIT_HANDLERS.keys():
-    h()
 
-signal.signal(signal.SIGQUIT, _quit_handler)
-
-def register_quit_handler(f):
-  QUIT_HANDLERS[f] = 1
-
-def enable_stacktrace():
-  register_quit_handler(stack_signal)
-
-def disable_stacktrace():
-  signal.signal(signal.SIGQUIT, signal.SIG_DFL)
-
-_thread_run = Thread.run
-_stat_lock = threading.Lock()
-def _run_with_profile(self):
-  self._prof = cProfile.Profile()
-  self._prof.enable()
-  _thread_run(self)
-  self._prof.disable()
-
-  with _stat_lock:
-    if Thread.stats is None:
-      Thread.stats = pstats.Stats(self._prof)
-    else:
-      Thread.stats.add(self._prof)
-
-def dump_profile():
-  if not flags.profile:
-    return
-  import yappi
-  yappi.stop()
-  yappi.get_func_stats().save('/tmp/prof.out.%d' % os.getpid(), type='callgrind')
-
-  from spartan.rpc import zeromq
-  zeromq.shutdown()
-  stats = get_profile()
-  if stats is None:
-    return
-  # stats.sort_stats('cumulative').print_stats(25)
-  stats.dump_stats('/tmp/prof.out.%d' % os.getpid())
-  try:
-    os.unlink('/tmp/prof.out')
-  except: pass
-
-  try:
-    os.symlink('/tmp/prof.out.%d' % os.getpid(), '/tmp/prof.out')
-  except:
-    pass
-
-PROFILER = None
-def enable_profiling():
-  import yappi
-  yappi.start()
-  atexit.register(dump_profile)
-  return
-
-def get_profile():
-  if PROFILER is None:
-    return None
-
-  stats = pstats.Stats(PROFILER)
-  if threading.Thread.stats is not None:
-    stats.add(threading.Thread.stats)
-  return stats
+signal.signal(signal.SIGQUIT, stack_signal)
 
 
 class Assert(object):
@@ -310,6 +210,7 @@ class Assert(object):
   
  
 def trace_fn(fn):
+  '''Function decorator: log on entry and exit to ``fn``.'''
   def tracer(*args, **kw):
     log('TRACE: >> %s with args: %s %s', fn, args, kw)
     result = fn(*args, **kw)
@@ -319,6 +220,13 @@ def trace_fn(fn):
    
    
 def rtype_check(typeclass):
+  '''Function decorator to check return type.
+  
+  @rtype_check(int)
+  def fn(x, y, z):
+    return x + y
+  '''
+  
   def wrap(fn):
     def checked_fn(*args, **kw):  
       result = fn(*args, **kw)
@@ -329,6 +237,17 @@ def rtype_check(typeclass):
     return checked_fn
   return wrap
   
+  
+def count_calls(fn):
+  count = [0]
+  def wrapped(*args, **kw):
+    count[0] += 1
+    if count[0] % 100 == 0: print count[0], fn.__name__
+    return fn(*args, **kw)
+  
+  wrapped.__name__ = 'counted_' + fn.__name__
+  wrapped.__doc__ = fn.__doc__
+  return wrapped
 
 def join_tuple(tuple_a, tuple_b):
   return tuple(list(tuple_a) + list(tuple_b))

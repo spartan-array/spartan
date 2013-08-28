@@ -11,7 +11,7 @@ import itertools
 TILE_SIZE = 100000
 
 def find_shape(extents):
-  util.log('Finding shape... %s', extents)
+  #util.log('Finding shape... %s', extents)
   return np.max([ex.lr for ex in extents], axis=0)
 
 
@@ -32,12 +32,6 @@ def extents_for_region(array, tile_extent):
       yield (ex, intersection)
       
 
-# def split_tile(array, tile_extent, tile_data):
-#   for ex in extents_for_region(array, tile_extent):
-#     intersection = extent.intersection(ex, tile_extent)
-#     local_idx = tile_extent.local_offset(intersection)
-#     yield (ex, intersection, get_data(tile_data, local_idx))
-       
   
 def find_matching_tile(array, tile_extent):
   for ex in array.extents():
@@ -160,32 +154,32 @@ def from_table(table):
   
   :param table:
   '''
-  d = DistArray()
-  d.table = table
-  d.extents = table.keys()
+  extents = table.keys()
+  Assert.no_duplicates(extents)
   
-  Assert.no_duplicates(d.extents)
-  
-  if not d.extents:
-    d.shape = tuple()
+  if not extents:
+    shape = tuple()
   else:
-    d.shape = find_shape(d.extents)
+    shape = find_shape(extents)
   
-  if len(d.extents) > 0:
-    t = table[d.extents[0]]
+  if len(extents) > 0:
+    t = table[extents[0]]
     # (We're not actually returning a tile, as the selector instead
     #  is returning just the underlying array.  Sigh).  
     # Assert.isinstance(t, tile.Tile)
-    d.dtype = t.dtype
+    dtype = t.dtype
   else:
     # empty table; default dtype.
-    d.dtype = np.float
+    dtype = np.float
   
-  return d
+  return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
 
-def create(master, shape, dtype=np.float, 
+def create(master, shape, 
+           dtype=np.float, 
            sharder=spartan.mod_sharder,
            accum=accum_replace):
+  
+  dtype = np.dtype(dtype)
   shape = tuple(shape)
   total_elems = np.prod(shape)
   extents = compute_splits(shape)
@@ -199,12 +193,7 @@ def create(master, shape, dtype=np.float,
     #util.log('Writing to %s: %s', ex, ex_tile)
     table.update(ex, ex_tile)
   
-  d = DistArray()
-  d.dtype = dtype
-  d.shape = shape
-  d.table = table
-  d.extents = extents
-  return d
+  return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
 
 def create_with(master, shape, init_fn):
   d = create(master, shape)
@@ -213,6 +202,12 @@ def create_with(master, shape, init_fn):
 
 
 class DistArray(object):
+  def __init__(self, shape, dtype, table, extents):
+    self.shape = shape
+    self.dtype = dtype
+    self.table = table
+    self.extents = extents
+  
   def id(self):
     return self.table.id()
    
@@ -252,7 +247,7 @@ class DistArray(object):
       ex, intersection = splits[0]
       return self.table.get(NestedSlice(ex, extent.offset_slice(ex, intersection)))
 
-    util.log('Target shape: %s', region.shape)
+    #util.log('Target shape: %s, %d splits', region.shape, len(splits))
     tgt = np.ndarray(region.shape)
     for ex, intersection in splits:
       dst_slice = extent.offset_slice(region, intersection)
@@ -273,6 +268,9 @@ class DistArray(object):
     
   
   def __getitem__(self, idx):
+    if isinstance(idx, extent.TileExtent):
+      return self.ensure(idx)
+    
     if np.isscalar(idx):
       return self[idx:idx+1][0]
     

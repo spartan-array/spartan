@@ -4,24 +4,27 @@ import numpy as np
 class TileExtent(object):
   '''A rectangular tile of a distributed array.'''
   def __init__(self, ul, sz, array_shape):
-    self.ul = np.array(ul)
-    self.sz = np.array(sz)
-    self.array_shape = np.array(array_shape)
-  
-  @property
-  def lr(self):
-    return self.ul + self.sz
-  
-  @property
-  def shape(self):
-    return tuple(self.sz)
+    self.ul = tuple(ul)
+    self.sz = tuple(sz)
+    self.array_shape = tuple(array_shape)
+    self.shape = self.sz
+    
+    # cache some values as numpy arrays for faster access
+    self.ul_array = np.asarray(self.ul, dtype=np.int)
+    self.sz_array = np.asarray(self.sz, dtype=np.int)
+    self.lr_array = self.ul_array + self.sz_array
+    
+    self.lr = tuple(self.lr_array)
+    
+  def __reduce__(self):
+    return (TileExtent, (self.ul, self.sz, self.array_shape))
   
   @property
   def ndim(self):
     return len(self.sz)
   
   def to_slice(self):
-    return tuple([slice(ul, ul + sz, None) for ul, sz in zip(self.ul, self.sz)])
+    return tuple([slice(ul, lr, None) for ul, lr in zip(self.ul, self.lr)])
 
   def __repr__(self):
     return 'extent(' + ','.join('%s:%s' % (a, b) for a, b in zip(self.ul, self.lr)) + ')'
@@ -39,7 +42,7 @@ class TileExtent(object):
     return TileExtent(ul, sz, shape)
 
   def __hash__(self):
-    return hash((tuple(self.ul), tuple(self.sz)))
+    return hash(tuple(self.ul)) ^ hash(tuple(self.sz))
 
   def __eq__(self, other):
     return np.all(self.ul == other.ul) and np.all(self.sz == other.sz)
@@ -78,7 +81,7 @@ class TileExtent(object):
 
   def stop(self, axis):
     if axis is None:
-      return self.ravelled_pos(self.ul + self.sz)
+      return self.ravelled_pos(self.lr)
     return self.ul[axis] + self.sz[axis]
 
   def size(self, axis):
@@ -97,8 +100,8 @@ def offset_from(base, other):
   :rtype: A new extent using this extent as a basis, instead of (0,0,0...) 
   '''
   assert np.all(other.ul >= base.ul)
-  assert np.all(other.sz + other.ul <= base.ul + base.sz)
-  return TileExtent(other.ul - base.ul, other.sz, other.shape)
+  assert np.all(other.lr <= base.lr)
+  return TileExtent(np.array(other.ul) - np.array(base.ul), other.sz, other.shape)
 
 def offset_slice(base, other):
   '''
@@ -138,10 +141,14 @@ def intersection(a, b):
   :rtype: The intersection of the 2 extents as a `TileExtent`, 
           or None if the intersection is empty.  
   '''
-  if np.any(b.lr <= a.ul): return None
-  if np.any(a.lr <= b.ul): return None
-  return TileExtent(np.maximum(b.ul, a.ul),
-                    np.minimum(b.lr, a.lr) - np.maximum(b.ul, a.ul),
+  for i in range(len(a.lr)):
+    if b.lr[i] < a.ul[i]: return None
+    if a.lr[i] < b.ul[i]: return None
+  #if np.any(b.lr_array <= a.ul_array): return None
+  #if np.any(a.lr_array <= b.ul_array): return None
+  return TileExtent(np.maximum(b.ul_array, a.ul_array),
+                    np.minimum(b.lr_array, a.lr_array) - 
+                    np.maximum(b.ul_array, a.ul_array),
                     a.array_shape)
 
 TileExtent.intersection = intersection

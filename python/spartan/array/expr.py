@@ -11,8 +11,11 @@ from spartan.util import Assert
 import numpy as np
 import spartan
 import types
+from spartan.array.prims import NotShapeable
 
 class Expr(Node):
+  _dag = None
+  
   def __add__(self, other):
     return Op(op=np.add, children=(self, other))
 
@@ -49,16 +52,31 @@ class Expr(Node):
   def __setitem__(self, k, val):
     raise Exception, '__setitem__ not supported.'
   
+  @property
+  def shape(self):
+    try:
+      dag = self.dag()
+      return dag.shape()
+    except NotShapeable:
+      return self.evaluate().shape
+  
   def dag(self):
+    if self._dag is not None:
+      return self._dag
+    
     from . import compile_expr
     dag = compile_expr.compile_op(self)
-    return compile_expr.optimize(dag)
+    dag = compile_expr.optimize(dag)
+    self._dag = dag
+    return self._dag
 
   def evaluate(self):
     from . import backend
     return backend.evaluate(spartan.get_master(), self.dag())
+  
+  def glom(self):
+    return self.evaluate().glom()
     
-
 
 Expr.__rsub__ = Expr.__sub__
 Expr.__radd__ = Expr.__add__
@@ -151,19 +169,19 @@ def ndarray(shape, dtype=np.float):
 
 def rand(*shape):
   return map_extents(ndarray(shape, dtype=np.float), 
-                     fn = lambda ex: np.random.rand(ex.shape))
+                     fn = lambda inputs, ex: (ex, np.random.rand(*ex.shape)))
   
 def randn(*shape):
   return map_extents(ndarray(shape, dtype=np.float), 
-                     fn = lambda ex: np.random.randn(ex.shape))
+                     fn = lambda inputs, ex: (ex, np.random.randn(*ex.shape)))
 
 def zeros(shape, dtype=np.float):
   return map_extents(ndarray(shape, dtype=np.float), 
-                     fn = lambda ex: np.zeros(ex.shape, dtype))
+                     fn = lambda inputs, ex: (ex, np.zeros(ex.shape, dtype)))
 
 def ones(shape, dtype=np.float):
   return map_extents(ndarray(shape, dtype=np.float), 
-                     fn = lambda ex: np.ones(ex.shape, dtype))
+                     fn = lambda inputs, ex: (ex, np.ones(ex.shape, dtype)))
 
 def _arange_mapper(ex):
   pos = ex.ravelled_pos()
