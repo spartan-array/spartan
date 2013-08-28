@@ -7,6 +7,9 @@ public:
     for (int i = 0; i < 100; ++i) {
       t->update(0, i);
     }
+    for (int i = 0; i < 100; ++i) {
+      t->update(100 + i, i);
+    }
   }
 };
 REGISTER_KERNEL(AccumKernel);
