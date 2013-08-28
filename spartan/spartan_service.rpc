@@ -81,8 +81,7 @@ struct ConfigData {
 struct ShardAssignment {
   i32 table;
   i32 shard;
-  i32 old_worker;
-  i32 new_worker;
+  i32 worker;
 };
 
 struct ShardAssignmentReq {

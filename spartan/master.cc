@@ -20,6 +20,8 @@ Master::Master(rpc::PollMgr* poller, int num_workers) {
   poller_ = poller;
   initialized_ = false;
   table_id_counter_ = 0;
+
+  TableContext::set_context(this);
 }
 
 void Master::wait_for_workers() {
@@ -28,7 +30,8 @@ void Master::wait_for_workers() {
   }
 
   while (workers_.size() < num_workers_) {
-    Sleep(0.01);
+    Log_info("Waiting for workers... %d/%d", workers_.size(), num_workers_);
+    Sleep(0.1);
   }
   Log_info("All workers registered; starting up.");
 
@@ -43,13 +46,15 @@ void Master::wait_for_workers() {
   }
 
   initialized_ = true;
-
-  TableContext::set_context(this);
 }
 
 Master::~Master() {
   for (auto w : workers_) {
     w->proxy->shutdown();
+  }
+
+  for (auto t : tables_) {
+    delete t.second;
   }
 }
 
@@ -74,7 +79,8 @@ WorkerState* Master::assign_shard(int table, int shard) {
   WorkerState* best = NULL;
   for (size_t i = 0; i < workers_.size(); ++i) {
     WorkerState& w = *workers_[i];
-    if (w.alive && (best == NULL || w.shards.size() < best->shards.size())) {
+    if (w.alive && (best == NULL ||
+        w.shards.size() < best->shards.size())) {
       best = workers_[i];
     }
   }
@@ -82,13 +88,16 @@ WorkerState* Master::assign_shard(int table, int shard) {
   CHECK(best != NULL);
   CHECK(best->alive);
 
+  Log_debug("Assigned shard (%d, %d) to worker %d",
+      table, shard, best->id);
+
   // Update local partition information, for performing put/fetches
   // on the master.
   PartitionInfo* p = tables_[table]->shard_info(shard);
   p->owner = best->id;
   p->shard = shard;
   p->table = table;
-  best->assign_shard(table, shard);
+  best->shards.insert(ShardId(table, shard));
 
   return best;
 }
@@ -96,17 +105,17 @@ WorkerState* Master::assign_shard(int table, int shard) {
 void Master::send_table_assignments() {
   ShardAssignmentReq req;
 
-  for (int i = 0; i < workers_.size(); ++i) {
-    WorkerState& w = *workers_[i];
-    for (ShardSet::iterator j = w.shards.begin(); j != w.shards.end(); ++j) {
-      req.assign.push_back( { j->first, j->second, -1, i });
+  for (auto i : tables_) {
+    auto t = i.second;
+    for (int j = 0; j < t->num_shards(); ++j) {
+      req.assign.push_back( { t->id(), j, t->shard_info(j)->owner } );
     }
   }
 
   for (auto w : workers_) {
     w->proxy->assign_shards(req);
   }
-  Log_info("Sent table assignments.");
+  Log_debug("Sent table assignments.");
 }
 
 void Master::assign_shards(Table* t) {
@@ -122,7 +131,7 @@ void Master::assign_tasks(const RunDescriptor& r, vector<int> shards) {
     w->clear_tasks();
   }
 
-  Log_info("Assigning workers for %d shards.", shards.size());
+  Log_debug("Assigning workers for %d shards.", shards.size());
   for (auto i : shards) {
     int worker = r.table->shard_info(i)->owner;
     workers_[worker]->assign_task(ShardId(r.table->id(), i));
@@ -161,8 +170,16 @@ int Master::num_pending(const RunDescriptor& r) {
 }
 
 void Master::destroy_table(int table_id) {
+  CHECK(tables_.find(table_id) != tables_.end());
   for (auto w : workers_) {
     w->proxy->destroy_table(table_id);
+    for (auto s = w->shards.begin(); s != w->shards.end(); ) {
+      if (s->first == table_id) {
+        s = w->shards.erase(s);
+      } else {
+        ++s;
+      }
+    }
   }
 
   tables_.erase(tables_.find(table_id));
@@ -224,7 +241,7 @@ void Master::flush() {
 
 Master* start_master(int port, int num_workers) {
   auto poller = new rpc::PollMgr;
-  auto tpool = new rpc::ThreadPool(8);
+  auto tpool = new rpc::ThreadPool(1);
   auto server = new rpc::Server(poller, tpool);
 
   auto master = new Master(poller, num_workers);

@@ -1,5 +1,6 @@
 #include <signal.h>
 
+#include <memory>
 #include <boost/bind.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/tuple/tuple_io.hpp>
@@ -29,18 +30,21 @@ Worker::~Worker() {
   for (size_t i = 0; i < peers_.size(); ++i) {
     delete peers_[i];
   }
+
+  for (auto t : tables_) {
+    delete t.second;
+  }
 }
 
 void Worker::run_kernel(const RunKernelReq& kreq) {
   TableContext::set_context(this);
 
   CHECK(id_ != -1);
-  Log_info("WORKER: Running kernel: %d:%d", kreq.table, kreq.shard);
+  Log_info("WORKER %d: Running kernel: %d:%d on %d items",
+            id_, kreq.table, kreq.shard,
+            tables_[kreq.table]->shard(kreq.shard)->size());
   int owner = -1;
-  {
-    rpc::ScopedLock sl(lock_);
-    owner = tables_[kreq.table]->worker_for_shard(kreq.shard);
-  }
+  owner = tables_[kreq.table]->worker_for_shard(kreq.shard);
 
   if (owner != id_) {
     Log_fatal(
@@ -48,19 +52,19 @@ void Worker::run_kernel(const RunKernelReq& kreq) {
         id_, kreq.table, kreq.shard, owner);
   }
 
-  Kernel* k = TypeRegistry<Kernel>::get_by_name(kreq.kernel);
+  std::unique_ptr<Kernel> k(TypeRegistry<Kernel>::get_by_name(kreq.kernel));
   k->init(this, kreq.table, kreq.shard, kreq.args);
   k->run();
-  flush();
 
-  Log_info("WORKER: Finished kernel: %d:%d", kreq.table, kreq.shard);
+  Log_debug("WORKER: Finished kernel: %d:%d", kreq.table, kreq.shard);
 }
 
 void Worker::flush() {
-  rpc::ScopedLock sl(lock_);
+  Log_debug("WORKER %d: Flushing tables...", id_);
   for (auto i : tables_) {
     i.second->flush();
   }
+  Log_debug("WORKER %d: done.", id_);
 }
 
 void Worker::get(const GetRequest& req, TableData* resp) {
@@ -69,7 +73,6 @@ void Worker::get(const GetRequest& req, TableData* resp) {
   resp->shard = -1;
   resp->done = true;
 
-  rpc::ScopedLock sl(lock_);
   Table *t = tables_[req.table];
   if (!t->contains_str(req.key)) {
     resp->missing_key = true;
@@ -80,38 +83,41 @@ void Worker::get(const GetRequest& req, TableData* resp) {
 }
 
 void Worker::get_iterator(const IteratorReq& req, IteratorResp* resp) {
-  rpc::ScopedLock sl(lock_);
   int table = req.table;
   int shard = req.shard;
 
   Table * t = tables_[table];
   TableIterator* it = NULL;
-  if (req.id == -1) {
-    it = t->get_iterator(shard);
-    uint32_t id = current_iterator_id_++;
-    iterators_[id] = it;
-    resp->id = id;
-  } else {
-    it = iterators_[req.id];
-    resp->id = req.id;
-    CHECK_NE(it, (void *)NULL);
-    it->next();
+ 
+  {
+    rpc::ScopedLock sl(lock_);
+    if (req.id == -1) {
+      it = t->get_iterator(shard);
+      uint32_t id = current_iterator_id_++;
+      iterators_[id] = it;
+      resp->id = id;
+    } else {
+      it = iterators_[req.id];
+      resp->id = req.id;
+      CHECK_NE(it, (void *)NULL);
+    }
   }
 
   for (size_t i = 0; i < req.count; i++) {
-    resp->done = it->done();
     if (!it->done()) {
       resp->results.push_back( { it->key_str(), it->value_str() });
       resp->row_count = i;
       it->next();
     }
   }
+  
+  resp->done = it->done();
 }
 
 void Worker::create_table(const CreateTableReq& req) {
   CHECK(id_ != -1);
   rpc::ScopedLock sl(lock_);
-  Log_info("Creating table: %d", req.id);
+  Log_debug("Creating table: %d", req.id);
   Table* t = TypeRegistry<Table>::get_by_id(req.table_type);
   t->init(req.id, req.num_shards);
   t->accum = TypeRegistry<Accumulator>::get_by_id(req.accum.type_id);
@@ -136,8 +142,9 @@ void Worker::assign_shards(const ShardAssignmentReq& shard_req) {
 //  Log_info("Shard assignment: " << shard_req.DebugString());
   rpc::ScopedLock sl(lock_);
   for (auto a : shard_req.assign) {
+    CHECK(tables_.find(a.table) != tables_.end());
     Table *t = tables_[a.table];
-    t->shard_info(a.shard)->owner = a.new_worker;
+    t->shard_info(a.shard)->owner = a.worker;
   }
 }
 
@@ -147,6 +154,8 @@ void Worker::shutdown() {
 
 void Worker::destroy_table(const rpc::i32& id) {
   rpc::ScopedLock sl(lock_);
+//  Log_info("Destroying table %d", id);
+  delete tables_[id];
   tables_.erase(tables_.find(id));
 }
 
@@ -177,7 +186,7 @@ void Worker::initialize(const WorkerInitReq& req) {
 
 Worker* start_worker(const std::string& master_addr, int port) {
   rpc::PollMgr* manager = new rpc::PollMgr;
-  rpc::ThreadPool* threadpool = new rpc::ThreadPool(8);
+  rpc::ThreadPool* threadpool = new rpc::ThreadPool(4);
 
   if (port == -1) {
     port = rpc::find_open_port();
@@ -187,6 +196,7 @@ Worker* start_worker(const std::string& master_addr, int port) {
   req.addr.host = rpc::get_host_name();
   req.addr.port = port;
 
+  Log_info("Starting worker %d", port);
   rpc::Server* server = new rpc::Server(manager, threadpool);
   auto worker = new Worker(manager);
   server->reg(worker);
@@ -194,8 +204,9 @@ Worker* start_worker(const std::string& master_addr, int port) {
       StringPrintf("%s:%d", req.addr.host.c_str(), req.addr.port).c_str());
 
   MasterProxy* master = connect<MasterProxy>(manager, master_addr);
+  Log_info("Registering %d", port);
   master->register_worker(req);
-
+  Log_info("Done.", port);
   return worker;
 }
 

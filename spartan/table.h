@@ -25,9 +25,6 @@ using boost::make_tuple;
 // X MB.
 static const int kDefaultIteratorFetch = 2048;
 
-// Flush changes after this writes.
-static const int kDefaultFlushFrequency = 1000000;
-
 #define GLOBAL_TABLE_USE_SCOPEDLOCK 1
 
 #if GLOBAL_TABLE_USE_SCOPEDLOCK == 0
@@ -184,8 +181,6 @@ public:
   Sharder *sharder;
   Accumulator *accum;
   Selector *selector;
-
-  int flush_frequency;
 
   virtual ~Table() {
   }
@@ -435,14 +430,16 @@ public:
     sharder = NULL;
     pending_writes_ = 0;
     ctx_ = NULL;
-    flush_frequency = kDefaultFlushFrequency;
 
     shards_.resize(num_shards);
+    shard_info_.resize(num_shards);
     for (int i = 0; i < num_shards; ++i) {
       shards_[i] = new ShardT<K, V>;
+      shard_info_[i].owner = -1;
+      shard_info_[i].shard = i;
+      shard_info_[i].table = id;
     }
 
-    shard_info_.resize(num_shards);
   }
 
   virtual ~TableT() {
@@ -481,10 +478,6 @@ public:
       } else {
         ((AccumulatorT<K>*) accum)->accumulate(&i->second, v);
       }
-    }
-
-    if (__sync_add_and_fetch(&pending_writes_, 1) > flush_frequency) {
-      flush();
     }
   }
 
@@ -636,19 +629,22 @@ public:
     int count = 0;
     TableData put;
 
-    GRAB_LOCK;
-
     for (size_t i = 0; i < shards_.size(); ++i) {
-      ShardT<K, V>* t = (ShardT<K, V>*) shards_[i];
-      if (!is_local_shard(i) && (shard_info_[i].dirty || !t->empty())) {
-        // Always send at least one chunk, to ensure that we clear taint on
-        // tables we own.
+      if (!is_local_shard(i)) {
         put.kv_data.clear();
 
-        for (auto j : *t) {
-          put.kv_data.push_back( {val::to_str(j.first), val::to_str(j.second)});
+        {
+          GRAB_LOCK;
+          ShardT<K, V>* t = (ShardT<K, V>*) shards_[i];
+          for (auto j : *t) {
+            put.kv_data.push_back( {val::to_str(j.first), val::to_str(j.second)});
+          }
+          t->clear();
         }
-        t->clear();
+
+        if (put.kv_data.empty()) {
+          continue;
+        }
 
         put.shard = i;
         put.source = ctx()->id();
@@ -656,7 +652,9 @@ public:
         put.done = true;
 
         count += put.kv_data.size();
-        workers[worker_for_shard(i)]->put(put);
+        int target = worker_for_shard(i);
+        //Log_info("Writing from %d to %d", ctx()->id(), target);
+        workers[target]->put(put);
       }
     }
 

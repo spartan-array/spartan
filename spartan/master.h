@@ -51,7 +51,6 @@ public:
   TaskMap active;
   TaskMap finished;
 
-  // Table shards this worker is responsible for serving.
   ShardSet shards;
 
   int status;
@@ -88,19 +87,6 @@ public:
 
   double idle_time() {
     return Now() - last_ping_time;
-  }
-
-  bool serves(ShardId id) const {
-    rpc::ScopedLock sl(&lock);
-
-    return shards.find(id) != shards.end();
-  }
-
-  void assign_shard(int table, int shard) {
-    rpc::ScopedLock sl(&lock);
-
-    ShardId t(table, shard);
-    shards.insert(t);
   }
 
   void assign_task(ShardId id) {
@@ -196,6 +182,7 @@ public:
       AccumulatorT<V>* accum = new Replace<V>(), SelectorT<K, V>* selector =
           NULL, std::string sharder_opts = "", std::string accum_opts = "",
       std::string selector_opts = "") {
+    Log_info("Creating table...");
     wait_for_workers();
 
     TableT<K, V>* t = new TableT<K, V>();
@@ -208,7 +195,7 @@ public:
     int table_id = table_id_counter_++;
     req.table_type = t->type_id();
     req.id = table_id;
-    req.num_shards = workers_.size() * 2;
+    req.num_shards = workers_.size() * 2 + 1;
 
     req.accum.type_id = accum->type_id();
     req.accum.opts = accum_opts;
@@ -235,8 +222,6 @@ public:
       t->selector->init(selector_opts);
     }
 
-    t->flush_frequency = 100;
-
     t->workers.resize(workers_.size());
     for (auto w : workers_) {
       t->workers[w->id] = w->proxy;
@@ -253,6 +238,7 @@ public:
     }
 
     assign_shards(t);
+    Log_info("New table %d", table_id);
     return t;
   }
 
@@ -274,9 +260,9 @@ public:
 private:
   void register_worker(const RegisterReq& req);
 
-// Find a worker to run a kernel on the given table and shard.  If a worker
-// already serves the given shard, return it.  Otherwise, find an eligible
-// worker and assign it to them.
+  // Find a worker to run a kernel on the given table and shard.  If a worker
+  // already serves the given shard, return it.  Otherwise, find an eligible
+  // worker and assign it to them.
   WorkerState* assign_shard(int table, int shard);
 
   void send_table_assignments();
