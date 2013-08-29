@@ -62,13 +62,6 @@ T from_str(const std::string& vstr) {
   return out;
 }
 
-template <class T>
-class KeyCompare {
-public:
-  bool operator()(const T& a, const T& b) const {
-    return a < b;
-  }
-};
 
 } // namespace val
 
@@ -299,7 +292,7 @@ private:
 template<class K, class V>
 class ShardT: public Shard {
 private:
-  typedef boost::unordered_map<K, V, val::KeyCompare<K> > Map;
+  typedef boost::unordered_map<K, V> Map;
   Map data_;
 public:
   typedef typename Map::iterator iterator;
