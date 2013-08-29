@@ -2,6 +2,7 @@
 
 import sys
 import os
+import random
 import re
 sys.path += os.path.abspath(os.path.join(os.path.split(__file__)[0], "../pylib")),
 
@@ -280,12 +281,6 @@ class SourceFile(object):
             self.f.write(txt)
         self.f.write("\n")
 
-def static_var(name, value):
-    def decorate(func):
-        setattr(func, name, value)
-        return func
-    return decorate
-
 def emit_struct(struct, f):
     f.writeln("struct %s {" % struct.name)
     with f.indent():
@@ -309,7 +304,6 @@ def emit_struct(struct, f):
     f.writeln()
 
 
-@static_var("rpc_counter", 0x1001)
 def emit_service_and_proxy(service, f):
     f.writeln("class %sService: public rpc::Service {" % service.name)
     f.writeln("public:")
@@ -317,16 +311,26 @@ def emit_service_and_proxy(service, f):
         f.writeln("enum {")
         with f.indent():
             for func in service.functions:
-                f.writeln("%s = %s," % (func.name.upper(), hex(emit_service_and_proxy.rpc_counter)))
-                emit_service_and_proxy.rpc_counter += 1
+                rpc_code = random.randint(0x10000000, 0x70000000)
+                f.writeln("%s = %s," % (func.name.upper(), hex(rpc_code)))
         f.writeln("};")
-        f.writeln("void reg_to(rpc::Server* svr) {")
+        f.writeln("int reg_to(rpc::Server* svr) {")
         with f.indent():
+            f.writeln("int ret = 0;")
             for func in service.functions:
                 if func.attr == "raw":
-                    f.writeln("svr->reg(%s, this, &%sService::%s);" % (func.name.upper(), service.name, func.name))
+                    f.writeln("if ((ret = svr->reg(%s, this, &%sService::%s)) != 0) {" % (func.name.upper(), service.name, func.name))
                 else:
-                    f.writeln("svr->reg(%s, this, &%sService::__%s__wrapper__);" % (func.name.upper(), service.name, func.name))
+                    f.writeln("if ((ret = svr->reg(%s, this, &%sService::__%s__wrapper__)) != 0) {" % (func.name.upper(), service.name, func.name))
+                with f.indent():
+                    f.writeln("goto err;")
+                f.writeln("}")
+            f.writeln("return 0;")
+        f.writeln("err:")
+        with f.indent():
+            for func in service.functions:
+                f.writeln("svr->unreg(%s);" % func.name.upper())
+            f.writeln("return ret;")
         f.writeln("}")
         f.writeln("// these RPC handler functions need to be implemented by user")
         f.writeln("// for 'raw' handlers, remember to reply req, delete req, and sconn->release(); use sconn->run_async for heavy job")

@@ -36,7 +36,7 @@ class Service {
 public:
     virtual ~Service() {
     }
-    virtual void reg_to(Server*) = 0;
+    virtual int reg_to(Server*) = 0;
 };
 
 class ServerConnection: public Pollable {
@@ -144,8 +144,8 @@ public:
 
     int start(const char* bind_addr);
 
-    void reg(Service* svc) {
-        svc->reg_to(this);
+    int reg(Service* svc) {
+        return svc->reg_to(this);
     }
 
     /**
@@ -165,7 +165,7 @@ public:
      *     server_connection->release();
      *  }
      */
-    void reg(i32 rpc_id, void (*svc_func)(Request*, ServerConnection*));
+    int reg(i32 rpc_id, void (*svc_func)(Request*, ServerConnection*));
 
     /**
      * The svc_func need to do this:
@@ -185,10 +185,12 @@ public:
      *  }
      */
     template<class S>
-    void reg(i32 rpc_id, S* svc, void (S::*svc_func)(Request*, ServerConnection*)) {
+    int reg(i32 rpc_id, S* svc, void (S::*svc_func)(Request*, ServerConnection*)) {
 
         // disallow duplicate rpc_id
-        verify(handlers_.find(rpc_id) == handlers_.end());
+        if (handlers_.find(rpc_id) != handlers_.end()) {
+            return -EEXIST;
+        }
 
         class H: public Handler {
             S* svc_;
@@ -203,7 +205,11 @@ public:
         };
 
         handlers_[rpc_id] = new H(svc, svc_func);
+
+        return 0;
     }
+
+    void unreg(i32 rpc_id);
 };
 
 }

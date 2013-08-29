@@ -32,22 +32,47 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, point3& o) {
 class DemoService: public rpc::Service {
 public:
     enum {
-        FAST_PRIME = 0x1001,
-        FAST_DOT_PROD = 0x1002,
-        FAST_LARGE_STR_NOP = 0x1003,
-        FAST_VEC_LEN = 0x1004,
-        PRIME = 0x1005,
-        DOT_PROD = 0x1006,
-        LARGE_STR_NOP = 0x1007,
+        FAST_PRIME = 0x667c8434,
+        FAST_DOT_PROD = 0x6dfeacf9,
+        FAST_LARGE_STR_NOP = 0x1753b1da,
+        FAST_VEC_LEN = 0x5d8e0ce6,
+        PRIME = 0x27f49cc3,
+        DOT_PROD = 0x3a67d81e,
+        LARGE_STR_NOP = 0x18482591,
     };
-    void reg_to(rpc::Server* svr) {
-        svr->reg(FAST_PRIME, this, &DemoService::__fast_prime__wrapper__);
-        svr->reg(FAST_DOT_PROD, this, &DemoService::__fast_dot_prod__wrapper__);
-        svr->reg(FAST_LARGE_STR_NOP, this, &DemoService::__fast_large_str_nop__wrapper__);
-        svr->reg(FAST_VEC_LEN, this, &DemoService::__fast_vec_len__wrapper__);
-        svr->reg(PRIME, this, &DemoService::__prime__wrapper__);
-        svr->reg(DOT_PROD, this, &DemoService::__dot_prod__wrapper__);
-        svr->reg(LARGE_STR_NOP, this, &DemoService::__large_str_nop__wrapper__);
+    int reg_to(rpc::Server* svr) {
+        int ret = 0;
+        if ((ret = svr->reg(FAST_PRIME, this, &DemoService::__fast_prime__wrapper__)) != 0) {
+            goto err;
+        }
+        if ((ret = svr->reg(FAST_DOT_PROD, this, &DemoService::__fast_dot_prod__wrapper__)) != 0) {
+            goto err;
+        }
+        if ((ret = svr->reg(FAST_LARGE_STR_NOP, this, &DemoService::__fast_large_str_nop__wrapper__)) != 0) {
+            goto err;
+        }
+        if ((ret = svr->reg(FAST_VEC_LEN, this, &DemoService::__fast_vec_len__wrapper__)) != 0) {
+            goto err;
+        }
+        if ((ret = svr->reg(PRIME, this, &DemoService::__prime__wrapper__)) != 0) {
+            goto err;
+        }
+        if ((ret = svr->reg(DOT_PROD, this, &DemoService::__dot_prod__wrapper__)) != 0) {
+            goto err;
+        }
+        if ((ret = svr->reg(LARGE_STR_NOP, this, &DemoService::__large_str_nop__wrapper__)) != 0) {
+            goto err;
+        }
+        return 0;
+    err:
+        svr->unreg(FAST_PRIME);
+        svr->unreg(FAST_DOT_PROD);
+        svr->unreg(FAST_LARGE_STR_NOP);
+        svr->unreg(FAST_VEC_LEN);
+        svr->unreg(PRIME);
+        svr->unreg(DOT_PROD);
+        svr->unreg(LARGE_STR_NOP);
+        return ret;
     }
     // these RPC handler functions need to be implemented by user
     // for 'raw' handlers, remember to reply req, delete req, and sconn->release(); use sconn->run_async for heavy job
@@ -293,10 +318,17 @@ public:
 class NullService: public rpc::Service {
 public:
     enum {
-        TEST = 0x1008,
+        TEST = 0x39fa9426,
     };
-    void reg_to(rpc::Server* svr) {
-        svr->reg(TEST, this, &NullService::__test__wrapper__);
+    int reg_to(rpc::Server* svr) {
+        int ret = 0;
+        if ((ret = svr->reg(TEST, this, &NullService::__test__wrapper__)) != 0) {
+            goto err;
+        }
+        return 0;
+    err:
+        svr->unreg(TEST);
+        return ret;
     }
     // these RPC handler functions need to be implemented by user
     // for 'raw' handlers, remember to reply req, delete req, and sconn->release(); use sconn->run_async for heavy job

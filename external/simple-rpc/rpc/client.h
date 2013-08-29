@@ -98,6 +98,7 @@ public:
   }
 
   ~FutureGroup() {
+    wait_all();
     for (auto f : futures_) {
       f->release();
     }

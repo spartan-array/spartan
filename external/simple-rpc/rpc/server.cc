@@ -344,9 +344,11 @@ int Server::start(const char* bind_addr) {
     return 0;
 }
 
-void Server::reg(i32 rpc_id, void (*svc_func)(Request*, ServerConnection*)) {
+int Server::reg(i32 rpc_id, void (*svc_func)(Request*, ServerConnection*)) {
     // disallow duplicate rpc_id
-    verify(handlers_.find(rpc_id) == handlers_.end());
+    if (handlers_.find(rpc_id) != handlers_.end()) {
+        return -EEXIST;
+    }
 
     class H: public Handler {
         void (*svc_func_)(Request*, ServerConnection*);
@@ -360,6 +362,11 @@ void Server::reg(i32 rpc_id, void (*svc_func)(Request*, ServerConnection*)) {
     };
 
     handlers_[rpc_id] = new H(svc_func);
+    return 0;
+}
+
+void Server::unreg(i32 rpc_id) {
+    handlers_.erase(rpc_id);
 }
 
 }

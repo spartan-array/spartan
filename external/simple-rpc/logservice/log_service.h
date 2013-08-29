@@ -12,12 +12,22 @@ namespace logservice {
 class RLogService: public rpc::Service {
 public:
     enum {
-        LOG = 0x1001,
-        AGGREGATE_QPS = 0x1002,
+        LOG = 0x2b077d20,
+        AGGREGATE_QPS = 0x59547fbd,
     };
-    void reg_to(rpc::Server* svr) {
-        svr->reg(LOG, this, &RLogService::__log__wrapper__);
-        svr->reg(AGGREGATE_QPS, this, &RLogService::__aggregate_qps__wrapper__);
+    int reg_to(rpc::Server* svr) {
+        int ret = 0;
+        if ((ret = svr->reg(LOG, this, &RLogService::__log__wrapper__)) != 0) {
+            goto err;
+        }
+        if ((ret = svr->reg(AGGREGATE_QPS, this, &RLogService::__aggregate_qps__wrapper__)) != 0) {
+            goto err;
+        }
+        return 0;
+    err:
+        svr->unreg(LOG);
+        svr->unreg(AGGREGATE_QPS);
+        return ret;
     }
     // these RPC handler functions need to be implemented by user
     // for 'raw' handlers, remember to reply req, delete req, and sconn->release(); use sconn->run_async for heavy job

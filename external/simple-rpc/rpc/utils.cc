@@ -59,19 +59,54 @@ void ThreadPool::run_async(const std::function<void()>& f) {
     q_[queue_id].push(new function<void()>(f));
 }
 
+// How long should a thread wait before stealing from
+// other queues.
+static const int kStealThreshold = 10 * 1000 * 1000;
+
 void ThreadPool::run_thread(int id_in_pool) {
     bool should_stop = false;
+    int64_t last_item_found = rdtsc();
+    list<function<void()>*> jobs;
+    struct timespec sleep_req;
+    sleep_req.tv_nsec = 1;
+    sleep_req.tv_sec = 0;
+
     while (!should_stop) {
-        list<function<void()>*>* jobs = q_[id_in_pool].pop_all();
-        for (auto& f : *jobs) {
+        if (sleep_req.tv_nsec > 1) {
+          nanosleep(&sleep_req, NULL);
+        }
+
+        int64_t now = rdtsc();
+        if (now - last_item_found > kStealThreshold) {
+          // start checking other queues
+          for (auto i = 0; i < n_; ++i) {
+            q_[i].pop_many(&jobs, 1);
+            if (!jobs.empty()) {
+              break;
+            }
+          }
+        } else {
+          q_[id_in_pool].pop_many(&jobs, 1);
+        }
+
+        if (jobs.empty()) {
+            sleep_req.tv_nsec = std::min(1000000l, sleep_req.tv_nsec << 1);
+            continue;
+        }
+
+        last_item_found = now;
+        sleep_req.tv_nsec = 1;
+
+        while (!jobs.empty()) {
+            auto& f = jobs.front();
             if (f == nullptr) {
                 should_stop = true;
             } else {
                 (*f)();
                 delete f;
             }
+            jobs.pop_front();
         }
-        delete jobs;
     }
 }
 
@@ -115,14 +150,23 @@ void Log::log_v(int level, int line, const char* file, const char* fmt, va_list 
     assert(level <= Log::DEBUG);
     if (level <= Log::level) {
         const char* filebase = basename(file);
+
+        const int tm_str_len = 80;
+        char tm_str[tm_str_len];
+        time_t now = time(NULL);
+        struct tm tm_val;
+        localtime_r(&now, &tm_val);
+        strftime(tm_str, tm_str_len - 1, "%F %T", &tm_val);
+        timeval tv;
+        gettimeofday(&tv, NULL);
+
         Pthread_mutex_lock(&Log::m);
         fprintf(Log::fp, "%c ", indicator[level]);
         if (filebase != nullptr) {
             fprintf(Log::fp, "<%s:%d> ", filebase, line);
         }
-        struct timeval now;
-        gettimeofday(&now, NULL);
-        fprintf(Log::fp, "%ld.%ld ", now.tv_sec, now.tv_usec / 1000);
+
+        fprintf(Log::fp, "%s.%03d| ", tm_str, tv.tv_usec / 1000);
         vfprintf(Log::fp, fmt, args);
         fprintf(Log::fp, "\n");
         fflush(Log::fp);

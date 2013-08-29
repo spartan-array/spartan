@@ -44,6 +44,117 @@ namespace rpc {
 typedef int32_t i32;
 typedef int64_t i64;
 
+
+class NoCopy {
+    NoCopy(const NoCopy&);
+    const NoCopy& operator =(const NoCopy&);
+protected:
+    NoCopy() {
+    }
+    virtual ~NoCopy() = 0;
+};
+inline NoCopy::~NoCopy() {
+}
+
+
+class Lockable: public NoCopy {
+public:
+    virtual void lock() = 0;
+    virtual void unlock() = 0;
+};
+
+class SpinLock: public Lockable {
+public:
+    SpinLock(): locked_(0) { }
+    void lock() {
+        if (!lock_state() && !__sync_lock_test_and_set(&locked_, 1)) {
+            return;
+        }
+        int wait = 1000;
+        while ((wait-- > 0) && lock_state()) {
+            // spin for a short while
+        }
+        struct timespec t;
+        t.tv_sec = 0;
+        t.tv_nsec = 50000;
+        while (__sync_lock_test_and_set(&locked_, 1)) {
+            nanosleep(&t, NULL);
+        }
+    }
+    void unlock() {
+        __sync_lock_release(&locked_);
+    }
+
+private:
+
+    int locked_ __attribute__((aligned (64)));
+
+    int lock_state() const volatile {
+        return locked_;
+    }
+};
+
+class Mutex: public Lockable {
+public:
+    Mutex()         {
+      pthread_mutexattr_t attr;
+      pthread_mutexattr_init(&attr);
+      pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+      Pthread_mutex_init(&m_, &attr);
+    }
+    ~Mutex()        { Pthread_mutex_destroy(&m_); }
+
+    void lock()     { Pthread_mutex_lock(&m_); }
+    void unlock()   { Pthread_mutex_unlock(&m_); }
+
+private:
+    friend class CondVar;
+
+    pthread_mutex_t m_;
+};
+
+// choice between spinlock & mutex:
+// * when n_thread > n_core, use mutex
+// * on virtual machines, use mutex
+
+
+// use spinlock for short critical section
+typedef SpinLock ShortLock;
+
+// use mutex for long critical section
+typedef Mutex LongLock;
+
+
+
+class ScopedLock: public NoCopy {
+public:
+    explicit ScopedLock(Lockable* lock): m_(lock)   { m_->lock(); }
+    // Allow pass by reference.
+    explicit ScopedLock(Lockable& lock): m_(&lock)  { m_->lock(); }
+
+    ~ScopedLock()   { m_->unlock(); }
+
+private:
+    Lockable* m_;
+};
+
+class CondVar: public NoCopy {
+public:
+    CondVar()               { Pthread_cond_init(&cv_, NULL); }
+    ~CondVar()              { Pthread_cond_destroy(&cv_); }
+
+    void wait(Mutex* mutex) { Pthread_cond_wait(&cv_, &(mutex->m_)); }
+    void signal()           { Pthread_cond_signal(&cv_); }
+    void signalAll()        { Pthread_cond_broadcast(&cv_); }
+
+    void timedWait(Mutex* mutex, const struct timespec* timeout) {
+        pthread_cond_timedwait(&cv_, &(mutex->m_), timeout);
+    }
+
+private:
+    pthread_cond_t cv_;
+};
+
 class Log {
     static int level;
     static FILE* fp;
@@ -80,17 +191,6 @@ public:
 #define Log_error(msg, ...) ::rpc::Log::error(__LINE__, __FILE__, msg, ## __VA_ARGS__)
 #define Log_fatal(msg, ...) ::rpc::Log::fatal(__LINE__, __FILE__, msg, ## __VA_ARGS__)
 
-
-class NoCopy {
-    NoCopy(const NoCopy&);
-    const NoCopy& operator =(const NoCopy&);
-protected:
-    NoCopy() {
-    }
-    virtual ~NoCopy() = 0;
-};
-inline NoCopy::~NoCopy() {
-}
 
 /**
  * Note: All sub class of RefCounted *MUST* have protected destructor!
@@ -157,15 +257,20 @@ public:
         Pthread_mutex_unlock(&m_);
     }
 
-    std::list<T>* pop_all() {
+    void pop_many(std::list<T>* out, int count) {
         Pthread_mutex_lock(&m_);
-        while (q_->empty()) {
-            Pthread_cond_wait(&not_empty_, &m_);
+        if (q_->empty()) {
+          Pthread_mutex_unlock(&m_);
+          return;
         }
-        std::list<T>* ret = q_;
-        q_ = new std::list<T>;
+
+        while (count > 0) {
+          out->push_back(q_->front());
+          q_->pop_front();
+          --count;
+        }
+
         Pthread_mutex_unlock(&m_);
-        return ret;
     }
 
     T pop() {
@@ -229,99 +334,6 @@ public:
     }
 };
 
-class Lockable: public NoCopy {
-public:
-    virtual void lock() = 0;
-    virtual void unlock() = 0;
-};
-
-class ShortLock: public Lockable {
-    int locked_ __attribute__ ((aligned (64)));;
-    int lock_state() const volatile {
-        return locked_;
-    }
-public:
-    ShortLock(): locked_(0) { }
-    void lock() {
-        if (!lock_state() && !__sync_lock_test_and_set(&locked_, 1)) {
-            return;
-        }
-        int wait = 1000;
-        while ((wait-- > 0) && lock_state()) {
-            // spin for a short while
-        }
-        struct timespec t;
-        t.tv_sec = 0;
-        t.tv_nsec = 50000;
-        while (__sync_lock_test_and_set(&locked_, 1)) {
-            nanosleep(&t, NULL);
-        }
-    }
-    void unlock() {
-        __sync_lock_release(&locked_);
-    }
-};
-
-class Mutex : public Lockable {
-public:
-    Mutex()         {
-      pthread_mutexattr_t attr;
-      pthread_mutexattr_init(&attr);
-      pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
-      Pthread_mutex_init(&m_, &attr);
-    }
-    ~Mutex()        { Pthread_mutex_destroy(&m_); }
-
-    void lock()     { Pthread_mutex_lock(&m_); }
-    void unlock()   { Pthread_mutex_unlock(&m_); }
-
-private:
-    friend class ConditionVar;
-
-    pthread_mutex_t m_;
-
-    // Non-copyable, non-assignable
-    Mutex(Mutex &);
-    Mutex& operator=(Mutex&);
-};
-
-typedef Mutex LongLock;
-
-class ScopedLock : NoCopy {
-public:
-    explicit ScopedLock(Lockable* lock) : m_(lock) { m_->lock(); }
-    // Allow pass by reference.
-    explicit ScopedLock(Lockable& lock) : m_(&lock) { m_->lock(); }
-
-    ~ScopedLock()   { m_->unlock(); }
-
-private:
-    Lockable* m_;
-};
-
-class ConditionVar {
-public:
-    ConditionVar()          { Pthread_cond_init(&cv_, NULL); }
-    ~ConditionVar()         { Pthread_cond_destroy(&cv_); }
-
-    void wait(Mutex* mutex) { Pthread_cond_wait(&cv_, &(mutex->m_)); }
-    void signal()           { Pthread_cond_signal(&cv_); }
-    void signalAll()        { Pthread_cond_broadcast(&cv_); }
-
-    void timedWait(Mutex* mutex, const struct timespec* timeout) {
-        pthread_cond_timedwait(&cv_, &(mutex->m_), timeout);
-    }
-
-
-private:
-    pthread_cond_t cv_;
-
-    // Non-copyable, non-assignable
-    ConditionVar(ConditionVar&);
-    ConditionVar& operator=(ConditionVar&);
-};
-
-
 // A microsecond precision timer based on the gettimeofday() call
 // (which should be low overhead).
 //
@@ -352,6 +364,13 @@ int set_nonblocking(int fd, bool nonblocking);
 
 int find_open_port();
 std::string get_host_name();
+
+inline uint64_t rdtsc() {
+    uint32_t hi, lo;
+    __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
+    return (((uint64_t) hi) << 32) | ((uint64_t) lo);
+}
+
 
 }
 
