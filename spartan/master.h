@@ -152,6 +152,10 @@ public:
       return false;
     }
 
+    if (!active.empty()) {
+      return false;
+    }
+
     TaskState state = pending.begin()->second;
     active[state.id] = state;
     pending.erase(pending.begin());
@@ -169,7 +173,7 @@ Master* start_master(int port, int num_workers);
 
 class Master: public TableContext, public MasterService {
 public:
-  Master(rpc::PollMgr* poller, int num_workers);
+  Master(int num_workers);
   ~Master();
 
   void wait_for_workers();
@@ -187,6 +191,10 @@ public:
 
   void destroy_table(Table* t) {
     destroy_table(t->id());
+  }
+
+  int num_workers() {
+    return workers_.size();
   }
 
   template<class K, class V>
@@ -244,11 +252,11 @@ public:
 
     tables_[t->id()] = t;
 
-//    rpc::FutureGroup futures;
+    rpc::FutureGroup futures;
     for (auto w : workers_) {
-      w->proxy->create_table(req);
-//      futures.add(w->proxy->async_create_table(req));
+      futures.add(w->proxy->async_create_table(req));
     }
+    futures.wait_all();
 
     assign_shards(t);
     return t;
@@ -292,7 +300,7 @@ private:
   rpc::Mutex lock_;
   std::map<int, rpc::Future*> running_kernels_;
 
-  rpc::PollMgr *poller_;
+  rpc::PollMgr *client_poller_;
   TableMap tables_;
   Timer runtime_;
 

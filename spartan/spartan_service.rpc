@@ -98,11 +98,11 @@ struct WorkerInitReq {
 };
 
 abstract service Worker {
-  fast initialize(WorkerInitReq req)
-  fast create_table(CreateTableReq req |)
-  fast destroy_table(i32 table_id |)
-  fast get(GetRequest req|TableData resp)
-  fast assign_shards(ShardAssignmentReq req)
+  initialize(WorkerInitReq req)
+  create_table(CreateTableReq req |)
+  destroy_table(i32 table_id |)
+  get(GetRequest req|TableData resp)
+  assign_shards(ShardAssignmentReq req)
   
   run_kernel(RunKernelReq req|)
   get_iterator(IteratorReq req| IteratorResp resp)

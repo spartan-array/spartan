@@ -14,10 +14,10 @@ using namespace boost::tuples;
 
 namespace spartan {
 
-Master::Master(rpc::PollMgr* poller, int num_workers) {
+Master::Master(int num_workers) {
   num_workers_ = num_workers;
   current_run_start_ = 0;
-  poller_ = poller;
+  client_poller_ = new rpc::PollMgr;
   initialized_ = false;
   table_id_counter_ = 0;
 
@@ -30,7 +30,8 @@ void Master::wait_for_workers() {
   }
 
   while (workers_.size() < num_workers_) {
-    Log_info("Waiting for workers... %d/%d", workers_.size(), num_workers_);
+    PERIODIC(5,
+        Log_info("Waiting for workers... %d/%d", workers_.size(), num_workers_));
     Sleep(0.1);
   }
   Log_info("All workers registered; starting up.");
@@ -72,7 +73,7 @@ void Master::register_worker(const RegisterReq& req) {
   int worker_id = workers_.size();
   WorkerState* w = new WorkerState(worker_id, req.addr);
 
-  w->proxy = connect<WorkerProxy>(poller_,
+  w->proxy = connect<WorkerProxy>(client_poller_,
       StringPrintf("%s:%d", req.addr.host.c_str(), req.addr.port));
   workers_.push_back(w);
 }
@@ -105,7 +106,7 @@ WorkerState* Master::assign_shard(int table, int shard) {
   CHECK(best != NULL);
   CHECK(best->alive);
 
-  Log_info("Assigned shard (%d, %d) to worker %d", table, shard, best->id);
+  Log_debug("Assigned shard (%d, %d) to worker %d", table, shard, best->id);
 
   // Update local partition information, for performing put/fetches
   // on the master.
@@ -257,17 +258,20 @@ void Master::flush() {
     i.second->flush();
   }
 
+  rpc::FutureGroup g;
   for (auto w : workers_) {
-    w->proxy->flush();
+    g.add(w->proxy->async_flush());
   }
+
+  //Log_info("Flushed...");
 }
 
 Master* start_master(int port, int num_workers) {
   auto poller = new rpc::PollMgr;
-  auto tpool = new rpc::ThreadPool(1);
+  auto tpool = new rpc::ThreadPool(8);
   auto server = new rpc::Server(poller, tpool);
 
-  auto master = new Master(poller, num_workers);
+  auto master = new Master(num_workers);
   server->reg(master);
   auto hostname = rpc::get_host_name();
   server->start(StringPrintf("%s:%d", hostname.c_str(), port).c_str());

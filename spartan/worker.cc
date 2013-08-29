@@ -41,8 +41,7 @@ void Worker::run_kernel(const RunKernelReq& kreq) {
 
   CHECK(id_ != -1);
   Log_debug("WORKER %d: Running kernel: %d:%d on %d items",
-            id_, kreq.table, kreq.shard,
-            tables_[kreq.table]->shard(kreq.shard)->size());
+      id_, kreq.table, kreq.shard, tables_[kreq.table]->shard(kreq.shard)->size());
   int owner = -1;
   owner = tables_[kreq.table]->worker_for_shard(kreq.shard);
 
@@ -68,6 +67,7 @@ void Worker::flush() {
 }
 
 void Worker::get(const GetRequest& req, TableData* resp) {
+  Log_debug("WORKER %d: handling get.", id_);
   resp->source = id_;
   resp->table = req.table;
   resp->shard = -1;
@@ -80,6 +80,7 @@ void Worker::get(const GetRequest& req, TableData* resp) {
     resp->missing_key = false;
     resp->kv_data.push_back( { req.key, t->get_str(req.key) });
   }
+  Log_debug("WORKER %d: done handling get.", id_);
 }
 
 void Worker::get_iterator(const IteratorReq& req, IteratorResp* resp) {
@@ -88,7 +89,7 @@ void Worker::get_iterator(const IteratorReq& req, IteratorResp* resp) {
 
   Table * t = tables_[table];
   TableIterator* it = NULL;
- 
+
   {
     rpc::ScopedLock sl(lock_);
     if (req.id == -1) {
@@ -110,7 +111,7 @@ void Worker::get_iterator(const IteratorReq& req, IteratorResp* resp) {
       it->next();
     }
   }
-  
+
   resp->done = it->done();
 }
 
@@ -149,6 +150,10 @@ void Worker::assign_shards(const ShardAssignmentReq& shard_req) {
 }
 
 void Worker::shutdown() {
+  for (auto t : tables_) {
+    delete t.second;
+  }
+  tables_.clear();
   running_ = false;
 }
 
@@ -160,6 +165,7 @@ void Worker::destroy_table(const rpc::i32& id) {
 }
 
 void Worker::put(const TableData& req) {
+  Log_debug("WORKER: %d -- got put", id_);
   Table* t;
   {
     rpc::ScopedLock sl(lock_);
@@ -168,13 +174,15 @@ void Worker::put(const TableData& req) {
   for (auto p : req.kv_data) {
     t->update_str(p.key, p.value);
   }
+  Log_debug("WORKER: %d -- finished put", id_);
 }
 
 void Worker::initialize(const WorkerInitReq& req) {
   id_ = req.id;
 
-  Log_info("Initializing worker %d, with connections to %d peers.", id_,
-      req.workers.size());
+  Log_info("Initializing worker %d, with connections to %d peers.",
+      id_, req.workers.size());
+
   peers_.resize(req.workers.size());
   for (auto w : req.workers) {
     if (w.first != id_) {
@@ -186,7 +194,7 @@ void Worker::initialize(const WorkerInitReq& req) {
 
 Worker* start_worker(const std::string& master_addr, int port) {
   rpc::PollMgr* manager = new rpc::PollMgr;
-  rpc::ThreadPool* threadpool = new rpc::ThreadPool(4);
+  rpc::ThreadPool* threadpool = new rpc::ThreadPool(8);
 
   if (port == -1) {
     port = rpc::find_open_port();

@@ -15,15 +15,13 @@ inline double Now() {
   return tp.tv_sec + 1e-9 * tp.tv_nsec;
 }
 
-double get_processor_frequency();
-
 class Timer {
 public:
   Timer() {
-    Reset();
+    reset();
   }
 
-  void Reset() {
+  void reset() {
     start_time_ = Now();
     start_cycle_ = rdtsc();
   }
@@ -50,23 +48,6 @@ private:
   uint64_t start_cycle_;
 };
 
-struct PeriodicTimer {
-  int64_t interval_;
-  int64_t last_;
-  PeriodicTimer(double interval) :
-      interval_((int64_t) (interval * get_processor_frequency())), last_(0) {
-  }
-
-  bool fire() {
-    int64_t now = rdtsc();
-    if (now - last_ > interval_) {
-      last_ = now;
-      return true;
-    }
-    return false;
-  }
-};
-
 }
 
 #define EVERY_N(interval, operation)\
@@ -77,16 +58,13 @@ struct PeriodicTimer {
 }
 
 #define START_PERIODIC(interval)\
-{ static int64_t last = 0;\
-  static int64_t cycles = (int64_t)(interval * get_processor_frequency());\
-  static int COUNT = 0; \
-  ++COUNT; \
-  int64_t now = rdtsc(); \
-  if (now - last > cycles) {\
-    last = now;\
+{ static Timer _t; \
+  static int _count = 0; \
+  ++_count; \
+  if (_t.elapsed() > interval) {\
+    _t.reset();
 
 #define END_PERIODIC\
-    COUNT = 0;\
   }\
 }
 

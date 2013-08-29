@@ -61,6 +61,15 @@ T from_str(const std::string& vstr) {
   read(&out, vstr);
   return out;
 }
+
+template <class T>
+class KeyCompare {
+public:
+  bool operator()(const T& a, const T& b) const {
+    return a < b;
+  }
+};
+
 } // namespace val
 
 class Table;
@@ -151,9 +160,9 @@ class Checkpointable {
 public:
   virtual ~Checkpointable() {
   }
-  virtual void start_checkpoint(const string& f, bool delta) = 0;
+  virtual void start_checkpoint(const std::string& f, bool delta) = 0;
   virtual void finish_checkpoint() = 0;
-  virtual void restore(const string& f) = 0;
+  virtual void restore(const std::string& f) = 0;
 };
 
 class Shard {
@@ -290,7 +299,7 @@ private:
 template<class K, class V>
 class ShardT: public Shard {
 private:
-  typedef boost::unordered_map<K, V> Map;
+  typedef boost::unordered_map<K, V, val::KeyCompare<K> > Map;
   Map data_;
 public:
   typedef typename Map::iterator iterator;
@@ -305,6 +314,10 @@ public:
     return data_.find(k);
   }
 
+  void put(const K& k, const V& v) {
+    data_.insert(make_pair(k, v));
+  }
+
   bool empty() const {
     return data_.empty();
   }
@@ -313,8 +326,8 @@ public:
     data_.clear();
   }
 
-  V& operator[](const K& k) {
-    return data_[k];
+  const V& get(const K& k) {
+    return data_.find(k)->second;
   }
 
   size_t size() const {
@@ -474,7 +487,7 @@ public:
       GRAB_LOCK;
       typename ShardT<K, V>::iterator i = s.find(k);
       if (i == s.end()) {
-        s[k] = v;
+        s.put(k, v);
       } else {
         ((AccumulatorT<K>*) accum)->accumulate(&i->second, v);
       }
@@ -628,6 +641,8 @@ public:
     int count = 0;
     TableData put;
 
+    rpc::FutureGroup g;
+
     for (size_t i = 0; i < shards_.size(); ++i) {
       if (!is_local_shard(i)) {
         put.kv_data.clear();
@@ -652,8 +667,8 @@ public:
 
         count += put.kv_data.size();
         int target = worker_for_shard(i);
-        //Log_info("Writing from %d to %d", ctx()->id(), target);
-        workers[target]->put(put);
+        Log_debug("Writing from %d to %d", ctx()->id(), target);
+        g.add(workers[target]->async_put(put));
       }
     }
 

@@ -46,6 +46,12 @@ public:
     return tables_.find(id)->second;
   }
 
+  void wait_for_shutdown() {
+    while (running_) {
+      Sleep(1);
+    }
+  }
+
 private:
   rpc::Mutex lock_;
 
