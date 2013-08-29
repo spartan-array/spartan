@@ -69,6 +69,7 @@ def compile_index(op, children):
     return prims.Index(src, idx)
 
 
+
 def compile_sum(op, children):
   axis = op.kwargs.get('axis', None)
   return prims.Reduce(children[0],
@@ -85,7 +86,11 @@ def compile_argmin(op, children):
                              dtype_fn = lambda input: 'i8,f8',
                              local_reducer_fn = argmin_local,
                              combiner_fn = argmin_reducer)
-  take_indices = prims.MapTiles([compute_min], lambda tile: tile['idx'])
+  
+  def _take_idx_mapper(tile):
+    return tile['idx']
+  
+  take_indices = prims.MapTiles([compute_min], _take_idx_mapper, fn_kw = {})
   
   return take_indices
 
@@ -93,20 +98,28 @@ def compile_argmin(op, children):
 def compile_map_extents(op, children):
   Assert.eq(len(children), 1)
   child = children[0]
-  return prims.MapExtents([child], map_fn = op.kwargs['map_fn'])  
+  return prims.MapExtents([child], 
+                          map_fn = op.kwargs['map_fn'],
+                          fn_kw = op.kwargs['fn_kw'])
+                            
 
 
 def compile_map_tiles(op, children):
   Assert.eq(len(children), 1)
   child = children[0]
-  return prims.MapTiles([child], map_fn = op.kwargs['map_fn'])  
+  return prims.MapTiles([child], 
+                        map_fn = op.kwargs['map_fn'],
+                        fn_kw = op.kwargs['fn_kw'])
  
   
 def compile_ndarray(op, children):
   shape = op.kwargs['shape']
   dtype = op.kwargs['dtype']
   return prims.NewArray(array_shape=shape, dtype=dtype)
-  
+ 
+def _binary_op(inputs, op=None): 
+  return op(*inputs)
+
   
 def compile_op(op):
   '''Convert a numpy expression tree in an Op tree.
@@ -119,7 +132,7 @@ def compile_op(op):
     children = [compile_op(c) for c in op.children]
   
   if op.op in binary_ops:
-    return prims.MapTiles(children, lambda a, b: op.op(a, b))
+    return prims.MapTiles(children, _binary_op, fn_kw = { 'op' : op.op })
   
   if isinstance(op.op, str):
     return globals()['compile_' + op.op](op, children)
@@ -154,11 +167,13 @@ class OptimizePass(object):
                         
   def visit_MapExtents(self, op):
     return prims.MapExtents(inputs = [self.visit(v) for v in op.inputs],
-                            map_fn = op.map_fn)  
+                            map_fn = op.map_fn,
+                            fn_kw = op.fn_kw) 
   
   def visit_MapTiles(self, op):
     return prims.MapTiles(inputs = [self.visit(v) for v in op.inputs],
-                          map_fn = op.map_fn)
+                          map_fn = op.map_fn,
+                          fn_kw = op.fn_kw) 
   
   def visit_NewArray(self, op):
     return prims.NewArray(array_shape = self.visit(op.shape()),
@@ -173,6 +188,18 @@ class OptimizePass(object):
   def visit_Slice(self, op):
     return prims.Index(self.visit(op.src), self.visit(op.idx))
 
+def fold_mapper(local_tiles, fns=None, ranges=None, map_fn=None, map_kw=None):
+  inputs = []
+  for (fn, kw), (st, ed) in zip(fns, ranges):
+    fn_in = local_tiles[st:ed]
+    result = fn(fn_in, **kw)
+    assert isinstance(result, np.ndarray), result
+    inputs.append(result)
+  
+  #util.log('%s %s %s', map_fn, inputs, map_kw)
+  return map_fn(inputs, **map_kw)
+    
+def _take_first(x): return x[0]
 
 class FoldMapPass(OptimizePass):
   def visit_MapTiles(self, op):
@@ -191,22 +218,27 @@ class FoldMapPass(OptimizePass):
       op_st = len(inputs)
       if isinstance(v, (prims.Value, prims.NewArray, prims.MapExtents)):
         inputs.append(v)
-        map_fn = lambda v: v
+        map_fn = _take_first
+        fn_kw = {}
       else:
         op_in = [self.visit(child) for child in v.inputs]
         inputs.extend(op_in)
         map_fn = v.map_fn
+        fn_kw = v.fn_kw
       
       op_ed = len(inputs)
-      fns.append(map_fn)
+      fns.append((map_fn, fn_kw)) 
       ranges.append((op_st, op_ed))
     
     map_fn = op.map_fn
-    def fold_mapper(*local_tiles):
-      inputs = []
-      for fn, (st, ed) in zip(fns, ranges):
-        inputs.append(fn(*local_tiles[st:ed]))
-      return map_fn(*inputs)
+    map_kw = op.fn_kw
+    util.log('Map function: %s, kw: %s', map_fn, map_kw)
     
     util.log('Created fold mapper with %d inputs', len(inputs))
-    return prims.MapTiles(inputs=inputs, map_fn = fold_mapper)
+    return prims.MapTiles(inputs=inputs, 
+                          map_fn = fold_mapper,
+                          fn_kw = { 'fns' : fns,
+                                    'ranges' : ranges,
+                                    'map_fn' : map_fn,
+                                    'map_kw' : map_kw })
+  

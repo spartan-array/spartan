@@ -92,9 +92,10 @@ class Pickler {
 
 public:
   Pickler() {
+    GILHelper lock;
     cPickle = to_ref(PyImport_ImportModule("cPickle"));
     cloudpickle = to_ref(
-        PyImport_ImportModule("cloud.serialization.cloudpickle"));
+        PyImport_ImportModule("spartan.cloudpickle"));
     loads = to_ref(PyObject_GetAttrString(cPickle.get(), "loads"));
     cpickle_dumps = to_ref(PyObject_GetAttrString(cPickle.get(), "dumps"));
     cloud_dumps = to_ref(PyObject_GetAttrString(cloudpickle.get(), "dumps"));
@@ -145,7 +146,14 @@ public:
   }
 };
 
-static Pickler kPickler;
+static Pickler* _pickler = NULL;
+static Pickler& get_pickler() {
+  if (_pickler == NULL) {
+    _pickler = new Pickler;
+  }
+  return *_pickler;
+}
+
 
 namespace spartan {
 
@@ -168,12 +176,12 @@ public:
       return false;
     }
 
-    *v = kPickler.load(py_str);
+    *v = get_pickler().load(py_str);
     return true;
   }
 
   static void write_value(Writer *w, const RefPtr& v) {
-    kPickler.store(w, v);
+    get_pickler().store(w, v);
   }
 };
 
@@ -183,7 +191,7 @@ public:
   RefPtr code;
 
   void init(const std::string& opts) {
-    code = kPickler.load(opts);
+    code = get_pickler().load(opts);
   }
 };
 
@@ -232,8 +240,8 @@ class PyKernel: public Kernel {
 public:
   void run() {
     GILHelper lock;
-    RefPtr fn = kPickler.load(args()["map_fn"]);
-    RefPtr fn_args = kPickler.load(args()["map_args"]);
+    RefPtr fn = get_pickler().load(args()["map_fn"]);
+    RefPtr fn_args = get_pickler().load(args()["map_args"]);
     to_ref(PyObject_CallFunction(fn.get(), W("lO"), this, fn_args.get()));
   }
 };
@@ -264,7 +272,7 @@ Table* create_table(Master*m, PyObject* sharder, PyObject* accum,
 
   return ((Master*) m)->create_table(
       new PySharder(), new PyAccum(), sel,
-      kPickler.store(sharder), kPickler.store(accum), kPickler.store(selector));
+      get_pickler().store(sharder), get_pickler().store(accum), get_pickler().store(selector));
 }
 
 void destroy_table(Master* m, Table* t) {
@@ -275,8 +283,8 @@ void foreach_shard(Master*m, Table* t,
                    PyObject* fn, PyObject* args) {
   spartan::RunDescriptor r;
   r.kernel = "PyKernel";
-  r.args["map_fn"] = kPickler.store(fn);
-  r.args["map_args"] = kPickler.store(args);
+  r.args["map_fn"] = get_pickler().store(fn);
+  r.args["map_args"] = get_pickler().store(args);
   r.table = (PyTable*) t;
   r.shards = spartan::range(0, ((Table*) t)->num_shards());
   ((Master*) m)->run(r);
@@ -380,7 +388,7 @@ void set_log_level(int l) {
 }
 
 void log(const char* file, int line, const char* msg) {
-  rpc::Log::log(rpc::Log::INFO, file, line, msg);
+  rpc::Log::log(rpc::Log::INFO, line, file, msg);
 }
 
 Master* cast_to_master(TableContext* ctx) {
@@ -390,6 +398,10 @@ Master* cast_to_master(TableContext* ctx) {
   }
 
   return m;
+}
+
+void wait_for_shutdown(Worker *w) {
+  w->wait_for_shutdown();
 }
 
 }

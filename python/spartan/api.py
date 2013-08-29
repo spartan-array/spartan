@@ -132,6 +132,14 @@ class Kernel(object):
     return wrap.current_table(self.handle)
 
 
+class Worker(object):
+  def __init__(self, handle):
+    self.handle = handle
+    
+  def wait_for_shutdown(self):
+    wrap.wait_for_shutdown(self.handle)
+    
+
 PROF = None
 
 def _bootstrap_kernel(handle, args):
@@ -164,6 +172,9 @@ class Master(object):
     if self.shutdown_on_del:
       util.log('Shutting down master.')
       wrap.shutdown(self.handle)
+      
+  def num_workers(self):
+    return wrap.num_workers(self.handle)
     
   def destroy_table(self, table_handle):
     wrap.destroy_table(self.handle, table_handle)
@@ -242,5 +253,5 @@ def start_master(*args):
   return Master(wrap.start_master(*args), shutdown_on_del=True)
 
 def start_worker(*args):
-  return wrap.start_worker(*args)
+  return Worker(wrap.start_worker(*args))
 

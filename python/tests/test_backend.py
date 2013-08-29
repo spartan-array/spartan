@@ -14,7 +14,7 @@ def test_add2(ctx):
   a = prims.Value(a)
   b = prims.Value(b)
   
-  map_prim = prims.MapTiles([a, b], lambda a, b: a + b)
+  map_prim = prims.MapTiles([a, b], lambda v: v[0] + v[1])
   c = backend.evaluate(ctx, map_prim)
   lc = c.glom()
   Assert.all_eq(lc, np.ones((DIM, DIM)) * 2)
@@ -28,7 +28,7 @@ def test_add3(ctx):
   b = prims.Value(b)
   c = prims.Value(c)
   
-  map_prim = prims.MapTiles([a, b, c], lambda a, b, c: a + b + c)
+  map_prim = prims.MapTiles([a, b, c], lambda v: v[0] + v[1] + v[2])
   d = backend.evaluate(ctx, map_prim)
   ld = d.glom()
   Assert.all_eq(ld, np.ones((DIM, DIM)) * 3)
@@ -92,28 +92,30 @@ def test_slice(ctx):
   z = x[5:8, 5:8]
   zc = compile_expr.compile_op(z)
   val = backend.evaluate(ctx, zc)
-  nx = np.arange(100).reshape(DIM, DIM)
+  nx = np.arange(DIM*DIM).reshape(DIM, DIM)
   
   Assert.all_eq(val.glom(), nx[5:8, 5:8])
   
+def _dot(inputs, ex, w):
+  t = inputs[0][ex.to_slice()]
+  out = extent.TileExtent(list(ex.ul[0:1]) + [0],
+                          list(ex.sz[0:1]) + [1],
+                          list(ex.array_shape[0:1]) + [1])
+  return out, t.dot(w)
+    
 def test_linear_regression(ctx):
-  N_EXAMPLES = 1000 * 1000 * 10
+  N_EXAMPLES = 1000 * 1000 * ctx.num_workers()
   N_DIM = 10
   x = expr.rand(N_EXAMPLES, N_DIM)
   y = expr.rand(N_EXAMPLES, 1)
   w = np.random.rand(N_DIM, 1)
   
   for i in range(10):
-    def _dot(inputs, ex):
-      t = inputs[0][ex.to_slice()]
-      out = extent.TileExtent(list(ex.ul[0:1]) + [0],
-                              list(ex.sz[0:1]) + [1],
-                              list(ex.array_shape[0:1]) + [1])
-      return out, t.dot(w)
-    
-    yp = expr.map_extents(x, _dot).evaluate()
+    yp = expr.map_extents(x, _dot, w=w).evaluate()
     grad = expr.sum(x * (yp - y), axis=0).glom().reshape((N_DIM, 1))
     w = w + grad * 0.0001
+    
+    util.log('END')
   
 if __name__ == '__main__':
   test_common.run_cluster_tests(__file__)

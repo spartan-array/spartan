@@ -2,15 +2,19 @@ from spartan import util, config
 from spartan.config import flags
 import imp
 import multiprocessing
+import os.path
 import socket
 import spartan
+import subprocess
 import sys
 import time
 import types
 
 config.add_flag('test_filter', default='')
 config.add_flag('num_workers', default=4, type=int)
+
 config.add_bool_flag('multiprocess', default=False)
+config.add_bool_flag('cluster', default=False)
 
 def worker_loop(port): 
   watchdog = util.FileWatchdog()
@@ -19,16 +23,39 @@ def worker_loop(port):
   while 1:
     time.sleep(1)
   
+def start_multiproc_worker(i):
+  p = multiprocessing.Process(target = lambda: worker_loop(10000 + i))
+  p.daemon = True
+  p.start()
+  
+def start_cluster_worker(i):
+  t = 0
+  for worker, count in config.HOSTS:
+    if t + count > i: break
+    t += count
+  
+  util.log('Starting worker %d on host %s', i, worker)
+  args = ['ssh', 
+          worker,
+          'cd %s && ' % os.path.abspath(os.path.curdir),
+          #'xterm', '-e',
+          #'gdb', '-ex', 'run', '--args',
+          'python', '-m spartan.worker',
+          '--master=%s:9999' % socket.gethostname(),
+          '--port=%d' % (10000 + i)]
+  
+  p = subprocess.Popen(args, executable='ssh')
+  return p
 
 def start_cluster():
-  spartan.set_log_level(spartan.INFO)
   master = spartan.start_master(9999, flags.num_workers)
+  spartan.set_log_level(flags.log_level)
   time.sleep(0.1)
   for i in range(flags.num_workers):
     if flags.multiprocess:
-      p = multiprocessing.Process(target = lambda: worker_loop(10000 + i))
-      p.daemon = True
-      p.start()
+      start_multiproc_worker(i)
+    elif flags.cluster:
+      start_cluster_worker(i)
     else:
       spartan.start_worker('%s:9999' % socket.gethostname(),  10000 + i)
   return master

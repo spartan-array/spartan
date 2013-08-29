@@ -5,15 +5,15 @@ and built into a control flow graph, which is then compiled
 into a series of primitive array operations.
 '''
 
+from node import node_type
+from prims import NotShapeable
 from spartan import util
-from spartan.node import Node
 from spartan.util import Assert
 import numpy as np
 import spartan
 import types
-from spartan.array.prims import NotShapeable
 
-class Expr(Node):
+class Expr(object):
   _dag = None
   
   def __add__(self, other):
@@ -83,6 +83,7 @@ Expr.__radd__ = Expr.__add__
 Expr.__rmul__ = Expr.__mul__
 Expr.__rdiv__ = Expr.__div__
 
+@node_type
 class LazyVal(Expr):
   _members = ['val']
 
@@ -101,6 +102,7 @@ def pretty(op):
     return op.__name__
   return repr(op)
 
+@node_type
 class Op(Expr):
   _members = ['op', 'children', 'kwargs']
   
@@ -157,12 +159,11 @@ Expr.diagflat = diagflat
 Expr.ravel = ravel
 Expr.argmin = argmin
 
+def map_extents(v, fn, **kw):
+  return Op('map_extents', (v,), kwargs={'map_fn' : fn, 'fn_kw' : kw})
 
-def map_extents(v, fn):
-  return Op('map_extents', (v,), kwargs={'map_fn' : fn})
-
-def map_tiles(v, fn):
-  return Op('map_tiles', (v,), kwargs={'map_fn' : fn})
+def map_tiles(v, fn, **kw):
+  return Op('map_tiles', (v,), kwargs={'map_fn' : fn, 'fn_kw' : kw})
 
 def ndarray(shape, dtype=np.float):
   return Op('ndarray', kwargs = { 'shape' : shape, 'dtype' : dtype })

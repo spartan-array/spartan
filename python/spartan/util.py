@@ -49,21 +49,21 @@ class FileWatchdog(threading.Thread):
   When the file closes, terminate the process.
   (This occurs when an ssh connection is terminated, for example.)
   """
-  def __init__(self, file_handle=sys.stdout):
+  def __init__(self, file_handle=sys.stdin):
     threading.Thread.__init__(self, name='WatchdogThread')
     self.setDaemon(True)
     self.file_handle = file_handle
-    # self.log = open('/tmp/watchdog.%d' % os.getpid(), 'w')
+    self.log = sys.stderr
 
   def run(self):
     f = [self.file_handle]
     while 1:
       r, w, x = select.select(f, f, f, 1.0)
-      # print >>self.log, 'Watchdog running: %s %s %s' % (r,w,x)
-      # self.log.flush()
       if r:
-        # print >>self.log, 'Watchdog: file closed.  Shutting down.'
-        # self.log.flush()
+        try:
+          print >>self.log, 'Watchdog: file closed.  Shutting down.'
+        except:
+          pass
         os._exit(1)
       time.sleep(1)
 
@@ -162,9 +162,6 @@ def stack_signal():
     print >> f, out.getvalue()
 
 
-signal.signal(signal.SIGQUIT, stack_signal)
-
-
 class Assert(object):
   @staticmethod
   def all_eq(a, b):
@@ -175,22 +172,22 @@ class Assert(object):
     assert numpy.all(a == b), 'Failed: \n%s\n ==\n%s' % (a, b)
   
   @staticmethod
-  def eq(a, b): assert (a == b), 'Failed: %s == %s' % (a, b)
+  def eq(a, b, *args): assert (a == b), 'Failed: %s == %s' % (a, b, args)
   
   @staticmethod
-  def ne(a, b): assert (a == b), 'Failed: %s != %s' % (a, b)
+  def ne(a, b, *args): assert (a == b), 'Failed: %s != %s' % (a, b, args)
   
   @staticmethod
-  def gt(a, b): assert (a > b), 'Failed: %s > %s' % (a, b)
+  def gt(a, b, *args): assert (a > b), 'Failed: %s > %s' % (a, b, args)
   
   @staticmethod
-  def lt(a, b): assert (a < b), 'Failed: %s < %s' % (a, b)
+  def lt(a, b, *args): assert (a < b), 'Failed: %s < %s' % (a, b, args)
   
   @staticmethod
-  def ge(a, b): assert (a >= b), 'Failed: %s >= %s' % (a, b)
+  def ge(a, b, *args): assert (a >= b), 'Failed: %s >= %s' % (a, b, args)
   
   @staticmethod
-  def le(a, b): assert (a <= b), 'Failed: %s <= %s' % (a, b)
+  def le(a, b, *args): assert (a <= b), 'Failed: %s <= %s' % (a, b, args)
   
   @staticmethod
   def true(expr): assert expr, 'Failed: %s == True' % (expr)

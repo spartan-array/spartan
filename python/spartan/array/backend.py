@@ -18,6 +18,7 @@ def eval_Value(ctx, prim, inputs):
 def eval_MapTiles(ctx, prim, inputs):
   largest = largest_value(inputs)
   map_fn = prim.map_fn
+  fn_kw = prim.fn_kw or {}
   
   util.log('Mapping over %d inputs; largest = %s', len(inputs), largest.shape)
   
@@ -27,7 +28,7 @@ def eval_MapTiles(ctx, prim, inputs):
     #util.log('Fetching %d inputs', len(inputs))
     local_values = [input[slc] for input in inputs]
     #util.log('Mapping...')
-    result = map_fn(*local_values)
+    result = map_fn(local_values,  **fn_kw)
     #util.log('Done.')
     assert isinstance(result, np.ndarray), result
     return [(ex, Tile(ex, result))]
@@ -37,9 +38,10 @@ def eval_MapTiles(ctx, prim, inputs):
 
 def eval_MapExtents(ctx, prim, inputs):
   map_fn = prim.map_fn
+  fn_kw = prim.fn_kw or {}
   
   def mapper(ex, tile):
-    new_extent, result = map_fn(inputs, ex)
+    new_extent, result = map_fn(inputs, ex, **fn_kw)
     # util.log('MapExtents: %s, %s', ex, new_extent)
     return [(new_extent, Tile(new_extent, result))]
   
@@ -82,7 +84,7 @@ def eval_Slice(ctx, prim, inputs):
   idx = inputs[1]
   
   slice_region = extent.from_slice(idx, src.shape)
-  matching_extents = dict(distarray.extents_for_region(src, slice_region))
+  matching_extents = dict(distarray.extents_for_region(src.extents, slice_region))
   
   util.log('Taking slice: %s from %s', idx, src.shape)
   util.log('Matching: %s', matching_extents)

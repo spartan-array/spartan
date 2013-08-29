@@ -10,6 +10,7 @@
 
 %{
 #include "Python.h"
+#include "spartan/master.h"
 #include <string>
 %}
 
@@ -38,6 +39,11 @@ void shutdown(Master*);
 void wait_for_workers(Master*);
 Table* create_table(Master*, PyObject* sharder, PyObject* accum, PyObject* selector);
 void destroy_table(Master*, Table*);
+int num_workers(Master* m) {
+  return m->num_workers();
+}
+
+void wait_for_shutdown(Worker*);
 
 TableContext* get_context();
 

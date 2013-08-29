@@ -7,6 +7,10 @@ and imports all symbols from the SWIG generated code.
 ''' 
 
 import sys
-sys.path += ['../build/.libs', '../build/python/spartan/']
+from os.path import abspath
+
+sys.path += [abspath('../build/.libs'), 
+             abspath('../build/python/spartan'), 
+             abspath('.')]
 
 from spartan_wrap import *

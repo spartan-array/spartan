@@ -26,6 +26,7 @@ def get_data(data, index):
 
 
 def extents_for_region(extents, tile_extent):
+  Assert.isinstance(extents, set)
   for ex in extents:
     intersection = extent.intersection(ex, tile_extent)
     if intersection is not None:
@@ -42,7 +43,7 @@ def find_matching_tile(array, tile_extent):
       return array.tile_for_extent(ex)
   
   raise Exception, 'No matching tile_extent!' 
-
+ 
  
 def take_first(a,b):
   return a
@@ -59,13 +60,12 @@ class NestedSlice(object):
     self.extent = extent
     self.subslice = subslice
     
-  def __hash__(self):
-    return hash(self.extent)
-  
   def __eq__(self, other):
     Assert.isinstance(other, extent.TileExtent)
     return self.extent == other 
-
+  
+  def __hash__(self):
+    return hash(self.extent)
 
 
 class TileSelector(object):
@@ -295,6 +295,23 @@ class DistArray(object):
     return self.ensure(ex)
 
 
+class Broadcast(object):
+  '''A broadcast object mimics the behavior of Numpy broadcasting.
+  
+  Takes an input of shape (x, y) and a desired output shape (x, y, z),
+  the broadcast object reports shape=(x,y,z) and overrides __getitem__
+  to return the appropriate values.
+  '''
+  def __init__(self, base, shape):
+    Assert.isinstance(base, (np.ndarray, DistArray))
+    Assert.isinstance(shape, tuple)
+    self.base = base
+    self.shape = shape
+  
+  def __getitem__(self, idx):
+    pass
+
+
 class Slice(object):
   def __init__(self, darray, idx):
     self.darray = darray
@@ -306,3 +323,28 @@ class Slice(object):
   def map_to_array(self, fn):
     pass
 
+
+
+def broadcast(*args):
+  if len(args) == 1:
+    return args
+ 
+  shapes = [x.shape for x in args]
+  dims = [len(shape) for shape in shapes]
+  max_dim = max(dims)
+  new_shape = []
+  
+  # prepend 1-element filler dimensions for smaller arrays
+  for i in range(len(shapes)):
+    diff = max_dim - len(shapes[i])
+    shapes[i] = [1] * diff + shapes[i]
+  
+  # check shapes are valid
+  for axis in range(max_dim):
+    axis_shape = set(s[axis] for s in shapes)
+    Assert.le(axis_shape, 2, 'Mismatched shapes for broadcast: ' + shapes)
+      
+    
+    
+    
+  

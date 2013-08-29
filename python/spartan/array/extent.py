@@ -42,10 +42,10 @@ class TileExtent(object):
     return TileExtent(ul, sz, shape)
 
   def __hash__(self):
-    return hash(tuple(self.ul)) ^ hash(tuple(self.sz))
-
+    return hash(self.ul) ^ hash(self.sz)
+  
   def __eq__(self, other):
-    return np.all(self.ul == other.ul) and np.all(self.sz == other.sz)
+    return np.all(self.ul_array == other.ul_array) and np.all(self.sz_array == other.sz_array)
 
   def ravelled_pos(self, global_pos=None):
     if global_pos is None:

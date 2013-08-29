@@ -153,7 +153,7 @@ class Node(object):
     return self.__str__()
 
 
-def node(klass):
+def node_type(klass):
   '''Decorator to add node behavior to a class.'''
   def obj_init(self, *args, **kw):
     node_initializer(self, *args, **kw)
