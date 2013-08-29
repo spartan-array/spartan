@@ -68,7 +68,7 @@ void RLog::log_v(int level, const char* fmt, va_list args) {
         verify(cnt < buf_len_s - 1);
     }
     buf_s[cnt] = '\0';
-    Log::log(level, "remote", -1, "%s", buf_s);
+    Log::log(level, 0, "remote", "%s", buf_s);
     if (rp_s) {
         // always use async rpc
         string message = buf_s;

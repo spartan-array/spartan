@@ -131,11 +131,11 @@ void Client::handle_write(const io_ratelimit& rate) {
 
     out_l_.lock();
     Marshal::read_barrier barrier = out_.get_read_barrier();
-    out_l_.unlock();
+//    out_l_.unlock();
 
     out_.write_to_fd(sock_, barrier, rate);
 
-    out_l_.lock();
+//    out_l_.lock();
     if (out_.empty()) {
         pollmgr_->update_mode(this, Pollable::READ);
     }

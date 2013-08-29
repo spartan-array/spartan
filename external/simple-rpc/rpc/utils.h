@@ -49,7 +49,7 @@ class Log {
     static FILE* fp;
     static pthread_mutex_t m;
 
-    static void log_v(int level, const char* file, int line, const char* fmt, va_list args);
+    static void log_v(int level, int line, const char* file, const char* fmt, va_list args);
 public:
 
     enum {
@@ -58,20 +58,27 @@ public:
 
     static void set_file(FILE* fp);
     static void set_level(int level);
-    static void log(int level, const char* file, int line, const char* fmt, ...);
 
-    static void fatal(const char* file, int line, const char* fmt, ...);
-    static void error(const char* file, int line, const char* fmt, ...);
-    static void warn(const char* file, int line, const char* fmt, ...);
-    static void info(const char* file, int line, const char* fmt, ...);
-    static void debug(const char* file, int line, const char* fmt, ...);
+    static void log(int level, int line, const char* file, const char* fmt, ...);
+
+    static void fatal(int line, const char* file, const char* fmt, ...);
+    static void error(int line, const char* file, const char* fmt, ...);
+    static void warn(int line, const char* file, const char* fmt, ...);
+    static void info(int line, const char* file, const char* fmt, ...);
+    static void debug(int line, const char* file, const char* fmt, ...);
+
+    static void fatal(const char* fmt, ...);
+    static void error(const char* fmt, ...);
+    static void warn(const char* fmt, ...);
+    static void info(const char* fmt, ...);
+    static void debug(const char* fmt, ...);
 };
 
-#define Log_debug(msg, ...) ::rpc::Log::debug(__FILE__, __LINE__, msg, ## __VA_ARGS__)
-#define Log_info(msg, ...) ::rpc::Log::info(__FILE__, __LINE__, msg, ## __VA_ARGS__)
-#define Log_warn(msg, ...) ::rpc::Log::warn(__FILE__, __LINE__, msg, ## __VA_ARGS__)
-#define Log_error(msg, ...) ::rpc::Log::error(__FILE__, __LINE__, msg, ## __VA_ARGS__)
-#define Log_fatal(msg, ...) ::rpc::Log::fatal(__FILE__, __LINE__, msg, ## __VA_ARGS__)
+#define Log_debug(msg, ...) ::rpc::Log::debug(__LINE__, __FILE__, msg, ## __VA_ARGS__)
+#define Log_info(msg, ...) ::rpc::Log::info(__LINE__, __FILE__, msg, ## __VA_ARGS__)
+#define Log_warn(msg, ...) ::rpc::Log::warn(__LINE__, __FILE__, msg, ## __VA_ARGS__)
+#define Log_error(msg, ...) ::rpc::Log::error(__LINE__, __FILE__, msg, ## __VA_ARGS__)
+#define Log_fatal(msg, ...) ::rpc::Log::fatal(__LINE__, __FILE__, msg, ## __VA_ARGS__)
 
 
 class NoCopy {
