@@ -198,17 +198,17 @@ public:
   }
 
   template<class K, class V>
-  TableT<K, V>* create_table(SharderT<K>* sharder = new Modulo<K>(),
-      AccumulatorT<V>* accum = new Replace<V>(), SelectorT<K, V>* selector =
-          NULL, std::string sharder_opts = "", std::string accum_opts = "",
-      std::string selector_opts = "") {
+  TableT<K, V>* create_table(
+      SharderT<K>* sharder = new Modulo<K>(),
+      AccumulatorT<V>* combiner = new Replace<V>(),
+      AccumulatorT<V>* reducer = new Replace<V>(),
+      SelectorT<K, V>* selector = NULL) {
     wait_for_workers();
 
     TableT<K, V>* t = new TableT<K, V>();
 
     // Crash here if we can't find the sharder/accumulators.
     delete TypeRegistry<Sharder>::get_by_id(sharder->type_id());
-    delete TypeRegistry<Accumulator>::get_by_id(accum->type_id());
 
     CreateTableReq req;
     int table_id = table_id_counter_++;
@@ -218,30 +218,37 @@ public:
     req.id = table_id;
     req.num_shards = workers_.size() * 2 + 1;
 
-    req.accum.type_id = accum->type_id();
-    req.accum.opts = accum_opts;
+    if (combiner != NULL) {
+      delete TypeRegistry<Accumulator>::get_by_id(combiner->type_id());
+      req.combiner.type_id = combiner->type_id();
+      req.combiner.opts = combiner->opts();
+    } else {
+      req.combiner.type_id = -1;
+    }
+
+    if (reducer != NULL) {
+      delete TypeRegistry<Accumulator>::get_by_id(reducer->type_id());
+      req.reducer.type_id = reducer->type_id();
+      req.reducer.opts = reducer->opts();
+    } else {
+      req.reducer.type_id = -1;
+    }
 
     req.sharder.type_id = sharder->type_id();
-    req.sharder.opts = sharder_opts;
+    req.sharder.opts = sharder->opts();
 
     if (selector != NULL) {
       req.selector.type_id = selector->type_id();
-      req.selector.opts = selector_opts;
+      req.selector.opts = selector->opts();
     } else {
       req.selector.type_id = -1;
     }
 
     t->init(table_id, req.num_shards);
     t->sharder = sharder;
-    t->sharder->init(sharder_opts);
-
-    t->accum = accum;
-    t->accum->init(accum_opts);
-
+    t->combiner = combiner;
+    t->reducer = reducer;
     t->selector = selector;
-    if (t->selector != NULL) {
-      t->selector->init(selector_opts);
-    }
 
     t->workers.resize(workers_.size());
     for (auto w : workers_) {

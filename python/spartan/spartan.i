@@ -37,7 +37,7 @@ Worker* start_worker(const std::string& master, int port);
 
 void shutdown(Master*);
 void wait_for_workers(Master*);
-Table* create_table(Master*, PyObject* sharder, PyObject* accum, PyObject* selector);
+Table* create_table(Master*, PyObject* sharder, PyObject* combiner, PyObject* reducer, PyObject* selector);
 void destroy_table(Master*, Table*);
 int num_workers(Master* m) {
   return m->num_workers();
@@ -54,13 +54,19 @@ int current_shard(Kernel* k);
 
 // Table operations
 Table* get_table(TableContext*, int table_id);
-PyObject* get_sharder(Table*);
-PyObject* get_accum(Table*);
-PyObject* get_selector(Table*);
 PyObject* get(Table*, PyObject* k);
 void update(Table*, PyObject* k, PyObject* v);
 int get_id(Table* t);
 int num_shards(Table* t);
+
+PyObject* get_reducer(Table *t);
+PyObject* get_combiner(Table* t);
+PyObject* get_sharder(Table *t);
+PyObject* get_selector(Table *t);
+
+void flush(Table* t) {
+  t->flush();
+}
 
 // Iterators
 TableIterator* get_iterator(Table*, int shard);

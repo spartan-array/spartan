@@ -62,26 +62,24 @@ T from_str(const std::string& vstr) {
   return out;
 }
 
-
 } // namespace val
 
 class Table;
-
-class Initable {
-public:
-  virtual ~Initable() {
-
-  }
-  virtual void init(const std::string& opts) = 0;
-  virtual int type_id() = 0;
-};
 
 class Sharder: public Initable {
 public:
 };
 
+template <class T>
+class AccumulatorT;
+
 class Accumulator: public Initable {
 public:
+
+  template <class V>
+  AccumulatorT<V>* cast() {
+    return (AccumulatorT<V>*)this;
+  }
 };
 
 class Selector: public Initable {
@@ -181,7 +179,8 @@ protected:
 public:
   std::vector<WorkerProxy*> workers;
   Sharder *sharder;
-  Accumulator *accum;
+  Accumulator *combiner;
+  Accumulator *reducer;
   Selector *selector;
 
   virtual ~Table() {
@@ -292,13 +291,14 @@ private:
 template<class K, class V>
 class ShardT: public Shard {
 private:
-  typedef boost::unordered_map<K, V> Map;
+  typedef boost::unordered_multimap<K, V> Map;
   Map data_;
 public:
   typedef typename Map::iterator iterator;
   iterator begin() {
     return data_.begin();
   }
+
   iterator end() {
     return data_.end();
   }
@@ -307,7 +307,7 @@ public:
     return data_.find(k);
   }
 
-  void put(const K& k, const V& v) {
+  void insert(const K& k, const V& v) {
     data_.insert(make_pair(k, v));
   }
 
@@ -446,6 +446,7 @@ public:
       shard_info_[i].table = id;
     }
 
+    combiner = reducer = NULL;
   }
 
   virtual ~TableT() {
@@ -474,21 +475,28 @@ public:
 
   void update(const K& k, const V& v) {
     int shard_id = this->shard_for_key(k);
-
     ShardT<K, V>& s = typed_shard(shard_id);
-    {
-      GRAB_LOCK;
-      typename ShardT<K, V>::iterator i = s.find(k);
-      if (i == s.end()) {
-        s.put(k, v);
-      } else {
-        ((AccumulatorT<K>*) accum)->accumulate(&i->second, v);
-      }
+    typename ShardT<K, V>::iterator i = s.find(k);
+
+    GRAB_LOCK;
+    if (i == s.end()) {
+      s.insert(k, v);
+      return;
     }
 
-//    if (!is_local_shard(shard_id)) {
-//      flush();
-//    }
+    if (is_local_shard(shard_id)) {
+      if (reducer != NULL) {
+        reducer->cast<V>()->accumulate(&i->second, v);
+      } else {
+        s.insert(k, v);
+      }
+    } else {
+      if (combiner != NULL) {
+        combiner->cast<V>()->accumulate(&i->second, v);
+      } else {
+        s.insert(k, v);
+      }
+    }
   }
 
   bool _get(const K& k, V* v) {
@@ -574,20 +582,10 @@ public:
   }
 
   bool is_local_shard(int shard) {
-    if (!ctx()) return false;
     return worker_for_shard(shard) == ctx()->id();
   }
 
   bool get_remote(int shard, const K& k, V* v) {
-//    {
-//      GRAB_LOCK;
-//      if (cache_.find(k) != cache_.end()) {
-//        CacheEntry& c = cache_[k];
-//        *v = c.val;
-//        return true;
-//      }
-//    }
-
     GetRequest req;
     TableData resp;
 
@@ -612,9 +610,6 @@ public:
       *v = val::from_str<V>(resp.kv_data[0].value);
     }
 
-//    GRAB_LOCK;
-//    CacheEntry c = {Now(), *v};
-//    cache_[k] = c;
     return true;
   }
 

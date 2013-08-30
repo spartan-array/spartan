@@ -7,6 +7,30 @@
 
 namespace spartan {
 
+class Initable {
+  std::string opts_;
+public:
+  virtual ~Initable() {
+
+  }
+  virtual int type_id() = 0;
+
+  virtual void init(const std::string& opts) {
+    opts_ = opts;
+  }
+
+  virtual const std::string& opts() {
+    return opts_;
+  }
+
+  template<class T>
+  static T* create(const std::string& opts) {
+    T* r = new T;
+    r->init(opts);
+    return r;
+  }
+};
+
 template<class T>
 class Creator {
 public:
@@ -56,8 +80,20 @@ public:
   }
 
   static T* get_by_id(int id) {
+    if (id == -1) {
+      return NULL;
+    }
+
     CHECK(get_map()[id] != NULL);
     return get_map()[id]->creator->create();
+  }
+
+  static T* get_by_id(int id, const std::string& init_opts) {
+    T* v = get_by_id(id);
+    if (v != NULL) {
+      v->init(init_opts);
+    }
+    return v;
   }
 
   static Map& get_map() {

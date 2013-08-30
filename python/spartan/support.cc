@@ -189,10 +189,19 @@ template<class T>
 class PyInitableT: public T {
 public:
   RefPtr code;
+  std::string opts_;
 
   void init(const std::string& opts) {
+    opts_ = opts;
     code = get_pickler().load(opts);
   }
+
+  PyInitableT() {}
+  PyInitableT(const std::string& opts) {
+    init(opts);
+  }
+
+  const std::string& opts() { return opts_; }
 };
 
 class PySharder: public PyInitableT<SharderT<RefPtr> > {
@@ -259,20 +268,37 @@ Table* get_table(Kernel* k, int id) {
   return ((Kernel*) k)->get_table(id);
 }
 
-Table* create_table(Master*m, PyObject* sharder, PyObject* accum,
+Table* create_table(Master*m,
+    PyObject* sharder,
+    PyObject* combiner,
+    PyObject* reducer,
     PyObject* selector) {
   Py_XINCREF(sharder);
-  Py_XINCREF(accum);
+  Py_XINCREF(combiner);
+  Py_XINCREF(reducer);
   Py_XINCREF(selector);
 
-  PySelector* sel = NULL;
+  Pickler& p = get_pickler();
+
+  auto py_sharder = Initable::create<PySharder>(p.store(sharder));
+
+  PyAccum* py_combiner = NULL;
+  if (combiner != Py_None) {
+    py_combiner = Initable::create<PyAccum>(p.store(combiner));
+  }
+
+  PyAccum* py_reducer = NULL;
+  if (reducer != Py_None) {
+    py_reducer = Initable::create<PyAccum>(p.store(reducer));
+  }
+
+  PySelector* py_selector = NULL;
   if (selector != Py_None) {
-    sel = new PySelector;
+    py_selector = Initable::create<PySelector>(p.store(selector));
   }
 
   return ((Master*) m)->create_table(
-      new PySharder(), new PyAccum(), sel,
-      get_pickler().store(sharder), get_pickler().store(accum), get_pickler().store(selector));
+      py_sharder, py_combiner, py_reducer, py_selector);
 }
 
 void destroy_table(Master* m, Table* t) {
@@ -358,29 +384,6 @@ Table* get_table(TableContext* t, int id) {
 
 int get_table_id(Table* t) {
   return t->id();
-}
-
-PyObject* get_sharder(Table* t) {
-  RefPtr p = ((PySharder*) t->sharder)->code;
-  Py_XINCREF(p.get());
-  return p.get();
-}
-
-PyObject* get_accum(Table* t) {
-  RefPtr p = ((PyAccum*) t->accum)->code;
-  Py_XINCREF(p.get());
-  return p.get();
-}
-
-PyObject* get_selector(Table* t) {
-  if (t->selector == NULL) {
-    Py_INCREF(Py_None);
-    return Py_None;
-  }
-
-  RefPtr p = ((PySelector*) t->selector)->code;
-  Py_XINCREF(p.get());
-  return p.get();
 }
 
 void set_log_level(int l) {

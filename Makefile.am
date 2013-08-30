@@ -1,7 +1,7 @@
 AM_CXX = clang++
 AM_LD = clang++
 CXXFLAGS = -std=c++11\
- -O2\
+ -O0\
  -ggdb3\
  -Wall\
  -Wno-unused-result\
@@ -35,8 +35,9 @@ $(builddir)/spartan/spartan_service.h : $(srcdir)/spartan/spartan_service.rpc
 	$(srcdir)/external/simple-rpc/rpc/rpcgen.py $<
 
 
-lib_LTLIBRARIES = libspartan.la librpc.la _spartan_wrap.la
+noinst_LTLIBRARIES = libspartan.la librpc.la 
 noinst_PROGRAMS = test-accum test-iterator
+lib_LTLIBRARIES = _spartan_wrap.la
 
 LDADD = libspartan.la librpc.la
 _spartan_wrap_la_LDFLAGS = -module -lrt

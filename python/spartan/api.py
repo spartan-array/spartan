@@ -101,6 +101,9 @@ class Table(object):
   def num_shards(self):
     return wrap.num_shards(self.handle)
   
+  def flush(self):
+    return wrap.flush(self.handle)
+  
   def __iter__(self):
     return self.iter(-1)
   
@@ -181,10 +184,11 @@ class Master(object):
     
   def create_table(self, 
                    sharder=mod_sharder, 
-                   accum=replace_accum, 
+                   combiner=None,
+                   reducer=replace_accum,
                    selector=None):
     return Table(self, 
-                 wrap.create_table(self.handle, sharder, accum, selector))
+                 wrap.create_table(self.handle, sharder, combiner, reducer, selector))
   
   def foreach_shard(self, table, kernel, args):
     return wrap.foreach_shard(

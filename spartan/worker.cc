@@ -121,17 +121,18 @@ void Worker::create_table(const CreateTableReq& req) {
   Log_debug("Creating table: %d", req.id);
   Table* t = TypeRegistry<Table>::get_by_id(req.table_type);
   t->init(req.id, req.num_shards);
-  t->accum = TypeRegistry<Accumulator>::get_by_id(req.accum.type_id);
-  t->accum->init(req.accum.opts);
 
-  t->sharder = TypeRegistry<Sharder>::get_by_id(req.sharder.type_id);
-  t->sharder->init(req.sharder.opts);
-  if (req.selector.type_id != -1) {
-    t->selector = TypeRegistry<Selector>::get_by_id(req.selector.type_id);
-    t->selector->init(req.selector.opts);
-  } else {
-    t->selector = NULL;
-  }
+  t->combiner = TypeRegistry<Accumulator>::get_by_id(req.combiner.type_id,
+      req.combiner.opts);
+
+  t->reducer = TypeRegistry<Accumulator>::get_by_id(req.reducer.type_id,
+      req.reducer.opts);
+
+  t->sharder = TypeRegistry<Sharder>::get_by_id(req.sharder.type_id,
+      req.sharder.opts);
+
+  t->selector = TypeRegistry<Selector>::get_by_id(req.selector.type_id,
+      req.selector.opts);
 
   t->workers = peers_;
 

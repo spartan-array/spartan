@@ -18,7 +18,7 @@ REGISTER_KERNEL(IterKernel);
 int main(int argc, char** argv) {
   Master* m = start_cluster();
 
-  auto t = m->create_table<int, int>(new Modulo<int>, new Replace<int>);
+  auto t = m->create_table<int, int>(new Modulo<int>, NULL, new Replace<int>);
   m->map_shards(t, "IterKernel");
 
   // Merged iterator.

@@ -16,5 +16,7 @@ Master* start_cluster() {
   }
 
   master->wait_for_workers();
+
+  rpc::Log::set_level(rpc::Log::INFO);
   return master;
 }

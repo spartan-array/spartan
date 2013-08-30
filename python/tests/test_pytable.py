@@ -11,6 +11,7 @@ def test_init(master):
 def test_master(master):
   table = master.create_table(mod_sharder, replace_accum)
   table.update('123', '456')
+  table.flush()
   Assert.eq(table.get('123'), '456')
 
 def put_kernel(kernel, args):

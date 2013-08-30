@@ -172,22 +172,22 @@ class Assert(object):
     assert numpy.all(a == b), 'Failed: \n%s\n ==\n%s' % (a, b)
   
   @staticmethod
-  def eq(a, b, *args): assert (a == b), 'Failed: %s == %s' % (a, b, args)
+  def eq(a, b): assert (a == b), 'Failed: %s == %s' % (a, b)
   
   @staticmethod
-  def ne(a, b, *args): assert (a == b), 'Failed: %s != %s' % (a, b, args)
+  def ne(a, b): assert (a == b), 'Failed: %s != %s' % (a, b)
   
   @staticmethod
-  def gt(a, b, *args): assert (a > b), 'Failed: %s > %s' % (a, b, args)
+  def gt(a, b): assert (a > b), 'Failed: %s > %s' % (a, b)
   
   @staticmethod
-  def lt(a, b, *args): assert (a < b), 'Failed: %s < %s' % (a, b, args)
+  def lt(a, b): assert (a < b), 'Failed: %s < %s' % (a, b)
   
   @staticmethod
-  def ge(a, b, *args): assert (a >= b), 'Failed: %s >= %s' % (a, b, args)
+  def ge(a, b): assert (a >= b), 'Failed: %s >= %s' % (a, b)
   
   @staticmethod
-  def le(a, b, *args): assert (a <= b), 'Failed: %s <= %s' % (a, b, args)
+  def le(a, b): assert (a <= b), 'Failed: %s <= %s' % (a, b)
   
   @staticmethod
   def true(expr): assert expr, 'Failed: %s == True' % (expr)

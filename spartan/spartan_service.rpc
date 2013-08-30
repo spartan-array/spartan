@@ -12,7 +12,8 @@ struct CreateTableReq {
   i32 id;
 
   TypeConstructor sharder;
-  TypeConstructor accum;
+  TypeConstructor combiner;
+  TypeConstructor reducer;
   TypeConstructor selector;
 }
 
