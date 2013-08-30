@@ -70,7 +70,7 @@ class NestedSlice(object):
 
 class TileSelector(object):
   def __call__(self, k, v):
-#     util.log('Selector called for %s', k)
+    #util.log('Selector called for %s', k)
     if isinstance(k, extent.TileExtent): 
       return v[:]
     if isinstance(k, NestedSlice):
@@ -178,8 +178,9 @@ def from_table(table):
 
 def create(master, shape, 
            dtype=np.float, 
-           sharder=spartan.mod_sharder,
-           accum=accum_replace):
+           sharder=spartan.ModSharder(),
+           combiner=None,
+           reducer=accum_replace):
   
   dtype = np.dtype(dtype)
   shape = tuple(shape)
@@ -189,7 +190,7 @@ def create(master, shape,
   util.log('Creating array of shape %s with %d tiles', 
            shape, len(extents))
 
-  table = master.create_table(sharder, accum, TileSelector())
+  table = master.create_table(sharder, combiner, reducer, TileSelector())
   for ex in extents:
     ex_tile = tile.Tile(ex, data=None, dtype=dtype)
     table.update(ex, ex_tile)

@@ -60,7 +60,7 @@ def eval_Reduce(ctx, prim, inputs):
   axis = prim.axis
   shape = extent.shape_for_reduction(input_array.shape, prim.axis)
   tile_accum = tile.TileAccum(prim.combiner_fn)
-  output_array = distarray.create(ctx, shape, dtype, accum=tile_accum)
+  output_array = distarray.create(ctx, shape, dtype, reducer=tile_accum)
   local_reducer = prim.local_reducer_fn
   
   def mapper(ex, tile):

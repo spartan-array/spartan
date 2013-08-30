@@ -1,7 +1,7 @@
 import spartan
 from spartan.array import distarray
 from spartan.array.distarray import DistArray
-from spartan import mod_sharder, replace_accum, util, sum_accum
+from spartan import ModSharder, replace_accum, util, sum_accum
 from spartan.util import Assert
 import numpy as np
 import test_common
@@ -16,7 +16,7 @@ def get_shard_kernel(kernel, args):
     pass
 
 def test_fill_array(master):
-  table = master.create_table(mod_sharder, replace_accum)
+  table = master.create_table(ModSharder(), combiner=None, reducer=replace_accum, selector=None)
   bytes = np.ndarray((10, 10), dtype=np.double)
   for i in range(5):
     for j in range(5):
@@ -26,7 +26,7 @@ def test_fill_array(master):
   
   
 def test_distarray_empty(master):
-  table = master.create_table(mod_sharder, replace_accum)
+  table = master.create_table(ModSharder(), combiner=None, reducer=replace_accum, selector=None)
   distarray.from_table(table)
   
 
@@ -76,7 +76,7 @@ def test_kmeans(master):
   centers = np.random.randn(N_CENTERS, DIM)
   
   util.log('Generating new centers.')
-  new_centers = master.create_table(mod_sharder, sum_accum)
+  new_centers = master.create_table(sharder=ModSharder(), combiner=None, reducer=sum_accum, selector=None)
   
   util.log('Finding closest')
   min_array = pts.map_to_array(lambda ex, tile: min_dist(ex, tile, centers))

@@ -382,6 +382,35 @@ Table* get_table(TableContext* t, int id) {
   return t->get_table(id);
 }
 
+template <class T>
+static inline PyObject* get_code(T* obj) {
+  if (obj == NULL) {
+    Py_INCREF(Py_None);
+    return Py_None;
+  }
+
+  RefPtr p = obj->code;
+  Py_INCREF(p.get());
+  return p.get();
+}
+
+PyObject* get_combiner(Table* t) {
+  return get_code((PyAccum*)t->combiner);
+}
+
+PyObject* get_reducer(Table* t) {
+  return get_code((PyAccum*)t->reducer);
+}
+
+PyObject* get_sharder(Table* t) {
+  return get_code((PySharder*)t->sharder);
+}
+
+PyObject* get_selector(Table* t) {
+  return get_code((PySelector*)t->selector);
+}
+
+
 int get_table_id(Table* t) {
   return t->id();
 }

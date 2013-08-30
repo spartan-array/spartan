@@ -7,9 +7,13 @@ import pstats
 import sys
 import traceback
 
+class Sharder(object):
+  def __call__(self, k, num_shards):
+    assert False
 
-def mod_sharder(k, num_shards):
-  return hash(k) % num_shards
+class ModSharder(Sharder):
+  def __call__(self, k, num_shards):
+    return hash(k) % num_shards
 
 def replace_accum(cur, update):
   return update
@@ -113,8 +117,11 @@ class Table(object):
   def sharder(self):
     return wrap.get_sharder(self.handle)
   
-  def accum(self):
-    return wrap.get_accum(self.handle)
+  def combiner(self):
+    return wrap.get_combiner(self.handle)
+
+  def reducer(self):
+    return wrap.get_reducer(self.handle)
   
   def selector(self):
     return wrap.get_selector(self.handle)
@@ -183,10 +190,13 @@ class Master(object):
     wrap.destroy_table(self.handle, table_handle)
     
   def create_table(self, 
-                   sharder=mod_sharder, 
+                   sharder=ModSharder(), 
                    combiner=None,
                    reducer=replace_accum,
                    selector=None):
+    
+    Assert.isinstance(sharder, Sharder)
+    util.log('Creating table with sharder %s', sharder)
     return Table(self, 
                  wrap.create_table(self.handle, sharder, combiner, reducer, selector))
   
@@ -220,11 +230,10 @@ def map_items(table, fn):
   src = table
   master = src.ctx
   
-  sharder = table.sharder()
-  accum = table.accum()
-  selector = table.selector()
-  
-  dst = master.create_table(sharder, accum, selector)
+  dst = master.create_table(table.sharder(), 
+                            table.combiner(), 
+                            table.reducer(),
+                            table.selector())
   master.foreach_shard(table, mapper_kernel, (src.id(), dst.id(), fn))
   return dst
 
