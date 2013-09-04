@@ -137,11 +137,6 @@ typename TypeRegistry<T>::Map* TypeRegistry<T>::creator_map_ = NULL;
 #define REGISTER_TYPE(BaseType, T)\
   static spartan::TypeRegistry<BaseType>::Helper<T> register_type_(#T); # T;
 
-#ifdef SWIG
-#define DECLARE_REGISTRY_HELPER(Base, Self)
-#define DEFINE_REGISTRY_HELPER(Base, Self)
-#define TMPL_DEFINE_REGISTRY_HELPER(Base, Self)
-#else
 #define DECLARE_REGISTRY_HELPER(Base, Self)\
   static spartan::TypeRegistry<Base>::Helper<Self> type_helper_;\
   int type_id() { return type_helper_.id(); }
@@ -152,6 +147,5 @@ typename TypeRegistry<T>::Map* TypeRegistry<T>::creator_map_ = NULL;
 #define TMPL_DEFINE_REGISTRY_HELPER(Base, Self)\
   template <class T>\
   spartan::TypeRegistry<Base>::Helper<Self<T> > Self<T>::type_helper_;
-#endif
 
 #endif

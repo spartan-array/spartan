@@ -15,7 +15,7 @@ class TableBase;
 class Worker;
 class Table;
 
-class Kernel {
+class Kernel : public Initable {
 public:
   virtual ~Kernel() {
 

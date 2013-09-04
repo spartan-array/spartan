@@ -21,7 +21,7 @@ class TaskState;
 struct RunDescriptor {
   Table *table;
 
-  string kernel;
+  int kernel_id;
   Kernel::ArgMap args;
   std::vector<int> shards;
 };
@@ -160,7 +160,7 @@ public:
     active[state.id] = state;
     pending.erase(pending.begin());
 
-    msg->kernel = r.kernel;
+    msg->kernel = r.kernel_id;
     msg->table = r.table->id();
     msg->shard = state.id.second;
     msg->args = r.args;
@@ -194,7 +194,7 @@ public:
   }
 
   int num_workers() {
-    return workers_.size();
+    return num_workers_;
   }
 
   template<class K, class V>
@@ -270,8 +270,13 @@ public:
   }
 
   void map_shards(Table* t, const std::string& kernel) {
+    map_shards(t, TypeRegistry<Kernel>::get_by_name(kernel));
+  }
+
+  void map_shards(Table* t, Kernel* k) {
     RunDescriptor r;
-    r.kernel = kernel;
+    r.kernel_id = k->type_id();
+    r.args = k->args();
     r.table = t;
     r.shards = range(0, t->num_shards());
 

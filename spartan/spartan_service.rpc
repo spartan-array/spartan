@@ -18,7 +18,7 @@ struct CreateTableReq {
 }
 
 struct RunKernelReq {
-  string kernel;
+  i32 kernel;
   i32 table;
   i32 shard;
   map<string, string> args;

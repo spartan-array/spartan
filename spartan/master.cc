@@ -213,10 +213,10 @@ void Master::run(RunDescriptor r) {
   wait_for_workers();
   flush();
 
-  Kernel::ScopedPtr k(TypeRegistry<Kernel>::get_by_name(r.kernel));
+  Kernel::ScopedPtr k(TypeRegistry<Kernel>::get_by_id(r.kernel_id));
   CHECK_NE(k.get(), (void*)NULL);
 
-  Log_info("Running: %s on %d", r.kernel.c_str(), r.table->id());
+  Log_info("Running: %d on %d", r.kernel_id, r.table->id());
 
   vector<int> shards = r.shards;
 
@@ -248,7 +248,7 @@ void Master::run(RunDescriptor r) {
   // Force workers to apply flushed updates.
   flush();
 
-  Log_info("Kernel %s finished in %f", current_run_.kernel.c_str(),
+  Log_info("Kernel %d finished in %f", current_run_.kernel_id,
       Now() - current_run_start_);
 }
 

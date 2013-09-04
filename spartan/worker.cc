@@ -51,7 +51,7 @@ void Worker::run_kernel(const RunKernelReq& kreq) {
         id_, kreq.table, kreq.shard, owner);
   }
 
-  std::unique_ptr<Kernel> k(TypeRegistry<Kernel>::get_by_name(kreq.kernel));
+  std::unique_ptr<Kernel> k(TypeRegistry<Kernel>::get_by_id(kreq.kernel));
   k->init(this, kreq.table, kreq.shard, kreq.args);
   k->run();
 
@@ -213,7 +213,7 @@ Worker* start_worker(const std::string& master_addr, int port) {
       StringPrintf("%s:%d", req.addr.host.c_str(), req.addr.port).c_str());
 
   MasterProxy* master = connect<MasterProxy>(manager, master_addr);
-  Log_info("Registering %d", port);
+  Log_info("Registering worker %s:%d", rpc::get_host_name().c_str(), port);
   master->register_worker(req);
   Log_info("Done.", port);
   return worker;
