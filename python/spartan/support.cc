@@ -253,8 +253,9 @@ public:
     RefPtr fn_args = get_pickler().load(args()["map_args"]);
     to_ref(PyObject_CallFunction(fn.get(), W("lO"), this, fn_args.get()));
   }
+  DECLARE_REGISTRY_HELPER(Kernel, PyKernel);
 };
-REGISTER_KERNEL(PyKernel);
+DEFINE_REGISTRY_HELPER(Kernel, PyKernel);
 
 void shutdown(Master*h) {
   ((Master*) h)->shutdown();
@@ -308,7 +309,9 @@ void destroy_table(Master* m, Table* t) {
 void foreach_shard(Master*m, Table* t,
                    PyObject* fn, PyObject* args) {
   spartan::RunDescriptor r;
-  r.kernel = "PyKernel";
+  auto p = new PyKernel();
+  r.kernel_id = p->type_id();
+  delete p;
   r.args["map_fn"] = get_pickler().store(fn);
   r.args["map_args"] = get_pickler().store(args);
   r.table = (PyTable*) t;

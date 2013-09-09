@@ -43,7 +43,6 @@ class Value(Primitive):
   
 @node_type
 class Map(Primitive):
-  _members = ['inputs', 'map_fn', 'fn_args', 'fn_kw']
    
   def dependencies(self):
     return self.inputs
@@ -51,6 +50,8 @@ class Map(Primitive):
 
 @node_type
 class MapTiles(Map):
+  _members = ['inputs', 'map_fn', 'fn_args', 'fn_kw', ]
+  
   def _shape(self):
     '''MapTiles retains the shape of inputs.
     
@@ -66,6 +67,7 @@ class MapTiles(Map):
 
 @node_type
 class MapExtents(Map):
+  _members = ['inputs', 'map_fn', 'fn_args', 'fn_kw']
   def _shape(self):
     raise NotShapeable
 

@@ -196,7 +196,7 @@ class Master(object):
                    selector=None):
     
     Assert.isinstance(sharder, Sharder)
-    util.log('Creating table with sharder %s', sharder)
+    #util.log('Creating table with sharder %s', sharder)
     return Table(self, 
                  wrap.create_table(self.handle, sharder, combiner, reducer, selector))
   
@@ -205,28 +205,47 @@ class Master(object):
                           self.handle, table.handle, _bootstrap_kernel, (kernel, args))
 
 
+def has_kw_args(fn):
+  return fn.__code__.co_flags & 0x08
+
 def mapper_kernel(kernel, args):
-  src_id, dst_id, fn = args
+  src_id, dst_id, fn, kw = args
   
   src = kernel.table(src_id)
   dst = kernel.table(dst_id)
   
+  assert not 'kernel' in kw
+  kw['kernel'] = kernel
+  
 #   util.log('MAPPING: Function: %s, args: %s', fn, fn_args)
   
   for sk, sv in src.iter(kernel.current_shard()):
-    result = fn(sk, sv)
+    if has_kw_args(fn):
+      result = fn(sk, sv, **kw)
+    else:
+      assert len(kw) == 1, 'Arguments passed but function does not support **kw'
+      result = fn(sk, sv)
+      
     if result is not None:
       for k, v in result:
         dst.update(k, v)
 
+
 def foreach_kernel(kernel, args):
-  src_id, fn = args
+  src_id, fn, kw = args
+  assert not 'kernel' in kw
+  kw['kernel'] = kernel
+  
   src = kernel.table(src_id)
   for sk, sv in src.iter(kernel.current_shard()):
-    fn(sk, sv)
+    if has_kw_args(fn):
+      fn(sk, sv, **kw)
+    else:
+      assert len(kw) == 1, 'Arguments passed but function does not support **kw'
+      fn(sk, sv)
 
 
-def map_items(table, fn):
+def map_items(table, fn, **kw):
   src = table
   master = src.ctx
   
@@ -234,21 +253,24 @@ def map_items(table, fn):
                             table.combiner(), 
                             table.reducer(),
                             table.selector())
-  master.foreach_shard(table, mapper_kernel, (src.id(), dst.id(), fn))
+  master.foreach_shard(table, mapper_kernel, 
+                       (src.id(), dst.id(), fn, kw))
   return dst
 
 
-def map_inplace(table, fn):
+def map_inplace(table, fn, **kw):
   src = table
   dst = src
-  table.ctx.foreach_shard(table, mapper_kernel, (src.id(), dst.id(), fn))
+  table.ctx.foreach_shard(table, mapper_kernel, 
+                          (src.id(), dst.id(), fn, kw))
   return dst
 
 
-def foreach(table, fn):
+def foreach(table, fn, **kw):
   src = table
   master = src.ctx
-  master.foreach_shard(table, foreach_kernel, (src.id(), fn))
+  master.foreach_shard(table, foreach_kernel, 
+                       (src.id(), fn, kw))
 
 
 def fetch(table):

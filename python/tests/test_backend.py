@@ -90,29 +90,29 @@ def test_compile_index(ctx):
 def test_slice(ctx):
   x = expr.arange((DIM, DIM))
   z = x[5:8, 5:8]
-  zc = compile_expr.compile_op(z)
+  zc = compile_expr.compile(z)
   val = backend.evaluate(ctx, zc)
   nx = np.arange(DIM*DIM).reshape(DIM, DIM)
   
   Assert.all_eq(val.glom(), nx[5:8, 5:8])
   
-def _dot(inputs, ex, w):
-  t = inputs[0][ex.to_slice()]
-  out = extent.TileExtent(list(ex.ul[0:1]) + [0],
-                          list(ex.sz[0:1]) + [1],
-                          list(ex.array_shape[0:1]) + [1])
-  return out, t.dot(w)
-    
 def test_linear_regression(ctx):
-  N_EXAMPLES = 1000 * 1000 * ctx.num_workers()
+  N_EXAMPLES = 2 * 1000 * 1000 * ctx.num_workers()
   N_DIM = 10
-  x = expr.rand(N_EXAMPLES, N_DIM)
-  y = expr.rand(N_EXAMPLES, 1)
+  distarray.TILE_SIZE = N_EXAMPLES / (4 * ctx.num_workers()) 
+  x = expr.lazify(expr.rand(N_EXAMPLES, N_DIM).evaluate())
+  y = expr.lazify(expr.rand(N_EXAMPLES, 1).evaluate())
   w = np.random.rand(N_DIM, 1)
   
+  util.log('INIT DONE')
   for i in range(10):
-    yp = expr.map_extents(x, _dot, w=w).evaluate()
-    grad = expr.sum(x * (yp - y), axis=0).glom().reshape((N_DIM, 1))
+    util.log('START')
+    yp = expr.map_extents(x, expr._dot, w=w)
+    diff = x * (yp - y)
+    util.log('DIFF')
+    diff.evaluate()
+    util.log('DONE')
+    grad = expr.sum(diff, axis=0).glom().reshape((N_DIM, 1))
     w = w + grad * 0.0001
     
     util.log('END')

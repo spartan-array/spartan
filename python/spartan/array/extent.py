@@ -25,7 +25,7 @@ class TileExtent(object):
   
   def to_slice(self):
     return tuple([slice(ul, lr, None) for ul, lr in zip(self.ul, self.lr)])
-
+  
   def __repr__(self):
     return 'extent(' + ','.join('%s:%s' % (a, b) for a, b in zip(self.ul, self.lr)) + ')'
 
@@ -70,8 +70,6 @@ class TileExtent(object):
     
     unravelled = np.array(list(reversed(unravelled)))
     unravelled += self.ul
-#    util.log('%s, %s, %s, %s %s',
-#             self.ul, idx, unravelled, self.ravelled_pos(unravelled), self.array_shape)
     return self.ravelled_pos(unravelled)
 
   def start(self, axis):
@@ -89,9 +87,28 @@ class TileExtent(object):
       return np.prod(self.sz)
     return self.sz[axis]
   
-  def create_array(self):
-    return np.ndarray(self.shape)
+
+def compute_slice(base, idx):
+  '''Return a new extent corresponding to slicing this extent by `idx`.'''
+  assert not np.isscalar(idx)
+  if not isinstance(idx, tuple):
+    idx = (idx,)
+    
+  ul = []
+  sz = []
+  array_shape = base.array_shape
   
+  for i in range(len(base.ul)):
+    if i >= len(idx):
+      ul.append(base.ul[i])
+      sz.append(base.sz[i])
+    else:
+      start, stop, step = idx.indices(base.sz[i])
+      ul.append(base.ul[i] + start)
+      sz.append(stop - start)
+  
+  return TileExtent(ul, sz, array_shape)
+
 
 def offset_from(base, other):
   '''
@@ -102,6 +119,8 @@ def offset_from(base, other):
   assert np.all(other.ul >= base.ul), (other, base)
   assert np.all(other.lr <= base.lr), (other, base)
   return TileExtent(np.array(other.ul) - np.array(base.ul), other.sz, other.shape)
+
+
 
 def offset_slice(base, other):
   '''

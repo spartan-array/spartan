@@ -8,6 +8,7 @@ into a series of primitive array operations.
 from node import node_type
 from prims import NotShapeable
 from spartan import util
+from spartan.array import extent
 from spartan.util import Assert
 import numpy as np
 import spartan
@@ -17,16 +18,16 @@ class Expr(object):
   _dag = None
   
   def __add__(self, other):
-    return Op(op=np.add, children=(self, other))
+    return Op(op=np.add, children=(self, other), numexpr='+')
 
   def __sub__(self, other):
-    return Op(op=np.subtract, children=(self, other))
+    return Op(op=np.subtract, children=(self, other), numexpr='-')
 
   def __mul__(self, other):
-    return Op(op=np.multiply, children=(self, other))
+    return Op(op=np.multiply, children=(self, other), numexpr='*')
 
   def __mod__(self, other):
-    return Op(op=np.mod, children=(self, other))
+    return Op(op=np.mod, children=(self, other), numexpr='%')
 
   def __div__(self, other):
     return Op(op=np.divide, children=(self, other))
@@ -65,7 +66,7 @@ class Expr(object):
       return self._dag
     
     from . import compile_expr
-    dag = compile_expr.compile_op(self)
+    dag = compile_expr.compile(self)
     dag = compile_expr.optimize(dag)
     self._dag = dag
     return self._dag
@@ -87,24 +88,10 @@ Expr.__rdiv__ = Expr.__div__
 class LazyVal(Expr):
   _members = ['val']
 
-def lazify(val):
-  if isinstance(val, Expr): return val
-  return LazyVal(val)
-
-def val(x):
-  return lazify(x)
-
-def pretty(op):
-  if isinstance(op, (types.FunctionType,
-                     types.BuiltinFunctionType,
-                     types.MethodType,
-                     types.BuiltinMethodType)):
-    return op.__name__
-  return repr(op)
 
 @node_type
 class Op(Expr):
-  _members = ['op', 'children', 'kwargs']
+  _members = ['op', 'children', 'kwargs', 'numexpr']
   
   def node_init(self):
     if self.kwargs is None: self.kwargs = {}
@@ -117,6 +104,14 @@ class Op(Expr):
   
   def _dtype(self):
     return self.args[0].dtype
+  
+
+def lazify(val):
+  if isinstance(val, Expr): return val
+  return LazyVal(val)
+
+def val(x):
+  return lazify(x)
 
 def outer(a, b):
   return Op(np.outer, (a, b))
@@ -159,14 +154,32 @@ Expr.diagflat = diagflat
 Expr.ravel = ravel
 Expr.argmin = argmin
 
+def _dot(inputs, ex, w):
+  t = inputs[0][ex.to_slice()]
+  out = extent.TileExtent(list(ex.ul[0:1]) + [0],
+                          list(ex.sz[0:1]) + [1],
+                          list(ex.array_shape[0:1]) + [1])
+  return out, t.dot(w)
+
+def map(v, fn, axis=None, **kw):
+  if axis is None:
+    return map_tiles(v, fn, **kw)
+  
+  return Op('map', (v,), 
+            kwargs = {'map_fn' : fn, 'fn_kw' : kw, 'axis' : axis})
+
+
 def map_extents(v, fn, **kw):
   return Op('map_extents', (v,), kwargs={'map_fn' : fn, 'fn_kw' : kw})
+
 
 def map_tiles(v, fn, **kw):
   return Op('map_tiles', (v,), kwargs={'map_fn' : fn, 'fn_kw' : kw})
 
+
 def ndarray(shape, dtype=np.float):
   return Op('ndarray', kwargs = { 'shape' : shape, 'dtype' : dtype })
+
 
 def rand(*shape):
   return map_extents(ndarray(shape, dtype=np.float), 

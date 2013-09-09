@@ -143,8 +143,17 @@ class Node(object):
   def __str__(self):
     member_strings = []
     for (k,v) in self.iteritems():
-      member_strings.append("%s = %s" % (k, v))
-    child_str = ",\n".join(member_strings)
+      if isinstance(v, list):
+        v_str = ['[']
+        for i, v in enumerate(v):
+          v_str.append('[%d] = %s' % (i, v))
+        v_str += [']']
+        
+        v_str = '\n'.join(v_str)
+      else:
+        v_str = str(v)
+      member_strings.append("%s = %s" % (k, v_str))
+    child_str = '  ' + ',\n'.join(member_strings)
     child_str = child_str.replace('\n', '\n  ')
     
     return "%s { \n%s \n}" % (self.node_type(), child_str) 

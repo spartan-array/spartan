@@ -217,7 +217,7 @@ class DistArray(object):
     return spartan.map_items(self.table, fn)
   
   def map_tiles(self, fn):
-    return spartan.map_items(self.table, fn)
+    return self.map_to_table(fn)
   
   def map_to_array(self, fn):
     return from_table(self.map_to_table(fn))
@@ -296,6 +296,54 @@ class DistArray(object):
     return self.ensure(ex)
 
 
+
+def slice_mapper(ex, tile, **kw):
+  fn = kw['fn']
+  slice_extent = kw['slice']
+  kernel = kw['kernel']
+  
+  intersection = extent.intersection(slice_extent, ex)
+  if intersection is None:
+    return []
+  
+  subslice = extent.offset_slice(ex, intersection)
+  subtile = tile[subslice]
+  
+  return fn(intersection, subtile)
+  
+
+class Slice(object):
+  def __init__(self, darray, idx):
+    Assert.isinstance(idx, extent.TileExtent)
+    Assert.isinstance(darray, DistArray)
+    self.darray = darray
+    self.idx = idx
+    self.shape = self.idx.shape
+    intersections = [extent.intersection(self.idx, ex) for ex in self.darray]
+    intersections = [ex for ex in intersections if ex is not None]
+    self.extents = intersections
+    
+  def map_to_array(self, fn):
+    return from_table(self.map_to_table(fn))
+  
+  def map_tiles(self, fn):
+    return self.map_to_table(fn)
+  
+  def map_to_table(self, fn):
+    return spartan.map_items(self.darray.table, 
+                             slice_mapper,
+                             fn = fn,
+                             slice_extent = self.idx)
+
+  def glom(self):
+    return self.darray.ensure(self.idx)
+
+  def __getitem__(self, idx):
+    ex = extent.compute_slice(self.idx, idx)
+    return self.darray.ensure(ex)
+
+
+
 class Broadcast(object):
   '''A broadcast object mimics the behavior of Numpy broadcasting.
   
@@ -311,39 +359,38 @@ class Broadcast(object):
   
   def __getitem__(self, idx):
     pass
-
-
-class Slice(object):
-  def __init__(self, darray, idx):
-    self.darray = darray
-    self.idx = idx
-    
-  def map_tiles(self, fn):
-    pass
   
-  def map_to_array(self, fn):
-    pass
-
+  def __repr__(self):
+    return 'Broadcast(%s -> %s)' % (self.base, self.shape)
 
 
 def broadcast(*args):
   if len(args) == 1:
-    return args
+    return args[0]
  
   shapes = [x.shape for x in args]
   dims = [len(shape) for shape in shapes]
   max_dim = max(dims)
   new_shape = []
   
-  # prepend 1-element filler dimensions for smaller arrays
+  # prepend filler dimensions for smaller arrays
   for i in range(len(shapes)):
     diff = max_dim - len(shapes[i])
     shapes[i] = [1] * diff + shapes[i]
   
-  # check shapes are valid
+  # check shapes are valid; there should be at most one unique
+  # shape.
   for axis in range(max_dim):
     axis_shape = set(s[axis] for s in shapes)
     Assert.le(axis_shape, 2, 'Mismatched shapes for broadcast: ' + shapes)
+    
+  results = []
+  for i in range(len(args)):
+    results.append(Broadcast(args[i], shapes[i]))
+    
+  util.log('Broadcast result: %s', results)
+  return results
+    
       
     
     

@@ -58,6 +58,7 @@ def eval_Reduce(ctx, prim, inputs):
   input_array = inputs[0]
   dtype = prim.dtype_fn(input_array)
   axis = prim.axis
+  util.log('Reducing %s over axis %s', input_array.shape, prim.axis)
   shape = extent.shape_for_reduction(input_array.shape, prim.axis)
   tile_accum = tile.TileAccum(prim.combiner_fn)
   output_array = distarray.create(ctx, shape, dtype, reducer=tile_accum)
@@ -86,8 +87,8 @@ def eval_Slice(ctx, prim, inputs):
   slice_region = extent.from_slice(idx, src.shape)
   matching_extents = dict(distarray.extents_for_region(src.extents, slice_region))
   
-  util.log('Taking slice: %s from %s', idx, src.shape)
-  util.log('Matching: %s', matching_extents)
+  #util.log('Taking slice: %s from %s', idx, src.shape)
+  #util.log('Matching: %s', matching_extents)
   
   return src.map_to_array(lambda k, v: slice_mapper(k, v, slice_region, matching_extents))
 

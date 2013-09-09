@@ -13,7 +13,6 @@ import types
 config.add_flag('test_filter', default='')
 config.add_flag('num_workers', default=4, type=int)
 
-config.add_bool_flag('multiprocess', default=False)
 config.add_bool_flag('cluster', default=False)
 
 def worker_loop(port): 
@@ -23,11 +22,6 @@ def worker_loop(port):
   while 1:
     time.sleep(1)
   
-def start_multiproc_worker(i):
-  p = multiprocessing.Process(target = lambda: worker_loop(10000 + i))
-  p.daemon = True
-  p.start()
-  
 def start_cluster_worker(i):
   t = 0
   for worker, count in config.HOSTS:
@@ -36,6 +30,7 @@ def start_cluster_worker(i):
   
   util.log('Starting worker %d on host %s', i, worker)
   args = ['ssh', 
+          '-oForwardX11=no',
           worker,
           'cd %s && ' % os.path.abspath(os.path.curdir),
           #'xterm', '-e',
@@ -44,6 +39,7 @@ def start_cluster_worker(i):
           '--master=%s:9999' % socket.gethostname(),
           '--port=%d' % (10000 + i)]
   
+  time.sleep(0.1)
   p = subprocess.Popen(args, executable='ssh')
   return p
 
@@ -52,12 +48,11 @@ def start_cluster():
   spartan.set_log_level(flags.log_level)
   time.sleep(0.1)
   for i in range(flags.num_workers):
-    if flags.multiprocess:
-      start_multiproc_worker(i)
-    elif flags.cluster:
+    if flags.cluster:
       start_cluster_worker(i)
     else:
       spartan.start_worker('%s:9999' % socket.gethostname(),  10000 + i)
+      
   return master
 
 def run_cluster_tests(filename):

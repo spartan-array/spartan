@@ -12,11 +12,27 @@ from spartan.config import flags
 from .extent import index_for_reduction, shapes_match
 import numpy as np
 
-binary_ops = set([np.add, np.subtract, np.multiply, np.divide, np.mod, np.power,
-                  np.equal, np.less, np.less_equal, np.greater, np.greater_equal])
+try:
+  import numexpr
+except:
+  numexpr = None
+
+# mapping from numpy functions to arithmetic operators
+# this is used for numexpr folding
+BINARY_OPS = { np.add : '+', 
+               np.subtract : '-', 
+               np.multiply : '*', 
+               np.divide : '/', 
+               np.mod : '%',
+               np.power : '**',
+               np.equal : '==', 
+               np.less : '<', 
+               np.less_equal : '<=', 
+               np.greater : '>', 
+               np.greater_equal : '>=' }
 
 
-def to_structured_array(**kw):
+def _to_structured_array(**kw):
   '''Create a structured array from the given input arrays.'''
   out = np.ndarray(kw.values()[0].shape, 
                   dtype=','.join([a.dtype.str for a in kw.itervalues()]))
@@ -25,7 +41,9 @@ def to_structured_array(**kw):
     out[k] = v
   return out
 
-def argmin_local(index, value, axis):
+
+
+def _argmin_local(index, value, axis):
   local_idx = value.argmin(axis)
   local_min = value.min(axis)
 
@@ -37,120 +55,110 @@ def argmin_local(index, value, axis):
   global_idx = index.to_global(local_idx, axis)
 
   new_idx = index_for_reduction(index, axis)
-  new_value = to_structured_array(idx=global_idx, min=local_min)
+  new_value = _to_structured_array(idx=global_idx, min=local_min)
 
 #   print index, value.shape, axis
 #   print local_idx.shape
   assert shapes_match(new_idx, new_value), (new_idx, new_value.shape)
   return [(new_idx, new_value)]
 
-def argmin_reducer(a, b):
+def _argmin_reducer(a, b):
   return np.where(a['min'] < b['min'], a, b)
 
-def sum_local(index, tile, axis):
+def _sum_local(index, tile, axis):
   return np.sum(tile[:], axis)
 
-def sum_reducer(a, b):
+def _sum_reducer(a, b):
   return a + b
 
-def binary_op(fn, inputs, kw):
-  return fn(*inputs)
+def _apply_binary_op(inputs, binary_op=None):
+  assert len(inputs) == 2
+  return binary_op(*inputs)
 
-
-def compile_index(op, children):
-  src, idx = children
+class OpToPrim(object):
+  def compile_index(self, op, children):
+    src, idx = children
+    
+    # differentiate between slices (cheap) and index/boolean arrays (expensive)
+    if isinstance(idx, prims.Value) and\
+       (isinstance(idx.value, tuple) or 
+        isinstance(idx.value, slice)):
+      return prims.Slice(src, idx)
+    else:
+      return prims.Index(src, idx)
   
-  # differentiate between slices (cheap) and index/boolean arrays (expensive)
-  if isinstance(idx, prims.Value) and\
-     (isinstance(idx.value, tuple) or 
-      isinstance(idx.value, slice)):
-    return prims.Slice(src, idx)
-  else:
-    return prims.Index(src, idx)
-
-
-
-def compile_sum(op, children):
-  axis = op.kwargs.get('axis', None)
-  return prims.Reduce(children[0],
-                      axis,
-                      dtype_fn = lambda input: input.dtype,
-                      local_reducer_fn = lambda ex, v: sum_local(ex, v, axis),
-                      combiner_fn = lambda a, b: a + b)
   
-
-def compile_argmin(op, children):
-  axis = op.kwargs.get('axis', None)
-  compute_min = prims.Reduce(children[0],
-                             axis,
-                             dtype_fn = lambda input: 'i8,f8',
-                             local_reducer_fn = argmin_local,
-                             combiner_fn = argmin_reducer)
   
-  def _take_idx_mapper(tile):
-    return tile['idx']
+  def compile_sum(self, op, children):
+    axis = op.kwargs.get('axis', None)
+    return prims.Reduce(children[0],
+                        axis,
+                        dtype_fn = lambda input: input.dtype,
+                        local_reducer_fn = lambda ex, v: _sum_local(ex, v, axis),
+                        combiner_fn = lambda a, b: a + b)
+    
   
-  take_indices = prims.MapTiles([compute_min], _take_idx_mapper, fn_kw = {})
+  def compile_argmin(self, op, children):
+    axis = op.kwargs.get('axis', None)
+    compute_min = prims.Reduce(children[0],
+                               axis,
+                               dtype_fn = lambda input: 'i8,f8',
+                               local_reducer_fn = _argmin_local,
+                               combiner_fn = _argmin_reducer)
+    
+    def _take_idx_mapper(tile):
+      return tile['idx']
+    
+    take_indices = prims.MapTiles([compute_min], _take_idx_mapper, fn_kw = {})
+    
+    return take_indices
   
-  return take_indices
-
-
-def compile_map_extents(op, children):
-  Assert.eq(len(children), 1)
-  child = children[0]
-  return prims.MapExtents([child], 
+  
+  def compile_map_extents(self, op, children):
+    Assert.eq(len(children), 1)
+    child = children[0]
+    return prims.MapExtents([child], 
+                            map_fn = op.kwargs['map_fn'],
+                            fn_kw = op.kwargs['fn_kw'])
+                              
+  
+  
+  def compile_map_tiles(self, op, children):
+    Assert.eq(len(children), 1)
+    child = children[0]
+    return prims.MapTiles([child], 
                           map_fn = op.kwargs['map_fn'],
                           fn_kw = op.kwargs['fn_kw'])
-                            
+   
+    
+  def compile_ndarray(self, op, children):
+    shape = op.kwargs['shape']
+    dtype = op.kwargs['dtype']
+    return prims.NewArray(array_shape=shape, dtype=dtype)
+    
+  def compile_op(self, op):
+    '''Convert a numpy expression tree in an Op tree.
+    :param op:
+    :rval: DAG of `Primitive` operations.
+    '''
+    if isinstance(op, expr.LazyVal):
+      return prims.Value(op.val)
+    else:
+      children = [self.compile_op(c) for c in op.children]
+    
+    if op.op in BINARY_OPS:
+      return prims.MapTiles(children, 
+                            _apply_binary_op, 
+                            fn_kw = { 'binary_op' : op.op })
+    
+    if isinstance(op.op, str):
+      op_key = op.op
+    else:
+      op_key = op.op.__name__
+    
+    return getattr(self, 'compile_' + op_key)(op, children)
 
 
-def compile_map_tiles(op, children):
-  Assert.eq(len(children), 1)
-  child = children[0]
-  return prims.MapTiles([child], 
-                        map_fn = op.kwargs['map_fn'],
-                        fn_kw = op.kwargs['fn_kw'])
- 
-  
-def compile_ndarray(op, children):
-  shape = op.kwargs['shape']
-  dtype = op.kwargs['dtype']
-  return prims.NewArray(array_shape=shape, dtype=dtype)
- 
-def _binary_op(inputs, op=None): 
-  return op(*inputs)
-
-  
-def compile_op(op):
-  '''Convert a numpy expression tree in an Op tree.
-  :param op:
-  :rval: DAG of `Primitive` operations.
-  '''
-  if isinstance(op, expr.LazyVal):
-    return prims.Value(op.val)
-  else:
-    children = [compile_op(c) for c in op.children]
-  
-  if op.op in binary_ops:
-    return prims.MapTiles(children, _binary_op, fn_kw = { 'op' : op.op })
-  
-  if isinstance(op.op, str):
-    return globals()['compile_' + op.op](op, children)
-  else:
-    return globals()['compile_' + op.op.__name__](op, children)
-
-def optimize(dag):
-  if not flags.optimization:
-    util.log('Optimizations disabled')
-    return dag
-  
-  if flags.folding:
-    folder = FoldMapPass()
-    dag = folder.visit(dag)
-  else:
-    util.log('Folding disabled')
-  
-  return dag
 
 class OptimizePass(object):
   def visit(self, op):
@@ -188,47 +196,70 @@ class OptimizePass(object):
   def visit_Slice(self, op):
     return prims.Index(self.visit(op.src), self.visit(op.idx))
 
-def fold_mapper(local_tiles, fns=None, ranges=None, map_fn=None, map_kw=None):
-  inputs = []
-  for (fn, kw), (st, ed) in zip(fns, ranges):
-    fn_in = local_tiles[st:ed]
-    result = fn(fn_in, **kw)
-    assert isinstance(result, np.ndarray), result
-    inputs.append(result)
+
+
+def _fold_mapper(inputs, fns=None, map_fn=None, map_kw=None):
+  '''Helper mapper function for folding.
   
-  #util.log('%s %s %s', map_fn, inputs, map_kw)
-  return map_fn(inputs, **map_kw)
+  Runs each fn in `fns` on a number of the input tiles.
+  :param inputs: Input values for folded mappers
+  :param fns: A list of dictionaries containing { 'fn', 'fn_kw', 'range' }
+  :param map_fn:
+  :param map_kw:
+  '''
+  results = []
+  for fn_info in fns:
+    st, ed = fn_info['range']
+    fn = fn_info['fn']
+    kw = fn_info['fn_kw']
+    result = fn(inputs[st:ed], **kw)
+    assert isinstance(result, np.ndarray), result
+    results.append(result)
+  
+  #util.log('%s %s %s', map_fn, results, map_kw)
+  return map_fn(results, **map_kw)
     
-def _take_first(x): return x[0]
+
+def _take_first(lst): 
+  return lst[0]
+
+def map_like(v):
+  return isinstance(v, (prims.Map, prims.NewArray, prims.Value))
 
 class FoldMapPass(OptimizePass):
+  '''Fold sequences of Map operations together.
+  
+  map(f, map(g, map(h, x))) -> map(f . g . h, x)
+  '''
+  
+  name = 'fold'
+   
   def visit_MapTiles(self, op):
     map_inputs = [self.visit(v) for v in op.inputs]
+    all_maps = np.all([map_like(v) for v in map_inputs])
     
-    all_maps = np.all([isinstance(v, (prims.Map, prims.NewArray, prims.Value)) 
-                       for v in map_inputs])
     if not all_maps:
       return super(FoldMapPass, self).visit_MapTiles(op)
     
-    # construct a mapper function which first evaluates inputs locally: [i_0... i_n]
     inputs = []
-    ranges = []
     fns = []
     for v in map_inputs:
       op_st = len(inputs)
-      if isinstance(v, (prims.Value, prims.NewArray, prims.MapExtents)):
-        inputs.append(v)
-        map_fn = _take_first
-        fn_kw = {}
-      else:
+      
+      if isinstance(v, prims.MapTiles):
         op_in = [self.visit(child) for child in v.inputs]
         inputs.extend(op_in)
         map_fn = v.map_fn
         fn_kw = v.fn_kw
+      else:
+        # evaluate these operations directly and use the result; we don't 
+        # avoid creating a new array for these operations.
+        inputs.append(v)
+        map_fn = _take_first
+        fn_kw = {}
       
       op_ed = len(inputs)
-      fns.append((map_fn, fn_kw)) 
-      ranges.append((op_st, op_ed))
+      fns.append( { 'fn' : map_fn, 'fn_kw' : fn_kw, 'range' : (op_st, op_ed) } ) 
     
     map_fn = op.map_fn
     map_kw = op.fn_kw
@@ -236,9 +267,96 @@ class FoldMapPass(OptimizePass):
     
     util.log('Created fold mapper with %d inputs', len(inputs))
     return prims.MapTiles(inputs=inputs, 
-                          map_fn = fold_mapper,
+                          map_fn = _fold_mapper,
                           fn_kw = { 'fns' : fns,
-                                    'ranges' : ranges,
                                     'map_fn' : map_fn,
                                     'map_kw' : map_kw })
   
+
+def _numexpr_mapper(inputs, var_map=None, expr=None):
+  gdict = {}
+  for k, v in var_map.iteritems():
+    gdict[k] = inputs[v]
+    
+  result = numexpr.evaluate(expr, global_dict = gdict)
+  return result
+
+
+_COUNTER = iter(xrange(1000000))
+def new_var():
+  return 'input_%d' % _COUNTER.next()
+    
+
+class FoldNumexprPass(OptimizePass):
+  '''Fold binary operations compatible with numexpr into a single numexpr operator.'''
+  name = 'numexpr'
+  
+  def visit_MapTiles(self, op):
+    map_inputs = [self.visit(v) for v in op.inputs]
+    all_maps = np.all([map_like(v) for v in map_inputs])
+    
+    if (not all_maps or 
+        len(map_inputs) > 2 or
+        op.map_fn != _apply_binary_op):
+      return super(FoldNumexprPass, self).visit_MapTiles(op)
+    
+    a, b = map_inputs
+    operation = op.fn_kw['binary_op']
+   
+    # mapping from variable name to input index 
+    var_map = {}
+    
+    # inputs to the expression
+    inputs = []
+    expr = []
+    
+    def _add_expr(child):
+      # fold expression from the a mapper into this one.
+      if isinstance(child, prims.MapTiles) and child.map_fn == _numexpr_mapper:
+        for k, v in child.fn_kw['var_map'].iteritems():
+          var_map[k] = len(inputs)
+          inputs.append(child.inputs[v])
+        expr.extend(['(' + child.fn_kw['expr'] + ')'])
+      else:
+        v = new_var()
+        var_map[v] = len(inputs)
+        inputs.append(child)
+        expr.append(v)
+    
+    _add_expr(a)
+    expr.append(BINARY_OPS[operation])
+    _add_expr(b)
+    
+    expr = ' '.join(expr)
+    
+    return prims.MapTiles(inputs=inputs,
+                          map_fn = _numexpr_mapper,
+                          fn_kw = { 
+                                    'expr' : expr,
+                                    'var_map' : var_map,
+                                  })
+
+def apply_pass(klass, dag):
+  if not getattr(flags, 'opt_' + klass.name):
+    util.log('Pass %s disabled', klass.name)
+    return dag
+  
+  p = klass()
+  return p.visit(dag)
+
+
+def compile(expr):
+  op_to_prim = OpToPrim()
+  return op_to_prim.compile_op(expr)
+
+
+def optimize(dag):
+  if not flags.optimization:
+    util.log('Optimizations disabled')
+    return dag
+  
+  print dag
+  dag = apply_pass(FoldNumexprPass, dag)
+  print dag
+  dag = apply_pass(FoldMapPass, dag)
+  return dag
