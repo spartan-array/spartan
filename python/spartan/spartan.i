@@ -1,5 +1,3 @@
-// Swig definitions for Sparrow 
-
 %module spartan_wrap
 
 %include <std_map.i>

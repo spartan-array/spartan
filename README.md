@@ -1,6 +1,6 @@
-## Sparrow
+## Spartan
 
-Sparrow is a distributed array engine, built on top of a Piccolo-style
+Spartan is a distributed array engine, built on top of a Piccolo-style
 key-value store.
 
 ### Installation
@@ -16,7 +16,7 @@ Dependencies:
 
 Fetch the source:
 
-    git clone https://github.com/rjpower/sparrow
+    git clone https://github.com/rjpower/spartan
     
 
 On Debian-based systems, dependencies can be installed via:
@@ -26,13 +26,13 @@ On Debian-based systems, dependencies can be installed via:
     
 Build:
 
-    cd sparrow
+    cd spartan
     autoreconf -fvi
     ./configure && make
 
 ### Running
 
-Sparrow compiles to a Python extension (sparrow.py + _sparrow.so).  These
+Spartan compiles to a Python extension (spartan.py + _spartan.so).  These
 should be on your PYTHONPATH for the remaining examples.
 
-export PYTHONPATH=$PYTHONPATH:/path/to/sparrow/build/
+export PYTHONPATH=$PYTHONPATH:/path/to/spartan/build/
