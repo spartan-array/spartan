@@ -134,7 +134,8 @@ class OpToPrim(object):
   def compile_ndarray(self, op, children):
     shape = op.kwargs['shape']
     dtype = op.kwargs['dtype']
-    return prims.NewArray(array_shape=shape, dtype=dtype)
+    tile_hint = op.kwargs['tile_hint']
+    return prims.NewArray(array_shape=shape, dtype=dtype, tile_hint=tile_hint)
     
   def compile_op(self, op):
     '''Convert a numpy expression tree in an Op tree.
@@ -355,8 +356,8 @@ def optimize(dag):
     util.log('Optimizations disabled')
     return dag
   
-  print dag
+  #print dag
   dag = apply_pass(FoldNumexprPass, dag)
-  print dag
+  #print dag
   dag = apply_pass(FoldMapPass, dag)
   return dag

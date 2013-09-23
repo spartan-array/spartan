@@ -8,7 +8,7 @@ into a series of primitive array operations.
 from node import node_type
 from prims import NotShapeable
 from spartan import util
-from spartan.array import extent
+from spartan.array import extent, distarray
 from spartan.util import Assert
 import numpy as np
 import spartan
@@ -87,6 +87,9 @@ Expr.__rdiv__ = Expr.__div__
 @node_type
 class LazyVal(Expr):
   _members = ['val']
+  
+  def __reduce__(self):
+    return self.evaluate().__reduce__()
 
 
 @node_type
@@ -116,9 +119,6 @@ def val(x):
 def outer(a, b):
   return Op(np.outer, (a, b))
 
-def dot(a, b):
-  return Op(np.dot, (a, b))
-
 def sum(x, axis=None):
   return Op(np.sum, (x,), kwargs={'axis' : axis })
 
@@ -145,7 +145,6 @@ def diagflat(v):
   return diag(ravel(v))
 
 Expr.outer = outer
-Expr.dot = dot
 Expr.sum = sum
 Expr.mean = mean
 Expr.astype = astype
@@ -154,12 +153,25 @@ Expr.diagflat = diagflat
 Expr.ravel = ravel
 Expr.argmin = argmin
 
-def _dot(inputs, ex, w):
-  t = inputs[0][ex.to_slice()]
-  out = extent.TileExtent(list(ex.ul[0:1]) + [0],
-                          list(ex.sz[0:1]) + [1],
-                          list(ex.array_shape[0:1]) + [1])
-  return out, t.dot(w)
+def _dot_mapper(inputs, ex_a, ex_b):
+  a = inputs[0].ensure(ex_a.to_slice())
+  
+  # fetch corresponding slice(s) of the other array
+  result = np.dot(a, b)
+  out = extent.TileExtent([ex1.lr[0], ex2.lr[1]],
+                          result.shape,
+                          (a.array_shape[0], b.array_shape[1]))
+  return out, result
+
+
+def dot(a, b):
+  av = a.evaluate()
+  bv = a.evaluate()
+  av, bv = distarray.broadcast(av, bv)
+  Assert.eq(a.shape[1], b.shape[0])
+ 
+  return Op('map_extents', (a,), kwargs={'map_fn' : _dot_mapper, 'fn_kw' : {} })
+            
 
 def map(v, fn, axis=None, **kw):
   if axis is None:
@@ -177,24 +189,27 @@ def map_tiles(v, fn, **kw):
   return Op('map_tiles', (v,), kwargs={'map_fn' : fn, 'fn_kw' : kw})
 
 
-def ndarray(shape, dtype=np.float):
-  return Op('ndarray', kwargs = { 'shape' : shape, 'dtype' : dtype })
+def ndarray(shape, dtype=np.float, tile_hint=None):
+  return Op('ndarray', kwargs = { 'shape' : shape, 'dtype' : dtype, 'tile_hint' : None })
 
 
-def rand(*shape):
-  return map_extents(ndarray(shape, dtype=np.float), 
+def rand(*shape, **kw):
+  '''
+  :param tile_hint: A tuple indicating the desired tile shape for this array.
+  '''
+  return map_extents(ndarray(shape, dtype=np.float, tile_hint=kw.get('tile_hint', None)), 
                      fn = lambda inputs, ex: (ex, np.random.rand(*ex.shape)))
   
-def randn(*shape):
-  return map_extents(ndarray(shape, dtype=np.float), 
+def randn(*shape, **kw):
+  return map_extents(ndarray(shape, dtype=np.float, tile_hint=kw.get('tile_hint', None)), 
                      fn = lambda inputs, ex: (ex, np.random.randn(*ex.shape)))
 
-def zeros(shape, dtype=np.float):
-  return map_extents(ndarray(shape, dtype=np.float), 
+def zeros(shape, dtype=np.float, tile_hint=None):
+  return map_extents(ndarray(shape, dtype=np.float, tile_hint=tile_hint), 
                      fn = lambda inputs, ex: (ex, np.zeros(ex.shape, dtype)))
 
-def ones(shape, dtype=np.float):
-  return map_extents(ndarray(shape, dtype=np.float), 
+def ones(shape, dtype=np.float, tile_hint=None):
+  return map_extents(ndarray(shape, dtype=np.float, tile_hint=tile_hint), 
                      fn = lambda inputs, ex: (ex, np.ones(ex.shape, dtype)))
 
 def _arange_mapper(inputs, ex):

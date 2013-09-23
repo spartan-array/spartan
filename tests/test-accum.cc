@@ -12,8 +12,10 @@ public:
       t->update(100 + i, i);
     }
   }
+
+  DECLARE_REGISTRY_HELPER(Kernel, AccumKernel);
 };
-REGISTER_KERNEL(AccumKernel);
+DEFINE_REGISTRY_HELPER(Kernel, AccumKernel);
 
 int main(int argc, char** argv) {
   Master *m = start_cluster();

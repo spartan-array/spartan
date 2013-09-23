@@ -6,7 +6,10 @@ from spartan.config import flags
 from spartan.util import FileWatchdog
 import sys
 
+
 if __name__ == '__main__':
+  sys.path.append('./tests')
+  
   import spartan
   config.add_flag('master', type=str)
   config.add_flag('port', type=int)

@@ -30,18 +30,18 @@ add_bool_flag('optimization', default=True)
 add_bool_flag('profile_kernels', default=False)
 add_flag('log_level', default=3, type=int)
 
-HOSTS = [ ('localhost', 8) ]
+#HOSTS = [ ('localhost', 8) ]
 
-#HOSTS = [
-#  ('localhost', 4),
-#  ('beaker-14', 8),
-#  ('beaker-15', 8),
-# # ('beaker-16', 8),
-#  ('beaker-17', 8),
-#  ('beaker-18', 8),
-#  ('beaker-19', 8),
-#  ('beaker-20', 8),
-#  ('beaker-21', 8),
-#  ('beaker-22', 8),
-#  ('beaker-23', 8),
-#]
+HOSTS = [
+  ('localhost', 4),
+  ('beaker-14', 8),
+  ('beaker-15', 8),
+ # ('beaker-16', 8),
+  ('beaker-17', 8),
+  ('beaker-18', 8),
+  ('beaker-19', 8),
+  ('beaker-20', 8),
+  ('beaker-21', 8),
+  ('beaker-22', 8),
+  ('beaker-23', 8),
+]

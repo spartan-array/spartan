@@ -51,8 +51,9 @@ def eval_MapExtents(ctx, prim, inputs):
 def eval_NewArray(ctx, prim, inputs):
   shape = prim.array_shape
   dtype = prim.dtype
+  tile_hint = prim.tile_hint
   
-  return distarray.create(ctx, shape, dtype)
+  return distarray.create(ctx, shape, dtype, tile_hint=tile_hint)
 
 def eval_Reduce(ctx, prim, inputs):
   input_array = inputs[0]

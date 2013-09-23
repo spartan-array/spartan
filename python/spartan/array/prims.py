@@ -57,12 +57,12 @@ class MapTiles(Map):
     
     Broadcasting results in a map taking the shape of the largest input.
     '''
-    shapes = [i._shape() for i in self.deps]
+    shapes = [i._shape() for i in self.dependencies()]
     output_shape = collections.defaultdict(int)
     for s in shapes:
       for i, v in enumerate(s):
         output_shape[i] = max(output_shape[i], v)
-    return tuple([output_shape[i] for i in len(output_shape)])
+    return tuple([output_shape[i] for i in range(len(output_shape))])
 
 
 @node_type
@@ -106,7 +106,7 @@ class Reduce(Primitive):
 
 @node_type
 class NewArray(Primitive):
-  _members = ['array_shape', 'dtype']
+  _members = ['array_shape', 'dtype', 'tile_hint']
   
   def dependencies(self):
     return []

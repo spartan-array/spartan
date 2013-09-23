@@ -81,28 +81,40 @@ class TileSelector(object):
   
 
 
-def compute_splits(shape):
+def compute_splits(shape, tile_hint=None):
   '''Split an array of shape ``shape`` into `Extent`s containing roughly `TILE_SIZE` elements.
-  
+ 
+  :param shape: tuple
+  :param tile_hint: tuple indicating the desired tile shape 
   :rtype: list of `Extent`
   '''
-    
-  if len(shape) == 0:
-    return [extent.TileExtent([], [], ())]
- 
-  weight = 1
-  splits = [None] * len(shape)
   
-  # split each dimension into tiles.  the first dimension
-  # is kept contiguous if possible.
-  for dim in reversed(range(len(shape))):
-    step = max(1, TILE_SIZE / weight)
-    dim_splits = []
-    for i in range(0, shape[dim], step):
-      dim_splits.append((i, min(shape[dim] - i,  step)))
-      
-    splits[dim] = dim_splits
-    weight *= shape[dim]
+  splits = [None] * len(shape)
+  if tile_hint is None:
+    # try to make reasonable tiles
+    if len(shape) == 0:
+      return [extent.TileExtent([], [], ())]
+   
+    weight = 1
+    
+    # split each dimension into tiles.  the first dimension
+    # is kept contiguous if possible.
+    for dim in reversed(range(len(shape))):
+      step = max(1, TILE_SIZE / weight)
+      dim_splits = []
+      for i in range(0, shape[dim], step):
+        dim_splits.append((i, min(shape[dim] - i,  step)))
+        
+      splits[dim] = dim_splits
+      weight *= shape[dim]
+  else:
+    Assert.eq(len(tile_hint), len(shape))
+    for dim in range(len(shape)):
+      step = tile_hint[dim]
+      Assert.le(step, shape[dim])
+      for i in range(0, shape[dim], step):
+        dim_splits.append((i, min(shape[dim] - i,  step)))
+      splits[dim] = dim_splits
  
   result = []
   for slc in itertools.product(*splits):
@@ -180,15 +192,15 @@ def create(master, shape,
            dtype=np.float, 
            sharder=spartan.ModSharder(),
            combiner=None,
-           reducer=accum_replace):
+           reducer=accum_replace,
+           tile_hint=None):
   
   dtype = np.dtype(dtype)
   shape = tuple(shape)
   total_elems = np.prod(shape)
-  extents = compute_splits(shape)
+  extents = compute_splits(shape, tile_hint)
   
-  util.log('Creating array of shape %s with %d tiles', 
-           shape, len(extents))
+  util.log('Creating array of shape %s with %d tiles', shape, len(extents))
 
   table = master.create_table(sharder, combiner, reducer, TileSelector())
   for ex in extents:
@@ -368,31 +380,30 @@ def broadcast(*args):
   if len(args) == 1:
     return args[0]
  
-  shapes = [x.shape for x in args]
-  dims = [len(shape) for shape in shapes]
+  orig_shapes = [list(x.shape) for x in args]
+  dims = [len(shape) for shape in orig_shapes]
   max_dim = max(dims)
-  new_shape = []
+  new_shapes = []
   
   # prepend filler dimensions for smaller arrays
-  for i in range(len(shapes)):
-    diff = max_dim - len(shapes[i])
-    shapes[i] = [1] * diff + shapes[i]
+  for i in range(len(orig_shapes)):
+    diff = max_dim - len(orig_shapes[i])
+    new_shapes.append([1] * diff + orig_shapes[i])
   
   # check shapes are valid; there should be at most one unique
   # shape.
   for axis in range(max_dim):
-    axis_shape = set(s[axis] for s in shapes)
-    Assert.le(axis_shape, 2, 'Mismatched shapes for broadcast: ' + shapes)
+    axis_shape = set(s[axis] for s in new_shapes)
+    assert len(axis_shape) <= 2, 'Mismatched shapes for broadcast: %s' % orig_shapes
     
+  # wrap arguments with missing dims in a Broadcast object.
   results = []
   for i in range(len(args)):
-    results.append(Broadcast(args[i], shapes[i]))
+    if new_shapes[i] == orig_shapes[i]:
+      results.append(args[i])
+    else:
+      results.append(Broadcast(args[i], new_shapes[i]))
     
   util.log('Broadcast result: %s', results)
   return results
-    
-      
-    
-    
-    
-  
+

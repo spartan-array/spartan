@@ -1,7 +1,7 @@
 AM_CXX = clang++
 AM_LD = clang++
 CXXFLAGS = -std=c++11\
- -O0\
+ -O2\
  -ggdb3\
  -Wall\
  -Wno-unused-result\
@@ -16,6 +16,7 @@ CPPFLAGS += \
   -I$(srcdir)/ \
   -I$(srcdir)/python \
   -I$(srcdir)/external/simple-rpc \
+  -I$(srcdir)/external/\
   -I/usr/include/python2.7
 
 SWIG_INCLUDES = \

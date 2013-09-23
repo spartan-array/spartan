@@ -40,6 +40,12 @@ class TileExtent(object):
 
 #    util.log('%s -> %s, %s -> %s', self.ul, ul, self.sz, sz)
     return TileExtent(ul, sz, shape)
+  
+  def __getitem__(self, idx):
+    return TileExtent([self.ul[idx]], [self.sz[idx]], [self.array_shape[idx]])
+
+  def add_dim(self):
+    return TileExtent(self.ul + (0,), self.sz + (1,), self.array_shape + (1,))
 
   def __hash__(self):
     return hash(self.ul) ^ hash(self.sz)

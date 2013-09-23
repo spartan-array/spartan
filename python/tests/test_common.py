@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 import types
+from os.path import basename, splitext
 
 config.add_flag('test_filter', default='')
 config.add_flag('num_workers', default=4, type=int)
@@ -61,7 +62,8 @@ def run_cluster_tests(filename):
   
   util.log('Rest: %s', argv)
   
-  module = imp.load_source('test_module', filename)
+  mod_name, _ = splitext(basename(filename))
+  module = imp.load_source(mod_name, filename)
   
   tests = [k for k in dir(module) if (
              k.startswith('test_') and 

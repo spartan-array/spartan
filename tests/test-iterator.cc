@@ -12,8 +12,9 @@ public:
       t->update(i, i);
     }
   }
+  DECLARE_REGISTRY_HELPER(Kernel, IterKernel);
 };
-REGISTER_KERNEL(IterKernel);
+DEFINE_REGISTRY_HELPER(Kernel, IterKernel);
 
 int main(int argc, char** argv) {
   Master* m = start_cluster();
