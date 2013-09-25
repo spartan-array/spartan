@@ -78,11 +78,11 @@ def _apply_binary_op(inputs, binary_op=None):
 class OpToPrim(object):
   def compile_index(self, op, children):
     src, idx = children
-    
+   
     # differentiate between slices (cheap) and index/boolean arrays (expensive)
-    if isinstance(idx, prims.Value) and\
-       (isinstance(idx.value, tuple) or 
-        isinstance(idx.value, slice)):
+    if (isinstance(idx, prims.Value) and
+       (isinstance(idx.value, tuple) or isinstance(idx.value, slice))
+       ):
       return prims.Slice(src, idx)
     else:
       return prims.Index(src, idx)
@@ -195,7 +195,7 @@ class OptimizePass(object):
     return prims.Index(self.visit(op.src), self.visit(op.idx))
   
   def visit_Slice(self, op):
-    return prims.Index(self.visit(op.src), self.visit(op.idx))
+    return prims.Slice(self.visit(op.src), self.visit(op.idx))
 
 
 
@@ -253,8 +253,9 @@ class FoldMapPass(OptimizePass):
         map_fn = v.map_fn
         fn_kw = v.fn_kw
       else:
-        # evaluate these operations directly and use the result; we don't 
-        # avoid creating a new array for these operations.
+        # evaluate these operations directly and use the result; 
+        # we can use the input of these operations, but can't
+        # avoid creating a new array.
         inputs.append(v)
         map_fn = _take_first
         fn_kw = {}

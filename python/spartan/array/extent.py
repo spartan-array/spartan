@@ -1,4 +1,5 @@
 from spartan import util
+from spartan.util import Assert
 import numpy as np
 
 class TileExtent(object):
@@ -93,9 +94,23 @@ class TileExtent(object):
       return np.prod(self.sz)
     return self.sz[axis]
   
+  
+
+def extents_for_region(extents, tile_extent):
+  '''
+  Return the extents that comprise ``tile_extent``.   
+  :param extents: 
+  :param tile_extent:
+  '''
+  Assert.isinstance(extents, set)
+  for ex in extents:
+    overlap = intersection(ex, tile_extent)
+    if overlap is not None:
+      yield (ex, overlap)
+      
 
 def compute_slice(base, idx):
-  '''Return a new extent corresponding to slicing this extent by `idx`.'''
+  '''Slice ``base`` by ``idx``, returning a new `TileExtent`.'''
   assert not np.isscalar(idx)
   if not isinstance(idx, tuple):
     idx = (idx,)
@@ -135,13 +150,17 @@ def offset_slice(base, other):
   :rtype: A slice representing the local offsets of ``other`` into this tile.
   '''
   return offset_from(base, other).to_slice()
-  #return tuple([slice(p, p + s, None) for (p, s) in zip(other.ul - self.ul, other.sz)])
+  # return tuple([slice(p, p + s, None) for (p, s) in zip(other.ul - self.ul, other.sz)])
   
 
 def from_slice(idx, shape):
-  if np.isscalar(idx):
-    idx = int(idx)
-    idx = slice(idx, idx + 1, None)
+  '''
+  Construct a `TileExtent` from a slice or tuple of slices.
+  
+  :param idx: int, slice, or tuple(slice...)
+  :param shape: shape of the input array
+  :rtype: `TileExtent` corresponding to ``idx``.
+  '''
   if not isinstance(idx, tuple):
     idx = (idx,)
   if len(idx) < len(shape):
@@ -150,10 +169,15 @@ def from_slice(idx, shape):
     
   ul = []
   sz = []
-  
+ 
   for i in range(len(shape)):
     dim = shape[i]
     slc = idx[i]
+    
+    if np.isscalar(slc):
+      slc = int(slc)
+      slc = slice(slc, slc + 1, None)
+    
     indices = slc.indices(dim)
     ul.append(indices[0])
     sz.append(indices[1] - indices[0])
@@ -169,8 +193,8 @@ def intersection(a, b):
   for i in range(len(a.lr)):
     if b.lr[i] < a.ul[i]: return None
     if a.lr[i] < b.ul[i]: return None
-  #if np.any(b.lr_array <= a.ul_array): return None
-  #if np.any(a.lr_array <= b.ul_array): return None
+  # if np.any(b.lr_array <= a.ul_array): return None
+  # if np.any(a.lr_array <= b.ul_array): return None
   return TileExtent(np.maximum(b.ul_array, a.ul_array),
                     np.minimum(b.lr_array, a.lr_array) - np.maximum(b.ul_array, a.ul_array),
                     a.array_shape)
@@ -179,6 +203,12 @@ TileExtent.intersection = intersection
 
 
 def shape_for_reduction(input_shape, axis):
+  '''
+  Return the shape for the result of applying a reduction along ``axis`` to 
+  an input of shape ``input_shape``.
+  :param input_shape:
+  :param axis:
+  '''
   if axis == None: return ()
   input_shape = list(input_shape)
   del input_shape[axis]
@@ -186,6 +216,11 @@ def shape_for_reduction(input_shape, axis):
 
 
 def shapes_match(offset, data):
+  '''
+  Return true if the shape of ``data`` matches the extent ``offset``. 
+  :param offset:
+  :param data:
+  '''
   return np.all(offset.sz == data.shape)
 
 def index_for_reduction(index, axis):

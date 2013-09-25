@@ -11,6 +11,11 @@ import itertools
 TILE_SIZE = 100000
 
 def find_shape(extents):
+  '''
+  Given a list of extents, return the shape of the array
+  necessary to fit all of them.
+  :param extents:
+  '''
   #util.log('Finding shape... %s', extents)
   return np.max([ex.lr for ex in extents], axis=0)
 
@@ -23,16 +28,6 @@ def get_data(data, index):
   if not data.shape:
     data = data.reshape((1,))
   return data[index]
-
-
-def extents_for_region(extents, tile_extent):
-  Assert.isinstance(extents, set)
-  for ex in extents:
-    intersection = extent.intersection(ex, tile_extent)
-    if intersection is not None:
-      yield (ex, intersection)
-      
-
   
 def find_matching_tile(array, tile_extent):
   for ex in array.extents():
@@ -262,7 +257,7 @@ class DistArray(object):
       ex, intersection = region, region
       return self.table.get(NestedSlice(ex, extent.offset_slice(ex, intersection)))
 
-    splits = list(extents_for_region(self.extents, region))
+    splits = list(extent.extents_for_region(self.extents, region))
     
     #util.log('Target shape: %s, %d splits', region.shape, len(splits))
     tgt = np.ndarray(region.shape)
@@ -284,7 +279,7 @@ class DistArray(object):
       self.table.update(region, tile.make_tile(region, data))
       return
     
-    splits = list(extents_for_region(self.extents, region))
+    splits = list(extent.extents_for_region(self.extents, region))
     for dst_key, intersection in splits:
       #util.log('%d %s %s %s', self.table.id(), region, dst_key, intersection)
       src_slice = extent.offset_slice(region, intersection)
@@ -310,6 +305,17 @@ class DistArray(object):
 
 
 def slice_mapper(ex, tile, **kw):
+  '''
+  Run when mapping over a slice.
+  Computes the intersection of the current tile and a global slice.
+  If the slice is non-zero, then run the user mapper function.
+  Otherwise, do nothing.
+  
+  :param ex:
+  :param tile: 
+  :param fn: User mapper function.
+  :param slice: `TileExtent` representing the slice of the input array.
+  '''
   fn = kw['fn']
   slice_extent = kw['slice']
   kernel = kw['kernel']

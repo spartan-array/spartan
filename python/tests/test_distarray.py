@@ -42,52 +42,6 @@ def test_distarray_random(master):
   distarray.randn(master, 200, 200)
   
 
-N_PTS = 10*10
-N_CENTERS = 10
-DIM = 5
-
-# An implementation of K-means by-hand.
-def min_dist(extent, tile, centers):
-  #util.log('%s %s', centers.shape, tile.shape)
-  dist = np.dot(centers, tile[:].T)
-  min_dist = np.argmin(dist, axis=0)
-#   util.log('%s %s', extent, dist.shape)
-  yield extent.drop_axis(1), min_dist
-
-def sum_centers(kernel, args):
-  min_idx_id, pts_id, new_centers_id = args
-  
-  min_idx = kernel.table(min_idx_id)
-  tgt = kernel.table(new_centers_id)
-  
-  c_pos = np.zeros((N_CENTERS, DIM))
-
-  for extent, tile in kernel.table(pts_id).iter(kernel.current_shard()):
-    idx = min_idx.get(extent.drop_axis(1))
-    for j in range(N_CENTERS):
-      c_pos[j] = np.sum(tile[idx == j], axis=0)
-     
-  tgt.update(0, c_pos)
-  
-  
-def test_kmeans(master):
-  util.log('Generating points.')
-  pts = distarray.rand(master, N_PTS, DIM)
-  centers = np.random.randn(N_CENTERS, DIM)
-  
-  util.log('Generating new centers.')
-  new_centers = master.create_table(sharder=ModSharder(), combiner=None, reducer=sum_accum, selector=None)
-  
-  util.log('Finding closest')
-  min_array = pts.map_to_array(lambda ex, tile: min_dist(ex, tile, centers))
-   
-  util.log('Updating clusters.')
-  master.foreach_shard(min_array.table, sum_centers,
-                       (min_array.id(), pts.table.id(), new_centers.id()))
-  
-  _, centers = spartan.fetch(new_centers)[0]
-  print centers
-  
 def test_ensure(master):
   local = np.arange(100 * 100, dtype=np.float).reshape((100, 100))
   dist = distarray.arange(master, ((100, 100)))

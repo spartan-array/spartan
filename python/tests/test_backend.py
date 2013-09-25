@@ -87,34 +87,5 @@ def test_compile_index(ctx):
   
   Assert.all_eq(val.glom(), nx[ny])
   
-def test_slice(ctx):
-  x = expr.arange((DIM, DIM))
-  z = x[5:8, 5:8]
-  zc = compile_expr.compile(z)
-  val = backend.evaluate(ctx, zc)
-  nx = np.arange(DIM*DIM).reshape(DIM, DIM)
-  
-  Assert.all_eq(val.glom(), nx[5:8, 5:8])
-  
-def _dot(ex, x, w):
-  return (ex[0].add_dim(), np.dot(x[ex], w))
-  
-def test_linear_regression(ctx):
-  N_EXAMPLES = 2 * 1000 * 1000 * ctx.num_workers()
-  N_DIM = 10
-  distarray.TILE_SIZE = N_EXAMPLES / (4 * ctx.num_workers()) 
-  x = expr.lazify(expr.rand(N_EXAMPLES, N_DIM, tile_hint=(10000, 10)).evaluate())
-  y = expr.lazify(expr.rand(N_EXAMPLES, 1, tile_hint=(10000, 1)).evaluate())
-  w = np.random.rand(N_DIM, 1)
-  
-  for i in range(10):
-    yp = expr.map_extents(x, lambda tiles, ex: _dot(ex, x, w))
-    Assert.all_eq(yp.shape, y.shape)
-    diff = x * (yp - y)
-    grad = expr.sum(diff, axis=0).glom().reshape((N_DIM, 1))
-    w = w - grad * 1e-6
-    util.log('Loop: %d', i)
-    util.log('Weights: %s', w)
-  
 if __name__ == '__main__':
   test_common.run_cluster_tests(__file__)

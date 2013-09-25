@@ -23,7 +23,7 @@ def eval_MapTiles(ctx, prim, inputs):
   util.log('Mapping over %d inputs; largest = %s', len(inputs), largest.shape)
   
   def mapper(ex, tile):
-    #util.log('%s : Running %s', threading.current_thread().getName(), map_fn)
+    util.log('MapTiles: %s', map_fn)
     slc = ex.to_slice()
     #util.log('Fetching %d inputs', len(inputs))
     local_values = [input[slc] for input in inputs]
@@ -41,6 +41,7 @@ def eval_MapExtents(ctx, prim, inputs):
   fn_kw = prim.fn_kw or {}
   
   def mapper(ex, tile):
+    #util.log('MapExtents: %s', map_fn)
     new_extent, result = map_fn(inputs, ex, **fn_kw)
     # util.log('MapExtents: %s, %s', ex, new_extent)
     return [(new_extent, Tile(new_extent, result))]
@@ -66,6 +67,7 @@ def eval_Reduce(ctx, prim, inputs):
   local_reducer = prim.local_reducer_fn
   
   def mapper(ex, tile):
+    util.log('Reduce: %s', local_reducer)
     reduced = local_reducer(ex, tile)
     dst_extent = extent.index_for_reduction(ex, axis)
     output_array.update(dst_extent, reduced)
@@ -86,7 +88,7 @@ def eval_Slice(ctx, prim, inputs):
   idx = inputs[1]
   
   slice_region = extent.from_slice(idx, src.shape)
-  matching_extents = dict(distarray.extents_for_region(src.extents, slice_region))
+  matching_extents = dict(extent.extents_for_region(src.extents, slice_region))
   
   #util.log('Taking slice: %s from %s', idx, src.shape)
   #util.log('Matching: %s', matching_extents)
@@ -116,6 +118,8 @@ def eval_Index(ctx, prim, inputs):
   dst = ctx.create_table()
   src = inputs[0]
   idx = inputs[1]
+  
+  Assert.eq(idx, (np.ndarray, distarray.DistArray))
   
   if idx.dtype == np.bool:
     dst = src.map_to_array(bool_index_mapper)

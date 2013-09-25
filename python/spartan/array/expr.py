@@ -48,7 +48,7 @@ class Expr(object):
     return Op(op=np.power, children=(self, other))
 
   def __getitem__(self, idx):
-    return Op('index', children=(self, idx))
+    return Op('index', children=(self, lazify(idx)))
 
   def __setitem__(self, k, val):
     raise Exception, '__setitem__ not supported.'
@@ -155,10 +155,11 @@ Expr.argmin = argmin
 
 def _dot_mapper(inputs, ex_a, ex_b):
   a = inputs[0].ensure(ex_a.to_slice())
+  b = inputs[1].ensure(ex_b.to_slice())
   
   # fetch corresponding slice(s) of the other array
   result = np.dot(a, b)
-  out = extent.TileExtent([ex1.lr[0], ex2.lr[1]],
+  out = extent.TileExtent([ex_a.lr[0], ex_b.lr[1]],
                           result.shape,
                           (a.array_shape[0], b.array_shape[1]))
   return out, result
@@ -170,7 +171,8 @@ def dot(a, b):
   av, bv = distarray.broadcast(av, bv)
   Assert.eq(a.shape[1], b.shape[0])
  
-  return Op('map_extents', (a,), kwargs={'map_fn' : _dot_mapper, 'fn_kw' : {} })
+  return Op('map_extents', (a,), 
+            kwargs={'map_fn' : _dot_mapper, 'fn_kw' : {} })
             
 
 def map(v, fn, axis=None, **kw):
