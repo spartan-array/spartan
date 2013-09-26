@@ -260,7 +260,7 @@ class DistArray(object):
     splits = list(extent.extents_for_region(self.extents, region))
     
     #util.log('Target shape: %s, %d splits', region.shape, len(splits))
-    tgt = np.ndarray(region.shape)
+    tgt = np.ndarray(region.shape, dtype=self.dtype)
     for ex, intersection in splits:
       dst_slice = extent.offset_slice(region, intersection)
       src_slice = self.table.get(NestedSlice(ex, extent.offset_slice(ex, intersection)))

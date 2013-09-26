@@ -58,10 +58,14 @@ class TileExtent(object):
     if global_pos is None:
       global_pos = self.ul
     
-    pos = 0
-    for i in range(len(self.array_shape) - 1):
-      pos += self.array_shape[i] * global_pos[i]
-    return pos + global_pos[-1]
+    rpos = 0
+    mul = 1
+    
+    for i in range(len(self.array_shape) - 1, -1, -1):
+      rpos += mul * global_pos[i]
+      mul *= self.array_shape[i]
+    
+    return rpos  
   
   def to_global(self, idx, axis):
     '''Convert ``idx`` from a local offset in this tile to a global offset.'''

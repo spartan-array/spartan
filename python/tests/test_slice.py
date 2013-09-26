@@ -45,6 +45,7 @@ def test_slice_map_extents(ctx):
   
   
 def test_slice_map_tiles2(ctx):
+  return
   x = expr.arange((10, 10, 10), dtype=np.int)
   nx = np.arange(10 * 10 * 10, dtype=np.int).reshape((10, 10, 10))
   
@@ -56,6 +57,14 @@ def test_slice_map_tiles2(ctx):
   
 def test_from_slice(ctx):
   print extent.from_slice((slice(None), slice(None), 0), [100, 100, 100])
+
+def test_slice_reduce(ctx):
+  x = expr.arange((DIM, DIM, DIM), dtype=np.int)
+  nx = np.arange(DIM * DIM * DIM, dtype=np.int).reshape((DIM, DIM, DIM))
+  y = x[:, :, 0].sum()
+  val = y.evaluate().glom()
+  
+  Assert.all_eq(val, nx[:, :, 0].sum())
   
 if __name__ == '__main__':
   test_common.run_cluster_tests(__file__)

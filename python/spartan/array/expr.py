@@ -214,12 +214,14 @@ def ones(shape, dtype=np.float, tile_hint=None):
   return map_extents(ndarray(shape, dtype=np.float, tile_hint=tile_hint), 
                      fn = lambda inputs, ex: (ex, np.ones(ex.shape, dtype)))
 
-def _arange_mapper(inputs, ex):
+def _arange_mapper(inputs, ex, dtype=None):
   pos = ex.ravelled_pos()
+  util.log('Extent: %s, pos: %s', ex, pos)
   sz = np.prod(ex.shape)
-  return (ex, np.arange(pos, pos+sz).reshape(ex.shape))
+  return (ex, np.arange(pos, pos+sz, dtype=dtype).reshape(ex.shape))
 
 def arange(shape, dtype=np.float):
-  return map_extents(ndarray(shape, dtype=np.float), 
-                     fn = _arange_mapper)
+  return map_extents(ndarray(shape, dtype=dtype), 
+                     fn = _arange_mapper,
+                     dtype=dtype)
 
