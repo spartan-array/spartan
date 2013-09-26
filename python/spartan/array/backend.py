@@ -66,9 +66,11 @@ def eval_Reduce(ctx, prim, inputs):
   output_array = distarray.create(ctx, shape, dtype, reducer=tile_accum)
   local_reducer = prim.local_reducer_fn
   
+  util.log('Reducing into array %d', output_array.table.id())
+  
   def mapper(ex, tile):
     util.log('Reduce: %s', local_reducer)
-    reduced = local_reducer(ex, tile)
+    reduced = local_reducer(ex, tile, axis)
     dst_extent = extent.index_for_reduction(ex, axis)
     output_array.update(dst_extent, reduced)
   
@@ -140,16 +142,13 @@ def eval_Index(ctx, prim, inputs):
 
 
 def _evaluate(ctx, prim):
-  print type(prim)
-  for v in prim.dependencies():
-    print 'DEP', type(v)
   inputs = [evaluate(ctx, v) for v in prim.dependencies()]
   #util.log('Evaluating: %s', prim.typename())
   return globals()['eval_' + prim.typename()](ctx, prim, inputs)    
     
 
 def evaluate(ctx, prim):
-  util.log('Evaluating: %s', prim)
+  #util.log('Evaluating: %s', prim)
   Assert.isinstance(prim, prims.Primitive) 
   if prim.cached_value is None:
     prim.cached_value = _evaluate(ctx, prim)

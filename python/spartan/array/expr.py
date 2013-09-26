@@ -185,7 +185,7 @@ def _sum_reducer(a, b):
 def sum(x, axis=None):
   return reduce_extents(x, axis=axis,
                        dtype_fn = lambda input: input.dtype,
-                       local_reducer_fn = lambda ex, tile: _sum_local(ex, tile, axis),
+                       local_reducer_fn = _sum_local,
                        combiner_fn = lambda a, b: a + b)
     
 
@@ -193,15 +193,15 @@ def _to_structured_array(**kw):
   '''Create a structured array from the given input arrays.'''
   out = np.ndarray(kw.values()[0].shape, 
                   dtype=','.join([a.dtype.str for a in kw.itervalues()]))
-  
+  out.dtype.names = kw.keys()
   for k, v in kw.iteritems():
     out[k] = v
   return out
 
 
-def _argmin_local(index, value, axis):
-  local_idx = value.argmin(axis)
-  local_min = value.min(axis)
+def _argmin_local(index, tile, axis):
+  local_idx = np.argmin(tile[:], axis)
+  local_min = np.min(tile[:], axis)
 
 #  util.log('Index for reduction: %s %s %s',
 #           index.array_shape,
@@ -216,19 +216,24 @@ def _argmin_local(index, value, axis):
 #   print index, value.shape, axis
 #   print local_idx.shape
   assert shapes_match(new_idx, new_value), (new_idx, new_value.shape)
-  return [(new_idx, new_value)]
+  return new_value
 
 def _argmin_reducer(a, b):
-  return np.where(a['min'] < b['min'], a, b)
+  reduced = np.where(a['min'] < b['min'], a, b)
+  return reduced
 
-def _take_idx_mapper(tile):
-  return tile['idx']
-  
+def _take_idx_mapper(inputs):
+  return inputs[0]['idx']
+ 
+def _argmin_dtype(input):
+  dtype = np.dtype('i8,%s' % input.dtype.str)
+  dtype.names = ('idx', 'min')
+  return dtype 
 
-def argmin(self, x, axis):
+def argmin(x, axis=None):
   x = x.evaluate()
   compute_min = reduce_extents(x, axis,
-                               dtype = lambda input: 'i8,%s' % input.dtype.str,
+                               dtype_fn = _argmin_dtype,
                                local_reducer_fn = _argmin_local,
                                combiner_fn = _argmin_reducer)
   
