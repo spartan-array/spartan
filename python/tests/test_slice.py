@@ -5,27 +5,27 @@ import math
 import numpy as np
 import test_common
 
-DIM = 100
-distarray.TILE_SIZE = DIM ** 2 / 4
+TEST_SIZE = 100
+distarray.TILE_SIZE = TEST_SIZE ** 2 / 4
 
 def test_slice_get(ctx):
-  x = expr.arange((DIM, DIM))
+  x = expr.arange((TEST_SIZE, TEST_SIZE))
   z = x[5:8, 5:8]
   zc = compile_expr.compile(z)
   val = backend.evaluate(ctx, zc)
-  nx = np.arange(DIM*DIM).reshape(DIM, DIM)
+  nx = np.arange(TEST_SIZE*TEST_SIZE).reshape(TEST_SIZE, TEST_SIZE)
   Assert.all_eq(val.glom(), nx[5:8, 5:8])
 
 def add_one_tile(tiles):
   return tiles[0] + 1
 
 def test_slice_map_tiles(ctx):
-  x = expr.arange((DIM, DIM))
+  x = expr.arange((TEST_SIZE, TEST_SIZE))
   z = x[5:8, 5:8]
   z = expr.map_tiles(z, add_one_tile) 
   zc = compile_expr.compile(z)
   val = backend.evaluate(ctx, zc)
-  nx = np.arange(DIM*DIM).reshape(DIM, DIM)
+  nx = np.arange(TEST_SIZE*TEST_SIZE).reshape(TEST_SIZE, TEST_SIZE)
   
   Assert.all_eq(val.glom(), nx[5:8, 5:8] + 1)
 
@@ -34,12 +34,12 @@ def add_one_extent(inputs, ex):
   return (ex, inputs[0][ex] + 1)
 
 def test_slice_map_extents(ctx):
-  x = expr.arange((DIM, DIM))
+  x = expr.arange((TEST_SIZE, TEST_SIZE))
   z = x[5:8, 5:8]
   z = expr.map_extents(z, add_one_extent) 
   zc = compile_expr.compile(z)
   val = backend.evaluate(ctx, zc)
-  nx = np.arange(DIM*DIM).reshape(DIM, DIM)
+  nx = np.arange(TEST_SIZE*TEST_SIZE).reshape(TEST_SIZE, TEST_SIZE)
   
   Assert.all_eq(val.glom(), nx[5:8, 5:8] + 1)
   
@@ -59,8 +59,8 @@ def test_from_slice(ctx):
   print extent.from_slice((slice(None), slice(None), 0), [100, 100, 100])
 
 def test_slice_reduce(ctx):
-  x = expr.arange((DIM, DIM, DIM), dtype=np.int)
-  nx = np.arange(DIM * DIM * DIM, dtype=np.int).reshape((DIM, DIM, DIM))
+  x = expr.arange((TEST_SIZE, TEST_SIZE, TEST_SIZE), dtype=np.int)
+  nx = np.arange(TEST_SIZE * TEST_SIZE * TEST_SIZE, dtype=np.int).reshape((TEST_SIZE, TEST_SIZE, TEST_SIZE))
   y = x[:, :, 0].sum()
   val = y.evaluate().glom()
   

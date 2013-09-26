@@ -105,6 +105,7 @@ def compute_splits(shape, tile_hint=None):
   else:
     Assert.eq(len(tile_hint), len(shape))
     for dim in range(len(shape)):
+      dim_splits = []
       step = tile_hint[dim]
       Assert.le(step, shape[dim])
       for i in range(0, shape[dim], step):

@@ -4,18 +4,17 @@ from spartan.util import Assert
 import numpy as np
 import test_common
 
-DIM = 1000
-distarray.TILE_SIZE = DIM ** 2 / 4
+TEST_SIZE = 1000
+
+N_EXAMPLES = 10 * TEST_SIZE
+N_DIM = 10
   
 def _dot(ex, x, w):
   return (ex[0].add_dim(), np.dot(x[ex], w))
   
 def test_linear_regression(ctx):
-  N_EXAMPLES = 2 * 1000 * 1000 * ctx.num_workers()
-  N_DIM = 10
-  distarray.TILE_SIZE = N_EXAMPLES / (4 * ctx.num_workers()) 
-  x = expr.lazify(expr.rand(N_EXAMPLES, N_DIM, tile_hint=(10000, 10)).evaluate())
-  y = expr.lazify(expr.rand(N_EXAMPLES, 1, tile_hint=(10000, 1)).evaluate())
+  x = expr.lazify(expr.rand(N_EXAMPLES, N_DIM, tile_hint=(N_EXAMPLES / 10, 10)).evaluate())
+  y = expr.lazify(expr.rand(N_EXAMPLES, 1, tile_hint=(N_EXAMPLES / 10, 1)).evaluate())
   w = np.random.rand(N_DIM, 1)
   
   for i in range(10):

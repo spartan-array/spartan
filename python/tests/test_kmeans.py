@@ -6,7 +6,7 @@ import test_common
 
 N_PTS = 10*10
 N_CENTERS = 10
-DIM = 5
+TEST_SIZE = 5
 
 distarray.TILE_SIZE = 10
 
@@ -24,7 +24,7 @@ def sum_centers(kernel, args):
   min_idx = kernel.table(min_idx_id)
   tgt = kernel.table(new_centers_id)
   
-  c_pos = np.zeros((N_CENTERS, DIM))
+  c_pos = np.zeros((N_CENTERS, TEST_SIZE))
 
   for extent, tile in kernel.table(pts_id).iter(kernel.current_shard()):
     idx = min_idx.get(extent.drop_axis(1))
@@ -36,8 +36,8 @@ def sum_centers(kernel, args):
   
 def test_kmeans(master):
   util.log('Generating points.')
-  pts = distarray.rand(master, N_PTS, DIM)
-  centers = np.random.randn(N_CENTERS, DIM)
+  pts = distarray.rand(master, N_PTS, TEST_SIZE)
+  centers = np.random.randn(N_CENTERS, TEST_SIZE)
   
   util.log('Generating new centers.')
   new_centers = master.create_table(sharder=ModSharder(), combiner=None, reducer=sum_accum, selector=None)

@@ -184,26 +184,51 @@ def map(v, fn, axis=None, **kw):
 
 
 def map_extents(v, fn, **kw):
+  '''
+  Evaluate ``fn`` over each extent of the input.
+  
+  ``fn`` should take (extent, [input_list], **kw)
+  :param v:
+  :param fn:
+  '''
   return Op('map_extents', (v,), kwargs={'map_fn' : fn, 'fn_kw' : kw})
 
 
 def map_tiles(v, fn, **kw):
+  '''
+  Evaluate ``fn`` over each tile of the input.
+  
+  ``fn`` should be of the form ([inputs], **kw).
+  :param v:
+  :param fn:
+  '''
   return Op('map_tiles', (v,), kwargs={'map_fn' : fn, 'fn_kw' : kw})
 
 
 def ndarray(shape, dtype=np.float, tile_hint=None):
-  return Op('ndarray', kwargs = { 'shape' : shape, 'dtype' : dtype, 'tile_hint' : None })
+  '''
+  Lazily create a new distribute array.
+  :param shape:
+  :param dtype:
+  :param tile_hint:
+  '''
+  return Op('ndarray', 
+            kwargs = { 'shape' : shape, 'dtype' : dtype, 'tile_hint' : tile_hint })
 
 
 def rand(*shape, **kw):
   '''
   :param tile_hint: A tuple indicating the desired tile shape for this array.
   '''
-  return map_extents(ndarray(shape, dtype=np.float, tile_hint=kw.get('tile_hint', None)), 
+  return map_extents(ndarray(shape, 
+                             dtype=np.float, 
+                             tile_hint=kw.get('tile_hint', None)), 
                      fn = lambda inputs, ex: (ex, np.random.rand(*ex.shape)))
   
 def randn(*shape, **kw):
-  return map_extents(ndarray(shape, dtype=np.float, tile_hint=kw.get('tile_hint', None)), 
+  return map_extents(ndarray(shape, 
+                             dtype=np.float, 
+                             tile_hint=kw.get('tile_hint', None)), 
                      fn = lambda inputs, ex: (ex, np.random.randn(*ex.shape)))
 
 def zeros(shape, dtype=np.float, tile_hint=None):
