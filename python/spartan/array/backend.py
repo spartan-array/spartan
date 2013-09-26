@@ -140,12 +140,16 @@ def eval_Index(ctx, prim, inputs):
 
 
 def _evaluate(ctx, prim):
+  print type(prim)
+  for v in prim.dependencies():
+    print 'DEP', type(v)
   inputs = [evaluate(ctx, v) for v in prim.dependencies()]
   #util.log('Evaluating: %s', prim.typename())
   return globals()['eval_' + prim.typename()](ctx, prim, inputs)    
     
 
 def evaluate(ctx, prim):
+  util.log('Evaluating: %s', prim)
   Assert.isinstance(prim, prims.Primitive) 
   if prim.cached_value is None:
     prim.cached_value = _evaluate(ctx, prim)

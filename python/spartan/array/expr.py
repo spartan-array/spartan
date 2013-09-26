@@ -5,29 +5,34 @@ and built into a control flow graph, which is then compiled
 into a series of primitive array operations.
 '''
 
-from node import node_type
 from prims import NotShapeable
+from .node import Node
 from spartan import util
 from spartan.array import extent, distarray
+from spartan.array.extent import index_for_reduction, shapes_match
 from spartan.util import Assert
 import numpy as np
 import spartan
 import types
 
+def _apply_binary_op(inputs, binary_op=None):
+  assert len(inputs) == 2
+  return binary_op(*inputs)
+
 class Expr(object):
   _dag = None
   
   def __add__(self, other):
-    return Op(op=np.add, children=(self, other), numexpr='+')
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.add)
 
   def __sub__(self, other):
-    return Op(op=np.subtract, children=(self, other), numexpr='-')
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.subtract)
 
   def __mul__(self, other):
-    return Op(op=np.multiply, children=(self, other), numexpr='*')
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.multiply)
 
   def __mod__(self, other):
-    return Op(op=np.mod, children=(self, other), numexpr='%')
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.mod)
 
   def __div__(self, other):
     return Op(op=np.divide, children=(self, other))
@@ -48,13 +53,16 @@ class Expr(object):
     return Op(op=np.power, children=(self, other))
 
   def __getitem__(self, idx):
-    return Op('index', children=(self, lazify(idx)))
+    return IndexExpr(src=self, idx=lazify(idx))
 
   def __setitem__(self, k, val):
     raise Exception, '__setitem__ not supported.'
   
   @property
   def shape(self):
+    if hasattr(self, '_shape'):
+      return self._shape
+    
     try:
       dag = self.dag()
       return dag.shape()
@@ -87,33 +95,79 @@ Expr.__radd__ = Expr.__add__
 Expr.__rmul__ = Expr.__mul__
 Expr.__rdiv__ = Expr.__div__
 
-@node_type
-class LazyVal(Expr):
+class LazyVal(Expr, Node):
   _members = ['val']
   
   def __reduce__(self):
     return self.evaluate().__reduce__()
 
+class IndexExpr(Expr, Node):
+  _members = ['src', 'idx']
 
-@node_type
 class Op(Expr):
-  _members = ['op', 'children', 'kwargs', 'numexpr']
-  
   def node_init(self):
-    if self.kwargs is None: self.kwargs = {}
     if self.children is None: self.children = tuple()
+    if isinstance(self.children, list): self.children = tuple(self.children)
+    if not isinstance(self.children, tuple): self.children = (self.children,)
     
-    Assert.isinstance(self.children, tuple)
-    
-    #util.log('%s', self.children)
     self.children = [lazify(c) for c in self.children]
+
+class ReduceExtentsExpr(Op, Node):
+  _members = ['children', 'axis', 'dtype_fn', 'local_reducer_fn', 'combiner_fn']
+ 
+class MapTilesExpr(Op, Node):
+  _members = ['children', 'map_fn', 'fn_kw']
+
+class MapExtentsExpr(Op, Node):
+  _members = ['children', 'map_fn', 'fn_kw']
+
+class NdArrayExpr(Expr, Node):
+  _members = ['_shape', 'dtype', 'tile_hint']
   
-  def _dtype(self):
-    return self.args[0].dtype
+def map_extents(v, fn, shape_hint=None, **kw):
+  '''
+  Evaluate ``fn`` over each extent of the input.
   
+  ``fn`` should take (extent, [input_list], **kw)
+  
+  :param v:
+  :param fn:
+  '''
+  return MapExtentsExpr(v, map_fn=fn, fn_kw=kw)
+
+
+def map_tiles(v, fn, **kw):
+  '''
+  Evaluate ``fn`` over each tile of the input.
+  
+  ``fn`` should be of the form ([inputs], **kw).
+  :param v:
+  :param fn:
+  '''
+  return MapTilesExpr(v, map_fn=fn, fn_kw=kw)
+
+
+def ndarray(shape, dtype=np.float, tile_hint=None):
+  '''
+  Lazily create a new distribute array.
+  :param shape:
+  :param dtype:
+  :param tile_hint:
+  '''
+  return NdArrayExpr(_shape = shape,
+                 dtype = dtype,
+                 tile_hint = tile_hint) 
+
+
+def reduce_extents(v, axis,
+                   dtype_fn,
+                   local_reducer_fn,
+                   combiner_fn):
+  return ReduceExtentsExpr(v, axis, dtype_fn, local_reducer_fn, combiner_fn)
 
 def lazify(val):
   if isinstance(val, Expr): return val
+  util.log('Lazifying... %s', val)
   return LazyVal(val)
 
 def val(x):
@@ -122,11 +176,65 @@ def val(x):
 def outer(a, b):
   return Op(np.outer, (a, b))
 
-def sum(x, axis=None):
-  return Op(np.sum, (x,), kwargs={'axis' : axis })
+def _sum_local(index, tile, axis):
+  return np.sum(tile[:], axis)
 
-def argmin(x, axis=None):
-  return Op(np.argmin, (x,), kwargs={'axis' : axis })
+def _sum_reducer(a, b):
+  return a + b
+
+def sum(x, axis=None):
+  return reduce_extents(x, axis=axis,
+                       dtype_fn = lambda input: input.dtype,
+                       local_reducer_fn = lambda ex, tile: _sum_local(ex, tile, axis),
+                       combiner_fn = lambda a, b: a + b)
+    
+
+def _to_structured_array(**kw):
+  '''Create a structured array from the given input arrays.'''
+  out = np.ndarray(kw.values()[0].shape, 
+                  dtype=','.join([a.dtype.str for a in kw.itervalues()]))
+  
+  for k, v in kw.iteritems():
+    out[k] = v
+  return out
+
+
+def _argmin_local(index, value, axis):
+  local_idx = value.argmin(axis)
+  local_min = value.min(axis)
+
+#  util.log('Index for reduction: %s %s %s',
+#           index.array_shape,
+#           axis,
+#           index_for_reduction(index, axis))
+
+  global_idx = index.to_global(local_idx, axis)
+
+  new_idx = index_for_reduction(index, axis)
+  new_value = _to_structured_array(idx=global_idx, min=local_min)
+
+#   print index, value.shape, axis
+#   print local_idx.shape
+  assert shapes_match(new_idx, new_value), (new_idx, new_value.shape)
+  return [(new_idx, new_value)]
+
+def _argmin_reducer(a, b):
+  return np.where(a['min'] < b['min'], a, b)
+
+def _take_idx_mapper(tile):
+  return tile['idx']
+  
+
+def argmin(self, x, axis):
+  x = x.evaluate()
+  compute_min = reduce_extents(x, axis,
+                               dtype = lambda input: 'i8,%s' % input.dtype.str,
+                               local_reducer_fn = _argmin_local,
+                               combiner_fn = _argmin_reducer)
+  
+  take_indices = map_tiles(compute_min, _take_idx_mapper)
+  return take_indices
+  
 
 def size(x, axis=None):
   return Op('size', (x,), kwargs={'axis' : axis })
@@ -155,6 +263,7 @@ Expr.diag = diag
 Expr.diagflat = diagflat
 Expr.ravel = ravel
 Expr.argmin = argmin
+
 
 def _dot_mapper(inputs, ex):
   ex_a = ex
@@ -195,41 +304,6 @@ def map(v, fn, axis=None, **kw):
   
   return Op('map', (v,), 
             kwargs = {'map_fn' : fn, 'fn_kw' : kw, 'axis' : axis})
-
-
-def map_extents(v, fn, shape_hint=None, **kw):
-  '''
-  Evaluate ``fn`` over each extent of the input.
-  
-  ``fn`` should take (extent, [input_list], **kw)
-  
-  :param v:
-  :param fn:
-  '''
-  return Op('map_extents', (v,), kwargs={'map_fn' : fn, 'fn_kw' : kw})
-
-
-def map_tiles(v, fn, **kw):
-  '''
-  Evaluate ``fn`` over each tile of the input.
-  
-  ``fn`` should be of the form ([inputs], **kw).
-  :param v:
-  :param fn:
-  '''
-  return Op('map_tiles', (v,), kwargs={'map_fn' : fn, 'fn_kw' : kw})
-
-
-def ndarray(shape, dtype=np.float, tile_hint=None):
-  '''
-  Lazily create a new distribute array.
-  :param shape:
-  :param dtype:
-  :param tile_hint:
-  '''
-  return Op('ndarray', 
-            kwargs = { 'shape' : shape, 'dtype' : dtype, 'tile_hint' : tile_hint })
-
 
 def rand(*shape, **kw):
   '''

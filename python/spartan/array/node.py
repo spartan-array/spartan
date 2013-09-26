@@ -13,25 +13,23 @@ _mro_cache = {}
 _reversed_mro_cache = {}
   
 def get_mro(klass):
-  class_name = klass.__name__ 
-  if class_name in _mro_cache:
-    return _mro_cache[class_name]
+  if klass in _mro_cache:
+    return _mro_cache[klass]
   else:
     mro = klass.mro()
     rev_mro = list(reversed(mro))
-    _mro_cache[class_name] = mro
-    _reversed_mro_cache[class_name] = rev_mro
+    _mro_cache[klass] = mro
+    _reversed_mro_cache[klass] = rev_mro
     return mro 
   
 def get_reverse_mro(klass):
-  class_name = klass.__name__
-  if class_name in _reversed_mro_cache:
-    return _reversed_mro_cache[class_name]
+  if klass in _reversed_mro_cache:
+    return _reversed_mro_cache[klass]
   else:
     mro = klass.mro()
     rev_mro = list(reversed(mro))
-    _mro_cache[class_name] = mro
-    _reversed_mro_cache[class_name] = rev_mro
+    _mro_cache[klass] = mro
+    _reversed_mro_cache[klass] = rev_mro
     return rev_mro 
   
 
@@ -64,7 +62,7 @@ def node_initializer(self, *args, **kw):
   # so add an extra check to avoid having to always
   # traverse the full class hierarchy 
   if hasattr(self, 'node_init'):
-    for C in _reversed_mro_cache[class_name]:
+    for C in _reversed_mro_cache[self.__class__]:
       if 'node_init' in C.__dict__:
         C.node_init(self)
 
@@ -73,9 +71,8 @@ def get_members(klass):
   """
   Walk through classes in mro order, accumulating member names.
   """
-  class_name = klass.__name__
-  if class_name  in _members_cache:
-    return _members_cache[class_name]
+  if klass  in _members_cache:
+    return _members_cache[klass]
   
   m = []
   for c in get_mro(klass):
@@ -83,7 +80,7 @@ def get_members(klass):
     for name in curr_members:
       if name not in m:
         m.append(name)  
-  _members_cache[class_name] = m
+  _members_cache[klass] = m
   return m
 
 
@@ -104,7 +101,7 @@ class Node(object):
       yield v 
   
   def items(self):
-    [(k,getattr(self,k)) for k in self.members()]
+    return [(k,getattr(self,k)) for k in self.members()]
 
 
   def __hash__(self):

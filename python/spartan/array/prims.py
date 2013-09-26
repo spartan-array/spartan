@@ -98,7 +98,7 @@ class Reduce(Primitive):
   _members = ['input', 'axis', 'dtype_fn', 'local_reducer_fn', 'combiner_fn']
     
   def dependencies(self):
-    return [self.input]
+    return self.input
   
   def _shape(self):
     return extent.shape_for_reduction(self.input._shape(), self.axis)

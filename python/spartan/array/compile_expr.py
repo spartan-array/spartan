@@ -31,53 +31,10 @@ BINARY_OPS = { np.add : '+',
                np.greater : '>', 
                np.greater_equal : '>=' }
 
-
-def _to_structured_array(**kw):
-  '''Create a structured array from the given input arrays.'''
-  out = np.ndarray(kw.values()[0].shape, 
-                  dtype=','.join([a.dtype.str for a in kw.itervalues()]))
-  
-  for k, v in kw.iteritems():
-    out[k] = v
-  return out
-
-
-
-def _argmin_local(index, value, axis):
-  local_idx = value.argmin(axis)
-  local_min = value.min(axis)
-
-#  util.log('Index for reduction: %s %s %s',
-#           index.array_shape,
-#           axis,
-#           index_for_reduction(index, axis))
-
-  global_idx = index.to_global(local_idx, axis)
-
-  new_idx = index_for_reduction(index, axis)
-  new_value = _to_structured_array(idx=global_idx, min=local_min)
-
-#   print index, value.shape, axis
-#   print local_idx.shape
-  assert shapes_match(new_idx, new_value), (new_idx, new_value.shape)
-  return [(new_idx, new_value)]
-
-def _argmin_reducer(a, b):
-  return np.where(a['min'] < b['min'], a, b)
-
-def _sum_local(index, tile, axis):
-  return np.sum(tile[:], axis)
-
-def _sum_reducer(a, b):
-  return a + b
-
-def _apply_binary_op(inputs, binary_op=None):
-  assert len(inputs) == 2
-  return binary_op(*inputs)
-
 class OpToPrim(object):
-  def compile_index(self, op, children):
-    src, idx = children
+  def compile_IndexExpr(self, op):
+    src = self.compile_op(op.src)
+    idx = self.compile_op(op.idx)
    
     # differentiate between slices (cheap) and index/boolean arrays (expensive)
     if (isinstance(idx, prims.Value) and
@@ -86,52 +43,35 @@ class OpToPrim(object):
       return prims.Slice(src, idx)
     else:
       return prims.Index(src, idx)
-  
-  def compile_sum(self, op, children):
-    axis = op.kwargs.get('axis', None)
-    return prims.Reduce(children[0],
-                        axis,
-                        dtype_fn = lambda input: input.dtype,
-                        local_reducer_fn = lambda ex, v: _sum_local(ex, v, axis),
-                        combiner_fn = lambda a, b: a + b)
     
-  
-  def compile_argmin(self, op, children):
-    axis = op.kwargs.get('axis', None)
-    compute_min = prims.Reduce(children[0],
-                               axis,
-                               dtype_fn = lambda input: 'i8,f8',
-                               local_reducer_fn = _argmin_local,
-                               combiner_fn = _argmin_reducer)
+  def compile_ReduceExtentsExpr(self, op):
+    children = [self.compile_op(c) for c in op.children]
     
-    def _take_idx_mapper(tile):
-      return tile['idx']
-    
-    take_indices = prims.MapTiles([compute_min], _take_idx_mapper, fn_kw = {})
-    
-    return take_indices
-  
-  
-  def compile_map_extents(self, op, children):
+    return prims.Reduce(children,
+                        axis=op.axis,
+                        dtype_fn = op.dtype_fn,
+                        local_reducer_fn = op.local_reducer_fn,
+                        combiner_fn = op.combiner_fn)
+                        
+  def compile_MapExtentsExpr(self, op):
+    children = [self.compile_op(c) for c in op.children]
     return prims.MapExtents(children,
-                            map_fn = op.kwargs['map_fn'],
-                            fn_kw = op.kwargs['fn_kw'])
+                            map_fn = op.map_fn,
+                            fn_kw = op.fn_kw)
                               
   
   
-  def compile_map_tiles(self, op, children):
-    Assert.eq(len(children), 1)
-    child = children[0]
-    return prims.MapTiles([child], 
-                          map_fn = op.kwargs['map_fn'],
-                          fn_kw = op.kwargs['fn_kw'])
+  def compile_MapTilesExpr(self, op):
+    children = [self.compile_op(c) for c in op.children]
+    return prims.MapTiles(children, 
+                          map_fn = op.map_fn,
+                          fn_kw = op.fn_kw)
    
     
-  def compile_ndarray(self, op, children):
-    shape = op.kwargs['shape']
-    dtype = op.kwargs['dtype']
-    tile_hint = op.kwargs['tile_hint']
-    return prims.NewArray(array_shape=shape, dtype=dtype, tile_hint=tile_hint)
+  def compile_NdArrayExpr(self, op):
+    return prims.NewArray(array_shape=op.shape, 
+                          dtype=op.dtype, 
+                          tile_hint=op.tile_hint)
     
   def compile_op(self, op):
     '''Convert a numpy expression tree in an Op tree.
@@ -140,20 +80,8 @@ class OpToPrim(object):
     '''
     if isinstance(op, expr.LazyVal):
       return prims.Value(op.val)
-    else:
-      children = [self.compile_op(c) for c in op.children]
     
-    if op.op in BINARY_OPS:
-      return prims.MapTiles(children, 
-                            _apply_binary_op, 
-                            fn_kw = { 'binary_op' : op.op })
-    
-    if isinstance(op.op, str):
-      op_key = op.op
-    else:
-      op_key = op.op.__name__
-    
-    return getattr(self, 'compile_' + op_key)(op, children)
+    return getattr(self, 'compile_' + op.node_type())(op)
 
 
 
