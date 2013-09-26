@@ -251,6 +251,7 @@ class DistArray(object):
     :param region: `Extent` indicating the region to fetch.
     '''
     Assert.isinstance(region, extent.TileExtent)
+    assert np.all(region.lr <= self.shape), (region, self.shape)
     
     # special case exact match against a tile 
     if region in self.extents:

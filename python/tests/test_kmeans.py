@@ -1,12 +1,12 @@
 from spartan import ModSharder, util, sum_accum
-from spartan.array import distarray
+from spartan.array import distarray, expr
 import numpy as np
 import spartan
 import test_common
 
 N_PTS = 10*10
 N_CENTERS = 10
-TEST_SIZE = 5
+N_DIM = 5
 
 distarray.TILE_SIZE = 10
 
@@ -24,7 +24,7 @@ def sum_centers(kernel, args):
   min_idx = kernel.table(min_idx_id)
   tgt = kernel.table(new_centers_id)
   
-  c_pos = np.zeros((N_CENTERS, TEST_SIZE))
+  c_pos = np.zeros((N_CENTERS, N_DIM))
 
   for extent, tile in kernel.table(pts_id).iter(kernel.current_shard()):
     idx = min_idx.get(extent.drop_axis(1))
@@ -34,10 +34,10 @@ def sum_centers(kernel, args):
   tgt.update(0, c_pos)
   
   
-def test_kmeans(master):
+def test_kmeans_manual(master):
   util.log('Generating points.')
-  pts = distarray.rand(master, N_PTS, TEST_SIZE)
-  centers = np.random.randn(N_CENTERS, TEST_SIZE)
+  pts = distarray.rand(master, N_PTS, N_DIM)
+  centers = np.random.randn(N_CENTERS, N_DIM)
   
   util.log('Generating new centers.')
   new_centers = master.create_table(sharder=ModSharder(), combiner=None, reducer=sum_accum, selector=None)
@@ -51,6 +51,11 @@ def test_kmeans(master):
   
   _, centers = spartan.fetch(new_centers)[0]
   print centers
+ 
+def test_kmeans_expr(ctx):
+  pts = expr.rand(N_PTS, N_DIM)
+  centers = expr.rand(N_CENTERS, N_DIM)
+   
   
 if __name__ == '__main__':
   test_common.run_cluster_tests(__file__)

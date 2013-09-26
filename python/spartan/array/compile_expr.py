@@ -87,8 +87,6 @@ class OpToPrim(object):
     else:
       return prims.Index(src, idx)
   
-  
-  
   def compile_sum(self, op, children):
     axis = op.kwargs.get('axis', None)
     return prims.Reduce(children[0],
@@ -115,9 +113,7 @@ class OpToPrim(object):
   
   
   def compile_map_extents(self, op, children):
-    Assert.eq(len(children), 1)
-    child = children[0]
-    return prims.MapExtents([child], 
+    return prims.MapExtents(children,
                             map_fn = op.kwargs['map_fn'],
                             fn_kw = op.kwargs['fn_kw'])
                               
@@ -186,7 +182,8 @@ class OptimizePass(object):
   
   def visit_NewArray(self, op):
     return prims.NewArray(array_shape = self.visit(op.shape()),
-                          dtype = self.visit(op.dtype))
+                          dtype = self.visit(op.dtype),
+                          tile_hint = op.tile_hint)
   
   def visit_Value(self, op):
     return prims.Value(op.value)

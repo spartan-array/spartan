@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from spartan import ModSharder(), replace_accum, fetch
+from spartan import ModSharder, replace_accum, fetch
 from spartan.util import Assert
 import sys
 import test_common

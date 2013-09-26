@@ -18,8 +18,10 @@ def test_linear_regression(ctx):
   w = np.random.rand(N_DIM, 1)
   
   for i in range(10):
-    yp = expr.map_extents(x, lambda tiles, ex: _dot(ex, x, w))
+    yp = expr.map_extents(x, lambda tiles, ex: _dot(ex, x, w),
+                          shape_hint=(y.shape))
     Assert.all_eq(yp.shape, y.shape)
+    
     diff = x * (yp - y)
     grad = expr.sum(diff, axis=0).glom().reshape((N_DIM, 1))
     w = w - grad * 1e-6

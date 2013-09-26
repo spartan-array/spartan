@@ -76,6 +76,9 @@ class Expr(object):
     return backend.evaluate(spartan.get_master(), self.dag())
   
   def glom(self):
+    '''
+    Evaluate this expression and return the result as a `numpy.ndarray`. 
+    '''
     return self.evaluate().glom()
     
 
@@ -153,15 +156,25 @@ Expr.diagflat = diagflat
 Expr.ravel = ravel
 Expr.argmin = argmin
 
-def _dot_mapper(inputs, ex_a, ex_b):
-  a = inputs[0].ensure(ex_a.to_slice())
-  b = inputs[1].ensure(ex_b.to_slice())
+def _dot_mapper(inputs, ex):
+  ex_a = ex
+  # read current tile of array 'a'
+  a = inputs[0].ensure(ex_a)
+
+  target_shape = (inputs[0].shape[1], inputs[1].shape[0])
   
-  # fetch corresponding slice(s) of the other array
+  # fetch corresponding column tile of array 'b'
+  # rows = ex_a.cols
+  # cols = *
+  ex_b = extent.TileExtent((ex_a.ul[1], 0),
+                           (ex_a.lr[1] - ex_a.ul[1], inputs[1].shape[1]),
+                           inputs[1].shape)
+  b = inputs[1].ensure(ex_b)
   result = np.dot(a, b)
-  out = extent.TileExtent([ex_a.lr[0], ex_b.lr[1]],
+  out = extent.TileExtent([ex_a.ul[0], 0],
                           result.shape,
-                          (a.array_shape[0], b.array_shape[1]))
+                          target_shape)
+  
   return out, result
 
 
@@ -171,8 +184,9 @@ def dot(a, b):
   av, bv = distarray.broadcast(av, bv)
   Assert.eq(a.shape[1], b.shape[0])
  
-  return Op('map_extents', (a,), 
-            kwargs={'map_fn' : _dot_mapper, 'fn_kw' : {} })
+  return Op('map_extents', (av, bv), 
+            kwargs={'map_fn' : _dot_mapper, 
+                    'fn_kw' : {} })
             
 
 def map(v, fn, axis=None, **kw):
@@ -183,11 +197,12 @@ def map(v, fn, axis=None, **kw):
             kwargs = {'map_fn' : fn, 'fn_kw' : kw, 'axis' : axis})
 
 
-def map_extents(v, fn, **kw):
+def map_extents(v, fn, shape_hint=None, **kw):
   '''
   Evaluate ``fn`` over each extent of the input.
   
   ``fn`` should take (extent, [input_list], **kw)
+  
   :param v:
   :param fn:
   '''
@@ -241,7 +256,7 @@ def ones(shape, dtype=np.float, tile_hint=None):
 
 def _arange_mapper(inputs, ex, dtype=None):
   pos = ex.ravelled_pos()
-  util.log('Extent: %s, pos: %s', ex, pos)
+  #util.log('Extent: %s, pos: %s', ex, pos)
   sz = np.prod(ex.shape)
   return (ex, np.arange(pos, pos+sz, dtype=dtype).reshape(ex.shape))
 

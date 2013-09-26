@@ -98,6 +98,9 @@ class TileExtent(object):
       return np.prod(self.sz)
     return self.sz[axis]
   
+  def clone(self):
+    return TileExtent(self.ul, self.sz, self.array_shape)
+  
   
 
 def extents_for_region(extents, tile_extent):

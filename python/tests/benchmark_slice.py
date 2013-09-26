@@ -5,7 +5,7 @@ import math
 import numpy as np
 import test_common
 
-TEST_SIZE = 1000
+TEST_SIZE = 10000
 def benchmark_slice_reduce(ctx):
   x = expr.arange((TEST_SIZE, TEST_SIZE))
   y = x[200:300]

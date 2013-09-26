@@ -66,7 +66,7 @@ def run_cluster_tests(filename):
   module = imp.load_source(mod_name, filename)
   
   tests = [k for k in dir(module) if (
-             k.startswith('test_') and 
+             (k.startswith('test_') or k.startswith('benchmark_')) and 
              isinstance(getattr(module, k), types.FunctionType))
           ]
   
