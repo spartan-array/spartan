@@ -1,13 +1,13 @@
-from spartan import util
+from spartan import util, flags
 from spartan.array import prims, compile_expr, backend, distarray, expr, extent
 from spartan.util import Assert
 import math
 import numpy as np
 import test_common
 
-TEST_SIZE = 10000
 def benchmark_slice_reduce(ctx):
-  x = expr.arange((TEST_SIZE, TEST_SIZE))
+  TEST_SIZE = 10000 * flags.num_workers
+  x = expr.arange((TEST_SIZE,10000))
   y = x[200:300]
   z = y.sum()
   zc = compile_expr.compile(z)

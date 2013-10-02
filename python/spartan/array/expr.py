@@ -35,22 +35,22 @@ class Expr(object):
     return map_tiles((self, other), _apply_binary_op, binary_op=np.mod)
 
   def __div__(self, other):
-    return Op(op=np.divide, children=(self, other))
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.divide)
 
   def __eq__(self, other):
-    return Op(op=np.equal, children=(self, other))
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.equal)
 
   def __ne__(self, other):
-    return Op(op=np.not_equal, children=(self, other))
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.not_equal)
 
   def __lt__(self, other):
-    return Op(op=np.less, children=(self, other))
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.less)
 
   def __gt__(self, other):
-    return Op(op=np.greater, children=(self, other))
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.greater)
 
   def __pow__(self, other):
-    return Op(op=np.power, children=(self, other))
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.power)
 
   def __getitem__(self, idx):
     return IndexExpr(src=self, idx=lazify(idx))
@@ -68,27 +68,46 @@ class Expr(object):
       return dag.shape()
     except NotShapeable:
       return self.evaluate().shape
-  
+    
   def dag(self):
-    if self._dag is not None:
-      return self._dag
-    
-    from . import compile_expr
-    dag = compile_expr.compile(self)
-    dag = compile_expr.optimize(dag)
-    self._dag = dag
-    return self._dag
-
-  def evaluate(self):
-    from . import backend
-    return backend.evaluate(spartan.get_master(), self.dag())
+    return dag(self)
   
+  def evaluate(self):
+    return evaluate(self) 
+
   def glom(self):
-    '''
-    Evaluate this expression and return the result as a `numpy.ndarray`. 
-    '''
-    return self.evaluate().glom()
+    return glom(self)
+
+def glom(node):    
+  '''
+  Evaluate this expression and return the result as a `numpy.ndarray`. 
+  '''
+  if isinstance(node, Expr):
+    node = evaluate(node)
+  
+  if isinstance(node, np.ndarray):
+    return node
+  
+  return node.glom()
+
+def dag(node):
+  if not isinstance(node, Expr):
+    raise TypeError
     
+  if node._dag is not None:
+    return node._dag
+  
+  from . import compile_expr
+  dag = compile_expr.compile(node)
+  dag = compile_expr.optimize(dag)
+  node._dag = dag
+  return node._dag
+
+  
+def evaluate(node):
+  from . import backend
+  return backend.evaluate(spartan.get_master(), node.dag())
+     
 
 Expr.__rsub__ = Expr.__sub__
 Expr.__radd__ = Expr.__add__
@@ -149,7 +168,7 @@ def map_tiles(v, fn, **kw):
 
 def ndarray(shape, dtype=np.float, tile_hint=None):
   '''
-  Lazily create a new distribute array.
+  Lazily create a new distributed array.
   :param shape:
   :param dtype:
   :param tile_hint:
