@@ -2,6 +2,7 @@ from . import util, wrap
 from spartan.config import flags
 from spartan.util import Assert
 from wrap import DEBUG, INFO, WARN, ERROR, FATAL, set_log_level
+import cPickle
 import cProfile
 import pstats
 import sys
@@ -135,11 +136,14 @@ class Kernel(object):
     return Table(None, 
                  wrap.get_table(self.handle, table_id))
   
+  def args(self):
+    return wrap.kernel_args(self.handle)
+  
   def current_shard(self):
-    return wrap.current_shard(self.handle)
+    return int(self.args()['shard'])
   
   def current_table(self):
-    return wrap.current_table(self.handle)
+    return int(self.args()['table'])
 
 
 class Worker(object):
@@ -152,17 +156,17 @@ class Worker(object):
 
 PROF = None
 
-def _bootstrap_kernel(handle, args):
+def _bootstrap_kernel(handle):
   kernel = Kernel(handle)
-  fn = args[0]
-  rest = args[1]
+  
+  fn, args = cPickle.loads(kernel.args()['map_args'])
   
   if not flags.profile_kernels:
-    return fn(kernel, rest)
+    return fn(kernel, args)
   
   p = cProfile.Profile()
   p.enable()  
-  result = fn(kernel, rest)
+  result = fn(kernel, args)
   p.disable()
   stats = pstats.Stats(p)
   global PROF
@@ -202,7 +206,8 @@ class Master(object):
   
   def foreach_shard(self, table, kernel, args):
     return wrap.foreach_shard(
-                          self.handle, table.handle, _bootstrap_kernel, (kernel, args))
+                          self.handle, table.handle, 
+                          _bootstrap_kernel, (kernel, args))
 
 
 def has_kw_args(fn):
