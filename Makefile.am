@@ -37,7 +37,6 @@ $(builddir)/spartan/spartan_service.h : $(srcdir)/spartan/spartan_service.rpc
 
 
 noinst_LTLIBRARIES = libspartan.la librpc.la 
-noinst_PROGRAMS = test-accum test-iterator
 lib_LTLIBRARIES = _spartan_wrap.la
 
 LDADD = libspartan.la librpc.la
@@ -65,5 +64,3 @@ _spartan_wrap_la_SOURCES =\
 	python/spartan/_spartan_wrap.cc \
     python/spartan/support.cc
 
-test_accum_SOURCES = tests/test-accum.cc
-test_iterator_SOURCES = tests/test-iterator.cc

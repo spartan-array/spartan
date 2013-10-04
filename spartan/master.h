@@ -200,8 +200,8 @@ public:
   template<class K, class V>
   TableT<K, V>* create_table(
       SharderT<K>* sharder = new Modulo<K>(),
-      AccumulatorT<V>* combiner = new Replace<V>(),
-      AccumulatorT<V>* reducer = new Replace<V>(),
+      AccumulatorT<K, V>* combiner = NULL,
+      AccumulatorT<K, V>* reducer = NULL,
       SelectorT<K, V>* selector = NULL) {
     wait_for_workers();
 

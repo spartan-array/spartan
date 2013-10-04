@@ -1,5 +1,6 @@
 from spartan import ModSharder, util, sum_accum
-from spartan.array import distarray, expr
+from spartan.dense import distarray
+from spartan.array import expr
 import numpy as np
 import spartan
 import test_common

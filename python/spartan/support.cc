@@ -218,12 +218,12 @@ public:
 };
 DEFINE_REGISTRY_HELPER(Sharder, PySharder);
 
-class PyAccum: public PyInitableT<AccumulatorT<RefPtr> > {
+class PyAccum: public PyInitableT<AccumulatorT<RefPtr, RefPtr> > {
 public:
-  void accumulate(RefPtr* v, const RefPtr& update) const {
+  void accumulate(const RefPtr& k, RefPtr* v, const RefPtr& update) const {
     GILHelper lock;
     RefPtr result =
-        to_ref(PyObject_CallFunction(code.get(), W("OO"), v->get(), update.get()));
+        to_ref(PyObject_CallFunction(code.get(), W("OOO"), k.get(), v->get(), update.get()));
     CHECK(result.get() != Py_None);
 
     *v = result;

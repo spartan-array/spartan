@@ -5,11 +5,11 @@ and built into a control flow graph, which is then compiled
 into a series of primitive array operations.
 '''
 
-from prims import NotShapeable
 from .node import Node
+from prims import NotShapeable
 from spartan import util
-from spartan.array import extent, distarray
-from spartan.array.extent import index_for_reduction, shapes_match
+from spartan.dense import extent, distarray
+from spartan.dense.extent import index_for_reduction, shapes_match
 from spartan.util import Assert
 import numpy as np
 import spartan
@@ -78,6 +78,30 @@ class Expr(object):
   def glom(self):
     return glom(self)
 
+
+Expr.__rsub__ = Expr.__sub__
+Expr.__radd__ = Expr.__add__
+Expr.__rmul__ = Expr.__mul__
+Expr.__rdiv__ = Expr.__div__
+
+
+class LazyVal(Expr, Node):
+  _members = ['val']
+  
+  def __reduce__(self):
+    return self.evaluate().__reduce__()
+
+
+def lazify(val):
+  if isinstance(val, Expr): return val
+  #util.log('Lazifying... %s', val)
+  return LazyVal(val)
+
+
+def val(x):
+  return lazify(x)
+
+
 def glom(node):    
   '''
   Evaluate this expression and return the result as a `numpy.ndarray`. 
@@ -89,6 +113,7 @@ def glom(node):
     return node
   
   return node.glom()
+
 
 def dag(node):
   if not isinstance(node, Expr):
@@ -105,23 +130,13 @@ def dag(node):
 
   
 def evaluate(node):
+  if isinstance(node, np.ndarray):
+    return node
+  
   from . import backend
   return backend.evaluate(spartan.get_master(), node.dag())
      
 
-Expr.__rsub__ = Expr.__sub__
-Expr.__radd__ = Expr.__add__
-Expr.__rmul__ = Expr.__mul__
-Expr.__rdiv__ = Expr.__div__
-
-class LazyVal(Expr, Node):
-  _members = ['val']
-  
-  def __reduce__(self):
-    return self.evaluate().__reduce__()
-
-class IndexExpr(Expr, Node):
-  _members = ['src', 'idx']
 
 class Op(Expr):
   def node_init(self):
@@ -130,6 +145,10 @@ class Op(Expr):
     if not isinstance(self.children, tuple): self.children = (self.children,)
     
     self.children = [lazify(c) for c in self.children]
+
+
+class IndexExpr(Expr, Node):
+  _members = ['src', 'idx']
 
 class ReduceExtentsExpr(Op, Node):
   _members = ['children', 'axis', 'dtype_fn', 'local_reducer_fn', 'combiner_fn']
@@ -140,9 +159,14 @@ class MapTilesExpr(Op, Node):
 class MapExtentsExpr(Op, Node):
   _members = ['children', 'map_fn', 'fn_kw']
 
+class OuterProductExpr(Op, Node):
+  _members = ['children', 'map_fn', 'map_fn_kw', 'reduce_fn', 'reduce_fn_kw']
+  
 class NdArrayExpr(Expr, Node):
   _members = ['_shape', 'dtype', 'tile_hint']
   
+
+
 def map_extents(v, fn, shape_hint=None, **kw):
   '''
   Evaluate ``fn`` over each extent of the input.
@@ -174,8 +198,8 @@ def ndarray(shape, dtype=np.float, tile_hint=None):
   :param tile_hint:
   '''
   return NdArrayExpr(_shape = shape,
-                 dtype = dtype,
-                 tile_hint = tile_hint) 
+                     dtype = dtype,
+                     tile_hint = tile_hint) 
 
 
 def reduce_extents(v, axis,
@@ -184,16 +208,12 @@ def reduce_extents(v, axis,
                    combiner_fn):
   return ReduceExtentsExpr(v, axis, dtype_fn, local_reducer_fn, combiner_fn)
 
-def lazify(val):
-  if isinstance(val, Expr): return val
-  util.log('Lazifying... %s', val)
-  return LazyVal(val)
 
-def val(x):
-  return lazify(x)
+def outer_product(a, b, map_fn, reducer_fn):
+  return OuterProductExpr(a, b, map_fn, reducer_fn)
 
 def outer(a, b):
-  return Op(np.outer, (a, b))
+  return OuterProductExpr(a, b, map_fn=np.dot, reducer_fn=np.add)
 
 def _sum_local(index, tile, axis):
   return np.sum(tile[:], axis)
@@ -260,31 +280,33 @@ def argmin(x, axis=None):
   return take_indices
   
 
-def size(x, axis=None):
-  return Op('size', (x,), kwargs={'axis' : axis })
+def size(x):
+  return np.prod(x.shape)
 
 def mean(x, axis=None):
-  return sum(x, axis) / size(x, axis)
+  return sum(x, axis) / x.shape[axis]
 
 def astype(x, dtype):
   assert x is not None
-  return Op('astype', (x,), kwargs={ 'dtype' : dtype })
+  return map_tiles(x, lambda inputs: inputs[0].astype(dtype))
 
+def _ravel_mapper(inputs, ex):
+  assert len(inputs) == 1
+  ul = extent.ravelled_pos(ex.ul, ex.array_shape)
+  lr = 1 + extent.ravelled_pos(ex.lr_array - 1, ex.array_shape)
+  shape = (np.prod(ex.array_shape),)
+  
+  ravelled_ex = extent.TileExtent((ul,), (lr - ul,), shape)
+  ravelled_data = inputs[0][ex].ravel()
+  return ravelled_ex, ravelled_data
+   
 def ravel(v):
-  return Op(np.ravel, (v,))
-
-def diag(v):
-  return Op(np.diag, (v,))
-
-def diagflat(v):
-  return diag(ravel(v))
+  return map_extents(v, _ravel_mapper)
 
 Expr.outer = outer
 Expr.sum = sum
 Expr.mean = mean
 Expr.astype = astype
-Expr.diag = diag
-Expr.diagflat = diagflat
 Expr.ravel = ravel
 Expr.argmin = argmin
 
@@ -310,24 +332,24 @@ def _dot_mapper(inputs, ex):
   
   return out, result
 
+def _dot_numpy(inputs, ex, numpy_data=None):
+  return (ex[0].add_dim(), np.dot(inputs[0][ex], numpy_data))
+  
 
 def dot(a, b):
-  av = a.evaluate()
-  bv = a.evaluate()
+  av = evaluate(a)
+  bv = evaluate(b)
+  
+  if isinstance(bv, np.ndarray):
+    return map_extents((av,), _dot_numpy, numpy_data=bv)
+  
   av, bv = distarray.broadcast(av, bv)
   Assert.eq(a.shape[1], b.shape[0])
- 
-  return Op('map_extents', (av, bv), 
-            kwargs={'map_fn' : _dot_mapper, 
-                    'fn_kw' : {} })
+  return map_extents((av, bv), _dot_mapper)
             
 
 def map(v, fn, axis=None, **kw):
-  if axis is None:
-    return map_tiles(v, fn, **kw)
-  
-  return Op('map', (v,), 
-            kwargs = {'map_fn' : fn, 'fn_kw' : kw, 'axis' : axis})
+  return map_tiles(v, fn, **kw)
 
 def rand(*shape, **kw):
   '''
@@ -352,11 +374,13 @@ def ones(shape, dtype=np.float, tile_hint=None):
   return map_extents(ndarray(shape, dtype=np.float, tile_hint=tile_hint), 
                      fn = lambda inputs, ex: (ex, np.ones(ex.shape, dtype)))
 
+
 def _arange_mapper(inputs, ex, dtype=None):
-  pos = ex.ravelled_pos()
+  pos = extent.ravelled_pos(ex.ul, ex.array_shape)
   #util.log('Extent: %s, pos: %s', ex, pos)
   sz = np.prod(ex.shape)
   return (ex, np.arange(pos, pos+sz, dtype=dtype).reshape(ex.shape))
+
 
 def arange(shape, dtype=np.float):
   return map_extents(ndarray(shape, dtype=dtype), 

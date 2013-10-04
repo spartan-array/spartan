@@ -10,6 +10,7 @@ import sys
 import time
 import types
 from os.path import basename, splitext
+import unittest
 
 config.add_flag('test_filter', default='')
 config.add_flag('num_workers', default=4, type=int)
@@ -85,6 +86,12 @@ def run_cluster_tests(filename):
   if flags.profile_kernels:
     spartan.api.PROF.dump_stats('kernel_prof.out')
   
+def declare_test(fn):
+  '''Function decorator: lift a top-level function into a TestCase'''
+  class TestCase(unittest.TestCase):
+    def test_fn(self):
+      fn()
+  return TestCase
 
 if __name__ == '__main__':
   raise Exception, 'Should not be run directly.'

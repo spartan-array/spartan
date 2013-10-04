@@ -70,15 +70,14 @@ class Sharder: public Initable {
 public:
 };
 
-template <class T>
+template <class K, class V>
 class AccumulatorT;
 
 class Accumulator: public Initable {
 public:
-
-  template <class V>
-  AccumulatorT<V>* cast() {
-    return (AccumulatorT<V>*)this;
+  template <class K, class V>
+  AccumulatorT<K, V>* cast() {
+    return (AccumulatorT<K, V>*)this;
   }
 };
 
@@ -86,12 +85,12 @@ class Selector: public Initable {
 public:
 };
 
-template<class T>
+template<class K, class V>
 class AccumulatorT: public Accumulator {
 public:
   virtual ~AccumulatorT() {
   }
-  virtual void accumulate(T* v, const T& update) const = 0;
+  virtual void accumulate(const K& key, V* v, const V& update) const = 0;
 };
 
 template<class T>
@@ -486,13 +485,13 @@ public:
 
     if (is_local_shard(shard_id)) {
       if (reducer != NULL) {
-        reducer->cast<V>()->accumulate(&i->second, v);
+        reducer->cast<K, V>()->accumulate(k, &i->second, v);
       } else {
         s.insert(k, v);
       }
     } else {
       if (combiner != NULL) {
-        combiner->cast<V>()->accumulate(&i->second, v);
+        combiner->cast<K, V>()->accumulate(k, &i->second, v);
       } else {
         s.insert(k, v);
       }

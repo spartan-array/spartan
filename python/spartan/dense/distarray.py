@@ -19,16 +19,6 @@ def find_shape(extents):
   #util.log('Finding shape... %s', extents)
   return np.max([ex.lr for ex in extents], axis=0)
 
-
-def get_data(data, index):
-  if isinstance(data, tuple):
-    return tuple([get_data(d, index) for d in data])
-  if not isinstance(data, np.ndarray):
-    data = np.array(data)
-  if not data.shape:
-    data = data.reshape((1,))
-  return data[index]
-  
 def find_matching_tile(array, tile_extent):
   for ex in array.extents():
     ul_diff = tile_extent.ul - ex.ul
@@ -65,9 +55,10 @@ class NestedSlice(object):
 
 class TileSelector(object):
   def __call__(self, k, v):
-    #util.log('Selector called for %s', k)
+    #util.log('Selector called for %s: %s', k, v)
     if isinstance(k, extent.TileExtent): 
       return v[:]
+    
     if isinstance(k, NestedSlice):
       result = v[k.subslice]
 #       print k.extent, k.subslice, result.shape
@@ -133,11 +124,11 @@ def _create_ones(extent, data):
 def _create_zeros(extent, data):
   data[:] = 0
 
-def _create_range(extent, data):
-  Assert.eq(extent.shape, data.shape)
-  pos = extent.ravelled_pos()
-  sz = np.prod(extent.shape)
-  data[:] = np.arange(pos, pos+sz).reshape(extent.shape)
+def _create_range(ex, data):
+  Assert.eq(ex.shape, data.shape)
+  pos = extent.ravelled_pos(ex.ul, ex.array_shape)
+  sz = np.prod(ex.shape)
+  data[:] = np.arange(pos, pos+sz).reshape(ex.shape)
   
 def randn(master, *shape):
   return create_with(master, shape, _create_randn)
@@ -200,7 +191,7 @@ def create(master, shape,
 
   table = master.create_table(sharder, combiner, reducer, TileSelector())
   for ex in extents:
-    ex_tile = tile.Tile(ex, data=None, dtype=dtype)
+    ex_tile = tile.from_shape(ex.shape, dtype=dtype)
     table.update(ex, ex_tile)
   
   return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
@@ -278,14 +269,14 @@ class DistArray(object):
     # exact match
     if region in self.extents:
       #util.log('EXACT: %d %s ', self.table.id(), region)
-      self.table.update(region, tile.make_tile(region, data))
+      self.table.update(region, tile.from_data(data))
       return
     
     splits = list(extent.extents_for_region(self.extents, region))
     for dst_key, intersection in splits:
       #util.log('%d %s %s %s', self.table.id(), region, dst_key, intersection)
       src_slice = extent.offset_slice(region, intersection)
-      update_tile = tile.make_tile(intersection, data[src_slice])
+      update_tile = tile.from_intersection(dst_key, intersection, data[src_slice])
       self.table.update(dst_key, update_tile)
     
   
@@ -301,9 +292,7 @@ class DistArray(object):
   
   def glom(self):
     util.log('Glomming: %s', self.shape)
-    ex = extent.TileExtent([0] * len(self.shape), self.shape, self.shape)
-    return self.ensure(ex)
-
+    return self[:]
 
 
 def slice_mapper(ex, tile, **kw):

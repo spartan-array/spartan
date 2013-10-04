@@ -5,11 +5,9 @@ operations supported by the backends (see `prims`).
 
 '''
 
-from . import expr, prims, distarray
+from . import expr, prims
 from .. import util
-from ..util import Assert
 from spartan.config import flags
-from .extent import index_for_reduction, shapes_match
 import numpy as np
 
 try:
@@ -284,6 +282,6 @@ def optimize(dag):
   
   #print dag
   dag = apply_pass(FoldNumexprPass, dag)
-  #print dag
   dag = apply_pass(FoldMapPass, dag)
+  print dag
   return dag

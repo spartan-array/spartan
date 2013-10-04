@@ -61,42 +61,6 @@ class Modulo: public SharderT<T> {
 };
 TMPL_DEFINE_REGISTRY_HELPER(Sharder, Modulo);
 
-template<class V>
-struct Min: public AccumulatorT<V> {
-  void accumulate(V* current, const V& update) const {
-    *current = std::min(*current, update);
-  }
-
-  DECLARE_REGISTRY_HELPER(Accumulator, Min);
-};
-TMPL_DEFINE_REGISTRY_HELPER(Accumulator, Min)
-
-template<class V>
-struct Max: public AccumulatorT<V> {
-  void accumulate(V* current, const V& update) const {
-    *current = std::max(*current, update);
-  }
-  DECLARE_REGISTRY_HELPER(Accumulator, Max);
-};
-TMPL_DEFINE_REGISTRY_HELPER(Accumulator, Max);
-
-template<class V>
-struct Sum: public AccumulatorT<V> {
-  void accumulate(V* current, const V& update) const {
-    *current += update;
-  }
-  DECLARE_REGISTRY_HELPER(Accumulator, Sum);
-};
-TMPL_DEFINE_REGISTRY_HELPER(Accumulator, Sum);
-
-template<class V>
-struct Replace: public AccumulatorT<V> {
-  void accumulate(V* current, const V& update) const {
-    *current = update;
-  }
-  DECLARE_REGISTRY_HELPER(Accumulator, Replace);
-};
-TMPL_DEFINE_REGISTRY_HELPER(Accumulator, Replace);
 
 }
  // namespace spartan

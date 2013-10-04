@@ -7,7 +7,12 @@ class TileExtent(object):
   def __init__(self, ul, sz, array_shape):
     self.ul = tuple(ul)
     self.sz = tuple(sz)
-    self.array_shape = tuple(array_shape)
+    
+    if array_shape is not None:
+      self.array_shape = tuple(array_shape)
+    else:
+      self.array_shape = None
+      
     self.shape = self.sz
     
     # cache some values as numpy arrays for faster access
@@ -54,18 +59,6 @@ class TileExtent(object):
   def __eq__(self, other):
     return np.all(self.ul_array == other.ul_array) and np.all(self.sz_array == other.sz_array)
 
-  def ravelled_pos(self, global_pos=None):
-    if global_pos is None:
-      global_pos = self.ul
-    
-    rpos = 0
-    mul = 1
-    
-    for i in range(len(self.array_shape) - 1, -1, -1):
-      rpos += mul * global_pos[i]
-      mul *= self.array_shape[i]
-    
-    return rpos  
   
   def to_global(self, idx, axis):
     '''Convert ``idx`` from a local offset in this tile to a global offset.'''
@@ -81,7 +74,7 @@ class TileExtent(object):
     
     unravelled = np.array(list(reversed(unravelled)))
     unravelled += self.ul
-    return self.ravelled_pos(unravelled)
+    return ravelled_pos(unravelled, self.array_shape)
 
   def start(self, axis):
     if axis is None:
@@ -102,6 +95,16 @@ class TileExtent(object):
     return TileExtent(self.ul, self.sz, self.array_shape)
   
   
+def ravelled_pos(idx, array_shape):
+  rpos = 0
+  mul = 1
+  
+  for i in range(len(array_shape) - 1, -1, -1):
+    rpos += mul * idx[i]
+    mul *= array_shape[i]
+  
+  return rpos  
+
 
 def extents_for_region(extents, tile_extent):
   '''

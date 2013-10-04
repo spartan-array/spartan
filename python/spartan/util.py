@@ -1,26 +1,17 @@
 #!/usr/bin/env python
 
-import atexit
-
+from . import wrap
 from contextlib import contextmanager
+from math import ceil
 from os.path import basename
-from threading import Thread
-import argparse
-import cProfile
+import cStringIO
 import collections
-
 import os
-import pstats
 import select
-import signal
 import sys
 import threading
 import time
 import traceback
-import cStringIO
-
-from . import wrap
-from .config import flags
 
 log_mutex = threading.RLock()
 def log(msg, *args, **kw):
@@ -248,3 +239,6 @@ def count_calls(fn):
 
 def join_tuple(tuple_a, tuple_b):
   return tuple(list(tuple_a) + list(tuple_b))
+
+def divup(a, b):
+  return int(ceil(float(a) / b))

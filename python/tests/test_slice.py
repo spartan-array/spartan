@@ -1,5 +1,6 @@
 from spartan import util
-from spartan.array import prims, compile_expr, backend, distarray, expr, extent
+from spartan.array import prims, compile_expr, backend, expr
+from spartan.dense import distarray, extent
 from spartan.util import Assert
 import math
 import numpy as np

@@ -1,7 +1,8 @@
 '''Primitives that backends must support.'''
 
-from . import distarray, extent
 from .node import node_type
+from spartan import util
+from spartan.dense import distarray, extent
 from spartan.util import Assert
 import collections
 import numpy as np
@@ -10,6 +11,7 @@ import numpy as np
 class NotShapeable(Exception):
   pass
 
+@node_type
 class Primitive(object):
   _members = []
   cached_value = None
@@ -26,6 +28,7 @@ class Primitive(object):
   def typename(self):
     return self.__class__.__name__
     
+
 @node_type
 class Value(Primitive):
   _members = ['value']
@@ -82,6 +85,7 @@ class Slice(Primitive):
   def _shape(self):
     return extent.shape_for_slice(self.input._shape(), self.slc)  
 
+
 @node_type
 class Index(Primitive):
   _members = ['src', 'idx']
@@ -103,6 +107,28 @@ class Reduce(Primitive):
   def _shape(self):
     return extent.shape_for_reduction(self.input._shape(), self.axis)
 
+
+@node_type
+class Stencil(Primitive):
+  _members = ['input', 'filters', 'stride']
+  
+  def dependencies(self):
+    return [self.input, self.filters]
+  
+  def _shape(self):
+    w,h = input.shape[:2]
+    return (util.divup(w, self.stride),
+            util.divup(h, self.stride)) + input.shape[2:]
+            
+@node_type
+class Outer(Primitive):
+  _members = ['a', 'b', 'map_fn', 'map_kw', 'reduce_fn', 'reduce_kw']
+  
+  def dependencies(self):
+    return [self.a, self.b]
+             
+  def _shape(self):
+    return (self.a.shape[0], self.b.shape[1]) 
 
 @node_type
 class NewArray(Primitive):

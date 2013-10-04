@@ -15,10 +15,10 @@ class ModSharder(Sharder):
   def __call__(self, k, num_shards):
     return hash(k) % num_shards
 
-def replace_accum(cur, update):
+def replace_accum(key, cur, update):
   return update
 
-def sum_accum(cur, update):
+def sum_accum(key, cur, update):
   return cur + update
 
 class Iter(object):
