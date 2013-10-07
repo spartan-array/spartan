@@ -176,10 +176,12 @@ void Master::wait_for_workers() {
     req.workers[w->id] = w->addr;
   }
 
+  rpc::FutureGroup g;
   for (auto w : workers_) {
     req.id = w->id;
-    w->proxy->initialize(req);
+    g.add(w->proxy->async_initialize(req));
   }
+  g.wait_all();
 
   initialized_ = true;
 }
@@ -189,10 +191,12 @@ Master::~Master() {
 }
 
 void Master::shutdown() {
+  rpc::FutureGroup g;
   for (auto w : workers_) {
     Log_debug("Shutting down %s:%d", w->addr.host.c_str(), w->addr.port);
-    w->proxy->shutdown();
+    g.add(w->proxy->async_shutdown());
   }
+  g.wait_all();
 
   workers_.clear();
 
@@ -261,9 +265,11 @@ void Master::send_table_assignments() {
     }
   }
 
+  rpc::FutureGroup g;
   for (auto w : workers_) {
-    w->proxy->assign_shards(req);
+    g.add(w->proxy->async_assign_shards(req));
   }
+  g.wait_all();
   Log_debug("Sent table assignments.");
 }
 
@@ -319,8 +325,10 @@ void Master::destroy_table(int table_id) {
 
   CHECK(tables_.find(table_id) != tables_.end());
   Log_debug("Destroying table %d", table_id);
+  rpc::FutureGroup g;
   for (auto w : workers_) {
-    w->proxy->destroy_table(table_id);
+    g.add(w->proxy->async_destroy_table(table_id));
+
     for (auto s = w->shards.begin(); s != w->shards.end(); ) {
       if (s->table == table_id) {
         s = w->shards.erase(s);
@@ -329,6 +337,8 @@ void Master::destroy_table(int table_id) {
       }
     }
   }
+
+  g.wait_all();
 
   Table* t = tables_[table_id];
   delete t;
@@ -402,15 +412,11 @@ void Master::wait_for_completion(Kernel* k) {
 
   // Force workers to flush outputs.
   flush();
-
-  // Force workers to apply flushed updates.
-  flush();
-
   Log_info("Kernel finished in %f", Now() - start);
-
 }
 
 void Master::flush() {
+  Timer t;
   // Flush any pending table updates
   for (auto i : tables_) {
     i.second->flush();
@@ -421,7 +427,9 @@ void Master::flush() {
     g.add(w->proxy->async_flush());
   }
 
-  //Log_info("Flushed...");
+  g.wait_all();
+
+  Log_info("Flush took %f seconds.", t.elapsed());
 }
 
 Master* start_master(int port, int num_workers) {

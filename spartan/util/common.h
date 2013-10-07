@@ -13,7 +13,9 @@ using rpc::Log;
 template<class T>
 T* connect(rpc::PollMgr* poller, std::string addr) {
   auto client = new rpc::Client(poller);
-  client->connect(addr.c_str());
+  if (client->connect(addr.c_str()) != 0) {
+    Log_fatal("Failed to connect to host: %s", addr.c_str());
+  }
   return new T(client);
 }
 

@@ -93,7 +93,8 @@ public:
 
   template<class K, class V>
   TableT<K, V>* create_table(SharderT<K>* sharder = new Modulo<K>(),
-      AccumulatorT<K, V>* combiner = NULL, AccumulatorT<K, V>* reducer = NULL,
+      AccumulatorT<K, V>* combiner = NULL,
+      AccumulatorT<K, V>* reducer = NULL,
       SelectorT<K, V>* selector = NULL) {
     wait_for_workers();
 
@@ -156,7 +157,6 @@ public:
       futures.add(worker_proxy(w)->async_create_table(req));
     }
     futures.wait_all();
-
     assign_shards(t);
     return t;
   }
