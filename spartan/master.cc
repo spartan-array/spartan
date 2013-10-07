@@ -155,7 +155,7 @@ Master::Master(int num_workers) {
   client_poller_ = new rpc::PollMgr;
   initialized_ = false;
   table_id_counter_ = 0;
-
+  server_ = NULL;
   TableContext::set_context(this);
 }
 
@@ -189,18 +189,15 @@ Master::~Master() {
 }
 
 void Master::shutdown() {
-  for (auto t : tables_) {
-    destroy_table(t.second);
-  }
-
-  CHECK(tables_.empty());
-
   for (auto w : workers_) {
+    Log_debug("Shutting down %s:%d", w->addr.host.c_str(), w->addr.port);
     w->proxy->shutdown();
   }
 
   workers_.clear();
-  tables_.clear();
+
+  delete server_;
+  server_ = NULL;
 }
 
 void Master::register_worker(const RegisterReq& req) {
@@ -436,6 +433,8 @@ Master* start_master(int port, int num_workers) {
   server->reg(master);
   auto hostname = rpc::get_host_name();
   server->start(StringPrintf("%s:%d", hostname.c_str(), port).c_str());
+
+  master->set_server(server);
   return master;
 }
 

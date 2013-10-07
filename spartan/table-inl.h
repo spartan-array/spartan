@@ -25,7 +25,7 @@ RemoteIterator<K, V>::RemoteIterator(Table *table, int shard,
 
 template<class K, class V>
 bool RemoteIterator<K, V>::done() {
-  return response_.done && index_ == response_.results.size();
+  return response_.done && index_ >= response_.results.size();
 }
 
 template<class K, class V>

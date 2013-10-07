@@ -46,17 +46,18 @@ public:
     return tables_.find(id)->second;
   }
 
-  void wait_for_shutdown() {
-    while (running_) {
-      Sleep(1);
-    }
+  void wait_for_shutdown();
+
+  void set_server(rpc::Server* s) {
+    server_ = s;
   }
 
 private:
+  rpc::CondVar running_cv_;
+  bool running_;
   rpc::Mutex lock_;
 
   int id_;
-  bool running_;
 
   ConfigData config_;
 
@@ -68,6 +69,7 @@ private:
   boost::unordered_map<uint32_t, TableIterator*> iterators_;
 
   TableMap tables_;
+  rpc::Server* server_;
 };
 
 }

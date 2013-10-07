@@ -22,6 +22,7 @@ Worker::Worker(rpc::PollMgr* poller) {
   current_iterator_id_ = 0;
   poller_ = poller;
   id_ = -1;
+  server_ = NULL;
 }
 
 Worker::~Worker() {
@@ -34,13 +35,15 @@ Worker::~Worker() {
   for (auto t : tables_) {
     delete t.second;
   }
+
+  delete server_;
 }
 
 void Worker::run_kernel(const RunKernelReq& kreq) {
   TableContext::set_context(this);
 
   CHECK(id_ != -1);
-  Log_info("WORKER %d: Running kernel: %d:%d on %d items",
+  Log_debug("WORKER %d: Running kernel: %d:%d on %d items",
       id_, kreq.table, kreq.shard, tables_[kreq.table]->shard(kreq.shard)->size());
   int owner = -1;
   owner = tables_[kreq.table]->worker_for_shard(kreq.shard);
@@ -151,11 +154,18 @@ void Worker::assign_shards(const ShardAssignmentReq& shard_req) {
 }
 
 void Worker::shutdown() {
+  Log_debug("Shutdown called...");
   for (auto t : tables_) {
     delete t.second;
   }
   tables_.clear();
+
+  delete server_;
+  server_ = NULL;
+
+  rpc::ScopedLock sl(lock_);
   running_ = false;
+  running_cv_.signal();
 }
 
 void Worker::destroy_table(const rpc::i32& id) {
@@ -181,6 +191,7 @@ void Worker::put(const TableData& req) {
 }
 
 void Worker::initialize(const WorkerInitReq& req) {
+  CHECK_NE(req.id, -1);
   id_ = req.id;
 
   Log_info("Initializing worker %d, with connections to %d peers.",
@@ -207,18 +218,32 @@ Worker* start_worker(const std::string& master_addr, int port) {
   req.addr.host = rpc::get_host_name();
   req.addr.port = port;
 
-  Log_info("Starting worker %d", port);
+  Log_info("Starting worker on port %d", port);
   rpc::Server* server = new rpc::Server(manager, threadpool);
   auto worker = new Worker(manager);
   server->reg(worker);
-  server->start(
-      StringPrintf("%s:%d", req.addr.host.c_str(), req.addr.port).c_str());
+  string hostport  = StringPrintf("%s:%d", req.addr.host.c_str(), req.addr.port);
+  CHECK_EQ(server->start(hostport.c_str()), 0);
 
   MasterProxy* master = connect<MasterProxy>(manager, master_addr);
-  Log_info("Registering worker %s:%d", rpc::get_host_name().c_str(), port);
+  Log_info("Registering worker (%d)", port);
   master->register_worker(req);
-  Log_info("Done.", port);
+  // Log_info("Done.", port);
+  delete master;
+
+  worker->set_server(server);
+
   return worker;
+}
+
+void Worker::wait_for_shutdown() {
+  if (!running_) {
+    return;
+  }
+
+  lock_.lock();
+  running_cv_.wait(&lock_);
+  Log_debug("Done waiting...");
 }
 
 } // end namespace

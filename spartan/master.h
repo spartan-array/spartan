@@ -173,8 +173,11 @@ public:
     return tables_.find(id)->second;
   }
 
-private:
+  void set_server(rpc::Server* s) {
+    server_ = s;
+  }
 
+private:
   void wait_for_completion(Kernel* k);
   void register_worker(const RegisterReq& req);
 
@@ -201,6 +204,8 @@ private:
 
   bool initialized_;
   int table_id_counter_;
+
+  rpc::Server* server_;
 };
 
 }
