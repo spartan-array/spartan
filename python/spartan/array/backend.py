@@ -60,7 +60,7 @@ def convolve(local_image, local_filters):
 
 
         
-def stencil_mapper(region, filters=None, image=None, target=None):
+def stencil_mapper(region, local, filters=None, image=None, target=None):
   local_filters = filters[:]
   local_image = image[region]
   
@@ -76,8 +76,11 @@ def stencil_mapper(region, filters=None, image=None, target=None):
       (region.ul[0], 0, region.ul[1], region.ul[2]),
       (region.sz[0], num_filt, region.sz[1], region.sz[2]),
       target.shape)
-      
-  target.update(target_region, convolve(local_image, local_filters))
+
+  result = convolve(local_image, local_filters)
+  
+  util.log('Updating: %s', target_region)
+  target.update(target_region, result)
    
  
 class Backend(object):
@@ -164,7 +167,7 @@ class Backend(object):
     src = inputs[0]
     idx = inputs[1]
     
-    Assert.eq(idx, (np.ndarray, distarray.DistArray))
+    Assert.isinstance(idx, (np.ndarray, distarray.DistArray))
     
     if idx.dtype == np.bool:
       dst = src.map_to_array(bool_index_mapper)
@@ -191,32 +194,13 @@ class Backend(object):
     num_img, w, h = image.shape
     num_filt, fw, fh = filters.shape
     
+    tile_size = util.divup(w, math.sqrt(ctx.num_workers())) 
+    
     dst = distarray.empty(ctx, (num_img, num_filt, w, h), image.dtype,
                           reducer=distarray.accum_sum,
-                          tile_hint=(divup(num_img, 4), num_filt, 64, 64))
+                          tile_hint=(num_img, num_filt, tile_size, tile_size))
                           
-    
-    #all_ex = extent.from_slice((slice(None, None, None),), dst.shape)
-    #dst.update(all_ex, np.zeros(dst.shape))
-    
-    num_splits = math.sqrt(ctx.num_workers())
-    region_strip = divup(w, num_splits)
-   
-    image.map_inplace(lambda k, v: stencil_mapper(k, filters, image, dst))
-    worklist = []
-    table_id = image.table.id()
-    for x in range(0, w, region_strip):
-      for y in range(0, h, region_strip):
-        rw = min(region_strip + fw, w - x)
-        rh = min(region_strip + fh, h - y)
-        ex = extent.TileExtent((0, x, y), 
-                               (image.shape[0], rw, rh),
-                               image.shape)
-        shard = distarray.best_locality(image, ex)
-        worklist.append((ex, (table_id, shard)))
-
-    util.log('Evaluating %d work items', len(worklist)) 
-    ctx.foreach_worklist(worklist, stencil_mapper)
+    image.map_inplace(lambda k, v: stencil_mapper(k, v, filters, image, dst))
     return dst
   
   def _evaluate(self, ctx, prim):

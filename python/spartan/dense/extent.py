@@ -54,7 +54,7 @@ class TileExtent(object):
     return TileExtent(self.ul + (0,), self.sz + (1,), self.array_shape + (1,))
 
   def __hash__(self):
-    return hash(self.ul) ^ hash(self.sz)
+    return hash(self.ul) #hash(self.ul[-2:])# 
   
   def __eq__(self, other):
     return np.all(self.ul_array == other.ul_array) and np.all(self.sz_array == other.sz_array)

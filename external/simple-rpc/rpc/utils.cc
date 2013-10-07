@@ -145,8 +145,14 @@ static const char* basename(const char* fpath) {
     return &fpath[idx];
 }
 
+static std::string hostname_;
+
 void Log::log_v(int level, int line, const char* file, const char* fmt, va_list args) {
     static char indicator[] = { 'F', 'E', 'W', 'I', 'D' };
+    if (hostname_.empty()) {
+      hostname_ = get_host_name();
+    }
+
     assert(level <= Log::DEBUG);
     if (level <= Log::level) {
         const char* filebase = basename(file);
@@ -165,6 +171,8 @@ void Log::log_v(int level, int line, const char* file, const char* fmt, va_list 
         if (filebase != nullptr) {
             fprintf(Log::fp, "<%s:%d> ", filebase, line);
         }
+
+        fprintf(Log::fp, "%s ", hostname_.c_str());
 
         fprintf(Log::fp, "%s.%03d| ", tm_str, tv.tv_usec / 1000);
         vfprintf(Log::fp, fmt, args);

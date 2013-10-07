@@ -1,6 +1,6 @@
 CXXFLAGS = -std=c++11\
- -O0\
- -ggdb3\
+ -O2\
+ -ggdb2\
  -Wall\
  -Wno-unused-result\
  -Wno-sign-compare\
