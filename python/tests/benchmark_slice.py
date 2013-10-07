@@ -1,8 +1,5 @@
 from spartan import util, flags
-from spartan.array import prims, compile_expr, backend, distarray, expr, extent
-from spartan.util import Assert
-import math
-import numpy as np
+from spartan.array import prims, compile_expr, backend, expr
 import test_common
 
 def benchmark_slice_reduce(ctx):

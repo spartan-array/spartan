@@ -26,6 +26,7 @@ class Iter(object):
   def __init__(self, handle):
     self.handle = handle
     self._val = None
+    
     if not wrap.iter_done(self.handle):
       self._val = (wrap.iter_key(self.handle), wrap.iter_value(self.handle)) 
     
@@ -38,6 +39,7 @@ class Iter(object):
     
     result = self._val
     self._val = None
+    
     wrap.iter_next(self.handle)
     if not wrap.iter_done(self.handle):
       self._val = (wrap.iter_key(self.handle), wrap.iter_value(self.handle))
@@ -127,6 +129,8 @@ class Table(object):
   def selector(self):
     return wrap.get_selector(self.handle)
   
+  def shard_for_key(self, k):
+    return wrap.shard_for_key(self.handle, k)
 
 class Kernel(object):
   def __init__(self, kernel_id):
@@ -208,6 +212,15 @@ class Master(object):
     return wrap.foreach_shard(
                           self.handle, table.handle, 
                           _bootstrap_kernel, (kernel, args))
+
+  def foreach_worklist(self, worklist, mapper):
+    mod_wl = []
+    for args, locality in worklist:
+      mod_wl.append(((mapper, args), locality))
+      
+    return wrap.foreach_worklist(self.handle, 
+                                 mod_wl,
+                                 _bootstrap_kernel)
 
 
 def has_kw_args(fn):

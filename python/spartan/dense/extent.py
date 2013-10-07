@@ -86,10 +86,15 @@ class TileExtent(object):
       return self.ravelled_pos(self.lr)
     return self.ul[axis] + self.sz[axis]
 
-  def size(self, axis):
-    if axis is None:
-      return np.prod(self.sz)
-    return self.sz[axis]
+  @property
+  def size(self):
+    mul = 1
+    res = 0
+    for s in reversed(self.sz):
+      res += mul * s
+      if s > 0: mul *= s
+    
+    return res
   
   def clone(self):
     return TileExtent(self.ul, self.sz, self.array_shape)
@@ -103,8 +108,7 @@ def ravelled_pos(idx, array_shape):
     rpos += mul * idx[i]
     mul *= array_shape[i]
   
-  return rpos  
-
+  return rpos
 
 def extents_for_region(extents, tile_extent):
   '''

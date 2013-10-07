@@ -42,6 +42,12 @@ class OpToPrim(object):
     else:
       return prims.Index(src, idx)
     
+  def compile_StencilExpr(self, op):
+    images = self.compile_op(op.images)
+    filters = self.compile_op(op.filters)
+    
+    return prims.Stencil(images, filters, op.stride)
+    
   def compile_ReduceExtentsExpr(self, op):
     children = [self.compile_op(c) for c in op.children]
     
@@ -119,6 +125,11 @@ class OptimizePass(object):
   
   def visit_Slice(self, op):
     return prims.Slice(self.visit(op.src), self.visit(op.idx))
+  
+  def visit_Stencil(self, op):
+    return prims.Stencil(self.visit(op.images),
+                         self.visit(op.filters),
+                         op.stride)
 
 
 

@@ -40,7 +40,7 @@ void Worker::run_kernel(const RunKernelReq& kreq) {
   TableContext::set_context(this);
 
   CHECK(id_ != -1);
-  Log_debug("WORKER %d: Running kernel: %d:%d on %d items",
+  Log_info("WORKER %d: Running kernel: %d:%d on %d items",
       id_, kreq.table, kreq.shard, tables_[kreq.table]->shard(kreq.shard)->size());
   int owner = -1;
   owner = tables_[kreq.table]->worker_for_shard(kreq.shard);
@@ -52,7 +52,7 @@ void Worker::run_kernel(const RunKernelReq& kreq) {
   }
 
   std::unique_ptr<Kernel> k(TypeRegistry<Kernel>::get_by_id(kreq.kernel));
-  k->init(this, kreq.table, kreq.shard, kreq.args);
+  k->init(this, kreq.args);
   k->run();
 
   Log_debug("WORKER: Finished kernel: %d:%d", kreq.table, kreq.shard);
@@ -195,7 +195,7 @@ void Worker::initialize(const WorkerInitReq& req) {
 
 Worker* start_worker(const std::string& master_addr, int port) {
   rpc::PollMgr* manager = new rpc::PollMgr;
-  rpc::ThreadPool* threadpool = new rpc::ThreadPool(8);
+  rpc::ThreadPool* threadpool = new rpc::ThreadPool(4);
 
   if (port == -1) {
     port = rpc::find_open_port();

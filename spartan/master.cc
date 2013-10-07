@@ -14,9 +14,144 @@ using namespace boost::tuples;
 
 namespace spartan {
 
+class WorkerState: private boost::noncopyable {
+public:
+  TaskMap pending;
+  TaskMap active;
+  TaskMap finished;
+
+  ShardSet shards;
+
+  int status;
+  int id;
+
+  double last_ping_time;
+  double total_runtime;
+
+  bool alive;
+
+  WorkerProxy *proxy;
+  HostPort addr;
+
+  mutable rpc::Mutex lock;
+
+  WorkerState(int w_id, HostPort addr) :
+      id(w_id) {
+    last_ping_time = Now();
+    total_runtime = 0;
+    alive = true;
+    status = 0;
+    proxy = NULL;
+    this->addr = addr;
+  }
+
+  bool is_assigned(ShardId id) {
+    rpc::ScopedLock sl(&lock);
+
+    return pending.find(id) != pending.end();
+  }
+
+  bool serves_shard(int shard) {
+    for (auto sid : shards) {
+      if (sid.shard == shard) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void ping() {
+    last_ping_time = Now();
+  }
+
+  double idle_time() {
+    return Now() - last_ping_time;
+  }
+
+  void assign_task(ShardId id, ArgMap args) {
+    rpc::ScopedLock sl(&lock);
+
+    TaskState state(id, 1, args);
+    pending.insert(make_pair(id, state));
+  }
+
+  void remove_task(ShardId id) {
+    rpc::ScopedLock sl(&lock);
+
+    pending.erase(pending.find(id));
+  }
+
+  void clear_tasks() {
+    rpc::ScopedLock sl(&lock);
+
+    CHECK(active.empty());
+    pending.clear();
+    active.clear();
+    finished.clear();
+  }
+
+  void set_finished(const ShardId& id) {
+    rpc::ScopedLock sl(&lock);
+
+    auto it = active.find(id);
+    finished.insert(*it);
+    active.erase(it);
+  }
+
+  std::string str() {
+    rpc::ScopedLock sl(&lock);
+
+    return StringPrintf("W(%d) p: %d; a: %d f: %d", id, pending.size(),
+        active.size(), finished.size());
+  }
+
+  int num_assigned() const {
+    rpc::ScopedLock sl(&lock);
+    return pending.size() + active.size() + finished.size();
+  }
+
+  int num_pending() const {
+    return pending.size();
+  }
+
+  // Order pending tasks by our guess of how large they are
+  bool get_next(RunKernelReq* msg) {
+    rpc::ScopedLock sl(&lock);
+
+    if (pending.empty()) {
+      return false;
+    }
+
+    if (!active.empty()) {
+      return false;
+    }
+
+    TaskState state = pending.begin()->second;
+    active.insert(make_pair(state.id, state));
+    pending.erase(pending.begin());
+
+    msg->table = state.id.table;
+    msg->shard = state.id.shard;
+
+    for (auto i : state.args) {
+      msg->args.insert(i);
+    }
+
+    return true;
+  }
+};
+
+WorkerProxy* worker_proxy(WorkerState* w) {
+  return w->proxy;
+}
+
+int worker_id(WorkerState* w) {
+  return w->id;
+}
+
+
 Master::Master(int num_workers) {
   num_workers_ = num_workers;
-  current_run_start_ = 0;
   client_poller_ = new rpc::PollMgr;
   initialized_ = false;
   table_id_counter_ = 0;
@@ -143,24 +278,18 @@ void Master::assign_shards(Table* t) {
   send_table_assignments();
 }
 
-void Master::assign_tasks(const RunDescriptor& r, vector<int> shards) {
-  for (auto w : workers_) {
-    w->clear_tasks();
-  }
-
-  Log_debug("Assigning workers for %d shards.", shards.size());
-  for (auto i : shards) {
-    int worker = r.table->shard_info(i)->owner;
-    workers_[worker]->assign_task(ShardId(r.table->id(), i));
-  }
-}
-
-int Master::dispatch_work(const RunDescriptor& r) {
+int Master::dispatch_work(Kernel* k) {
   int num_dispatched = 0;
   for (size_t i = 0; i < workers_.size(); ++i) {
     WorkerState* w = workers_[i];
     RunKernelReq w_req;
-    if (!w->get_next(r, &w_req)) {
+
+    // first setup kernel level arguments;
+    // task arguments will be filled in by get_next
+    w_req.args = k->args();
+    w_req.kernel = k->type_id();
+
+    if (!w->get_next(&w_req)) {
       continue;
     }
 
@@ -178,7 +307,7 @@ int Master::dispatch_work(const RunDescriptor& r) {
   return num_dispatched;
 }
 
-int Master::num_pending(const RunDescriptor& r) {
+int Master::num_pending() {
   int t = 0;
   for (auto w : workers_) {
     t += w->num_pending();
@@ -196,7 +325,7 @@ void Master::destroy_table(int table_id) {
   for (auto w : workers_) {
     w->proxy->destroy_table(table_id);
     for (auto s = w->shards.begin(); s != w->shards.end(); ) {
-      if (s->first == table_id) {
+      if (s->table == table_id) {
         s = w->shards.erase(s);
       } else {
         ++s;
@@ -209,25 +338,57 @@ void Master::destroy_table(int table_id) {
   tables_.erase(tables_.find(table_id));
 }
 
-void Master::run(RunDescriptor r) {
+void Master::map_worklist(WorkList worklist, Kernel* k) {
   wait_for_workers();
   flush();
 
-  Kernel::ScopedPtr k(TypeRegistry<Kernel>::get_by_id(r.kernel_id));
-  CHECK_NE(k.get(), (void*)NULL);
+  for (auto w : workers_) {
+    w->clear_tasks();
+  }
 
-  Log_info("Running: %d on %d", r.kernel_id, r.table->id());
+  for (auto i : worklist) {
+    auto t = tables_[i.locality.table];
+    int worker = t->shard_info(i.locality.shard)->owner;
+    workers_[worker]->assign_task(i.locality, i.args);
+  }
 
-  vector<int> shards = r.shards;
+  wait_for_completion(k);
+}
 
-  current_run_ = r;
-  current_run_start_ = Now();
+void Master::map_shards(Table* table, Kernel* k) {
+  wait_for_workers();
+  flush();
 
-  assign_tasks(current_run_, shards);
+  int kernel_id = k->type_id();
+  auto kernel_args = k->args();
 
-  dispatch_work(current_run_);
-  while (num_pending(r) > 0) {
-    dispatch_work(current_run_);
+  Kernel::ScopedPtr test_k(TypeRegistry<Kernel>::get_by_id(kernel_id));
+  CHECK_NE(test_k.get(), (void*)NULL);
+
+  Log_info("Running: kernel %d against table %d", kernel_id, table->id());
+
+  auto shards = range(0, table->num_shards());
+  for (auto w : workers_) {
+    w->clear_tasks();
+  }
+
+  Log_debug("Assigning workers for %d shards.", shards.size());
+  for (auto i : shards) {
+    int worker = table->shard_info(i)->owner;
+    ArgMap task_args;
+    task_args["shard"] = StringPrintf("%d", i);
+    task_args["table"] = StringPrintf("%d", table->id());
+    workers_[worker]->assign_task(ShardId(table->id(), i), task_args);
+  }
+
+  wait_for_completion(k);
+}
+
+void Master::wait_for_completion(Kernel* k) {
+  double start = Now();
+  dispatch_work(k);
+  while (num_pending() > 0) {
+    dispatch_work(k);
 //    Log_info("Dispatch loop: %d", running_kernels_.size());
     Sleep(0);
   }
@@ -248,8 +409,8 @@ void Master::run(RunDescriptor r) {
   // Force workers to apply flushed updates.
   flush();
 
-  Log_info("Kernel %d finished in %f", current_run_.kernel_id,
-      Now() - current_run_start_);
+  Log_info("Kernel finished in %f", Now() - start);
+
 }
 
 void Master::flush() {
@@ -268,7 +429,7 @@ void Master::flush() {
 
 Master* start_master(int port, int num_workers) {
   auto poller = new rpc::PollMgr;
-  auto tpool = new rpc::ThreadPool(8);
+  auto tpool = new rpc::ThreadPool(4);
   auto server = new rpc::Server(poller, tpool);
 
   auto master = new Master(num_workers);

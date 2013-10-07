@@ -5,7 +5,6 @@ Provides pretty printing, equality testing, hashing and keyword initialization.
 
 
 from itertools import izip
-from spartan import util
 import copy
 
 _members_cache = {}  

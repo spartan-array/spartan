@@ -1,7 +1,5 @@
-AM_CXX = clang++
-AM_LD = clang++
 CXXFLAGS = -std=c++11\
- -O2\
+ -O0\
  -ggdb3\
  -Wall\
  -Wno-unused-result\

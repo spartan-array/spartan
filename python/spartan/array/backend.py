@@ -3,8 +3,9 @@
 from . import prims
 from spartan import util
 from spartan.dense import distarray, extent, tile
-from spartan.util import join_tuple, Assert
+from spartan.util import join_tuple, Assert, divup
 import numpy as np
+import math
 
 def largest_value(vals):
   return sorted(vals, key=lambda v: np.prod(v.shape))[-1]
@@ -31,8 +32,54 @@ def bool_index_mapper(ex, tile, src, idx):
   local_val = src[slc]
   local_idx = idx[slc]
   return [(ex, local_val[local_idx])]
+
+
+try:
+  import parakeet
+  jit = parakeet.jit
+except:
+  def jit(fn):
+    return fn
   
-    
+def convolve(local_image, local_filters):
+  num_images, w, h = local_image.shape
+  num_filts, fw, fh = local_filters.shape
+
+  def _inner(args):
+    iid, fid, x, y = args
+    image = local_image[iid]
+    f = local_filters[fid]
+    out = 0
+    for i in xrange(fw):
+      for j in xrange(fh):
+        if x + i < w and y + j < h:
+          out += image[x + i, y + j] * f[i, j]                                                                                                                            
+    return out
+
+  return parakeet.imap(_inner, (num_images, num_filts, w, h))
+
+
+        
+def stencil_mapper(region, filters=None, image=None, target=None):
+  local_filters = filters[:]
+  local_image = image[region]
+  
+  num_img, w, h = image.shape
+  num_filt, fw, fh = filters.shape
+  
+  util.log('Stencil(%s), image: %s, filter: %s (%s, %s)',
+           region,
+           local_image.shape, local_filters.shape,
+           image.shape, filters.shape)
+  
+  target_region = extent.TileExtent(
+      (region.ul[0], 0, region.ul[1], region.ul[2]),
+      (region.sz[0], num_filt, region.sz[1], region.sz[2]),
+      target.shape)
+      
+  target.update(target_region, convolve(local_image, local_filters))
+   
+ 
 class Backend(object):
   def eval_Value(self, ctx, prim, inputs):
     return prim.value
@@ -135,6 +182,42 @@ class Backend(object):
       
       # map over it, replacing existing items.
       return dst.map_inplace(lambda k, v: int_index_mapper(k, v, src, idx, dst))
+    
+    
+  def eval_Stencil(self, ctx, prim, inputs):
+    image = inputs[0]
+    filters = inputs[1] 
+    
+    num_img, w, h = image.shape
+    num_filt, fw, fh = filters.shape
+    
+    dst = distarray.empty(ctx, (num_img, num_filt, w, h), image.dtype,
+                          reducer=distarray.accum_sum,
+                          tile_hint=(divup(num_img, 4), num_filt, 64, 64))
+                          
+    
+    #all_ex = extent.from_slice((slice(None, None, None),), dst.shape)
+    #dst.update(all_ex, np.zeros(dst.shape))
+    
+    num_splits = math.sqrt(ctx.num_workers())
+    region_strip = divup(w, num_splits)
+   
+    image.map_inplace(lambda k, v: stencil_mapper(k, filters, image, dst))
+    worklist = []
+    table_id = image.table.id()
+    for x in range(0, w, region_strip):
+      for y in range(0, h, region_strip):
+        rw = min(region_strip + fw, w - x)
+        rh = min(region_strip + fh, h - y)
+        ex = extent.TileExtent((0, x, y), 
+                               (image.shape[0], rw, rh),
+                               image.shape)
+        shard = distarray.best_locality(image, ex)
+        worklist.append((ex, (table_id, shard)))
+
+    util.log('Evaluating %d work items', len(worklist)) 
+    ctx.foreach_worklist(worklist, stencil_mapper)
+    return dst
   
   def _evaluate(self, ctx, prim):
     inputs = [self.evaluate(ctx, v) for v in prim.dependencies()]

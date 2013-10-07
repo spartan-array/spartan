@@ -6,6 +6,7 @@ from spartan import util
 from spartan.util import Assert
 import numpy as np
 import itertools
+import collections
 
 # number of elements per tile
 TILE_SIZE = 100000
@@ -98,7 +99,7 @@ def compute_splits(shape, tile_hint=None):
     for dim in range(len(shape)):
       dim_splits = []
       step = tile_hint[dim]
-      Assert.le(step, shape[dim])
+      #Assert.le(step, shape[dim])
       for i in range(0, shape[dim], step):
         dim_splits.append((i, min(shape[dim] - i,  step)))
       splits[dim] = dim_splits
@@ -139,6 +140,9 @@ def rand(master, *shape):
 def ones(master, shape):
   return create_with(master, shape, _create_ones)
 
+def zeros(master, shape):
+  return create_with(master, shape, _create_zeros)
+  
 def arange(master, shape):
   return create_with(master, shape, _create_range)
 
@@ -195,6 +199,8 @@ def create(master, shape,
     table.update(ex, ex_tile)
   
   return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
+
+empty = create
 
 def create_with(master, shape, init_fn):
   d = create(master, shape)
@@ -293,6 +299,23 @@ class DistArray(object):
   def glom(self):
     util.log('Glomming: %s', self.shape)
     return self[:]
+  
+  
+def best_locality(array, ex):
+  '''
+  Return the table shard with the best locality for extent `ex`.
+  :param table:
+  :param ex:
+  '''
+  splits = extent.extents_for_region(array.extents, ex)
+  counts = collections.defaultdict(int)
+  for key, overlap in splits:
+    shard = array.table.shard_for_key(key)
+    counts[shard] += overlap.size
+  
+  s_counts = sorted(counts.items(), key=lambda kv: kv[1])
+  return s_counts[-1][0]
+  
 
 
 def slice_mapper(ex, tile, **kw):
@@ -319,7 +342,7 @@ def slice_mapper(ex, tile, **kw):
   subtile = tile[subslice]
   
   return fn(intersection, subtile)
-  
+
 
 class Slice(object):
   def __init__(self, darray, idx):

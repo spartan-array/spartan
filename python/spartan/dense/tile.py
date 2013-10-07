@@ -67,11 +67,13 @@ def from_intersection(src, overlap, data):
   t = Tile()
   t.data = np.ndarray(src.shape)
   t.valid = np.zeros(src.shape, dtype=np.bool)
+  t.shape = src.shape
   t.dtype = data.dtype
   
   slc = extent.offset_slice(src, overlap)
   t.data[slc] = data
   t.valid[slc] = 1
+  return t
   
 
 class TileAccum(object):

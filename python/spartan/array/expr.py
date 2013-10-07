@@ -67,7 +67,7 @@ class Expr(object):
       dag = self.dag()
       return dag.shape()
     except NotShapeable:
-      return self.evaluate().shape
+      return evaluate(self).shape
     
   def dag(self):
     return dag(self)
@@ -165,6 +165,11 @@ class OuterProductExpr(Op, Node):
 class NdArrayExpr(Expr, Node):
   _members = ['_shape', 'dtype', 'tile_hint']
   
+class StencilExpr(Expr, Node):
+  _members = ['images', 'filters', 'stride']
+  
+def stencil(image, filters, stride=1):
+  return StencilExpr(image, filters, stride)
 
 
 def map_extents(v, fn, shape_hint=None, **kw):

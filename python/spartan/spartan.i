@@ -127,8 +127,8 @@ public:
 
     // cPickle is faster, but will fail when trying to serialize lambdas/closures
     // try it first and fall back to cloudpickle.
-    PyObject* py_str = PyObject_CallFunction(cpickle_dumps.get(), W("Oi"),
-        p.get(), -1);
+    PyObject* py_str = PyObject_CallFunction(
+        cpickle_dumps.get(), W("Oi"), p.get(), -1);
 
     if (py_str == NULL) {
       PyErr_Clear();
@@ -144,7 +144,7 @@ public:
     Py_DECREF(py_str);
 
     if (len > 1e6) {
-      Log_info("Large update: %d", len);
+      Log_info("Large value for pickle: %d", len);
       //abort();
     }
   }
@@ -299,6 +299,10 @@ void wait_for_workers(Master* m) {
   m->wait_for_workers();
 }
 
+int num_workers(Master* m) {
+  return m->num_workers();
+}
+
 Table* get_table(Kernel* k, int id) {
   return ((Kernel*) k)->get_table(id);
 }
@@ -344,31 +348,31 @@ void foreach_shard(Master*m, Table* t, PyObject* fn, PyObject* args) {
   m->map_shards(t, p);
 }
 
-void map_worklist(Master* m, PyObject* worklist, PyObject* fn) {
+void foreach_worklist(Master* m, PyObject* worklist, PyObject* fn) {
   auto p = new PyKernel();
   p->args()["map_fn"] = get_pickler().store(fn);
   
-  auto iter = to_ref(PyObject_GetIter(worklist));
-  
   WorkList w;
-  while (1) {
-    auto py_item = to_ref(PyIter_Next(iter.get()));
-    if (py_item.get() == NULL) {
-      break;
+  {
+    GILHelper h;
+    auto iter = to_ref(check(PyObject_GetIter(worklist)));
+    while (1) {
+      auto py_item = to_ref(PyIter_Next(iter.get()));
+      if (py_item.get() == NULL) {
+        break;
+      }
+      
+      PyObject* args = check(PyTuple_GetItem(py_item.get(), 0));
+
+      int table, shard;
+      PyObject* locality = check(PyTuple_GetItem(py_item.get(), 1));
+      check(PyArg_ParseTuple(locality, "ii", &table, &shard));
+      
+      WorkItem w_item;
+      w_item.args["map_args"] = get_pickler().store(args);
+      w_item.locality = ShardId(table, shard);
+      w.push_back(w_item);
     }
-    
-    char* data;
-    int len;
-    int table, shard;
-    
-    if (!check(PyArg_ParseTuple(py_item.get(), "s#ii", &data, &len, &table, &shard))) {
-      return;
-    }
-    
-    WorkItem w_item;
-    w_item.args["map_args"] = string(data, len);
-    w_item.locality = ShardId(table, shard);
-    w.push_back(w_item);
   }
   
   m->map_worklist(w, p);
@@ -425,6 +429,7 @@ void iter_next(TableIterator* i) {
 }
 
 PyObject* kernel_args(Kernel* k) {
+  GILHelper h;
   PyObject* out = PyDict_New();
   for (auto i : k->args()) {
     PyDict_SetItemString(out, i.first.c_str(),
@@ -468,6 +473,10 @@ PyObject* get_sharder(Table* t) {
 
 PyObject* get_selector(Table* t) {
   return get_code((PySelector*) t->selector);
+}
+
+int shard_for_key(Table* t, PyObject* key) {
+  return ((PyTable*)t)->shard_for_key(key);
 }
 
 int get_table_id(Table* t) {

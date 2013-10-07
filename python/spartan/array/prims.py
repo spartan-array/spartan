@@ -110,15 +110,16 @@ class Reduce(Primitive):
 
 @node_type
 class Stencil(Primitive):
-  _members = ['input', 'filters', 'stride']
+  _members = ['images', 'filters', 'stride']
   
   def dependencies(self):
-    return [self.input, self.filters]
+    return [self.images, self.filters]
   
   def _shape(self):
-    w,h = input.shape[:2]
-    return (util.divup(w, self.stride),
-            util.divup(h, self.stride)) + input.shape[2:]
+    w,h = self.images.shape()[:2]
+    return (w, h)
+    #return (util.divup(w, self.stride),
+    #        util.divup(h, self.stride)) + input.shape[2:]
             
 @node_type
 class Outer(Primitive):
