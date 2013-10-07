@@ -70,14 +70,14 @@ class Sharder: public Initable {
 public:
 };
 
-template <class K, class V>
+template<class K, class V>
 class AccumulatorT;
 
 class Accumulator: public Initable {
 public:
-  template <class K, class V>
+  template<class K, class V>
   AccumulatorT<K, V>* cast() {
-    return (AccumulatorT<K, V>*)this;
+    return (AccumulatorT<K, V>*) this;
   }
 };
 
@@ -478,24 +478,30 @@ public:
     typename ShardT<K, V>::iterator i = s.find(k);
 
     GRAB_LOCK;
-    if (i == s.end()) {
-      s.insert(k, v);
+    if (is_local_shard(shard_id)) {
+      if (i == s.end() || reducer == NULL) {
+        s.insert(k, v);
+      } else {
+        reducer->cast<K, V>()->accumulate(k, &i->second, v);
+      }
       return;
     }
 
-    if (is_local_shard(shard_id)) {
-      if (reducer != NULL) {
-        reducer->cast<K, V>()->accumulate(k, &i->second, v);
-      } else {
+    if (combiner != NULL) {
+      if (i == s.end()) {
         s.insert(k, v);
-      }
-    } else {
-      if (combiner != NULL) {
+      } else {
         combiner->cast<K, V>()->accumulate(k, &i->second, v);
-      } else {
-        s.insert(k, v);
       }
+      return;
     }
+
+    TableData put;
+    int shard = shard_for_key(k);
+    put.table = this->id();
+    put.shard = shard;
+    put.kv_data.push_back( { val::to_str(k), val::to_str(v) });
+    workers[worker_for_shard(shard)]->async_put(put);
   }
 
   bool _get(const K& k, V* v) {

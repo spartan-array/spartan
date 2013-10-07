@@ -170,8 +170,10 @@ void Worker::put(const TableData& req) {
   Table* t;
   {
     rpc::ScopedLock sl(lock_);
+    CHECK(tables_.find(req.table) != tables_.end());
     t = tables_[req.table];
   }
+
   for (auto p : req.kv_data) {
     t->update_str(p.key, p.value);
   }
