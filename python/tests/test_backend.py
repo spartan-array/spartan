@@ -89,4 +89,4 @@ def test_compile_index(ctx):
   Assert.all_eq(val.glom(), nx[ny])
   
 if __name__ == '__main__':
-  test_common.run_cluster_tests(__file__)
+  test_common.run(__file__)

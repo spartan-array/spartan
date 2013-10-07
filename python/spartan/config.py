@@ -28,6 +28,7 @@ add_bool_flag('opt_fold', default=True)
 add_bool_flag('opt_numexpr', default=True)
 add_bool_flag('optimization', default=True)
 add_bool_flag('profile_kernels', default=False)
+add_bool_flag('profile_master', default=False)
 add_flag('log_level', default=3, type=int)
 
 #HOSTS = [ ('localhost', 8) ]

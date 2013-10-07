@@ -96,9 +96,8 @@ class Backend(object):
     
     def mapper(ex, _):
       util.log('MapTiles: %s', map_fn)
-      slc = ex.to_slice()
       #util.log('Fetching %d inputs', len(inputs))
-      local_values = [input[slc] for input in inputs]
+      local_values = [input.fetch(ex) for input in inputs]
       #util.log('Mapping...')
       result = map_fn(local_values,  **fn_kw)
       #util.log('Done.')
@@ -135,13 +134,15 @@ class Backend(object):
     util.log('Reducing %s over axis %s', input_array.shape, prim.axis)
     shape = extent.shape_for_reduction(input_array.shape, prim.axis)
     tile_accum = tile.TileAccum(prim.combiner_fn)
-    output_array = distarray.create(ctx, shape, dtype, reducer=tile_accum)
+    output_array = distarray.create(ctx, shape, dtype,
+                                    combiner=tile_accum, 
+                                    reducer=tile_accum)
     local_reducer = prim.local_reducer_fn
     
     util.log('Reducing into array %d', output_array.table.id())
     
     def mapper(ex, tile):
-      util.log('Reduce: %s', local_reducer)
+      #util.log('Reduce: %s', local_reducer)
       reduced = local_reducer(ex, tile, axis)
       dst_extent = extent.index_for_reduction(ex, axis)
       output_array.update(dst_extent, reduced)
@@ -154,13 +155,17 @@ class Backend(object):
     src = inputs[0]
     idx = inputs[1]
     
+    return distarray.Slice(src, idx)
+    
     slice_region = extent.from_slice(idx, src.shape)
     matching_extents = dict(extent.extents_for_region(src.extents, slice_region))
     
-    #util.log('Taking slice: %s from %s', idx, src.shape)
+    util.log('Taking slice: %s from %s', idx, src.shape)
     #util.log('Matching: %s', matching_extents)
-    
-    return src.map_to_array(lambda k, v: slice_mapper(k, v, slice_region, matching_extents))
+    result = src.map_to_array(lambda k, v: 
+                              slice_mapper(k, v, slice_region, matching_extents))
+    util.log('Done.')
+    return result
   
   def eval_Index(self, ctx, prim, inputs):
     dst = ctx.create_table()

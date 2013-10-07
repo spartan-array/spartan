@@ -10,6 +10,8 @@ import sys
 def _start_worker(master, port):
   worker = spartan.start_worker(master, port)
   worker.wait_for_shutdown()
+  
+  #util.log('Shutting down worker... %s:%d' % (socket.gethostname(), port))
 
 if __name__ == '__main__':
   sys.path.append('./tests')

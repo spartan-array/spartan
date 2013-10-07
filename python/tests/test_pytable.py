@@ -45,4 +45,4 @@ def test_copy(master):
   Assert.eq(sorted(src_v), sorted(dst_v))
 
 if __name__ == '__main__':
-  test_common.run_cluster_tests(sys.modules['__main__'].__file__)
+  test_common.run(sys.modules['__main__'].__file__)

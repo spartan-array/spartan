@@ -14,4 +14,4 @@ def test_ravel(ctx):
   Assert.all_eq(n.ravel(), x.ravel())
   
 if __name__ == '__main__':
-  test_common.run_cluster_tests(__file__)
+  test_common.run(__file__)

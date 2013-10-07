@@ -25,4 +25,4 @@ def test_linear_regression(ctx):
     util.log('Weights: %s', w)
   
 if __name__ == '__main__':
-  test_common.run_cluster_tests(__file__)
+  test_common.run(__file__)

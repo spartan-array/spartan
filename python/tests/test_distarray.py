@@ -42,7 +42,7 @@ def test_distarray_random(ctx):
   distarray.randn(ctx, 200, 200)
   
 
-def test_ensure(ctx):
+def test_fetch(ctx):
   N = 30
   local = np.arange(N * N, dtype=np.float).reshape((N, N))
   dist = distarray.arange(ctx, ((N, N)))
@@ -65,4 +65,4 @@ def test_locality(ctx):
   
 
 if __name__ == '__main__':
-  test_common.run_cluster_tests(__file__)
+  test_common.run(__file__)

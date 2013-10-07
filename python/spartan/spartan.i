@@ -36,7 +36,7 @@ struct GILHelper {
 // anything (and we don't care about ref counts at that point anyway).
 static inline void intrusive_ptr_add_ref(PyObject* p) {
   if (Py_IsInitialized()) {
-    GILHelper h;
+  //  GILHelper h;
     Py_XINCREF(p);
   }
 }

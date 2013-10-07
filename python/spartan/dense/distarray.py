@@ -192,7 +192,6 @@ def create(master, shape,
   extents = compute_splits(shape, tile_hint)
   
   util.log('Creating array of shape %s with %d tiles', shape, len(extents))
-
   table = master.create_table(sharder, combiner, reducer, TileSelector())
   for ex in extents:
     ex_tile = tile.from_shape(ex.shape, dtype=dtype)
@@ -240,7 +239,7 @@ class DistArray(object):
   def _get(self, extent):
     return self.table.get(extent)
   
-  def ensure(self, region):
+  def fetch(self, region):
     '''
     Return a local numpy array for the given region.
     
@@ -286,19 +285,25 @@ class DistArray(object):
       self.table.update(dst_key, update_tile)
     
   
-  def __getitem__(self, idx):
+  def select(self, idx):
+    '''
+    Effectively __getitem__.
+    
+    Renamed to avoid the chance of accidentally using a slow, local operation on
+    a distributed array.
+    '''
     if isinstance(idx, extent.TileExtent):
-      return self.ensure(idx)
+      return self.fetch(idx)
     
     if np.isscalar(idx):
       return self[idx:idx+1][0]
     
     ex = extent.from_slice(idx, self.shape)
-    return self.ensure(ex)
+    return self.fetch(ex)
   
   def glom(self):
     util.log('Glomming: %s', self.shape)
-    return self[:]
+    return self.select(np.index_exp[:])
   
   
 def best_locality(array, ex):
@@ -327,33 +332,39 @@ def slice_mapper(ex, tile, **kw):
   
   :param ex:
   :param tile: 
-  :param fn: User mapper function.
+  :param mapper_fn: User mapper function.
   :param slice: `TileExtent` representing the slice of the input array.
   '''
-  fn = kw['fn']
-  slice_extent = kw['slice']
+  mapper_fn = kw['mapper_fn']
+  slice_extent = kw['slice_extent']
   kernel = kw['kernel']
   
   intersection = extent.intersection(slice_extent, ex)
   if intersection is None:
     return []
   
+  offset = extent.offset_from(slice_extent, intersection)
+  
   subslice = extent.offset_slice(ex, intersection)
   subtile = tile[subslice]
   
-  return fn(intersection, subtile)
+  return mapper_fn(offset, subtile)
 
 
 class Slice(object):
   def __init__(self, darray, idx):
-    Assert.isinstance(idx, extent.TileExtent)
+    if not isinstance(idx, extent.TileExtent):
+      idx = extent.from_slice(idx, darray.shape)
+    
     Assert.isinstance(darray, DistArray)
     self.darray = darray
-    self.idx = idx
-    self.shape = self.idx.shape
-    intersections = [extent.intersection(self.idx, ex) for ex in self.darray]
+    self.base = idx
+    self.shape = self.base.shape
+    intersections = [extent.intersection(self.base, ex) for ex in self.darray.extents]
     intersections = [ex for ex in intersections if ex is not None]
-    self.extents = intersections
+    offsets = [extent.offset_from(self.base, ex) for ex in intersections]
+    self.extents = offsets
+    self.dtype = darray.dtype
     
   def map_to_array(self, fn):
     return from_table(self.map_to_table(fn))
@@ -361,18 +372,28 @@ class Slice(object):
   def map_tiles(self, fn):
     return self.map_to_table(fn)
   
-  def map_to_table(self, fn):
+  def foreach(self, mapper_fn):
+    return spartan.map_inplace(self.darray.table,
+                               slice_mapper,
+                               mapper_fn = mapper_fn,
+                               slice_extent = self.base)
+  
+  def map_to_table(self, mapper_fn):
     return spartan.map_items(self.darray.table, 
                              slice_mapper,
-                             fn = fn,
-                             slice_extent = self.idx)
+                             mapper_fn = mapper_fn,
+                             slice_extent = self.base)
+    
+  def fetch(self, idx):
+    offset = extent.compute_slice(self.base, idx.to_slice())
+    return self.darray.fetch(offset)
 
   def glom(self):
-    return self.darray.ensure(self.idx)
+    return self.darray.fetch(self.base)
 
   def __getitem__(self, idx):
-    ex = extent.compute_slice(self.idx, idx)
-    return self.darray.ensure(ex)
+    ex = extent.compute_slice(self.base, idx)
+    return self.darray.fetch(ex)
 
 
 

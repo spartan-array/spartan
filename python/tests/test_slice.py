@@ -32,7 +32,7 @@ def test_slice_map_tiles(ctx):
 
 def add_one_extent(inputs, ex):
   util.log('Mapping: %s', ex)
-  return (ex, inputs[0][ex] + 1)
+  return (ex, inputs[0].fetch(ex) + 1)
 
 def test_slice_map_extents(ctx):
   x = expr.arange((TEST_SIZE, TEST_SIZE))
@@ -68,4 +68,4 @@ def test_slice_reduce(ctx):
   Assert.all_eq(val, nx[:, :, 0].sum())
   
 if __name__ == '__main__':
-  test_common.run_cluster_tests(__file__)
+  test_common.run(__file__)

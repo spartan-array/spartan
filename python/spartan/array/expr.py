@@ -130,11 +130,11 @@ def dag(node):
 
   
 def evaluate(node):
-  if isinstance(node, np.ndarray):
+  if not isinstance(node, Expr):
     return node
   
   from . import backend
-  return backend.evaluate(spartan.get_master(), node.dag())
+  return backend.evaluate(spartan.get_master(), dag(node))
      
 
 
@@ -319,7 +319,7 @@ Expr.argmin = argmin
 def _dot_mapper(inputs, ex):
   ex_a = ex
   # read current tile of array 'a'
-  a = inputs[0].ensure(ex_a)
+  a = inputs[0].fetch(ex_a)
 
   target_shape = (inputs[0].shape[1], inputs[1].shape[0])
   
@@ -329,7 +329,7 @@ def _dot_mapper(inputs, ex):
   ex_b = extent.TileExtent((ex_a.ul[1], 0),
                            (ex_a.lr[1] - ex_a.ul[1], inputs[1].shape[1]),
                            inputs[1].shape)
-  b = inputs[1].ensure(ex_b)
+  b = inputs[1].fetch(ex_b)
   result = np.dot(a, b)
   out = extent.TileExtent([ex_a.ul[0], 0],
                           result.shape,

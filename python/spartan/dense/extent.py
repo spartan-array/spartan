@@ -48,7 +48,9 @@ class TileExtent(object):
     return TileExtent(ul, sz, shape)
   
   def __getitem__(self, idx):
-    return TileExtent([self.ul[idx]], [self.sz[idx]], [self.array_shape[idx]])
+    return TileExtent([self.ul[idx]], 
+                      [self.sz[idx]], 
+                      [self.array_shape[idx]])
 
   def add_dim(self):
     return TileExtent(self.ul + (0,), self.sz + (1,), self.array_shape + (1,))
@@ -138,7 +140,7 @@ def compute_slice(base, idx):
       ul.append(base.ul[i])
       sz.append(base.sz[i])
     else:
-      start, stop, step = idx.indices(base.sz[i])
+      start, stop, step = idx[i].indices(base.sz[i])
       ul.append(base.ul[i] + start)
       sz.append(stop - start)
   
@@ -242,3 +244,4 @@ def index_for_reduction(index, axis):
 
 def shape_for_slice(input_shape, slc):
   raise NotImplementedError
+        

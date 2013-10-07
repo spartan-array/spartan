@@ -59,4 +59,4 @@ def test_kmeans_expr(ctx):
    
   
 if __name__ == '__main__':
-  test_common.run_cluster_tests(__file__)
+  test_common.run(__file__)

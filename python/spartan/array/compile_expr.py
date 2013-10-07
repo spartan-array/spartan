@@ -294,5 +294,5 @@ def optimize(dag):
   #print dag
   dag = apply_pass(FoldNumexprPass, dag)
   dag = apply_pass(FoldMapPass, dag)
-  print dag
+  #util.log('%s', dag)
   return dag

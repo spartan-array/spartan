@@ -42,7 +42,8 @@ class Iter(object):
     
     wrap.iter_next(self.handle)
     if not wrap.iter_done(self.handle):
-      self._val = (wrap.iter_key(self.handle), wrap.iter_value(self.handle))
+      self._val = (wrap.iter_key(self.handle), 
+                   wrap.iter_value(self.handle))
     return result 
 
   
@@ -153,7 +154,7 @@ class Kernel(object):
 class Worker(object):
   def __init__(self, handle):
     self.handle = handle
-    
+     
   def wait_for_shutdown(self):
     wrap.wait_for_shutdown(self.handle)
     
@@ -162,9 +163,8 @@ PROF = None
 
 def _bootstrap_kernel(handle):
   kernel = Kernel(handle)
-  
   fn, args = cPickle.loads(kernel.args()['map_args'])
-  
+ 
   if not flags.profile_kernels:
     return fn(kernel, args)
   

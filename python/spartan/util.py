@@ -60,7 +60,7 @@ class FileWatchdog(threading.Thread):
         self.on_closed()
         return
       
-      time.sleep(1)
+      time.sleep(0.1)
 
 def flatten(lst, depth=1):
   if depth == 0:
