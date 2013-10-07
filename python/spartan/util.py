@@ -40,11 +40,12 @@ class FileWatchdog(threading.Thread):
   When the file closes, terminate the process.
   (This occurs when an ssh connection is terminated, for example.)
   """
-  def __init__(self, file_handle=sys.stdin):
+  def __init__(self, file_handle=sys.stdin, on_closed=lambda: os._exit(1)):
     threading.Thread.__init__(self, name='WatchdogThread')
     self.setDaemon(True)
     self.file_handle = file_handle
     self.log = sys.stderr
+    self.on_closed = on_closed
 
   def run(self):
     f = [self.file_handle]
@@ -55,7 +56,10 @@ class FileWatchdog(threading.Thread):
           print >>self.log, 'Watchdog: file closed.  Shutting down.'
         except:
           pass
-        os._exit(1)
+        
+        self.on_closed()
+        return
+      
       time.sleep(1)
 
 def flatten(lst, depth=1):

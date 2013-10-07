@@ -24,13 +24,8 @@ def worker_loop(port):
   while 1:
     time.sleep(1)
   
-def start_cluster_worker(i):
-  t = 0
-  for worker, count in config.HOSTS:
-    if t + count > i: break
-    t += count
-  
-  util.log('Starting worker %d on host %s', i, worker)
+def start_cluster_worker(worker, st, ed):
+  util.log('Starting worker %d:%d on host %s', st, ed, worker)
   args = ['ssh', 
           '-oForwardX11=no',
           worker,
@@ -39,7 +34,8 @@ def start_cluster_worker(i):
           #'gdb', '-ex', 'run', '--args',
           'python', '-m spartan.worker',
           '--master=%s:9999' % socket.gethostname(),
-          '--port=%d' % (10000 + i)]
+          '--count=%d' % (ed - st),
+          '--port=%d' % (10000)]
   
   time.sleep(0.1)
   p = subprocess.Popen(args, executable='ssh')
@@ -49,12 +45,19 @@ def start_cluster():
   master = spartan.start_master(9999, flags.num_workers)
   spartan.set_log_level(flags.log_level)
   time.sleep(0.1)
-  for i in range(flags.num_workers):
-    if flags.cluster:
-      start_cluster_worker(i)
-    else:
+
+  if not flags.cluster:
+    for i in range(flags.num_workers):  
       spartan.start_worker('%s:9999' % socket.gethostname(),  10000 + i)
-      
+    
+  count = 0
+  for worker, sz in config.HOSTS:
+    sz = min(sz, flags.num_workers - count)
+    start_cluster_worker(worker, count, count + sz)
+    count += sz
+    if count == flags.num_workers:
+      break
+    
   return master
 
 def run_cluster_tests(filename):
