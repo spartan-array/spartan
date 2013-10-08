@@ -23,16 +23,22 @@ def sum_accum(key, cur, update):
   return cur + update
 
 class Iter(object):
-  def __init__(self, handle):
-    self.handle = handle
+  def __init__(self, table, shard):
+    self._table = table
+    if shard == -1:
+      wrap_iter = self._table.get_iterator()
+    else:
+      wrap_iter = self._table.get_iterator(shard)
+      
+    self._iter = wrap_iter
     self._val = None
     
-    if not wrap.iter_done(self.handle):
-      self._val = (wrap.iter_key(self.handle), wrap.iter_value(self.handle)) 
+    if not self._iter.done():
+      self._val = (self._iter.shard(), self._iter.key(), self._iter.value())
     
   def __iter__(self):
     return self
-    
+  
   def next(self):
     if self._val is None:
       raise StopIteration
@@ -40,10 +46,10 @@ class Iter(object):
     result = self._val
     self._val = None
     
-    wrap.iter_next(self.handle)
-    if not wrap.iter_done(self.handle):
-      self._val = (wrap.iter_key(self.handle), 
-                   wrap.iter_value(self.handle))
+    self._iter.next()
+    if not self._iter.done():
+      self._val = (self._iter.shard(), self._iter.key(), self._iter.value())
+    
     return result 
 
   
@@ -51,118 +57,54 @@ def key_mapper(k, v):
   yield k, 1
   
 def keys(src):
-  key_table = map_items(src, key_mapper)
-  result = [k for k, _ in key_table]
-  return result
-        
+  return map_items(src, key_mapper)
 
-class Table(object):
-  def __init__(self, master, ptr_or_id):
-    if master is not None:
-      self.ctx = master
-      self.destroy_on_del = True
-    else:
-      self.destroy_on_del = False
-      self.ctx = wrap.get_context()
-    
-    if isinstance(ptr_or_id, int):
-      self.handle = wrap.get_table(self.ctx, ptr_or_id)
-    else:
-      self.handle = ptr_or_id
+class Table(wrap.PyTable):
+  def __init__(self, id, destroy_on_del=False):
+    #print 'Creating table: %d, destroy? %d' % (id, destroy_on_del)
+    wrap.PyTable.__init__(self, id)
+    self.thisown = False
+    self.destroy_on_del = destroy_on_del
       
   def __del__(self):
     if self.destroy_on_del:
-      self.destroy()
+      get_master().destroy_table(self)
           
   def __reduce__(self):
-    return (Table, (None, self.id()))
+    return (Table, (self.id(), False))
+  
+  def iter(self, shard=-1):
+    return Iter(self, shard)
+  
+  def __iter__(self):
+    return self.iter()
     
-  def id(self):
-    return wrap.get_id(self.handle)
-    
-  def __getitem__(self, key):
-    return wrap.get(self.handle, key)
-  
-  def __setitem__(self, key, value):
-    return wrap.update(self.handle, key, value)
-  
-  def destroy(self):
-    Assert.isinstance(self.ctx, Master) 
-    return self.ctx.destroy_table(self.handle)
-  
   def keys(self):
     # Don't create an iterator directly; this would have us 
-    # copy all the values locally.  First construct a key-only
-    # table
+    # copy all the values locally.  Instead construct a key-only table
     return keys(self)
   
   def values(self):
     for _, v in iter(self):
       yield v
-  
-  def get(self, key):
-    return wrap.get(self.handle, key)
-  
-  def update(self, key, value):
-    return wrap.update(self.handle, key, value)
-  
-  def num_shards(self):
-    return wrap.num_shards(self.handle)
-  
-  def flush(self):
-    return wrap.flush(self.handle)
-  
-  def __iter__(self):
-    return self.iter(-1)
-  
-  def iter(self, shard):
-    return Iter(wrap.get_iterator(self.handle, shard))
-  
-  def sharder(self):
-    return wrap.get_sharder(self.handle)
-  
-  def combiner(self):
-    return wrap.get_combiner(self.handle)
-
-  def reducer(self):
-    return wrap.get_reducer(self.handle)
-  
-  def selector(self):
-    return wrap.get_selector(self.handle)
-  
-  def shard_for_key(self, k):
-    return wrap.shard_for_key(self.handle, k)
 
 class Kernel(object):
-  def __init__(self, kernel_id):
-    self.handle = wrap.cast_to_kernel(kernel_id)
+  def __init__(self, handle):
+    self._kernel = wrap.cast_to_kernel(handle)
   
-  def table(self, table_id):
-    return Table(None, 
-                 wrap.get_table(self.handle, table_id))
+  def table(self, id):
+    return Table(id)
   
   def args(self):
-    return wrap.kernel_args(self.handle)
+    return self._kernel.args()
   
   def current_shard(self):
     return int(self.args()['shard'])
-  
-  def current_table(self):
-    return int(self.args()['table'])
-
-
-class Worker(object):
-  def __init__(self, handle):
-    self.handle = handle
-     
-  def wait_for_shutdown(self):
-    wrap.wait_for_shutdown(self.handle)
     
-
 PROF = None
 
 def _bootstrap_kernel(handle):
-  kernel = Kernel(handle)
+  kernel= Kernel(handle)
   fn, args = cPickle.loads(kernel.args()['map_args'])
  
   if not flags.profile_kernels:
@@ -182,45 +124,31 @@ def _bootstrap_kernel(handle):
   return result
 
 class Master(object):
-  def __init__(self, handle, shutdown_on_del=False):
-    self.handle = handle
+  def __init__(self, master, shutdown_on_del=False):
     self.shutdown_on_del = shutdown_on_del
+    self._master = master
+    
+  def __getattr__(self, k):
+    return getattr(self._master, k)
      
   def __del__(self):
     if self.shutdown_on_del:
       util.log('Shutting down master.')
-      wrap.shutdown(self.handle)
-      
-  def num_workers(self):
-    return wrap.num_workers(self.handle)
-    
-  def destroy_table(self, table_handle):
-    wrap.destroy_table(self.handle, table_handle)
-    
-  def create_table(self, 
-                   sharder=ModSharder(), 
-                   combiner=None,
-                   reducer=replace_accum,
-                   selector=None):
-    
-    Assert.isinstance(sharder, Sharder)
-    #util.log('Creating table with sharder %s', sharder)
-    return Table(self, 
-                 wrap.create_table(self.handle, sharder, combiner, reducer, selector))
+      self._master.shutdown()
   
+  def create_table(self, *args):
+    t = self._master.create_table(*args)
+    return Table(t.id(), destroy_on_del=True)
+   
   def foreach_shard(self, table, kernel, args):
-    return wrap.foreach_shard(
-                          self.handle, table.handle, 
-                          _bootstrap_kernel, (kernel, args))
+    return self._master.foreach_shard(table, _bootstrap_kernel, (kernel, args))
 
   def foreach_worklist(self, worklist, mapper):
     mod_wl = []
     for args, locality in worklist:
       mod_wl.append(((mapper, args), locality))
       
-    return wrap.foreach_worklist(self.handle, 
-                                 mod_wl,
-                                 _bootstrap_kernel)
+    return self._master.foreach_worklist(mod_wl, _bootstrap_kernel)
 
 
 def has_kw_args(fn):
@@ -237,7 +165,9 @@ def mapper_kernel(kernel, args):
   
 #   util.log('MAPPING: Function: %s, args: %s', fn, fn_args)
   
-  for sk, sv in src.iter(kernel.current_shard()):
+  shard = kernel.current_shard()
+  
+  for _, sk, sv in src.iter(kernel.current_shard()):
     if has_kw_args(fn):
       result = fn(sk, sv, **kw)
     else:
@@ -246,7 +176,7 @@ def mapper_kernel(kernel, args):
       
     if result is not None:
       for k, v in result:
-        dst.update(k, v)
+        dst.update(shard, k, v)
 
 
 def foreach_kernel(kernel, args):
@@ -255,7 +185,7 @@ def foreach_kernel(kernel, args):
   kw['kernel'] = kernel
   
   src = kernel.table(src_id)
-  for sk, sv in src.iter(kernel.current_shard()):
+  for _, sk, sv in src.iter(kernel.current_shard()):
     if has_kw_args(fn):
       fn(sk, sv, **kw)
     else:
@@ -265,7 +195,7 @@ def foreach_kernel(kernel, args):
 
 def map_items(table, fn, **kw):
   src = table
-  master = src.ctx
+  master = get_master()
   
   dst = master.create_table(table.sharder(), 
                             table.combiner(), 
@@ -279,14 +209,15 @@ def map_items(table, fn, **kw):
 def map_inplace(table, fn, **kw):
   src = table
   dst = src
-  table.ctx.foreach_shard(table, mapper_kernel, 
+  master = get_master()
+  master.foreach_shard(table, mapper_kernel, 
                           (src.id(), dst.id(), fn, kw))
   return dst
 
 
 def foreach(table, fn, **kw):
   src = table
-  master = src.ctx
+  master = get_master()
   master.foreach_shard(table, foreach_kernel, 
                        (src.id(), fn, kw))
 
@@ -299,12 +230,14 @@ def fetch(table):
 
 
 def get_master():
-  return Master(wrap.cast_to_master(wrap.get_context()),
+  return Master(wrap.cast_to_master(wrap.TableContext.get_context()),
                 shutdown_on_del = False)
   
 def start_master(*args):
-  return Master(wrap.start_master(*args), shutdown_on_del=True)
+  m = wrap.start_master(*args)
+  return Master(m, 
+                shutdown_on_del=True)
 
 def start_worker(*args):
-  return Worker(wrap.start_worker(*args))
+  return wrap.start_worker(*args)
 

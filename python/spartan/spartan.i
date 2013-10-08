@@ -74,6 +74,19 @@ T check(T result) {
   return result;
 }
 
+std::string repr(RefPtr p) {
+  GILHelper h;
+  PyObject* str = PyObject_Repr(p.get());
+  char* data;
+  Py_ssize_t sz;
+  PyString_AsStringAndSize(str, &data, &sz);
+  Py_DECREF(str);
+  
+  std::string out(data, sz);
+  
+  return out;
+}
+
 // Most python functions return 'new' references; we don't need
 // to incref these when turning them into a RefPtr.
 RefPtr to_ref(PyObject* o) {
@@ -165,6 +178,18 @@ static Pickler& get_pickler() {
   return *_pickler;
 }
 
+template<class T>
+static inline PyObject* get_code(T* obj) {
+  if (obj == NULL) {
+    Py_INCREF(Py_None);
+    return Py_None;
+  }
+
+  RefPtr p = obj->code;
+  Py_INCREF(p.get());
+  return p.get();
+}
+
 namespace spartan {
   
 template<>
@@ -234,6 +259,7 @@ public:
         PyObject_CallFunction(code.get(), W("OOO"), k.get(), v->get(),
             update.get()));
     CHECK(result.get() != Py_None);
+    CHECK(result.get() != NULL);
 
     *v = result;
   }
@@ -265,223 +291,207 @@ public:
 };
 DEFINE_REGISTRY_HELPER(Kernel, PyKernel);
 
+typedef TableT<RefPtr, RefPtr> PyTable;
+typedef TypedIterator<RefPtr, RefPtr> PyIterator;
+
 } // namespace spartan
 
-%}
+using namespace spartan;
+
+%} // end helpers
+
+
+typedef boost::intrusive_ptr<PyObject> RefPtr;
+namespace spartan {
+
+%typemap(in) RefPtr {
+  $1 = RefPtr($input);
+}
+
+%typemap(out) RefPtr {
+  if ($1.get() == NULL) {
+    $result = Py_None;
+  } else {
+    $result = $1.get();
+  }
+  
+  Py_XINCREF($result);
+  return $result;
+}
+
+class PyIterator {
+private:
+  PyIterator();
+public:
+  RefPtr key();
+  RefPtr value();
+  int shard();
+  bool done();
+  void next();
+};
+
+class PyTable {
+public:
+  int id();
+  int num_shards();
+
+  RefPtr get(int shard, RefPtr k);
+  void update(int shard, RefPtr k, RefPtr v);
+
+  PyIterator* get_iterator();
+  PyIterator* get_iterator(int shard);
+};
+
+%extend PyTable {
+  PyTable(int id) {
+    return (PyTable*)TableContext::get_context()->get_table(id);
+  }
+  
+  PyObject* combiner() {
+    return get_code((PyAccum*) $self->combiner);
+  }
+  
+  PyObject* reducer() {
+    return get_code((PyAccum*) $self->reducer);
+  }
+  
+  PyObject* sharder() {
+    return get_code((PySharder*) $self->sharder);
+  }
+  
+  PyObject* selector() {
+    return get_code((PySelector*) $self->selector);
+  }
+}
+
+class TableContext {
+private:
+  TableContext();
+public:
+  static TableContext* get_context();
+};
+
+class Kernel {
+private:
+  Kernel();
+public:
+  
+};
+
+%extend Kernel {
+  PyObject* args() {
+    GILHelper h;
+    PyObject* out = PyDict_New();
+    for (auto i : $self->args()) {
+      PyDict_SetItemString(out, i.first.c_str(),
+          PyString_FromStringAndSize(i.second.data(), i.second.size()));
+    }
+  
+    return out;
+  }
+  
+  PyTable* table(int id) {
+    return (PyTable*)$self->get_table(id);
+  }
+}
+
+class Worker {
+  Worker();
+public:
+  void wait_for_shutdown();
+};
+
+class Master {
+private:
+  Master();
+public:
+  void shutdown();
+  void wait_for_workers();
+  int num_workers();
+  void destroy_table(PyTable*);
+};
+
+%extend Master {
+  PyTable* create_table(PyObject* sharder, PyObject* combiner, PyObject* reducer, PyObject* selector) {
+    Py_XINCREF(sharder);
+    Py_XINCREF(combiner);
+    Py_XINCREF(reducer);
+    Py_XINCREF(selector);
+  
+    Pickler& p = get_pickler();
+  
+    auto py_sharder = Initable::create<PySharder>(p.store(sharder));
+  
+    PyAccum* py_combiner = NULL;
+    if (combiner != Py_None) {
+      py_combiner = Initable::create<PyAccum>(p.store(combiner));
+    }
+  
+    PyAccum* py_reducer = NULL;
+    if (reducer != Py_None) {
+      py_reducer = Initable::create<PyAccum>(p.store(reducer));
+    }
+  
+    PySelector* py_selector = NULL;
+    if (selector != Py_None) {
+      py_selector = Initable::create<PySelector>(p.store(selector));
+    }
+  
+    return $self->create_table(py_sharder, py_combiner, py_reducer, py_selector);
+  }
+  
+  void foreach_shard(PyTable* t, PyObject* fn, PyObject* args) {
+    auto p = new PyKernel();
+    p->args()["map_fn"] = get_pickler().store(fn);
+    p->args()["map_args"] = get_pickler().store(args);
+    $self->map_shards(t, p);
+  }
+
+  void foreach_worklist(PyObject* worklist, PyObject* fn) {
+    auto p = new PyKernel();
+    p->args()["map_fn"] = get_pickler().store(fn);
+    
+    WorkList w;
+    {
+      GILHelper h;
+      auto iter = to_ref(check(PyObject_GetIter(worklist)));
+      while (1) {
+        auto py_item = to_ref(PyIter_Next(iter.get()));
+        if (py_item.get() == NULL) {
+          break;
+        }
+        
+        PyObject* args = check(PyTuple_GetItem(py_item.get(), 0));
+  
+        int table, shard;
+        PyObject* locality = check(PyTuple_GetItem(py_item.get(), 1));
+        check(PyArg_ParseTuple(locality, "ii", &table, &shard));
+        
+        WorkItem w_item;
+        w_item.args["map_args"] = get_pickler().store(args);
+        w_item.locality = ShardId(table, shard);
+        w.push_back(w_item);
+      }
+    }
+    
+    $self->map_worklist(w, p);
+  }
+} // extend Master
+
+
+Master* start_master(int port, int num_workers);
+Worker* start_worker(const std::string& master, int port);
+
+} // namespace spartan(handle
+
 
 %inline %{
   
 namespace spartan {
 
-class Master;
-class Worker;
-class Table;
-class TableIterator;
-class Kernel;
-class TableContext;
-
 enum LogLevel {
     FATAL = 0, ERROR = 1, WARN = 2, INFO = 3, DEBUG = 4
 };
-
-using rpc::Log;
-typedef TableT<RefPtr, RefPtr> PyTable;
-
-class PyKernel;
-PyKernel* active_kernel;
-
-
-void shutdown(Master*h) {
-  ((Master*) h)->shutdown();
-}
-
-void wait_for_workers(Master* m) {
-  m->wait_for_workers();
-}
-
-int num_workers(Master* m) {
-  return m->num_workers();
-}
-
-Table* get_table(Kernel* k, int id) {
-  return ((Kernel*) k)->get_table(id);
-}
-
-Table* create_table(Master*m, PyObject* sharder, PyObject* combiner,
-    PyObject* reducer, PyObject* selector) {
-  Py_XINCREF(sharder);
-  Py_XINCREF(combiner);
-  Py_XINCREF(reducer);
-  Py_XINCREF(selector);
-
-  Pickler& p = get_pickler();
-
-  auto py_sharder = Initable::create<PySharder>(p.store(sharder));
-
-  PyAccum* py_combiner = NULL;
-  if (combiner != Py_None) {
-    py_combiner = Initable::create<PyAccum>(p.store(combiner));
-  }
-
-  PyAccum* py_reducer = NULL;
-  if (reducer != Py_None) {
-    py_reducer = Initable::create<PyAccum>(p.store(reducer));
-  }
-
-  PySelector* py_selector = NULL;
-  if (selector != Py_None) {
-    py_selector = Initable::create<PySelector>(p.store(selector));
-  }
-
-  return ((Master*) m)->create_table(py_sharder, py_combiner, py_reducer,
-      py_selector);
-}
-
-void destroy_table(Master* m, Table* t) {
-  m->destroy_table(t);
-}
-
-void foreach_shard(Master*m, Table* t, PyObject* fn, PyObject* args) {
-  auto p = new PyKernel();
-  p->args()["map_fn"] = get_pickler().store(fn);
-  p->args()["map_args"] = get_pickler().store(args);
-  m->map_shards(t, p);
-}
-
-void foreach_worklist(Master* m, PyObject* worklist, PyObject* fn) {
-  auto p = new PyKernel();
-  p->args()["map_fn"] = get_pickler().store(fn);
-  
-  WorkList w;
-  {
-    GILHelper h;
-    auto iter = to_ref(check(PyObject_GetIter(worklist)));
-    while (1) {
-      auto py_item = to_ref(PyIter_Next(iter.get()));
-      if (py_item.get() == NULL) {
-        break;
-      }
-      
-      PyObject* args = check(PyTuple_GetItem(py_item.get(), 0));
-
-      int table, shard;
-      PyObject* locality = check(PyTuple_GetItem(py_item.get(), 1));
-      check(PyArg_ParseTuple(locality, "ii", &table, &shard));
-      
-      WorkItem w_item;
-      w_item.args["map_args"] = get_pickler().store(args);
-      w_item.locality = ShardId(table, shard);
-      w.push_back(w_item);
-    }
-  }
-  
-  m->map_worklist(w, p);
-}
-
-int get_id(Table* t) {
-  return ((PyTable*) t)->id();
-}
-
-PyObject* get(Table* t, PyObject* k) {
-  RefPtr result = ((PyTable*) t)->get(k);
-//  Log_info("Result: %s", to_string(result).c_str());
-  if (result.get() == NULL) {
-    result = Py_None;
-  }
-
-  Py_XINCREF(result.get());
-  return result.get();
-}
-
-void update(Table* t, PyObject* k, PyObject* v) {
-  ((PyTable*) t)->update(k, v);
-}
-
-int num_shards(Table* t) {
-  return t->num_shards();
-}
-
-TableIterator* get_iterator(Table* t, int shard) {
-  if (shard != -1) {
-    return ((PyTable*) t)->get_iterator(shard);
-  }
-  return ((PyTable*) t)->get_iterator();
-}
-
-PyObject* iter_key(TableIterator* i) {
-  RefPtr k = ((PyTable::Iterator*) i)->key();
-  Py_XINCREF(k.get());
-  return k.get();
-}
-
-PyObject* iter_value(TableIterator* i) {
-  RefPtr v = ((PyTable::Iterator*) i)->value();
-  Py_XINCREF(v.get());
-  return v.get();
-}
-
-bool iter_done(TableIterator* i) {
-  return ((PyTable::Iterator*) i)->done();
-}
-
-void iter_next(TableIterator* i) {
-  ((PyTable::Iterator*) i)->next();
-}
-
-PyObject* kernel_args(Kernel* k) {
-  GILHelper h;
-  PyObject* out = PyDict_New();
-  for (auto i : k->args()) {
-    PyDict_SetItemString(out, i.first.c_str(),
-        PyString_FromStringAndSize(i.second.data(), i.second.size()));
-  }
-
-  return out;
-}
-
-TableContext* get_context() {
-  return TableContext::get_context();
-}
-
-Table* get_table(TableContext* t, int id) {
-  return t->get_table(id);
-}
-
-template<class T>
-static inline PyObject* get_code(T* obj) {
-  if (obj == NULL) {
-    Py_INCREF(Py_None);
-    return Py_None;
-  }
-
-  RefPtr p = obj->code;
-  Py_INCREF(p.get());
-  return p.get();
-}
-
-PyObject* get_combiner(Table* t) {
-  return get_code((PyAccum*) t->combiner);
-}
-
-PyObject* get_reducer(Table* t) {
-  return get_code((PyAccum*) t->reducer);
-}
-
-PyObject* get_sharder(Table* t) {
-  return get_code((PySharder*) t->sharder);
-}
-
-PyObject* get_selector(Table* t) {
-  return get_code((PySelector*) t->selector);
-}
-
-int shard_for_key(Table* t, PyObject* key) {
-  return ((PyTable*)t)->shard_for_key(key);
-}
-
-int get_table_id(Table* t) {
-  return t->id();
-}
 
 void set_log_level(int l) {
   rpc::Log::set_level(l);
@@ -500,17 +510,15 @@ Master* cast_to_master(TableContext* ctx) {
   return m;
 }
 
-void wait_for_shutdown(Worker *w) {
-  w->wait_for_shutdown();
-}
-
 // Hack to allow passing Kernel* to user functions.
 static inline Kernel* cast_to_kernel(long kernel_handle) {
   return (Kernel*)kernel_handle;
 }
 
-Master* start_master(int port, int num_workers);
-Worker* start_worker(const std::string& master, int port);
+static int x;
+PyTable* blah() {
+  return (PyTable*)(&x);
+}
 
 } // namespace spartan
 

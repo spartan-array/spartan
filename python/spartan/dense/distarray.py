@@ -74,7 +74,7 @@ class TileSelector(object):
   
 
 
-def compute_splits(shape, tile_hint=None):
+def compute_splits(shape, tile_hint=None, num_shards=-1):
   '''Split an array of shape ``shape`` into `Extent`s containing roughly `TILE_SIZE` elements.
  
   :param shape: tuple
@@ -86,7 +86,7 @@ def compute_splits(shape, tile_hint=None):
   if tile_hint is None:
     # try to make reasonable tiles
     if len(shape) == 0:
-      return { extent.TileExtent([], [], (), 0) :  0 }
+      return { extent.TileExtent([], [], ()) :  0 }
    
     weight = 1
     
@@ -110,15 +110,18 @@ def compute_splits(shape, tile_hint=None):
         dim_splits.append((i, min(shape[dim] - i,  step)))
       splits[dim] = dim_splits
  
-  result = []
+  result = {}
   idx = 0
   for slc in itertools.product(*splits):
+    if num_shards != -1:
+      idx = idx % num_shards
+      
     ul, lr = zip(*slc)
-    ex = extent.TileExtent(ul, lr, shape, index=idx)
-    result.append(ex)
+    ex = extent.TileExtent(ul, lr, shape)
+    result[ex] = idx
     idx += 1
   
-  return dict((ex, ex.shard()) for ex in result)
+  return result
     
 def _create_rand(extent, data):
   data[:] = np.random.rand(*extent.shape)
@@ -154,7 +157,6 @@ def zeros(master, shape):
 def arange(master, shape):
   return create_with(master, shape, _create_range)
 
-
 def from_table(table):
   '''
   Construct a distarray from an existing table.
@@ -166,18 +168,22 @@ def from_table(table):
   
   :param table:
   '''
-  extents = table.keys()
+  extents = {}
+  for shard, k, v in table.keys():
+    extents[k] = shard
+    
   Assert.no_duplicates(extents)
   
   if not extents:
     shape = tuple()
   else:
-    shape = find_shape(extents)
+    shape = find_shape(extents.keys())
   
   if len(extents) > 0:
-    # fetch a one element array in order to get the dtype 
-    fetch = NestedSlice(extents[0], np.index_exp[0:1])
-    t = table[fetch]
+    # fetch a one element array in order to get the dtype
+    key, shard = extents.iteritems().next() 
+    fetch = NestedSlice(key, np.index_exp[0:1])
+    t = table.get(shard, fetch)
     # (We're not actually returning a tile, as the selector instead
     #  is returning just the underlying array.  Sigh).  
     # Assert.isinstance(t, tile.Tile)
@@ -186,7 +192,6 @@ def from_table(table):
     # empty table; default dtype.
     dtype = np.float
   
-  extents = dict((ex, ex.shard()) for ex in extents)
   return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
 
 def create(master, shape, 
@@ -195,17 +200,17 @@ def create(master, shape,
            combiner=None,
            reducer=accum_replace,
            tile_hint=None):
-  
   dtype = np.dtype(dtype)
   shape = tuple(shape)
   total_elems = np.prod(shape)
-  extents = compute_splits(shape, tile_hint)
-  
-  util.log('Creating array of shape %s with %d tiles', shape, len(extents))
+
   table = master.create_table(sharder, combiner, reducer, TileSelector())
-  for ex in extents:
+  extents = compute_splits(shape, tile_hint, table.num_shards())
+
+  util.log('Creating array of shape %s with %d tiles', shape, len(extents))
+  for ex, shard in extents.iteritems():
     ex_tile = tile.from_shape(ex.shape, dtype=dtype)
-    table.update(ex, ex_tile)
+    table.update(shard, ex, ex_tile)
   
   return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
 
@@ -255,17 +260,18 @@ class DistArray(object):
     # special case exact match against a tile 
     if region in self.extents:
       #util.log('Exact match.')
-      region.index = self.extents.get(region)
       ex, intersection = region, region
-      return self.table.get(NestedSlice(ex, extent.offset_slice(ex, intersection)))
+      shard = self.extents[region]
+      return self.table.get(shard, NestedSlice(ex, extent.offset_slice(ex, intersection)))
 
-    splits = list(extent.extents_for_region(self.extents, region))
+    splits = list(extent.extents_for_region(self.extents.iterkeys(), region))
     
     #util.log('Target shape: %s, %d splits', region.shape, len(splits))
     tgt = np.ndarray(region.shape, dtype=self.dtype)
     for ex, intersection in splits:
       dst_slice = extent.offset_slice(region, intersection)
-      src_slice = self.table.get(NestedSlice(ex, extent.offset_slice(ex, intersection)))
+      shard = self.extents[ex]
+      src_slice = self.table.get(shard, NestedSlice(ex, extent.offset_slice(ex, intersection)))
       tgt[dst_slice] = src_slice
     return tgt
     #return tile.data[]
@@ -278,16 +284,17 @@ class DistArray(object):
     # exact match
     if region in self.extents:
       #util.log('EXACT: %d %s ', self.table.id(), region)
-      region.index = self.extents.get(region)
-      self.table.update(region, tile.from_data(data))
+      shard = self.extents[region]
+      self.table.update(shard, region, tile.from_data(data))
       return
     
     splits = list(extent.extents_for_region(self.extents, region))
     for dst_key, intersection in splits:
       #util.log('%d %s %s %s', self.table.id(), region, dst_key, intersection)
+      shard = self.extents[dst_key]
       src_slice = extent.offset_slice(region, intersection)
       update_tile = tile.from_intersection(dst_key, intersection, data[src_slice])
-      self.table.update(dst_key, update_tile)
+      self.table.update(shard, dst_key, update_tile)
     
   
   def select(self, idx):

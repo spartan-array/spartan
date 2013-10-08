@@ -29,7 +29,8 @@ def log(msg, *args, **kw):
       msg = msg % args
     else:
       msg = repr(msg)
-    
+   
+    msg = str(msg) 
     wrap.log(level, filename, lineno, msg)
     if exc is not None:
       wrap.log(level, filename, lineno, exc)

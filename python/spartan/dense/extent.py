@@ -4,11 +4,10 @@ import numpy as np
 
 class TileExtent(object):
   '''A rectangular tile of a distributed array.'''
-  def __init__(self, ul, sz, array_shape, index=None):
+  def __init__(self, ul, sz, array_shape):
     #print 'Creating: %s %s %s %s' % (ul, sz, array_shape, index)
     self.ul = tuple(ul)
     self.sz = tuple(sz)
-    self.index = index
     
     if array_shape is not None:
       self.array_shape = tuple(array_shape)
@@ -25,8 +24,7 @@ class TileExtent(object):
     self.lr = tuple(self.lr_array)
     
   def __reduce__(self):
-    #assert self.index is not None
-    return (TileExtent, (self.ul, self.sz, self.array_shape, self.index))
+    return (TileExtent, (self.ul, self.sz, self.array_shape))
   
   @property
   def ndim(self):
@@ -42,27 +40,18 @@ class TileExtent(object):
   def __getitem__(self, idx):
     return TileExtent([self.ul[idx]], 
                       [self.sz[idx]], 
-                      [self.array_shape[idx]],
-                      self.index)
-
+                      [self.array_shape[idx]])
+                      
   def add_dim(self):
     return TileExtent(self.ul + (0,), 
                       self.sz + (1,), 
-                      self.array_shape + (1,),
-                      self.index)
+                      self.array_shape + (1,))
 
   def __hash__(self):
     return hash(self.ul)
     #return hash(self.ul[-2:])
     #return ravelled_pos(self.ul, self.array_shape)
     
-  def shard(self):
-    assert self.index is not None
-    if self.index is not None:
-      return self.index
-    
-    return hash(self.ul)
-  
   def __eq__(self, other):
     return np.all(self.ul_array == other.ul_array) and np.all(self.sz_array == other.sz_array)
 
@@ -137,7 +126,6 @@ def extents_for_region(extents, tile_extent):
   :param extents: 
   :param tile_extent:
   '''
-  Assert.isinstance(extents, set)
   for ex in extents:
     overlap = intersection(ex, tile_extent)
     if overlap is not None:
