@@ -4,9 +4,11 @@ import numpy as np
 
 class TileExtent(object):
   '''A rectangular tile of a distributed array.'''
-  def __init__(self, ul, sz, array_shape):
+  def __init__(self, ul, sz, array_shape, index=None):
+    #print 'Creating: %s %s %s %s' % (ul, sz, array_shape, index)
     self.ul = tuple(ul)
     self.sz = tuple(sz)
+    self.index = index
     
     if array_shape is not None:
       self.array_shape = tuple(array_shape)
@@ -23,7 +25,8 @@ class TileExtent(object):
     self.lr = tuple(self.lr_array)
     
   def __reduce__(self):
-    return (TileExtent, (self.ul, self.sz, self.array_shape))
+    #assert self.index is not None
+    return (TileExtent, (self.ul, self.sz, self.array_shape, self.index))
   
   @property
   def ndim(self):
@@ -35,28 +38,30 @@ class TileExtent(object):
   def __repr__(self):
     return 'extent(' + ','.join('%s:%s' % (a, b) for a, b in zip(self.ul, self.lr)) + ')'
 
-  def drop_axis(self, axis):
-    if axis is None: return TileExtent((), (), ())
-    ul = list(self.ul)
-    sz = list(self.sz)
-    shape = list(self.array_shape)
-    del ul[axis]
-    del sz[axis]
-    del shape[axis]
-
-#    util.log('%s -> %s, %s -> %s', self.ul, ul, self.sz, sz)
-    return TileExtent(ul, sz, shape)
   
   def __getitem__(self, idx):
     return TileExtent([self.ul[idx]], 
                       [self.sz[idx]], 
-                      [self.array_shape[idx]])
+                      [self.array_shape[idx]],
+                      self.index)
 
   def add_dim(self):
-    return TileExtent(self.ul + (0,), self.sz + (1,), self.array_shape + (1,))
+    return TileExtent(self.ul + (0,), 
+                      self.sz + (1,), 
+                      self.array_shape + (1,),
+                      self.index)
 
   def __hash__(self):
-    return hash(self.ul) #hash(self.ul[-2:])# 
+    return hash(self.ul)
+    #return hash(self.ul[-2:])
+    #return ravelled_pos(self.ul, self.array_shape)
+    
+  def shard(self):
+    assert self.index is not None
+    if self.index is not None:
+      return self.index
+    
+    return hash(self.ul)
   
   def __eq__(self, other):
     return np.all(self.ul_array == other.ul_array) and np.all(self.sz_array == other.sz_array)
@@ -100,7 +105,21 @@ class TileExtent(object):
   
   def clone(self):
     return TileExtent(self.ul, self.sz, self.array_shape)
+ 
+ 
+def drop_axis(ex, axis):
+  if axis is None: return TileExtent((), (), ())
+  if axis < 0: axis = len(ex.ul) - axis
   
+  ul = list(ex.ul)
+  sz = list(ex.sz)
+  shape = list(ex.array_shape)
+  del ul[axis]
+  del sz[axis]
+  del shape[axis]
+
+#    util.log('%s -> %s, %s -> %s', ex.ul, ul, ex.sz, sz)
+  return TileExtent(ul, sz, shape)
   
 def ravelled_pos(idx, array_shape):
   rpos = 0
@@ -240,7 +259,7 @@ def shapes_match(offset, data):
   return np.all(offset.sz == data.shape)
 
 def index_for_reduction(index, axis):
-  return index.drop_axis(axis)
+  return drop_axis(index, axis)
 
 def shape_for_slice(input_shape, slc):
   raise NotImplementedError

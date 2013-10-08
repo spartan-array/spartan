@@ -34,16 +34,16 @@ add_flag('log_level', default=3, type=int)
 #HOSTS = [ ('localhost', 8) ]
 
 HOSTS = [
-  ('beaker-20', 8),
-  ('beaker-21', 8),
-  ('beaker-22', 8),
-  ('beaker-23', 8),
-  ('beaker-24', 8),
-  ('beaker-25', 8),
   ('beaker-14', 8),
   ('beaker-15', 8),
  # ('beaker-16', 8),
   ('beaker-17', 8),
   ('beaker-18', 8),
   ('beaker-19', 8),
+  ('beaker-20', 8),
+  ('beaker-21', 8),
+  ('beaker-22', 8),
+  ('beaker-23', 8),
+  ('beaker-24', 8),
+  ('beaker-25', 8),
 ]

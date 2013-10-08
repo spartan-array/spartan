@@ -55,8 +55,9 @@ def start_cluster(num_workers, local=True):
   
   count = 0
   num_hosts = len(config.HOSTS)
-  for worker, _ in config.HOSTS:
-    sz = util.divup(num_workers, num_hosts)
+  for worker, total_tasks in config.HOSTS:
+    #sz = util.divup(num_workers, num_hosts)
+    sz = total_tasks
     sz = min(sz, num_workers - count)
     start_cluster_worker(worker, count, count + sz)
     count += sz
@@ -126,9 +127,9 @@ def run(filename):
     # header
     print 'num_workers,bench,time'
     if flags.cluster:
-      workers = [1, 2, 4, 8, 16, 32, 64]
+      workers = [1, 2, 4, 8, 16, 32, 64, 80]
     else:
-      workers = [8]
+      workers = [flags.num_workers]
     
     for i in workers:
       timer = BenchTimer(i)

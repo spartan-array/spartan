@@ -111,7 +111,7 @@ void ThreadPool::run_thread(int id_in_pool) {
 }
 
 int Log::level = Log::DEBUG;
-FILE* Log::fp = stdout;
+FILE* Log::fp = stderr;
 pthread_mutex_t Log::m = PTHREAD_MUTEX_INITIALIZER;
 
 void Log::set_level(int level) {
@@ -168,13 +168,14 @@ void Log::log_v(int level, int line, const char* file, const char* fmt, va_list 
 
         Pthread_mutex_lock(&Log::m);
         fprintf(Log::fp, "%c ", indicator[level]);
+        fprintf(Log::fp, "%s.%03d| ", tm_str, tv.tv_usec / 1000);
+
         if (filebase != nullptr) {
             fprintf(Log::fp, "<%s:%d> ", filebase, line);
         }
 
         fprintf(Log::fp, "%s ", hostname_.c_str());
 
-        fprintf(Log::fp, "%s.%03d| ", tm_str, tv.tv_usec / 1000);
         vfprintf(Log::fp, fmt, args);
         fprintf(Log::fp, "\n");
         fflush(Log::fp);

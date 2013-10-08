@@ -51,7 +51,8 @@ class OpToPrim(object):
   def compile_ReduceExtentsExpr(self, op):
     children = [self.compile_op(c) for c in op.children]
     
-    return prims.Reduce(children,
+    assert len(children) == 1
+    return prims.Reduce(children[0],
                         axis=op.axis,
                         dtype_fn = op.dtype_fn,
                         local_reducer_fn = op.local_reducer_fn,
@@ -199,9 +200,9 @@ class FoldMapPass(OptimizePass):
     
     map_fn = op.map_fn
     map_kw = op.fn_kw
-    util.log('Map function: %s, kw: %s', map_fn, map_kw)
+    #util.log('Map function: %s, kw: %s', map_fn, map_kw)
     
-    util.log('Created fold mapper with %d inputs', len(inputs))
+    #util.log('Created fold mapper with %d inputs', len(inputs))
     return prims.MapTiles(inputs=inputs, 
                           map_fn = _fold_mapper,
                           fn_kw = { 'fns' : fns,
@@ -292,7 +293,7 @@ def optimize(dag):
     return dag
   
   #print dag
-  dag = apply_pass(FoldNumexprPass, dag)
+  #dag = apply_pass(FoldNumexprPass, dag)
   dag = apply_pass(FoldMapPass, dag)
   #util.log('%s', dag)
   return dag

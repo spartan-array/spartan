@@ -15,6 +15,7 @@ import traceback
 
 log_mutex = threading.RLock()
 def log(msg, *args, **kw):
+  level = kw.get('level', wrap.INFO)
   with log_mutex:
     caller = sys._getframe(1)
     filename = caller.f_code.co_filename
@@ -29,10 +30,21 @@ def log(msg, *args, **kw):
     else:
       msg = repr(msg)
     
-    wrap.log(filename, lineno, msg)
+    wrap.log(level, filename, lineno, msg)
     if exc is not None:
-      wrap.log(filename, lineno, exc)
+      wrap.log(level, filename, lineno, exc)
 
+def log_info(msg, *args, **kw):
+  kw['level'] = wrap.INFO
+  return log(msg, *args, **kw)
+
+def log_debug(msg, *args, **kw):
+  kw['level'] = wrap.DEBUG
+  return log(msg, *args, **kw)
+
+def log_error(msg, *args, **kw):
+  kw['level'] = wrap.ERROR
+  return log(msg, *args, **kw)
 
 class FileWatchdog(threading.Thread):
   """Watchdog for a file (typically `sys.stdin` or `sys.stdout`).

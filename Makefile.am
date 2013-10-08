@@ -1,5 +1,5 @@
-CXXFLAGS = -std=c++11\
- -O2\
+AM_CXXFLAGS = \
+ -std=c++11\
  -ggdb2\
  -Wall\
  -Wno-unused-result\

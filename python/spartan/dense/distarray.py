@@ -42,16 +42,22 @@ accum_sum = tile.TileAccum(np.add)
 
   
 class NestedSlice(object):
-  def __init__(self, extent, subslice):
-    self.extent = extent
-    self.subslice = subslice
+  def __init__(self, ex, subslice):
+    Assert.isinstance(ex, extent.TileExtent)
+    Assert.isinstance(subslice, (tuple, int))
     
+    self.extent = ex
+    self.subslice = subslice
+   
   def __eq__(self, other):
     Assert.isinstance(other, extent.TileExtent)
     return self.extent == other 
   
   def __hash__(self):
     return hash(self.extent)
+  
+  def shard(self):
+    return self.extent.shard()
 
 
 class TileSelector(object):
@@ -80,7 +86,7 @@ def compute_splits(shape, tile_hint=None):
   if tile_hint is None:
     # try to make reasonable tiles
     if len(shape) == 0:
-      return [extent.TileExtent([], [], ())]
+      return { extent.TileExtent([], [], (), 0) :  0 }
    
     weight = 1
     
@@ -105,12 +111,14 @@ def compute_splits(shape, tile_hint=None):
       splits[dim] = dim_splits
  
   result = []
+  idx = 0
   for slc in itertools.product(*splits):
     ul, lr = zip(*slc)
-    ex = extent.TileExtent(ul, lr, shape)
+    ex = extent.TileExtent(ul, lr, shape, index=idx)
     result.append(ex)
+    idx += 1
   
-  return set(result)
+  return dict((ex, ex.shard()) for ex in result)
     
 def _create_rand(extent, data):
   data[:] = np.random.rand(*extent.shape)
@@ -167,7 +175,9 @@ def from_table(table):
     shape = find_shape(extents)
   
   if len(extents) > 0:
-    t = table[extents[0]]
+    # fetch a one element array in order to get the dtype 
+    fetch = NestedSlice(extents[0], np.index_exp[0:1])
+    t = table[fetch]
     # (We're not actually returning a tile, as the selector instead
     #  is returning just the underlying array.  Sigh).  
     # Assert.isinstance(t, tile.Tile)
@@ -176,7 +186,7 @@ def from_table(table):
     # empty table; default dtype.
     dtype = np.float
   
-  extents = set(extents)
+  extents = dict((ex, ex.shard()) for ex in extents)
   return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
 
 def create(master, shape, 
@@ -212,6 +222,9 @@ class DistArray(object):
     self.shape = shape
     self.dtype = dtype
     self.table = table
+    
+    #util.log('%s', extents)
+    Assert.isinstance(extents, dict)
     self.extents = extents
   
   def id(self):
@@ -219,16 +232,6 @@ class DistArray(object):
    
   def map_to_table(self, fn):
     return spartan.map_items(self.table, fn)
-  
-  def map_tiles(self, fn):
-    return self.map_to_table(fn)
-  
-  def map_to_array(self, fn):
-    return from_table(self.map_to_table(fn))
-  
-  def map_inplace(self, fn):
-    spartan.map_inplace(self.table, fn)
-    return self
   
   def foreach(self, fn):
     return spartan.foreach(self.table, fn)
@@ -252,6 +255,7 @@ class DistArray(object):
     # special case exact match against a tile 
     if region in self.extents:
       #util.log('Exact match.')
+      region.index = self.extents.get(region)
       ex, intersection = region, region
       return self.table.get(NestedSlice(ex, extent.offset_slice(ex, intersection)))
 
@@ -274,6 +278,7 @@ class DistArray(object):
     # exact match
     if region in self.extents:
       #util.log('EXACT: %d %s ', self.table.id(), region)
+      region.index = self.extents.get(region)
       self.table.update(region, tile.from_data(data))
       return
     
@@ -304,7 +309,11 @@ class DistArray(object):
   def glom(self):
     util.log('Glomming: %s', self.shape)
     return self.select(np.index_exp[:])
-  
+
+
+def map_to_array(array, fn):
+  return from_table(array.map_to_table(fn))
+
   
 def best_locality(array, ex):
   '''
@@ -366,12 +375,6 @@ class Slice(object):
     self.extents = offsets
     self.dtype = darray.dtype
     
-  def map_to_array(self, fn):
-    return from_table(self.map_to_table(fn))
-  
-  def map_tiles(self, fn):
-    return self.map_to_table(fn)
-  
   def foreach(self, mapper_fn):
     return spartan.map_inplace(self.darray.table,
                                slice_mapper,
@@ -396,6 +399,9 @@ class Slice(object):
     return self.darray.fetch(ex)
 
 
+def broadcast_mapper(ex, tile, mapper_fn=None, bcast_obj=None):
+  pass
+
 
 class Broadcast(object):
   '''A broadcast object mimics the behavior of Numpy broadcasting.
@@ -410,16 +416,44 @@ class Broadcast(object):
     self.base = base
     self.shape = shape
   
-  def __getitem__(self, idx):
-    pass
-  
   def __repr__(self):
     return 'Broadcast(%s -> %s)' % (self.base, self.shape)
+  
+  def fetch(self, ex):
+    # drop extra dimensions
+    while len(ex.shape) > len(self.base.shape):
+      ex = extent.drop_axis(ex, -1)
+      
+    # fold down expanded dimensions
+    ul = []
+    sz = []
+    for i in xrange(len(self.base.shape)):
+      size = self.base.shape[i]
+      if size == 1:
+        ul.append(0)
+        sz.append(1)
+      else:
+        ul.append(ex.ul[i])
+        sz.append(ex.sz[i])
+    
+    ex = extent.TileExtent(ul, sz, self.base.shape) 
+   
+    template = np.ndarray(ex.shape, dtype=self.base.dtype)
+    fetched = self.base.fetch(ex)
+    
+    _, bcast = np.broadcast_arrays(template, fetched)
+    return bcast 
+  
+  def map_to_table(self, fn):
+    raise NotImplementedError
+  
+  def foreach(self, fn):
+    raise NotImplementedError
+  
 
-
-def broadcast(*args):
+def broadcast(args):
   if len(args) == 1:
-    return args[0]
+    return args
  
   orig_shapes = [list(x.shape) for x in args]
   dims = [len(shape) for shape in orig_shapes]
@@ -430,12 +464,22 @@ def broadcast(*args):
   for i in range(len(orig_shapes)):
     diff = max_dim - len(orig_shapes[i])
     new_shapes.append([1] * diff + orig_shapes[i])
-  
-  # check shapes are valid; there should be at most one unique
-  # shape.
+ 
+  # check shapes are valid
+  # for each axis, all arrays should either share the 
+  # same size, or have size == 1
   for axis in range(max_dim):
     axis_shape = set(s[axis] for s in new_shapes)
+   
     assert len(axis_shape) <= 2, 'Mismatched shapes for broadcast: %s' % orig_shapes
+    if len(axis_shape) == 2:
+      assert 1 in axis_shape, 'Mismatched shapes for broadcast: %s' % orig_shapes
+  
+    # now lift the inputs with size(axis) == 1 
+    # to have the maximum size for the axis 
+    max_size = max(s[axis] for s in new_shapes)
+    for s in new_shapes:
+      s[axis] = max_size
     
   # wrap arguments with missing dims in a Broadcast object.
   results = []
@@ -443,8 +487,8 @@ def broadcast(*args):
     if new_shapes[i] == orig_shapes[i]:
       results.append(args[i])
     else:
-      results.append(Broadcast(args[i], new_shapes[i]))
+      results.append(Broadcast(args[i], tuple(new_shapes[i])))
     
-  util.log('Broadcast result: %s', results)
+  #util.log_debug('Broadcast result: %s', results)
   return results
 

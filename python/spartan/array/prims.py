@@ -102,7 +102,7 @@ class Reduce(Primitive):
   _members = ['input', 'axis', 'dtype_fn', 'local_reducer_fn', 'combiner_fn']
     
   def dependencies(self):
-    return self.input
+    return [self.input]
   
   def _shape(self):
     return extent.shape_for_reduction(self.input._shape(), self.axis)
@@ -121,6 +121,7 @@ class Stencil(Primitive):
     #return (util.divup(w, self.stride),
     #        util.divup(h, self.stride)) + input.shape[2:]
             
+
 @node_type
 class Outer(Primitive):
   _members = ['a', 'b', 'map_fn', 'map_kw', 'reduce_fn', 'reduce_kw']
@@ -130,6 +131,7 @@ class Outer(Primitive):
              
   def _shape(self):
     return (self.a.shape[0], self.b.shape[1]) 
+
 
 @node_type
 class NewArray(Primitive):

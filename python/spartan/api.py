@@ -14,7 +14,7 @@ class Sharder(object):
 
 class ModSharder(Sharder):
   def __call__(self, k, num_shards):
-    return hash(k) % num_shards
+    return k.shard() % num_shards
 
 def replace_accum(key, cur, update):
   return update

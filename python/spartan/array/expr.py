@@ -79,27 +79,17 @@ class Expr(object):
     return glom(self)
 
 
-Expr.__rsub__ = Expr.__sub__
-Expr.__radd__ = Expr.__add__
-Expr.__rmul__ = Expr.__mul__
-Expr.__rdiv__ = Expr.__div__
-
-
 class LazyVal(Expr, Node):
   _members = ['val']
   
   def __reduce__(self):
-    return self.evaluate().__reduce__()
+    return evaluate(self).__reduce__()
 
 
-def lazify(val):
-  if isinstance(val, Expr): return val
-  #util.log('Lazifying... %s', val)
-  return LazyVal(val)
-
-
-def val(x):
-  return lazify(x)
+Expr.__rsub__ = Expr.__sub__
+Expr.__radd__ = Expr.__add__
+Expr.__rmul__ = Expr.__mul__
+Expr.__rdiv__ = Expr.__div__
 
 
 def glom(node):    
@@ -116,6 +106,10 @@ def glom(node):
 
 
 def dag(node):
+  '''
+  Compile and return the DAG representing this expression.
+  :param node:
+  '''
   if not isinstance(node, Expr):
     raise TypeError
     
@@ -130,6 +124,11 @@ def dag(node):
 
   
 def evaluate(node):
+  '''
+  Evaluate this expression.
+  
+  :param node:
+  '''
   if not isinstance(node, Expr):
     return node
   
@@ -137,7 +136,33 @@ def evaluate(node):
   return backend.evaluate(spartan.get_master(), dag(node))
      
 
+def eager(node):
+  '''
+  Eagerly evaluate ``node``.
+  
+  Convert the result back into an `Expr`.
+  :param node: `Expr` to evaluate.
+  '''
+  return lazify(evaluate(node))
+  
 
+def lazify(val):
+  '''
+  Lift ``val`` into an Expr node.
+ 
+  If ``val`` is already an expression, it is returned unmodified.
+   
+  :param val:
+  '''
+  if isinstance(val, Expr): return val
+  #util.log('Lazifying... %s', val)
+  return LazyVal(val)
+
+
+def val(x):
+  return lazify(x)
+
+  
 class Op(Expr):
   def node_init(self):
     if self.children is None: self.children = tuple()
@@ -338,7 +363,8 @@ def _dot_mapper(inputs, ex):
   return out, result
 
 def _dot_numpy(inputs, ex, numpy_data=None):
-  return (ex[0].add_dim(), np.dot(inputs[0][ex], numpy_data))
+  return (ex[0].add_dim(), 
+          np.dot(inputs[0].fetch(ex), numpy_data))
   
 
 def dot(a, b):

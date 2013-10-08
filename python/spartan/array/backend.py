@@ -89,14 +89,17 @@ class Backend(object):
   
   def eval_MapTiles(self, ctx, prim, inputs):
     largest = largest_value(inputs)
+    inputs = distarray.broadcast(inputs)
     map_fn = prim.map_fn
     fn_kw = prim.fn_kw or {}
     
-    util.log('Mapping over %d inputs; largest = %s', len(inputs), largest.shape)
+    util.log('Mapping %s over %d inputs; largest = %s', 
+             map_fn, len(inputs), largest.shape)
     
     def mapper(ex, _):
-      util.log('MapTiles: %s', map_fn)
+      #util.log('MapTiles: %s', map_fn)
       #util.log('Fetching %d inputs', len(inputs))
+      #util.log('%s %s', inputs, ex)
       local_values = [input.fetch(ex) for input in inputs]
       #util.log('Mapping...')
       result = map_fn(local_values,  **fn_kw)
@@ -104,7 +107,7 @@ class Backend(object):
       assert isinstance(result, np.ndarray), result
       return [(ex, tile.from_data(result))]
     
-    result = largest.map_to_array(mapper)
+    result = distarray.map_to_array(largest, mapper)
     return result
   
   def eval_MapExtents(self, ctx, prim, inputs):
@@ -117,7 +120,7 @@ class Backend(object):
       # util.log('MapExtents: %s, %s', ex, new_extent)
       return [(new_extent, tile.from_data(result))]
     
-    return inputs[0].map_to_array(mapper)
+    return distarray.map_to_array(inputs[0], mapper)
   
   
   def eval_NewArray(self, ctx, prim, inputs):
@@ -162,8 +165,9 @@ class Backend(object):
     
     util.log('Taking slice: %s from %s', idx, src.shape)
     #util.log('Matching: %s', matching_extents)
-    result = src.map_to_array(lambda k, v: 
-                              slice_mapper(k, v, slice_region, matching_extents))
+    result = distarray.map_to_array(
+      src, lambda k, v: slice_mapper(k, v, slice_region, matching_extents))
+    
     util.log('Done.')
     return result
   
@@ -175,7 +179,7 @@ class Backend(object):
     Assert.isinstance(idx, (np.ndarray, distarray.DistArray))
     
     if idx.dtype == np.bool:
-      dst = src.map_to_array(bool_index_mapper)
+      dst = distarray.map_to_array(src, bool_index_mapper)
       # scan over output, compute running count of the size 
       # of the first dimension
       row_counts = src.map_to_table(lambda k, v: v.shape[0])

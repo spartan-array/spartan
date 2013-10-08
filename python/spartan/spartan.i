@@ -487,8 +487,8 @@ void set_log_level(int l) {
   rpc::Log::set_level(l);
 }
 
-void log(const char* file, int line, const char* msg) {
-  rpc::Log::log(rpc::Log::INFO, line, file, msg);
+void log(int level, const char* file, int line, const char* msg) {
+  rpc::Log::log(level, line, file, msg);
 }
 
 Master* cast_to_master(TableContext* ctx) {

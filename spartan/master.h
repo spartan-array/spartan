@@ -96,6 +96,7 @@ public:
       AccumulatorT<K, V>* combiner = NULL,
       AccumulatorT<K, V>* reducer = NULL,
       SelectorT<K, V>* selector = NULL) {
+    Timer timer;
     wait_for_workers();
 
     TableT<K, V>* t = new TableT<K, V>();
@@ -158,6 +159,8 @@ public:
     }
     futures.wait_all();
     assign_shards(t);
+
+    // Log_info("Table created in %f seconds", timer.elapsed());
     return t;
   }
 

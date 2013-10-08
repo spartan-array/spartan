@@ -1,6 +1,6 @@
 from spartan import ModSharder, util, sum_accum
-from spartan.dense import distarray
 from spartan.array import expr
+from spartan.dense import distarray, extent
 import numpy as np
 import spartan
 import test_common
@@ -12,12 +12,12 @@ N_DIM = 5
 distarray.TILE_SIZE = 10
 
 # An implementation of K-means by-hand.
-def min_dist(extent, tile, centers):
+def min_dist(ex, tile, centers):
   #util.log('%s %s', centers.shape, tile.shape)
   dist = np.dot(centers, tile[:].T)
   min_dist = np.argmin(dist, axis=0)
 #   util.log('%s %s', extent, dist.shape)
-  yield extent.drop_axis(1), min_dist
+  yield extent.drop_axis(ex, 1), min_dist
 
 def sum_centers(kernel, args):
   min_idx_id, pts_id, new_centers_id = args
@@ -27,8 +27,8 @@ def sum_centers(kernel, args):
   
   c_pos = np.zeros((N_CENTERS, N_DIM))
 
-  for extent, tile in kernel.table(pts_id).iter(kernel.current_shard()):
-    idx = min_idx.get(extent.drop_axis(1))
+  for ex, tile in kernel.table(pts_id).iter(kernel.current_shard()):
+    idx = min_idx.get(extent.drop_axis(ex, 1))
     for j in range(N_CENTERS):
       c_pos[j] = np.sum(tile[idx == j], axis=0)
      
