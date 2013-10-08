@@ -276,7 +276,10 @@ public:
   }
 
 private:
+  void wait_for_fetch();
+
   Table* table_;
+  rpc::Future* pending_;
   IteratorReq request_;
   IteratorResp response_;
 

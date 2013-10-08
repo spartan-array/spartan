@@ -19,17 +19,28 @@ RemoteIterator<K, V>::RemoteIterator(Table *table, int shard,
   index_ = 0;
   int target_worker = table->worker_for_shard(shard);
 
-  table->workers[target_worker]->get_iterator(request_, &response_);
+  pending_ = table->workers[target_worker]->async_get_iterator(request_);
   request_.id = response_.id;
 }
 
 template<class K, class V>
 bool RemoteIterator<K, V>::done() {
+  wait_for_fetch();
   return response_.done && index_ >= response_.results.size();
+}
+
+template <class K, class V>
+void RemoteIterator<K, V>::wait_for_fetch() {
+  if (pending_ != NULL) {
+    pending_->wait();
+    pending_->get_reply() >> response_;
+    pending_ = NULL;
+  }
 }
 
 template<class K, class V>
 void RemoteIterator<K, V>::next() {
+  wait_for_fetch();
   ++index_;
   int target_worker = table_->worker_for_shard(shard_);
 
@@ -38,17 +49,19 @@ void RemoteIterator<K, V>::next() {
       return;
     }
 
-    table_->workers[target_worker]->get_iterator(request_, &response_);
+    pending_ = table_->workers[target_worker]->async_get_iterator(request_);
   }
 }
 
 template<class K, class V>
 std::string RemoteIterator<K, V>::key_str() {
+  wait_for_fetch();
   return response_.results[index_].key;
 }
 
 template<class K, class V>
 std::string RemoteIterator<K, V>::value_str() {
+  wait_for_fetch();
   return response_.results[index_].value;
 }
 

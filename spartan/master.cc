@@ -429,7 +429,7 @@ void Master::flush() {
 
   g.wait_all();
 
-  Log_info("Flush took %f seconds.", t.elapsed());
+  // Log_info("Flush took %f seconds.", t.elapsed());
 }
 
 Master* start_master(int port, int num_workers) {
