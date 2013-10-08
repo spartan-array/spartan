@@ -77,11 +77,11 @@ void Worker::get(const GetRequest& req, TableData* resp) {
   resp->done = true;
 
   Table *t = tables_[req.table];
-  if (!t->contains_str(req.key)) {
+  if (!t->contains_str(req.shard, req.key)) {
     resp->missing_key = true;
   } else {
     resp->missing_key = false;
-    resp->kv_data.push_back( { req.key, t->get_str(req.key) });
+    resp->kv_data.push_back( { req.key, t->get_str(req.shard, req.key) });
   }
   Log_debug("WORKER %d: done handling get.", id_);
 }
@@ -185,7 +185,7 @@ void Worker::put(const TableData& req) {
   }
 
   for (auto p : req.kv_data) {
-    t->update_str(p.key, p.value);
+    t->update_str(req.shard, p.key, p.value);
   }
   Log_debug("WORKER: %d -- finished put", id_);
 }

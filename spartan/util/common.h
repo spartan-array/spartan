@@ -24,6 +24,8 @@ void print_backtrace();
 #define CHECK(expr) if (!(expr)) { Log_fatal("Check failed: %s.", #expr); }
 #define CHECK_EQ(a, b) CHECK((a == b))
 #define CHECK_NE(a, b) CHECK((a != b))
+#define CHECK_LT(a, b) CHECK((a < b))
+#define CHECK_GT(a, b) CHECK((a > b))
 
 void Sleep(double t);
 

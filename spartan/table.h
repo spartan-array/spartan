@@ -133,6 +133,7 @@ public:
   }
   virtual std::string key_str() = 0;
   virtual std::string value_str() = 0;
+  virtual int shard() = 0;
   virtual bool done() = 0;
   virtual void next() = 0;
 };
@@ -250,9 +251,10 @@ public:
   virtual int flush() = 0;
 
   // Untyped (string, string) operations.
-  virtual std::string get_str(const std::string&) = 0;
-  virtual bool contains_str(const std::string&) = 0;
-  virtual void update_str(const std::string&, const std::string&) = 0;
+  virtual std::string get_str(int shard, const std::string&) = 0;
+  virtual bool contains_str(int shard, const std::string&) = 0;
+  virtual void update_str(int shard, const std::string&,
+      const std::string&) = 0;
 };
 
 template<class K, class V>
@@ -273,6 +275,10 @@ public:
 
   V value() {
     return val::from_str<V>(value_str());
+  }
+
+  int shard() {
+    return shard_;
   }
 
 private:
@@ -296,6 +302,10 @@ private:
   typedef boost::unordered_multimap<K, V> Map;
   Map data_;
 public:
+
+  virtual ~ShardT() {
+
+  }
   typedef typename Map::iterator iterator;
   iterator begin() {
     return data_.begin();
@@ -310,6 +320,8 @@ public:
   }
 
   void insert(const K& k, const V& v) {
+    CHECK_NE(k.get(), NULL);
+
     data_.insert(make_pair(k, v));
   }
 
@@ -336,10 +348,16 @@ private:
   typename ShardT<K, V>::iterator begin_;
   typename ShardT<K, V>::iterator cur_;
   typename ShardT<K, V>::iterator end_;
-public:
-  LocalIterator(ShardT<K, V>& m) :
-      begin_(m.begin()), cur_(m.begin()), end_(m.end()) {
 
+  int shard_;
+public:
+  LocalIterator(int shard, ShardT<K, V>& m) :
+      begin_(m.begin()), cur_(m.begin()), end_(m.end()), shard_(shard) {
+
+  }
+
+  int shard() {
+    return shard_;
   }
 
   void next() {
@@ -390,6 +408,10 @@ public:
     while (!iters_.empty() && cur()->done()) {
       iters_.pop_back();
     }
+  }
+
+  int shard() {
+    return cur()->shard();
   }
 
   bool done() {
@@ -452,6 +474,7 @@ public:
   }
 
   virtual ~TableT() {
+    //Log_info("Deleting table %d", id());
     for (auto p : shards_) {
       delete p;
     }
@@ -462,6 +485,7 @@ public:
   }
 
   int shard_for_key(const K& k) {
+    CHECK_NE(sharder, NULL);
     return ((SharderT<K>*) sharder)->shard_for_key(k, this->num_shards());
   }
 
@@ -469,23 +493,24 @@ public:
     return *((ShardT<K, V>*) this->shards_[id]);
   }
 
-  V get_local(const K& k) {
-    int shard = this->shard_for_key(k);
-    CHECK(is_local_shard(shard));
-    return typed_shard(shard)[k];
-  }
+  void update(int shard, const K& k, const V& v) {
+    if (shard == -1) {
+      shard = this->shard_for_key(k);
+    }
 
-  void update(const K& k, const V& v) {
-    int shard_id = this->shard_for_key(k);
-    ShardT<K, V>& s = typed_shard(shard_id);
+    CHECK_LT(shard, num_shards());
+
+    ShardT<K, V>& s = typed_shard(shard);
     typename ShardT<K, V>::iterator i = s.find(k);
 
     GRAB_LOCK;
-    if (is_local_shard(shard_id)) {
+    if (is_local_shard(shard)) {
+      CHECK_NE(k.get(), NULL);
       if (i == s.end() || reducer == NULL) {
         s.insert(k, v);
       } else {
         reducer->cast<K, V>()->accumulate(k, &i->second, v);
+        CHECK_NE(i->second.get(), NULL);
       }
       return;
     }
@@ -496,24 +521,24 @@ public:
       } else {
         combiner->cast<K, V>()->accumulate(k, &i->second, v);
       }
+
       return;
     }
 
     TableData put;
-    int shard = shard_for_key(k);
     put.table = this->id();
     put.shard = shard;
     put.kv_data.push_back( { val::to_str(k), val::to_str(v) });
     workers[worker_for_shard(shard)]->async_put(put);
   }
 
-  bool _get(const K& k, V* v) {
-    int shard = this->shard_for_key(k);
+  bool _get(int shard, const K& k, V* v) {
+    if (shard == -1) {
+      shard = this->shard_for_key(k);
+    }
 
-    if (tainted(shard)) {
-      while (tainted(shard)) {
-        sched_yield();
-      }
+    while (tainted(shard)) {
+      sched_yield();
     }
 
     if (is_local_shard(shard)) {
@@ -538,14 +563,14 @@ public:
     return get_remote(shard, k, v);
   }
 
-  V get(const K& k) {
+  V get(int shard, const K& k) {
     V out;
-    _get(k, &out);
+    _get(shard, k, &out);
     return out;
   }
 
-  bool contains(const K& k) {
-    return _get(k, NULL);
+  bool contains(int shard, const K& k) {
+    return _get(shard, k, NULL);
   }
 
   void remove(const K& k) {
@@ -553,16 +578,16 @@ public:
   }
 
   // Untyped operations:
-  bool contains_str(const std::string& k) {
-    return contains(val::from_str<K>(k));
+  bool contains_str(int shard, const std::string& k) {
+    return contains(shard, val::from_str<K>(k));
   }
 
-  std::string get_str(const std::string& k) {
-    return val::to_str(get(val::from_str<K>(k)));
+  std::string get_str(int shard, const std::string& k) {
+    return val::to_str(get(shard, val::from_str<K>(k)));
   }
 
-  void update_str(const std::string& k, const std::string& v) {
-    update(val::from_str<K>(k), val::from_str<V>(v));
+  void update_str(int shard, const std::string& k, const std::string& v) {
+    update(shard, val::from_str<K>(k), val::from_str<V>(v));
   }
 
   Shard* create_local(int shard_id) {
@@ -579,7 +604,8 @@ public:
 
   TypedIterator<K, V>* get_iterator(int shard) {
     if (this->is_local_shard(shard)) {
-      return new LocalIterator<K, V>((ShardT<K, V>&) *(shards_[shard]));
+      auto s = shards_[shard];
+      return new LocalIterator<K, V>(shard, *((ShardT<K, V>*)s));
     } else {
       return new RemoteIterator<K, V>(this, shard);
     }

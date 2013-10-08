@@ -92,7 +92,8 @@ public:
   }
 
   template<class K, class V>
-  TableT<K, V>* create_table(SharderT<K>* sharder = new Modulo<K>(),
+  TableT<K, V>* create_table(
+      SharderT<K>* sharder = NULL,
       AccumulatorT<K, V>* combiner = NULL,
       AccumulatorT<K, V>* reducer = NULL,
       SelectorT<K, V>* selector = NULL) {
@@ -128,8 +129,12 @@ public:
       req.reducer.type_id = -1;
     }
 
-    req.sharder.type_id = sharder->type_id();
-    req.sharder.opts = sharder->opts();
+    if (sharder != NULL) {
+      req.sharder.type_id = sharder->type_id();
+      req.sharder.opts = sharder->opts();
+    } else {
+      req.sharder.type_id = -1;
+    }
 
     if (selector != NULL) {
       req.selector.type_id = selector->type_id();
