@@ -2,6 +2,7 @@ from spartan import util
 from spartan.array import expr
 from spartan.dense import distarray
 from spartan.util import Assert, divup
+from test_common import with_ctx
 import math
 import numpy as np
 import test_common
@@ -9,6 +10,7 @@ import test_common
 
 ONE_TILE = (10000, 10000, 10000)
 
+@with_ctx
 def test_stencil(ctx):
   IMG_SIZE = int(16 * math.sqrt(ctx.num_workers()))
   FILT_SIZE = 8
@@ -28,6 +30,3 @@ def test_stencil(ctx):
   result = expr.stencil(images, filters, 1)
   print result[0:1].glom()[0]
   
-  
-if __name__ == '__main__':
-  test_common.run(__file__)

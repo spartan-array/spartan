@@ -4,6 +4,7 @@ from spartan.dense import distarray, extent
 import numpy as np
 import spartan
 import test_common
+from test_common import with_ctx
 
 N_PTS = 10*10
 N_CENTERS = 10
@@ -34,7 +35,7 @@ def sum_centers(kernel, args):
      
   tgt.update(0, 0, c_pos)
   
-  
+@with_ctx
 def test_kmeans_manual(master):
   util.log('Generating points.')
   pts = distarray.rand(master, N_PTS, N_DIM)
@@ -53,10 +54,8 @@ def test_kmeans_manual(master):
   _, centers = spartan.fetch(new_centers)[0]
   print centers
  
+@with_ctx
 def test_kmeans_expr(ctx):
   pts = expr.rand(N_PTS, N_DIM)
   centers = expr.rand(N_CENTERS, N_DIM)
    
-  
-if __name__ == '__main__':
-  test_common.run(__file__)

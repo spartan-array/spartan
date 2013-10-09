@@ -10,8 +10,14 @@ import time
 import types
 import unittest
 
-
-config.add_flag('test_filter', default='')
+CTX = None
+def get_cluster_ctx():
+  global CTX
+  if CTX is None:
+    config.parse_known_args(sys.argv)
+    CTX = start_cluster(flags.num_workers, not flags.cluster)
+    
+  return CTX
 
 class BenchTimer(object):
   def __init__(self, num_workers):
@@ -30,24 +36,6 @@ def run_benchmarks(module, benchmarks, master, timer):
   for benchname in benchmarks:
     getattr(module, benchname)(master, timer)
   
-def run_tests(module):
-  tests = [k for k in dir(module) if (
-             k.startswith('test_') and 
-             isinstance(getattr(module, k), types.FunctionType))
-          ]
-  
-  if flags.test_filter:
-    tests = [t for t in tests if flags.test_filter in t]
-    
-  if not tests:
-    return
-  
-  master = start_cluster(flags.num_workers, not flags.cluster)
-  util.log_warn('Tests to run: %s', tests)
-  for testname in tests:
-    util.log_warn('Running %s', testname)
-    getattr(module, testname)(master)
-
 def run(filename):
   util.log('Loading tests from %s', filename)
   _, argv = config.parse_known_args(sys.argv)
@@ -57,8 +45,6 @@ def run(filename):
   mod_name, _ = splitext(basename(filename))
   module = imp.load_source(mod_name, filename)
   util.log('Running tests for module: %s (%s)', module, filename)
-  
-  run_tests(module)
  
   if flags.profile_master:
     prof = cProfile.Profile()
@@ -91,13 +77,20 @@ def run(filename):
   
   if flags.profile_kernels:
     spartan.PROF.dump_stats('kernel_prof.out')
+
+
+def with_ctx(fn):
+  '''
+  Decorator: invoke this test using a cluster instance.
+  :param fn:
+  '''
+  def test_fn():
+    ctx = get_cluster_ctx()
+    fn(ctx)
+      
+  test_fn.__name__ = fn.__name__
+  return test_fn
   
-def declare_test(fn):
-  '''Function decorator: lift a top-level function into a TestCase'''
-  class TestCase(unittest.TestCase):
-    def test_fn(self):
-      fn()
-  return TestCase
 
 if __name__ == '__main__':
   raise Exception, 'Should not be run directly.'

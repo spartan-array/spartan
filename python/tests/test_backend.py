@@ -2,13 +2,13 @@ from spartan import util
 from spartan.array import prims, compile_expr, backend, expr
 from spartan.dense import distarray, extent
 from spartan.util import Assert
-import math
+from test_common import with_ctx
 import numpy as np
-import test_common
 
 TEST_SIZE = 1000
 distarray.TILE_SIZE = TEST_SIZE ** 2 / 4
- 
+
+@with_ctx
 def test_add2(ctx):
   a = distarray.ones(ctx, (TEST_SIZE, TEST_SIZE))
   b = distarray.ones(ctx, (TEST_SIZE, TEST_SIZE))
@@ -20,6 +20,7 @@ def test_add2(ctx):
   lc = c.glom()
   Assert.all_eq(lc, np.ones((TEST_SIZE, TEST_SIZE)) * 2)
 
+@with_ctx
 def test_add3(ctx):
   a = distarray.ones(ctx, (TEST_SIZE, TEST_SIZE))
   b = distarray.ones(ctx, (TEST_SIZE, TEST_SIZE))
@@ -35,24 +36,28 @@ def test_add3(ctx):
   Assert.all_eq(ld, np.ones((TEST_SIZE, TEST_SIZE)) * 3)
   
   
+@with_ctx
 def test_compile_add2(ctx):
   a = expr.ones((TEST_SIZE, TEST_SIZE))
   b = expr.ones((TEST_SIZE, TEST_SIZE))
   Assert.all_eq((a + b).evaluate().glom(), np.ones((TEST_SIZE, TEST_SIZE)) * 2)
 
 
+@with_ctx
 def test_compile_add3(ctx):
   a = expr.ones((TEST_SIZE, TEST_SIZE))
   b = expr.ones((TEST_SIZE, TEST_SIZE))
   c = expr.ones((TEST_SIZE, TEST_SIZE))
   Assert.all_eq((a + b + c).evaluate().glom(), np.ones((TEST_SIZE, TEST_SIZE)) * 3)
 
+@with_ctx
 def test_compile_add_many(ctx):
   a = expr.ones((TEST_SIZE, TEST_SIZE))
   b = expr.ones((TEST_SIZE, TEST_SIZE))
   Assert.all_eq((a + b + a + b + a + b + a + b + a + b).evaluate().glom(), np.ones((TEST_SIZE, TEST_SIZE)) * 10)
   
 
+@with_ctx 
 def test_sum(ctx):
   a = distarray.ones(ctx, (TEST_SIZE, TEST_SIZE))
   a = prims.Value(a)
@@ -64,6 +69,7 @@ def test_sum(ctx):
   lc = c.glom()
   Assert.all_eq(lc, np.ones((TEST_SIZE,)) * TEST_SIZE)
   
+@with_ctx 
 def test_compile_sum(ctx):
   def _(axis):
     util.log('Testing sum over axis %s', axis)
@@ -76,7 +82,7 @@ def test_compile_sum(ctx):
   _(axis=1)
   _(axis=None)
  
- 
+@with_ctx 
 def test_compile_index(ctx):
   a = expr.arange((TEST_SIZE, TEST_SIZE))
   b = expr.ones((10,))
@@ -87,6 +93,3 @@ def test_compile_index(ctx):
   ny = np.ones((10,), dtype=np.int)
   
   Assert.all_eq(val.glom(), nx[ny])
-  
-if __name__ == '__main__':
-  test_common.run(__file__)

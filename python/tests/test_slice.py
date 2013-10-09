@@ -5,10 +5,12 @@ from spartan.util import Assert
 import math
 import numpy as np
 import test_common
+from test_common import with_ctx
 
 TEST_SIZE = 100
 distarray.TILE_SIZE = TEST_SIZE ** 2 / 4
 
+@with_ctx
 def test_slice_get(ctx):
   x = expr.arange((TEST_SIZE, TEST_SIZE))
   z = x[5:8, 5:8]
@@ -20,6 +22,7 @@ def test_slice_get(ctx):
 def add_one_tile(tiles):
   return tiles[0] + 1
 
+@with_ctx
 def test_slice_map_tiles(ctx):
   x = expr.arange((TEST_SIZE, TEST_SIZE))
   z = x[5:8, 5:8]
@@ -34,6 +37,7 @@ def add_one_extent(inputs, ex):
   util.log('Mapping: %s', ex)
   return (ex, inputs[0].fetch(ex) + 1)
 
+@with_ctx
 def test_slice_map_extents(ctx):
   x = expr.arange((TEST_SIZE, TEST_SIZE))
   z = x[5:8, 5:8]
@@ -45,8 +49,8 @@ def test_slice_map_extents(ctx):
   Assert.all_eq(val.glom(), nx[5:8, 5:8] + 1)
   
   
+@with_ctx
 def test_slice_map_tiles2(ctx):
-  return
   x = expr.arange((10, 10, 10), dtype=np.int)
   nx = np.arange(10 * 10 * 10, dtype=np.int).reshape((10, 10, 10))
   
@@ -54,11 +58,13 @@ def test_slice_map_tiles2(ctx):
   z = expr.map_tiles(y, lambda tiles: tiles[0] + 13)
   val = z.evaluate().glom()
   
-  Assert.all_eq(val, nx[:, :, 0] + 13)
+  Assert.all_eq(val.reshape(10, 10), nx[:, :, 0] + 13)
   
+@with_ctx
 def test_from_slice(ctx):
   print extent.from_slice((slice(None), slice(None), 0), [100, 100, 100])
 
+@with_ctx
 def test_slice_reduce(ctx):
   x = expr.arange((TEST_SIZE, TEST_SIZE, TEST_SIZE), dtype=np.int)
   nx = np.arange(TEST_SIZE * TEST_SIZE * TEST_SIZE, dtype=np.int).reshape((TEST_SIZE, TEST_SIZE, TEST_SIZE))
@@ -67,5 +73,3 @@ def test_slice_reduce(ctx):
   
   Assert.all_eq(val, nx[:, :, 0].sum())
   
-if __name__ == '__main__':
-  test_common.run(__file__)
