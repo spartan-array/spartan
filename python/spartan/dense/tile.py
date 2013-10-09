@@ -40,7 +40,7 @@ class Tile(object):
     self.data[idx] = val
     
   def __repr__(self):
-    return 'tile(%s)' % (self.shape,)
+    return 'tile(%s, %s)' % (self.shape, self.dtype)
 
 def from_data(data):
   t = Tile()
@@ -102,9 +102,11 @@ class TileAccum(object):
     updated = old_tile.valid & new_tile.valid
     
     old_tile.data[replaced] = new_tile.data[replaced]
-    old_tile.data[updated] = self.accum(
-                old_tile.data[updated],
-                new_tile.data[updated])
-    
     old_tile.valid[replaced] = 1
+    
+    if np.any(updated):
+      old_tile.data[updated] = self.accum(
+                  old_tile.data[updated],
+                  new_tile.data[updated])
+    
     return old_tile

@@ -60,8 +60,8 @@ def convolve(local_image, local_filters):
 
         
 def stencil_mapper(region, local, filters=None, image=None, target=None):
-  local_filters = filters[:]
-  local_image = image[region]
+  local_filters = filters.glom()
+  local_image = image.fetch(region)
   
   num_img, w, h = image.shape
   num_filt, fw, fh = filters.shape
@@ -208,7 +208,7 @@ class Backend(object):
                           reducer=distarray.accum_sum,
                           tile_hint=(num_img, num_filt, tile_size, tile_size))
                           
-    image.map_inplace(lambda k, v: stencil_mapper(k, v, filters, image, dst))
+    image.foreach(lambda k, v: stencil_mapper(k, v, filters, image, dst))
     return dst
   
   def _evaluate(self, ctx, prim):

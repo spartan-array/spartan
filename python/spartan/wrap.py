@@ -151,6 +151,9 @@ class Kernel(object):
   def args(self):
     return self._kernel.args()
   
+  def current_table(self):
+    return int(self.args()['table'])
+  
   def current_shard(self):
     return int(self.args()['shard'])
     

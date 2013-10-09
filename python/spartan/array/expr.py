@@ -327,7 +327,7 @@ def _ravel_mapper(inputs, ex):
   shape = (np.prod(ex.array_shape),)
   
   ravelled_ex = extent.TileExtent((ul,), (lr - ul,), shape)
-  ravelled_data = inputs[0][ex].ravel()
+  ravelled_data = inputs[0].fetch(ex).ravel()
   return ravelled_ex, ravelled_data
    
 def ravel(v):
@@ -374,7 +374,7 @@ def dot(a, b):
   if isinstance(bv, np.ndarray):
     return map_extents((av,), _dot_numpy, numpy_data=bv)
   
-  av, bv = distarray.broadcast(av, bv)
+  #av, bv = distarray.broadcast([av, bv])
   Assert.eq(a.shape[1], b.shape[0])
   return map_extents((av, bv), _dot_mapper)
             

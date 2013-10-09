@@ -291,7 +291,7 @@ def best_locality(array, ex):
   splits = extent.extents_for_region(array.extents, ex)
   counts = collections.defaultdict(int)
   for key, overlap in splits:
-    shard = array.table.shard_for_key(key)
+    shard = array.extents[key]
     counts[shard] += overlap.size
   
   s_counts = sorted(counts.items(), key=lambda kv: kv[1])

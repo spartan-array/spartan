@@ -337,6 +337,7 @@ public:
 
   RefPtr get(int shard, RefPtr k);
   void update(int shard, RefPtr k, RefPtr v);
+  void flush();
 
   PyIterator* get_iterator();
   PyIterator* get_iterator(int shard);
