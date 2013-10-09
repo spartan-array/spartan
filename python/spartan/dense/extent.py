@@ -98,7 +98,7 @@ class TileExtent(object):
  
 def drop_axis(ex, axis):
   if axis is None: return TileExtent((), (), ())
-  if axis < 0: axis = len(ex.ul) - axis
+  if axis < 0: axis = len(ex.ul) + axis
   
   ul = list(ex.ul)
   sz = list(ex.sz)

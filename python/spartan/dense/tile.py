@@ -28,7 +28,9 @@ class Tile(object):
     if len(self.shape) == 0:
       return self.data
     
-    assert np.all(self.valid[idx])
+    if not np.all(self.valid[idx]):
+      util.log('%s %s %s', idx, self.data[idx], self.valid[idx])
+      raise ValueError
     
     return self.data[idx] 
   

@@ -62,7 +62,6 @@ class NestedSlice(object):
 
 class TileSelector(object):
   def __call__(self, k, v):
-    #util.log('Selector called for %s: %s', k, v)
     if isinstance(k, extent.TileExtent): 
       return v[:]
     
@@ -123,39 +122,6 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
   
   return result
     
-def _create_rand(extent, data):
-  data[:] = np.random.rand(*extent.shape)
-
-def _create_randn(extent, data):
-  data[:] = np.random.randn(*extent.shape)
-  
-def _create_ones(extent, data):
-#   util.log('Updating %s, %s', extent, data)
-  data[:] = 1
-
-def _create_zeros(extent, data):
-  data[:] = 0
-
-def _create_range(ex, data):
-  Assert.eq(ex.shape, data.shape)
-  pos = extent.ravelled_pos(ex.ul, ex.array_shape)
-  sz = np.prod(ex.shape)
-  data[:] = np.arange(pos, pos+sz).reshape(ex.shape)
-  
-def randn(master, *shape):
-  return create_with(master, shape, _create_randn)
-
-def rand(master, *shape):
-  return create_with(master, shape, _create_rand)
-
-def ones(master, shape):
-  return create_with(master, shape, _create_ones)
-
-def zeros(master, shape):
-  return create_with(master, shape, _create_zeros)
-  
-def arange(master, shape):
-  return create_with(master, shape, _create_range)
 
 def from_table(table):
   '''
@@ -202,7 +168,6 @@ def create(master, shape,
            tile_hint=None):
   dtype = np.dtype(dtype)
   shape = tuple(shape)
-  total_elems = np.prod(shape)
 
   table = master.create_table(sharder, combiner, reducer, TileSelector())
   extents = compute_splits(shape, tile_hint, table.num_shards())
@@ -215,11 +180,6 @@ def create(master, shape,
   return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
 
 empty = create
-
-def create_with(master, shape, init_fn):
-  d = create(master, shape)
-  spartan.map_inplace(d.table, init_fn)
-  return d 
 
 
 class DistArray(object):
@@ -498,4 +458,50 @@ def broadcast(args):
     
   #util.log_debug('Broadcast result: %s', results)
   return results
+
+
+# TODO(rjp)
+# These functions shouldn't be needed, as they are 
+# all available via expression level operations.
+# At the moment, they're being used by various tests,
+# but they should be moved to some common testing module
+# at some point.
+def create_with(master, shape, init_fn):
+  d = create(master, shape)
+  spartan.map_inplace(d.table, init_fn)
+  return d 
+
+def _create_rand(extent, data):
+  data[:] = np.random.rand(*extent.shape)
+
+def _create_randn(extent, data):
+  data[:] = np.random.randn(*extent.shape)
+  
+def _create_ones(extent, data):
+  util.log('Updating %s, %s', extent, data)
+  data[:] = 1
+
+def _create_zeros(extent, data):
+  data[:] = 0
+
+def _create_range(ex, data):
+  Assert.eq(ex.shape, data.shape)
+  pos = extent.ravelled_pos(ex.ul, ex.array_shape)
+  sz = np.prod(ex.shape)
+  data[:] = np.arange(pos, pos+sz).reshape(ex.shape)
+  
+def randn(master, *shape):
+  return create_with(master, shape, _create_randn)
+
+def rand(master, *shape):
+  return create_with(master, shape, _create_rand)
+
+def ones(master, shape):
+  return create_with(master, shape, _create_ones)
+
+def zeros(master, shape):
+  return create_with(master, shape, _create_zeros)
+  
+def arange(master, shape):
+  return create_with(master, shape, _create_range)
 

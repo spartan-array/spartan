@@ -19,12 +19,11 @@ def slice_mapper(ex, val, region, matching_extents):
 
 def int_index_mapper(ex, tile, src, idx, dst):
   '''Map over the index array, fetching rows from the data array.'''
-  idx_slc = ex.to_slice()[0]
-  idx_vals = idx[idx_slc]
+  idx_vals = idx.fetch(extent.drop_axis(ex, -1))
   
   util.log('Dest shape: %s, idx: %s, %s', tile.shape, ex, idx_vals)
   for dst_idx, src_idx in enumerate(idx_vals):
-    tile[dst_idx] = src[int(src_idx)]
+    tile[dst_idx] = src.fetch(extent.from_slice(int(src_idx), src.shape))
   return [(ex, tile)]
 
 def bool_index_mapper(ex, tile, src, idx):
@@ -172,7 +171,6 @@ class Backend(object):
     return result
   
   def eval_Index(self, ctx, prim, inputs):
-    dst = ctx.create_table()
     src = inputs[0]
     idx = inputs[1]
     
@@ -193,7 +191,8 @@ class Backend(object):
                              dtype = src.dtype)
       
       # map over it, replacing existing items.
-      return dst.map_inplace(lambda k, v: int_index_mapper(k, v, src, idx, dst))
+      dst.foreach(lambda k, v: int_index_mapper(k, v, src, idx, dst))
+      return dst
     
     
   def eval_Stencil(self, ctx, prim, inputs):
