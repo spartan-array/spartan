@@ -58,7 +58,7 @@ def test_sum(ctx):
   a = prims.Value(a)
   b = prims.Reduce(a, 0, 
                    lambda _: np.float, 
-                   lambda ex, tile: np.sum(tile[:], axis=0), 
+                   lambda ex, tile, axis: np.sum(tile[:], axis=axis), 
                    lambda a, b: a + b)
   c = backend.evaluate(ctx, b)
   lc = c.glom()
@@ -81,7 +81,7 @@ def test_compile_index(ctx):
   a = expr.arange((TEST_SIZE, TEST_SIZE))
   b = expr.ones((10,))
   z = a[b]  
-  val = z.evaluate()
+  val = expr.evaluate(z)
   
   nx = np.arange(TEST_SIZE * TEST_SIZE).reshape(TEST_SIZE, TEST_SIZE)
   ny = np.ones((10,), dtype=np.int)

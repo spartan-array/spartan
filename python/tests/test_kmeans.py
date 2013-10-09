@@ -27,12 +27,12 @@ def sum_centers(kernel, args):
   
   c_pos = np.zeros((N_CENTERS, N_DIM))
 
-  for ex, tile in kernel.table(pts_id).iter(kernel.current_shard()):
-    idx = min_idx.get(extent.drop_axis(ex, 1))
+  for shard, ex, tile in kernel.table(pts_id).iter(kernel.current_shard()):
+    idx = min_idx.get(shard, extent.drop_axis(ex, 1))
     for j in range(N_CENTERS):
       c_pos[j] = np.sum(tile[idx == j], axis=0)
      
-  tgt.update(0, c_pos)
+  tgt.update(0, 0, c_pos)
   
   
 def test_kmeans_manual(master):
@@ -44,7 +44,7 @@ def test_kmeans_manual(master):
   new_centers = master.create_table(sharder=ModSharder(), combiner=None, reducer=sum_accum, selector=None)
   
   util.log('Finding closest')
-  min_array = pts.map_to_array(lambda ex, tile: min_dist(ex, tile, centers))
+  min_array = distarray.map_to_array(pts, lambda ex, tile: min_dist(ex, tile, centers))
    
   util.log('Updating clusters.')
   master.foreach_shard(min_array.table, sum_centers,
