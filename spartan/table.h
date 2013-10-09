@@ -173,7 +173,6 @@ protected:
   std::vector<PartitionInfo> shard_info_;
   std::vector<Shard*> shards_;
   int id_;
-  int pending_writes_;
   TableContext *ctx_;
 
 public:
@@ -184,10 +183,6 @@ public:
   Selector *selector;
 
   virtual ~Table() {
-  }
-
-  int pending_writes() {
-    return pending_writes_;
   }
 
   void set_ctx(TableContext* h) {
@@ -450,16 +445,24 @@ private:
   rpc::Mutex m_;
   static TypeRegistry<Table>::Helper<TableT<K, V> > register_me_;
 
+  int pending_updates_;
+
 public:
+
+  TableT() {
+    pending_updates_ = 0;
+    sharder = NULL;
+    ctx_ = NULL;
+    id_ = -1;
+    combiner = reducer = NULL;
+  }
+
   int type_id() {
     return register_me_.id();
   }
 
   void init(int id, int num_shards) {
     id_ = id;
-    sharder = NULL;
-    pending_writes_ = 0;
-    ctx_ = NULL;
 
     shards_.resize(num_shards);
     shard_info_.resize(num_shards);
@@ -469,8 +472,6 @@ public:
       shard_info_[i].shard = i;
       shard_info_[i].table = id;
     }
-
-    combiner = reducer = NULL;
   }
 
   virtual ~TableT() {
@@ -525,11 +526,17 @@ public:
       return;
     }
 
+    ++pending_updates_;
     TableData put;
     put.table = this->id();
     put.shard = shard;
     put.kv_data.push_back( { val::to_str(k), val::to_str(v) });
-    workers[worker_for_shard(shard)]->async_put(put);
+
+    auto callback = [=](rpc::Future *future) {
+      --this->pending_updates_;
+    };
+
+    workers[worker_for_shard(shard)]->async_put(put, rpc::FutureAttr(callback));
   }
 
   bool _get(int shard, const K& k, V* v) {
@@ -694,7 +701,12 @@ public:
       }
     }
 
-    pending_writes_ = 0;
+    // Wait for any updates that were sent asynchronously
+    // (this occurs if we don't have a combiner).
+    while (pending_updates_ > 0) {
+      Sleep(0.0001);
+    }
+
     return count;
   }
 
