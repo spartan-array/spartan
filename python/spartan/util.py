@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from . import wrap
 from contextlib import contextmanager
 from math import ceil
 from os.path import basename
@@ -13,39 +12,7 @@ import threading
 import time
 import traceback
 
-log_mutex = threading.RLock()
-def log(msg, *args, **kw):
-  level = kw.get('level', wrap.INFO)
-  with log_mutex:
-    caller = sys._getframe(1)
-    filename = caller.f_code.co_filename
-    lineno = caller.f_lineno
-    if 'exc_info' in kw:
-      exc = ''.join(traceback.format_exc())
-    else:
-      exc = None
-
-    if isinstance(msg, str):
-      msg = msg % args
-    else:
-      msg = repr(msg)
-   
-    msg = str(msg) 
-    wrap.log(level, filename, lineno, msg)
-    if exc is not None:
-      wrap.log(level, filename, lineno, exc)
-
-def log_info(msg, *args, **kw):
-  kw['level'] = wrap.INFO
-  return log(msg, *args, **kw)
-
-def log_debug(msg, *args, **kw):
-  kw['level'] = wrap.DEBUG
-  return log(msg, *args, **kw)
-
-def log_error(msg, *args, **kw):
-  kw['level'] = wrap.ERROR
-  return log(msg, *args, **kw)
+from wrap import log, log_info, log_debug, log_warn, log_error
 
 class FileWatchdog(threading.Thread):
   """Watchdog for a file (typically `sys.stdin` or `sys.stdout`).
