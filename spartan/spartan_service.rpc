@@ -1,3 +1,10 @@
+#include "spartan/py-support.h"
+
+extern rpc::Marshal& operator <<(rpc::Marshal& m, const RefPtr& p);
+extern rpc::Marshal& operator >>(rpc::Marshal& m, RefPtr p);
+
+%%
+
 namespace spartan
 
 struct TypeConstructor {
@@ -6,7 +13,6 @@ struct TypeConstructor {
 };
 
 struct CreateTableReq {
-  i32 table_type;
   i32 num_shards;
   vector<i32> shards;
   i32 id;
@@ -24,9 +30,13 @@ struct RunKernelReq {
   map<string, string> args;
 }
 
+struct RunKernelResp {
+  string error;
+};
+
 struct KV {
-  string key;
-  string value;
+  RefPtr key;
+  RefPtr value;
 }
 
 struct IteratorReq {
@@ -57,14 +67,16 @@ struct TableData {
   i32 table;
   i32 shard;
   i32 done;
-  string table_data;
+  
   vector<KV> kv_data;
   i32 marker;
   i32 missing_key;
+  
+  string error;
 };
 
 struct GetRequest {
-  string key;
+  RefPtr key;
   i32 table;
   i32 shard;
 };
@@ -105,7 +117,7 @@ abstract service Worker {
   get(GetRequest req|TableData resp)
   assign_shards(ShardAssignmentReq req)
   
-  run_kernel(RunKernelReq req|)
+  run_kernel(RunKernelReq req|RunKernelResp resp)
   get_iterator(IteratorReq req| IteratorResp resp)
   put(TableData req|)
   flush()
@@ -115,6 +127,5 @@ abstract service Worker {
 abstract service Master {
   fast register_worker(RegisterReq req|)
 }
-
 
 %%

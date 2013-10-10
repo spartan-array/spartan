@@ -9,7 +9,7 @@ and imports all symbols from the SWIG generated code.
 from os.path import abspath
 import sys
 sys.path += [abspath('../build/.libs'), 
-             abspath('../build/python/spartan'), 
+             abspath('../build/python/spartan/wrap'), 
              abspath('.')]
 
 import spartan_wrap
@@ -112,10 +112,10 @@ def key_mapper(k, v):
 def keys(src):
   return map_items(src, key_mapper)
 
-class Table(spartan_wrap.PyTable):
+class Table(spartan_wrap.Table):
   def __init__(self, id, destroy_on_del=False):
     #print 'Creating table: %d, destroy? %d' % (id, destroy_on_del)
-    spartan_wrap.PyTable.__init__(self, id)
+    spartan_wrap.Table.__init__(self, id)
     self.thisown = False
     self.destroy_on_del = destroy_on_del
       
@@ -267,7 +267,7 @@ def map_inplace(table, fn, **kw):
   dst = src
   master = get_master()
   master.foreach_shard(table, mapper_kernel, 
-                          (src.id(), dst.id(), fn, kw))
+                       (src.id(), dst.id(), fn, kw))
   return dst
 
 

@@ -8,6 +8,7 @@
 #include "spartan/kernel.h"
 #include "spartan/table.h"
 #include "spartan/util/common.h"
+#include "spartan/util/stringpiece.h"
 #include "spartan/util/timer.h"
 #include "spartan/worker.h"
 
@@ -39,7 +40,7 @@ Worker::~Worker() {
   delete server_;
 }
 
-void Worker::run_kernel(const RunKernelReq& kreq) {
+void Worker::run_kernel(const RunKernelReq& kreq, RunKernelResp* resp) {
   TableContext::set_context(this);
 
   CHECK(id_ != -1);
@@ -77,11 +78,11 @@ void Worker::get(const GetRequest& req, TableData* resp) {
   resp->done = true;
 
   Table *t = tables_[req.table];
-  if (!t->contains_str(req.shard, req.key)) {
+  if (!t->contains(req.shard, req.key)) {
     resp->missing_key = true;
   } else {
     resp->missing_key = false;
-    resp->kv_data.push_back( { req.key, t->get_str(req.shard, req.key) });
+    resp->kv_data.push_back( { req.key, t->get(req.shard, req.key) });
   }
   Log_debug("WORKER %d: done handling get.", id_);
 }
@@ -109,7 +110,7 @@ void Worker::get_iterator(const IteratorReq& req, IteratorResp* resp) {
 
   for (size_t i = 0; i < req.count; i++) {
     if (!it->done()) {
-      resp->results.push_back( { it->key_str(), it->value_str() });
+      resp->results.push_back( { it->key(), it->value() });
       resp->row_count = i;
       it->next();
     }
@@ -122,7 +123,7 @@ void Worker::create_table(const CreateTableReq& req) {
   CHECK(id_ != -1);
   rpc::ScopedLock sl(lock_);
   Log_debug("Creating table: %d", req.id);
-  Table* t = TypeRegistry<Table>::get_by_id(req.table_type);
+  Table* t = new Table;
   t->init(req.id, req.num_shards);
 
   t->combiner = TypeRegistry<Accumulator>::get_by_id(req.combiner.type_id,
@@ -185,7 +186,7 @@ void Worker::put(const TableData& req) {
   }
 
   for (auto p : req.kv_data) {
-    t->update_str(req.shard, p.key, p.value);
+    t->update(req.shard, p.key, p.value);
   }
   Log_debug("WORKER: %d -- finished put", id_);
 }
@@ -222,7 +223,7 @@ Worker* start_worker(const std::string& master_addr, int port) {
   rpc::Server* server = new rpc::Server(manager, threadpool);
   auto worker = new Worker(manager);
   server->reg(worker);
-  string hostport  = StringPrintf("%s:%d", req.addr.host.c_str(), req.addr.port);
+  std::string hostport  = StringPrintf("%s:%d", req.addr.host.c_str(), req.addr.port);
   CHECK_EQ(server->start(hostport.c_str()), 0);
 
   MasterProxy* master = connect<MasterProxy>(manager, master_addr);

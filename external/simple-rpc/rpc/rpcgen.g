@@ -118,6 +118,10 @@ class SourceFile(object):
     def decr_indent(self):
         self.indent_level -= 1
         assert self.indent_level >= 0
+        
+    def write(self, txt):
+        self.f.write(txt)
+        
     def writeln(self, txt=None):
         if txt != None:
             self.f.write("    " * self.indent_level)
@@ -316,7 +320,27 @@ def emit_rpc_source(rpc_source, f):
 def rpcgen(rpc_fpath):
     with open(rpc_fpath) as f:
         rpc_src = f.read()
-        rpc_source = parse("rpc_source", rpc_src)
+        
+    rpc_src_lines = [l.strip() for l in rpc_src.split("\n")]
+   
+    header = footer = src = ''
+    
+    if rpc_src_lines.count('%%') == 2:
+	    # header + source + footer
+	    first = rpc_src_lines.index("%%")
+	    next = rpc_src_lines.index("%%", first + 1)
+	    header =  '\n'.join(rpc_src_lines[:first])
+	    src = '\n'.join(rpc_src_lines[first+1:next])
+	    footer = '\n'.join(rpc_src_lines[next + 1:])
+    elif rpc_src_lines.count('%%') == 1:
+	    # source + footer
+	    first = rpc_src_lines.index("%%")
+	    src = '\n'.join(rpc_src_lines[:first])
+	    footer = '\n'.join(rpc_src_lines[first + 1:])
+    else: 
+        src = '\n'.join(rpc_src_lines) 
+      
+    rpc_source = parse("rpc_source", src)
     with open(os.path.splitext(rpc_fpath)[0] + ".h", "w") as f:
         f = SourceFile(f)
         f.writeln("// generated from '%s'" % os.path.split(rpc_fpath)[1])
@@ -328,13 +352,9 @@ def rpcgen(rpc_fpath):
         f.writeln()
         f.writeln("#include <errno.h>")
         f.writeln()
-
+        f.write(header)
         emit_rpc_source(rpc_source, f)
-
-        rpc_src_lines = rpc_src.split("\n")
-        if "%%" in rpc_src_lines:
-            for l in rpc_src_lines[rpc_src_lines.index("%%") + 1:]:
-                f.writeln(l)
+        f.write(footer)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

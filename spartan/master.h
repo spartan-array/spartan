@@ -4,6 +4,7 @@
 #include "spartan/kernel.h"
 #include "spartan/table.h"
 #include "spartan/util/common.h"
+#include "spartan/util/stringpiece.h"
 #include "spartan/util/timer.h"
 #include "spartan/spartan_service.h"
 
@@ -22,7 +23,8 @@ struct ShardId {
   int table;
   int shard;
 
-  ShardId() : table(-1), shard(-1) {
+  ShardId() :
+      table(-1), shard(-1) {
 
   }
   ShardId(int t, int s) :
@@ -30,9 +32,15 @@ struct ShardId {
   }
 
   bool operator<(const ShardId& r) const {
-    if (table < r.table) { return true; }
-    if (table > r.table) { return false; }
-    if (shard < r.shard) { return true; }
+    if (table < r.table) {
+      return true;
+    }
+    if (table > r.table) {
+      return false;
+    }
+    if (shard < r.shard) {
+      return true;
+    }
     return false;
   }
 };
@@ -91,83 +99,8 @@ public:
     return num_workers_;
   }
 
-  template<class K, class V>
-  TableT<K, V>* create_table(
-      SharderT<K>* sharder = NULL,
-      AccumulatorT<K, V>* combiner = NULL,
-      AccumulatorT<K, V>* reducer = NULL,
-      SelectorT<K, V>* selector = NULL) {
-    Timer timer;
-    wait_for_workers();
-
-    TableT<K, V>* t = new TableT<K, V>();
-
-    // Crash here if we can't find the sharder/accumulators.
-    delete TypeRegistry<Sharder>::get_by_id(sharder->type_id());
-
-    CreateTableReq req;
-    int table_id = table_id_counter_++;
-
-    Log_debug("Creating table %d", table_id);
-    req.table_type = t->type_id();
-    req.id = table_id;
-    req.num_shards = workers_.size() * 2 + 1;
-
-    if (combiner != NULL) {
-      delete TypeRegistry<Accumulator>::get_by_id(combiner->type_id());
-      req.combiner.type_id = combiner->type_id();
-      req.combiner.opts = combiner->opts();
-    } else {
-      req.combiner.type_id = -1;
-    }
-
-    if (reducer != NULL) {
-      delete TypeRegistry<Accumulator>::get_by_id(reducer->type_id());
-      req.reducer.type_id = reducer->type_id();
-      req.reducer.opts = reducer->opts();
-    } else {
-      req.reducer.type_id = -1;
-    }
-
-    if (sharder != NULL) {
-      req.sharder.type_id = sharder->type_id();
-      req.sharder.opts = sharder->opts();
-    } else {
-      req.sharder.type_id = -1;
-    }
-
-    if (selector != NULL) {
-      req.selector.type_id = selector->type_id();
-      req.selector.opts = selector->opts();
-    } else {
-      req.selector.type_id = -1;
-    }
-
-    t->init(table_id, req.num_shards);
-    t->sharder = sharder;
-    t->combiner = combiner;
-    t->reducer = reducer;
-    t->selector = selector;
-
-    t->workers.resize(workers_.size());
-    for (auto w : workers_) {
-      t->workers[worker_id(w)] = worker_proxy(w);
-    }
-
-    t->set_ctx(this);
-
-    tables_[t->id()] = t;
-
-    rpc::FutureGroup futures;
-    for (auto w : workers_) {
-      futures.add(worker_proxy(w)->async_create_table(req));
-    }
-    futures.wait_all();
-    assign_shards(t);
-
-    // Log_info("Table created in %f seconds", timer.elapsed());
-    return t;
-  }
+  Table* create_table(Sharder* sharder = NULL, Accumulator* combiner = NULL,
+      Accumulator* reducer = NULL, Selector* selector = NULL);
 
   void map_shards(Table* t, const std::string& kernel) {
     map_shards(t, TypeRegistry<Kernel>::get_by_name(kernel));

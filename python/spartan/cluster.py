@@ -43,8 +43,8 @@ def start_cluster(num_workers, local=not flags.cluster):
   count = 0
   num_hosts = len(config.HOSTS)
   for worker, total_tasks in config.HOSTS:
-    #sz = util.divup(num_workers, num_hosts)
-    sz = total_tasks
+    sz = util.divup(num_workers, num_hosts)
+    #sz = total_tasks
     sz = min(sz, num_workers - count)
     start_remote_worker(worker, count, count + sz)
     count += sz

@@ -149,7 +149,6 @@ int worker_id(WorkerState* w) {
   return w->id;
 }
 
-
 Master::Master(int num_workers) {
   num_workers_ = num_workers;
   client_poller_ = new rpc::PollMgr;
@@ -214,6 +213,64 @@ void Master::register_worker(const RegisterReq& req) {
   workers_.push_back(w);
 }
 
+Table* Master::create_table(Sharder* sharder, Accumulator* combiner,
+    Accumulator* reducer, Selector* selector) {
+  Timer timer;
+  wait_for_workers();
+  Table* t = new Table;
+  // Crash here if we can't find the sharder/accumulators.
+  delete TypeRegistry<Sharder>::get_by_id(sharder->type_id());
+  CreateTableReq req;
+  int table_id = table_id_counter_++;
+  Log_debug("Creating table %d", table_id);
+  req.id = table_id;
+  req.num_shards = workers_.size() * 2 + 1;
+  if (combiner != NULL) {
+    delete TypeRegistry<Accumulator>::get_by_id(combiner->type_id());
+    req.combiner.type_id = combiner->type_id();
+    req.combiner.opts = combiner->opts();
+  } else {
+    req.combiner.type_id = -1;
+  }
+  if (reducer != NULL) {
+    delete TypeRegistry<Accumulator>::get_by_id(reducer->type_id());
+    req.reducer.type_id = reducer->type_id();
+    req.reducer.opts = reducer->opts();
+  } else {
+    req.reducer.type_id = -1;
+  }
+  if (sharder != NULL) {
+    req.sharder.type_id = sharder->type_id();
+    req.sharder.opts = sharder->opts();
+  } else {
+    req.sharder.type_id = -1;
+  }
+  if (selector != NULL) {
+    req.selector.type_id = selector->type_id();
+    req.selector.opts = selector->opts();
+  } else {
+    req.selector.type_id = -1;
+  }
+  t->init(table_id, req.num_shards);
+  t->sharder = sharder;
+  t->combiner = combiner;
+  t->reducer = reducer;
+  t->selector = selector;
+  t->workers.resize(workers_.size());
+  for (auto w : workers_) {
+    t->workers[worker_id(w)] = worker_proxy(w);
+  }
+  t->set_ctx(this);
+  tables_[t->id()] = t;
+  rpc::FutureGroup futures;
+  for (auto w : workers_) {
+    futures.add(worker_proxy(w)->async_create_table(req));
+  }
+  futures.wait_all();
+  assign_shards(t);
+  // Log_info("Table created in %f seconds", timer.elapsed());
+  return t;
+}
 WorkerState* Master::assign_shard(int table, int shard) {
   {
     int owner = tables_[table]->shard_info(shard)->owner;
@@ -261,7 +318,7 @@ void Master::send_table_assignments() {
   for (auto i : tables_) {
     auto t = i.second;
     for (int j = 0; j < t->num_shards(); ++j) {
-      req.assign.push_back( { t->id(), j, t->shard_info(j)->owner } );
+      req.assign.push_back( { t->id(), j, t->shard_info(j)->owner });
     }
   }
 
@@ -301,10 +358,12 @@ int Master::dispatch_work(Kernel* k) {
       w->set_finished(ShardId(w_req.table, w_req.shard));
     };
 
-    rpc::Future *f = w->proxy->async_run_kernel(w_req, rpc::FutureAttr(callback));
+    rpc::Future *f = w->proxy->async_run_kernel(w_req,
+        rpc::FutureAttr(callback));
     running_kernels_[w_req.shard] = f;
 //    assert(w->proxy->run_kernel(w_req)== 0);
-    Log_debug("MASTER: Kernel %d:%d dispatched as request %p", w_req.table, w_req.shard, f);
+    Log_debug("MASTER: Kernel %d:%d dispatched as request %p",
+        w_req.table, w_req.shard, f);
     num_dispatched++;
   }
   return num_dispatched;
@@ -329,7 +388,7 @@ void Master::destroy_table(int table_id) {
   for (auto w : workers_) {
     g.add(w->proxy->async_destroy_table(table_id));
 
-    for (auto s = w->shards.begin(); s != w->shards.end(); ) {
+    for (auto s = w->shards.begin(); s != w->shards.end();) {
       if (s->table == table_id) {
         s = w->shards.erase(s);
       } else {
@@ -402,7 +461,8 @@ void Master::wait_for_completion(Kernel* k) {
 
   int count = 0;
   for (auto f : running_kernels_) {
-    Log_debug("Waiting for kernel %d/%d to finish...", count, running_kernels_.size());
+    Log_debug("Waiting for kernel %d/%d to finish...",
+        count, running_kernels_.size());
     f.second->wait();
     f.second->release();
     ++count;

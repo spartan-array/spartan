@@ -28,7 +28,7 @@ public:
   void destroy_table(const rpc::i32& id);
   void get(const GetRequest& req, TableData* resp);
   void assign_shards(const ShardAssignmentReq& req);
-  void run_kernel(const RunKernelReq& req);
+  void run_kernel(const RunKernelReq& req, RunKernelResp* resp);
   void get_iterator(const IteratorReq& req, IteratorResp* resp);
   void put(const TableData& req);
   void flush();

@@ -28,7 +28,7 @@ class Flags(object):
   profile_kernels = add_bool_flag('profile_kernels', default=False)
   profile_master = add_bool_flag('profile_master', default=False)
   log_level = add_flag('log_level', default=3, type=int)
-  num_workers = add_flag('num_workers', default=1, type=int)
+  num_workers = add_flag('num_workers', default=4, type=int)
   cluster = add_bool_flag('cluster', default=False)
 
 flags = Flags()

@@ -10,7 +10,6 @@
 #include <boost/unordered_map.hpp>
 
 #include "spartan/util/common.h"
-#include "spartan/util/marshal.h"
 #include "spartan/util/registry.h"
 #include "spartan/util/timer.h"
 #include "spartan/spartan_service.h"
@@ -25,6 +24,9 @@ using boost::make_tuple;
 // X MB.
 static const int kDefaultIteratorFetch = 2048;
 
+class Table;
+class Master;
+
 #define GLOBAL_TABLE_USE_SCOPEDLOCK 1
 
 #if GLOBAL_TABLE_USE_SCOPEDLOCK == 0
@@ -33,81 +35,20 @@ static const int kDefaultIteratorFetch = 2048;
 #define GRAB_LOCK rpc::ScopedLock sl(mutex())
 #endif
 
-// An instance of Marshal must be available for key and value types.
-namespace val {
-
-template<class T>
-bool read(T* v, StringPiece src) {
-  StringReader r(src);
-  return Marshal<T>::read_value(&r, v);
-}
-
-template<class T>
-void write(const T& v, string* out) {
-  StringWriter w(out);
-  Marshal<T>::write_value(&w, v);
-}
-
-template<class T>
-std::string to_str(const T& v) {
-  std::string out;
-  write(v, &out);
-  return out;
-}
-
-template<class T>
-T from_str(const std::string& vstr) {
-  T out;
-  read(&out, vstr);
-  return out;
-}
-
-} // namespace val
-
-class Table;
+class Accumulator: public Initable {
+public:
+  virtual void accumulate(const RefPtr& key, RefPtr* v,
+      const RefPtr& update) const = 0;
+};
 
 class Sharder: public Initable {
 public:
-};
-
-template<class K, class V>
-class AccumulatorT;
-
-class Accumulator: public Initable {
-public:
-  template<class K, class V>
-  AccumulatorT<K, V>* cast() {
-    return (AccumulatorT<K, V>*) this;
-  }
+  virtual size_t shard_for_key(const RefPtr& k, int num_shards) const = 0;
 };
 
 class Selector: public Initable {
 public:
-};
-
-template<class K, class V>
-class AccumulatorT: public Accumulator {
-public:
-  virtual ~AccumulatorT() {
-  }
-  virtual void accumulate(const K& key, V* v, const V& update) const = 0;
-};
-
-template<class T>
-class SharderT: public Sharder {
-public:
-  virtual ~SharderT() {
-  }
-  virtual size_t shard_for_key(const T& k, int num_shards) const = 0;
-};
-
-template<class K, class V>
-class SelectorT: public Selector {
-public:
-  virtual ~SelectorT() {
-  }
-
-  virtual V select(const K& k, const V& v) = 0;
+  virtual RefPtr select(const RefPtr& k, const RefPtr& v) = 0;
 };
 
 struct TableContext {
@@ -131,59 +72,172 @@ private:
 public:
   virtual ~TableIterator() {
   }
-  virtual std::string key_str() = 0;
-  virtual std::string value_str() = 0;
+  virtual RefPtr key() = 0;
+  virtual RefPtr value() = 0;
   virtual int shard() = 0;
   virtual bool done() = 0;
   virtual void next() = 0;
 };
 
-template<class K, class V>
-class TypedIterator: public TableIterator {
-public:
-  virtual ~TypedIterator() {
-  }
-  virtual K key() = 0;
-  virtual V value() = 0;
-};
-
-class Checkpointable {
-public:
-  virtual ~Checkpointable() {
-  }
-  virtual void start_checkpoint(const std::string& f, bool delta) = 0;
-  virtual void finish_checkpoint() = 0;
-  virtual void restore(const std::string& f) = 0;
-};
-
 class Shard {
+private:
+  typedef boost::unordered_multimap<RefPtr, RefPtr> Map;
+  Map data_;
 public:
-  virtual ~Shard() {
+  typedef typename Map::iterator iterator;
+  iterator begin() {
+    return data_.begin();
   }
-  virtual size_t size() const = 0;
+
+  iterator end() {
+    return data_.end();
+  }
+
+  iterator find(const RefPtr& k) {
+    return data_.find(k);
+  }
+
+  void insert(const RefPtr& k, const RefPtr& v) {
+    CHECK_NE(k.get(), NULL);
+
+    data_.insert(make_pair(k, v));
+  }
+
+  bool empty() const {
+    return data_.empty();
+  }
+
+  void clear() {
+    data_.clear();
+  }
+
+  const RefPtr& get(const RefPtr& k) {
+    return data_.find(k)->second;
+  }
+
+  size_t size() const {
+    return data_.size();
+  }
 };
 
-template<class K, class V>
-class TableT;
 
-class Master;
+class RemoteIterator: public TableIterator {
+public:
+  RemoteIterator(Table *table, int shard, uint32_t fetch_num =
+      kDefaultIteratorFetch);
+
+  bool done();
+  void next();
+  RefPtr key();
+  RefPtr value();
+
+  int shard() {
+    return shard_;
+  }
+
+private:
+  void wait_for_fetch();
+
+  Table* table_;
+  rpc::Future* pending_;
+  IteratorReq request_;
+  IteratorResp response_;
+
+  int shard_;
+  int index_;
+  bool done_;
+
+  size_t fetch_num_;
+};
+
+class LocalIterator: public TableIterator {
+private:
+  typename Shard::iterator begin_;
+  typename Shard::iterator cur_;
+  typename Shard::iterator end_;
+
+  int shard_;
+public:
+  LocalIterator(int shard, Shard& m) :
+      begin_(m.begin()), cur_(m.begin()), end_(m.end()), shard_(shard) {
+
+  }
+
+  int shard() {
+    return shard_;
+  }
+
+  void next() {
+    ++cur_;
+  }
+
+  bool done() {
+    return cur_ == end_;
+  }
+
+  RefPtr key() {
+    return cur_->first;
+  }
+
+  RefPtr value() {
+    return cur_->second;
+  }
+};
+
+class MergedIterator: public TableIterator {
+private:
+  typedef std::vector<TableIterator*> IterList;
+  IterList iters_;
+
+  TableIterator* cur() {
+    return iters_.back();
+  }
+
+public:
+  MergedIterator(IterList iters) :
+      iters_(iters) {
+    while (!iters_.empty() && cur()->done()) {
+      iters_.pop_back();
+    }
+  }
+
+  void next() {
+    cur()->next();
+    while (!iters_.empty() && cur()->done()) {
+      iters_.pop_back();
+    }
+  }
+
+  int shard() {
+    return cur()->shard();
+  }
+
+  bool done() {
+    return iters_.empty();
+  }
+
+  RefPtr key() {
+    return cur()->key();
+  }
+
+  RefPtr value() {
+    return cur()->value();
+  }
+};
+
 
 class Table {
-protected:
-  std::vector<PartitionInfo> shard_info_;
-  std::vector<Shard*> shards_;
-  int id_;
-  TableContext *ctx_;
-
 public:
+  struct CacheEntry {
+    double last_read_time;
+    RefPtr val;
+  };
+
   std::vector<WorkerProxy*> workers;
   Sharder *sharder;
   Accumulator *combiner;
   Accumulator *reducer;
   Selector *selector;
-
-  virtual ~Table() {
-  }
 
   void set_ctx(TableContext* h) {
     ctx_ = h;
@@ -235,230 +289,20 @@ public:
     }
   }
 
-  template<class K, class V>
-  TableT<K, V>* cast() {
-    return (TableT<K, V>*) (this);
-  }
-
-  virtual void init(int id, int num_shards) = 0;
-
-  virtual TableIterator* get_iterator(int shard_id) = 0;
-  virtual int flush() = 0;
-
-  // Untyped (string, string) operations.
-  virtual std::string get_str(int shard, const std::string&) = 0;
-  virtual bool contains_str(int shard, const std::string&) = 0;
-  virtual void update_str(int shard, const std::string&,
-      const std::string&) = 0;
-};
-
-template<class K, class V>
-class RemoteIterator: public TypedIterator<K, V> {
-public:
-  RemoteIterator(Table *table, int shard, uint32_t fetch_num =
-      kDefaultIteratorFetch);
-
-  bool done();
-  void next();
-
-  std::string key_str();
-  std::string value_str();
-
-  K key() {
-    return val::from_str<K>(key_str());
-  }
-
-  V value() {
-    return val::from_str<V>(value_str());
-  }
-
-  int shard() {
-    return shard_;
-  }
-
-private:
-  void wait_for_fetch();
-
-  Table* table_;
-  rpc::Future* pending_;
-  IteratorReq request_;
-  IteratorResp response_;
-
-  int shard_;
-  int index_;
-  bool done_;
-
-  size_t fetch_num_;
-};
-
-template<class K, class V>
-class ShardT: public Shard {
-private:
-  typedef boost::unordered_multimap<K, V> Map;
-  Map data_;
-public:
-
-  virtual ~ShardT() {
-
-  }
-  typedef typename Map::iterator iterator;
-  iterator begin() {
-    return data_.begin();
-  }
-
-  iterator end() {
-    return data_.end();
-  }
-
-  iterator find(const K& k) {
-    return data_.find(k);
-  }
-
-  void insert(const K& k, const V& v) {
-    CHECK_NE(k.get(), NULL);
-
-    data_.insert(make_pair(k, v));
-  }
-
-  bool empty() const {
-    return data_.empty();
-  }
-
-  void clear() {
-    data_.clear();
-  }
-
-  const V& get(const K& k) {
-    return data_.find(k)->second;
-  }
-
-  size_t size() const {
-    return data_.size();
-  }
-};
-
-template<class K, class V>
-class LocalIterator: public TypedIterator<K, V> {
-private:
-  typename ShardT<K, V>::iterator begin_;
-  typename ShardT<K, V>::iterator cur_;
-  typename ShardT<K, V>::iterator end_;
-
-  int shard_;
-public:
-  LocalIterator(int shard, ShardT<K, V>& m) :
-      begin_(m.begin()), cur_(m.begin()), end_(m.end()), shard_(shard) {
-
-  }
-
-  int shard() {
-    return shard_;
-  }
-
-  void next() {
-    ++cur_;
-  }
-
-  bool done() {
-    return cur_ == end_;
-  }
-
-  std::string key_str() {
-    return val::to_str(cur_->first);
-  }
-
-  std::string value_str() {
-    return val::to_str(cur_->second);
-  }
-
-  K key() {
-    return cur_->first;
-  }
-
-  V value() {
-    return cur_->second;
-  }
-};
-
-template<class K, class V>
-class MergedIterator: public TypedIterator<K, V> {
-private:
-  typedef std::vector<TypedIterator<K, V>*> IterList;
-  IterList iters_;
-
-  TypedIterator<K, V>* cur() {
-    return iters_.back();
-  }
-
-public:
-  MergedIterator(IterList iters) :
-      iters_(iters) {
-    while (!iters_.empty() && cur()->done()) {
-      iters_.pop_back();
-    }
-  }
-
-  void next() {
-    cur()->next();
-    while (!iters_.empty() && cur()->done()) {
-      iters_.pop_back();
-    }
-  }
-
-  int shard() {
-    return cur()->shard();
-  }
-
-  bool done() {
-    return iters_.empty();
-  }
-
-  std::string key_str() {
-    return cur()->key_str();
-  }
-
-  std::string value_str() {
-    return cur()->value_str();
-  }
-
-  K key() {
-    return cur()->key();
-  }
-
-  V value() {
-    return cur()->value();
-  }
-};
-
-template<class K, class V>
-class TableT: public Table {
-public:
-  typedef TypedIterator<K, V> Iterator;
-
-  struct CacheEntry {
-    double last_read_time;
-    V val;
-  };
-
-private:
-  boost::unordered_map<K, CacheEntry> cache_;
-  rpc::Mutex m_;
-  static TypeRegistry<Table>::Helper<TableT<K, V> > register_me_;
-
-  int pending_updates_;
-
-public:
-
-  TableT() {
+  Table() {
     pending_updates_ = 0;
     sharder = NULL;
     ctx_ = NULL;
     id_ = -1;
     combiner = reducer = NULL;
+    selector = NULL;
   }
 
-  int type_id() {
-    return register_me_.id();
+  virtual ~Table() {
+    //Log_info("Deleting table %d", id());
+    for (auto p : shards_) {
+      delete p;
+    }
   }
 
   void init(int id, int num_shards) {
@@ -467,154 +311,62 @@ public:
     shards_.resize(num_shards);
     shard_info_.resize(num_shards);
     for (int i = 0; i < num_shards; ++i) {
-      shards_[i] = new ShardT<K, V>;
+      shards_[i] = new Shard;
       shard_info_[i].owner = -1;
       shard_info_[i].shard = i;
       shard_info_[i].table = id;
     }
   }
 
-  virtual ~TableT() {
-    //Log_info("Deleting table %d", id());
-    for (auto p : shards_) {
-      delete p;
-    }
-  }
-
-  bool is_local_key(const K& key) {
+  bool is_local_key(const RefPtr& key) {
     return is_local_shard(shard_for_key(key));
   }
 
-  int shard_for_key(const K& k) {
+  int shard_for_key(const RefPtr& k) {
     CHECK_NE(sharder, NULL);
-    return ((SharderT<K>*) sharder)->shard_for_key(k, this->num_shards());
+    return sharder->shard_for_key(k, this->num_shards());
   }
 
-  ShardT<K, V>& typed_shard(int id) {
-    return *((ShardT<K, V>*) this->shards_[id]);
+  Shard& typed_shard(int id) {
+    return *((Shard*) this->shards_[id]);
   }
 
-  void update(int shard, const K& k, const V& v) {
-    if (shard == -1) {
-      shard = this->shard_for_key(k);
-    }
+  void update(int shard, const RefPtr& k, const RefPtr& v);
 
-    CHECK_LT(shard, num_shards());
+  bool _get(int shard, const RefPtr& k, RefPtr* v);
 
-    ShardT<K, V>& s = typed_shard(shard);
-    typename ShardT<K, V>::iterator i = s.find(k);
-
-    GRAB_LOCK;
-    if (is_local_shard(shard)) {
-      CHECK_NE(k.get(), NULL);
-      if (i == s.end() || reducer == NULL) {
-        s.insert(k, v);
-      } else {
-        reducer->cast<K, V>()->accumulate(k, &i->second, v);
-        CHECK_NE(i->second.get(), NULL);
-      }
-      return;
-    }
-
-    if (combiner != NULL) {
-      if (i == s.end()) {
-        s.insert(k, v);
-      } else {
-        combiner->cast<K, V>()->accumulate(k, &i->second, v);
-      }
-
-      return;
-    }
-
-    ++pending_updates_;
-    TableData put;
-    put.table = this->id();
-    put.shard = shard;
-    put.kv_data.push_back( { val::to_str(k), val::to_str(v) });
-
-    auto callback = [=](rpc::Future *future) {
-      --this->pending_updates_;
-    };
-
-    workers[worker_for_shard(shard)]->async_put(put, rpc::FutureAttr(callback));
-  }
-
-  bool _get(int shard, const K& k, V* v) {
-    if (shard == -1) {
-      shard = this->shard_for_key(k);
-    }
-
-    while (tainted(shard)) {
-      sched_yield();
-    }
-
-    if (is_local_shard(shard)) {
-      GRAB_LOCK;
-      ShardT<K, V>& s = (ShardT<K, V>&) (*shards_[shard]);
-      typename ShardT<K, V>::iterator i = s.find(k);
-      if (i == s.end()) {
-        return false;
-      }
-
-      if (v != NULL) {
-        if (selector != NULL) {
-          *v = ((SelectorT<K, V>*) selector)->select(k, i->second);
-        } else {
-          *v = i->second;
-        }
-      }
-
-      return true;
-    }
-
-    return get_remote(shard, k, v);
-  }
-
-  V get(int shard, const K& k) {
-    V out;
+  RefPtr get(int shard, const RefPtr& k) {
+    RefPtr out;
     _get(shard, k, &out);
     return out;
   }
 
-  bool contains(int shard, const K& k) {
+  bool contains(int shard, const RefPtr& k) {
     return _get(shard, k, NULL);
   }
 
-  void remove(const K& k) {
+  void remove(const RefPtr& k) {
     Log_fatal("Not implemented!");
   }
 
-  // Untyped operations:
-  bool contains_str(int shard, const std::string& k) {
-    return contains(shard, val::from_str<K>(k));
-  }
-
-  std::string get_str(int shard, const std::string& k) {
-    return val::to_str(get(shard, val::from_str<K>(k)));
-  }
-
-  void update_str(int shard, const std::string& k, const std::string& v) {
-    update(shard, val::from_str<K>(k), val::from_str<V>(v));
-  }
-
   Shard* create_local(int shard_id) {
-    return new ShardT<K, V>();
+    return new Shard();
   }
 
-  TypedIterator<K, V>* get_iterator() {
-    std::vector<TypedIterator<K, V>*> iters;
+  TableIterator* get_iterator() {
+    std::vector<TableIterator*> iters;
     for (int i = 0; i < num_shards(); ++i) {
       iters.push_back(get_iterator(i));
     }
-    return new MergedIterator<K, V>(iters);
+    return new MergedIterator(iters);
   }
 
-  TypedIterator<K, V>* get_iterator(int shard) {
+  TableIterator* get_iterator(int shard) {
     if (this->is_local_shard(shard)) {
       auto s = shards_[shard];
-      return new LocalIterator<K, V>(shard, *((ShardT<K, V>*)s));
+      return new LocalIterator(shard, *((Shard*) s));
     } else {
-      return new RemoteIterator<K, V>(this, shard);
+      return new RemoteIterator(this, shard);
     }
   }
 
@@ -626,35 +378,9 @@ public:
     return worker_for_shard(shard) == ctx()->id();
   }
 
-  bool get_remote(int shard, const K& k, V* v) {
-    GetRequest req;
-    TableData resp;
+  bool get_remote(int shard, const RefPtr& k, RefPtr* v);
 
-    req.key = val::to_str(k);
-    req.table = id();
-    req.shard = shard;
-
-    if (!ctx()) {
-      Log_fatal("get_remote() failed: helper() undefined.");
-    }
-
-    int peer = worker_for_shard(shard);
-
-//    Log_debug("Sending get request to: (%d, %d)", peer, shard);
-    workers[peer]->get(req, &resp);
-
-    if (resp.missing_key) {
-      return false;
-    }
-
-    if (v != NULL) {
-      *v = val::from_str<V>(resp.kv_data[0].value);
-    }
-
-    return true;
-  }
-
-  void start_checkpoint(const string& f, bool deltaOnly) {
+  void start_checkpoint(const std::string& f, bool deltaOnly) {
     Log_fatal("Not implemented.");
   }
 
@@ -662,67 +388,29 @@ public:
     Log_fatal("Not implemented.");
   }
 
-  void restore(const string& f) {
+  void restore(const std::string& f) {
     Log_fatal("Not implemented.");
   }
 
-  int flush() {
-    int count = 0;
-    TableData put;
+  int flush();
 
-    rpc::FutureGroup g;
-
-    for (size_t i = 0; i < shards_.size(); ++i) {
-      if (!is_local_shard(i)) {
-        put.kv_data.clear();
-
-        {
-          GRAB_LOCK;
-          ShardT<K, V>* t = (ShardT<K, V>*) shards_[i];
-          for (auto j : *t) {
-            put.kv_data.push_back( {val::to_str(j.first), val::to_str(j.second)});
-          }
-          t->clear();
-        }
-
-        if (put.kv_data.empty()) {
-          continue;
-        }
-
-        put.shard = i;
-        put.source = ctx()->id();
-        put.table = id();
-        put.done = true;
-
-        count += put.kv_data.size();
-        int target = worker_for_shard(i);
-        Log_debug("Writing from %d to %d", ctx()->id(), target);
-        g.add(workers[target]->async_put(put));
-      }
-    }
-
-    // Wait for any updates that were sent asynchronously
-    // (this occurs if we don't have a combiner).
-    while (pending_updates_ > 0) {
-      Sleep(0.0001);
-    }
-
-    return count;
-  }
+private:
+  boost::unordered_map<RefPtr, CacheEntry> cache_;
+  rpc::Mutex m_;
+  int pending_updates_;
 
 protected:
+  std::vector<PartitionInfo> shard_info_;
+  std::vector<Shard*> shards_;
+  int id_;
+  TableContext *ctx_;
   rpc::Mutex* mutex() {
     return &m_;
   }
 };
 
-template<class K, class V>
-TypeRegistry<Table>::Helper<TableT<K, V>> TableT<K, V>::register_me_;
-
 typedef std::map<int, Table*> TableMap;
 
-}
-
-#include "table-inl.h"
+} // namespace spartan
 
 #endif

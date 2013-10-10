@@ -288,7 +288,7 @@ def compile(expr):
 
 
 def optimize(dag):
-  if not flags.optimization:
+  if not flags.opt:
     util.log('Optimizations disabled')
     return dag
   

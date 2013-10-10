@@ -7,6 +7,8 @@ import math
 import numpy as np
 import test_common
 
+import pickle
+
 
 ONE_TILE = (10000, 10000, 10000)
 
