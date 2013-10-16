@@ -1,6 +1,6 @@
-from spartan import util
-from spartan.array import prims, compile_expr, backend, expr
+from spartan import util, expr
 from spartan.dense import distarray, extent
+from spartan.expr import backend
 from spartan.util import Assert
 from test_common import with_ctx
 import numpy as np
@@ -8,39 +8,12 @@ import numpy as np
 TEST_SIZE = 1000
 distarray.TILE_SIZE = TEST_SIZE ** 2 / 4
 
-@with_ctx
-def test_add2(ctx):
-  a = distarray.ones(ctx, (TEST_SIZE, TEST_SIZE))
-  b = distarray.ones(ctx, (TEST_SIZE, TEST_SIZE))
-  a = prims.Value(a)
-  b = prims.Value(b)
-  
-  map_prim = prims.MapTiles([a, b], lambda v: v[0] + v[1])
-  c = backend.evaluate(ctx, map_prim)
-  lc = c.glom()
-  Assert.all_eq(lc, np.ones((TEST_SIZE, TEST_SIZE)) * 2)
-
-@with_ctx
-def test_add3(ctx):
-  a = distarray.ones(ctx, (TEST_SIZE, TEST_SIZE))
-  b = distarray.ones(ctx, (TEST_SIZE, TEST_SIZE))
-  c = distarray.ones(ctx, (TEST_SIZE, TEST_SIZE))
-  
-  a = prims.Value(a)
-  b = prims.Value(b)
-  c = prims.Value(c)
-  
-  map_prim = prims.MapTiles([a, b, c], lambda v: v[0] + v[1] + v[2])
-  d = backend.evaluate(ctx, map_prim)
-  ld = d.glom()
-  Assert.all_eq(ld, np.ones((TEST_SIZE, TEST_SIZE)) * 3)
-  
   
 @with_ctx
 def test_compile_add2(ctx):
   a = expr.ones((TEST_SIZE, TEST_SIZE))
   b = expr.ones((TEST_SIZE, TEST_SIZE))
-  Assert.all_eq((a + b).evaluate().glom(), np.ones((TEST_SIZE, TEST_SIZE)) * 2)
+  Assert.all_eq((a + b).glom(), np.ones((TEST_SIZE, TEST_SIZE)) * 2)
 
 
 @with_ctx
@@ -48,34 +21,22 @@ def test_compile_add3(ctx):
   a = expr.ones((TEST_SIZE, TEST_SIZE))
   b = expr.ones((TEST_SIZE, TEST_SIZE))
   c = expr.ones((TEST_SIZE, TEST_SIZE))
-  Assert.all_eq((a + b + c).evaluate().glom(), np.ones((TEST_SIZE, TEST_SIZE)) * 3)
+  Assert.all_eq((a + b + c).glom(), np.ones((TEST_SIZE, TEST_SIZE)) * 3)
 
 @with_ctx
 def test_compile_add_many(ctx):
   a = expr.ones((TEST_SIZE, TEST_SIZE))
   b = expr.ones((TEST_SIZE, TEST_SIZE))
-  Assert.all_eq((a + b + a + b + a + b + a + b + a + b).evaluate().glom(), np.ones((TEST_SIZE, TEST_SIZE)) * 10)
+  Assert.all_eq((a + b + a + b + a + b + a + b + a + b).glom(), np.ones((TEST_SIZE, TEST_SIZE)) * 10)
   
 
-@with_ctx 
-def test_sum(ctx):
-  a = distarray.ones(ctx, (TEST_SIZE, TEST_SIZE))
-  a = prims.Value(a)
-  b = prims.Reduce(a, 0, 
-                   lambda _: np.float, 
-                   lambda ex, tile, axis: np.sum(tile[:], axis=axis), 
-                   lambda a, b: a + b)
-  c = backend.evaluate(ctx, b)
-  lc = c.glom()
-  Assert.all_eq(lc, np.ones((TEST_SIZE,)) * TEST_SIZE)
-  
 @with_ctx 
 def test_compile_sum(ctx):
   def _(axis):
     util.log_info('Testing sum over axis %s', axis)
     a = expr.ones((TEST_SIZE, TEST_SIZE))
     b = a.sum(axis=axis)
-    val = b.evaluate()
+    val = b.force()
     Assert.all_eq(val.glom(), np.ones((TEST_SIZE,TEST_SIZE)).sum(axis))
 
   _(axis=0)

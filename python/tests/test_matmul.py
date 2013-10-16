@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from spartan import ModSharder, util, sum_accum
-from spartan.array import expr
+from spartan import expr
 from spartan.dense import distarray
 from test_common import with_ctx
 import numpy as np

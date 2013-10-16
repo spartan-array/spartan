@@ -1,4 +1,4 @@
-from spartan.array import expr
+from spartan import expr
 from spartan.dense import distarray
 from spartan.util import Assert
 from test_common import with_ctx
@@ -16,7 +16,7 @@ def test_sum_3d(ctx):
 
   for axis in [None, 0, 1, 2]:  
     y = x.sum(axis)
-    val = y.evaluate().glom()
+    val = y.glom()
     Assert.all_eq(val, nx.sum(axis))
 
 @with_ctx
@@ -26,7 +26,7 @@ def test_sum_2d(ctx):
   nx = np.arange(TEST_SIZE * TEST_SIZE, dtype=np.int).reshape((TEST_SIZE, TEST_SIZE))
   for axis in [None, 0, 1]:  
     y = x.sum(axis)
-    val = y.evaluate().glom()
+    val = y.glom()
     Assert.all_eq(val, nx.sum(axis))
   
 @with_ctx
@@ -35,7 +35,7 @@ def test_sum_1d(ctx):
   x = expr.arange((TEST_SIZE,), dtype=np.int)
   nx = np.arange(TEST_SIZE, dtype=np.int)
   y = x.sum()
-  val = y.evaluate().glom()
+  val = y.glom()
   Assert.all_eq(val, nx.sum())
   
 @with_ctx
@@ -44,7 +44,7 @@ def test_argmin_1d(ctx):
   x = expr.arange((TEST_SIZE,), dtype=np.int)
   nx = np.arange(TEST_SIZE, dtype=np.int)
   y = x.argmin()
-  val = y.evaluate().glom()
+  val = y.glom()
   Assert.all_eq(val, nx.argmin())
 
 @with_ctx
@@ -66,5 +66,5 @@ def test_argmin_3d(ctx):
 
   for axis in [None, 0, 1, 2]:  
     y = x.argmin(axis)
-    val = y.evaluate().glom()
+    val = y.glom()
     Assert.all_eq(val, nx.argmin(axis))

@@ -1,5 +1,5 @@
 from spartan import util
-from spartan.array import expr
+from spartan import expr
 from spartan.util import Assert
 from test_common import with_ctx
 import numpy as np
@@ -16,4 +16,4 @@ def test_numexpr_opt(ctx):
   f = a + b + c + d + e
   
   print f.dag()
-  print f.evaluate()
+  print f.force()

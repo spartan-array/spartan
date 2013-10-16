@@ -1,5 +1,5 @@
 from spartan import util
-from spartan.array import expr
+from spartan import expr
 from spartan.util import Assert
 import numpy as np
 import test_common

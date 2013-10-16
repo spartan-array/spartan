@@ -289,8 +289,9 @@ class DistArray(object):
     return self.select(np.index_exp[:])
 
 
-def map_to_array(array, mapper_fn, reduce_fn=None):
+def map_to_array(array, mapper_fn, combine_fn=None, reduce_fn=None):
   return from_table(array.map_to_table(mapper_fn=mapper_fn,
+                                       combine_fn=combine_fn,
                                        reduce_fn=reduce_fn))
 
   
@@ -356,9 +357,9 @@ class Slice(object):
     
   def foreach(self, mapper_fn):
     return spartan.map_inplace(self.darray.table,
-                               slice_mapper,
-                               mapper_fn = mapper_fn,
-                               slice_extent = self.base)
+                               fn=slice_mapper,
+                               _slice_extent = self.base,
+                               _slice_fn = mapper_fn)
   
   def map_to_table(self, mapper_fn, combine_fn=None, reduce_fn=None):
     return spartan.map_items(self.darray.table, 
@@ -425,7 +426,7 @@ class Broadcast(object):
     _, bcast = np.broadcast_arrays(template, fetched)
     return bcast 
   
-  def map_to_table(self, fn):
+  def map_to_table(self, mapper_fn, combine_fn=None, reduce_fn=None):
     raise NotImplementedError
   
   def foreach(self, fn):
@@ -473,6 +474,13 @@ def broadcast(args):
   #util.log_debug('Broadcast result: %s', results)
   return results
 
+def _size(v):
+  if isinstance(v, Broadcast):
+    return np.prod(v.base.shape)
+  return np.prod(v.shape)
+
+def largest_value(vals):
+  return sorted(vals, key=lambda v: _size(v))[-1]
 
 # TODO(rjp)
 # These functions shouldn't be needed, as they are 

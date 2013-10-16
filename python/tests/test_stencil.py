@@ -1,13 +1,12 @@
-from spartan import util
-from spartan.array import expr
+from spartan import expr, util
 from spartan.dense import distarray
 from spartan.util import Assert, divup
 from test_common import with_ctx
 import math
 import numpy as np
+import pickle
 import test_common
 
-import pickle
 
 
 ONE_TILE = (10000, 10000, 10000)
