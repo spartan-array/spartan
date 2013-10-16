@@ -57,4 +57,4 @@ def test_kmeans_manual(master):
 def test_kmeans_expr(ctx):
   pts = expr.rand(N_PTS, N_DIM)
   centers = expr.rand(N_CENTERS, N_DIM)
-   
+  

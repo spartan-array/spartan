@@ -91,10 +91,6 @@ public:
 
   void destroy_table(int table_id);
 
-  void destroy_table(Table* t) {
-    destroy_table(t->id());
-  }
-
   int num_workers() {
     return num_workers_;
   }

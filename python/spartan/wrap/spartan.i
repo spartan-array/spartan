@@ -130,7 +130,7 @@ public:
   void shutdown();
   void wait_for_workers();
   int num_workers();
-  void destroy_table(Table*);
+  void destroy_table(int);
 };
 
 %extend Master {

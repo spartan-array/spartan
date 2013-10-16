@@ -43,10 +43,8 @@ class MapTilesExpr(Op, Node):
     map_fn = prim.map_fn
     fn_kw = prim.fn_kw or {}
     
-    util.log_info('Mapping %s over %d inputs; largest = %s', 
-             map_fn, len(children), largest.shape)
-    
-    util.log_info('%s', children)
+    #util.log_info('Mapping %s over %d inputs; largest = %s', map_fn, len(children), largest.shape)
+    #util.log_info('%s', children)
     
     def mapper(ex, _):
       #util.log_info('MapTiles: %s', map_fn)

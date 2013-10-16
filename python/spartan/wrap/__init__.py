@@ -8,6 +8,7 @@ and imports all symbols from the SWIG generated code.
 
 from os.path import abspath
 import sys
+import collections
 sys.path += [abspath('../build/.libs'), 
              abspath('../build/python/spartan/wrap'), 
              abspath('.')]
@@ -113,19 +114,19 @@ def key_mapper(k, v):
 def keys(src):
   return map_items(src, key_mapper)
 
+_table_refs = collections.defaultdict(int)
+
 class Table(spartan_wrap.Table):
-  def __init__(self, id, destroy_on_del=False):
-    #print 'Creating table: %d, destroy? %d' % (id, destroy_on_del)
+  def __init__(self, id):
+    _table_refs[id] += 1
     spartan_wrap.Table.__init__(self, id)
     self.thisown = False
-    self.destroy_on_del = destroy_on_del
       
   def __del__(self):
-    if self.destroy_on_del:
-      get_master().destroy_table(self)
+    _table_refs[self.id()] -= 1
           
   def __reduce__(self):
-    return (Table, (self.id(), False))
+    return (Table, (self.id(),))
   
   def iter(self, shard=-1):
     return Iter(self, shard)
@@ -196,8 +197,14 @@ class Master(object):
       self._master.shutdown()
   
   def create_table(self, sharder, combiner, reducer, selector):
+    for k, v in _table_refs.items():
+      if v == 0:
+        log_debug('GC, destroying table %s', k)
+        self.destroy_table(k)
+        del _table_refs[k]
+        
     t = self._master.create_table(sharder, combiner, reducer, selector)
-    return Table(t.id(), destroy_on_del=True)
+    return Table(t.id())
    
   def foreach_shard(self, table, kernel, args):
     return self._master.foreach_shard(table, _bootstrap_kernel, (kernel, args))
@@ -254,7 +261,6 @@ def foreach_kernel(kernel, args):
 
 
 def map_items(table, mapper_fn, combine_fn=None, reduce_fn=None, **kw):
-  src = table
   master = get_master()
   
   dst = master.create_table(table.sharder(),
@@ -263,7 +269,7 @@ def map_items(table, mapper_fn, combine_fn=None, reduce_fn=None, **kw):
                             table.selector())
   
   master.foreach_shard(table, mapper_kernel, 
-                       (src.id(), dst.id(), mapper_fn, kw))
+                       (table.id(), dst.id(), mapper_fn, kw))
   return dst
 
 
