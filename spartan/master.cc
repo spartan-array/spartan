@@ -90,12 +90,14 @@ public:
     finished.clear();
   }
 
-  void set_finished(const ShardId& id) {
+  void set_finished(const ShardId& id, double kernel_time) {
     rpc::ScopedLock sl(&lock);
 
     auto it = active.find(id);
     finished.insert(*it);
     active.erase(it);
+
+    total_runtime += kernel_time;
   }
 
   std::string str() {
@@ -193,6 +195,7 @@ void Master::shutdown() {
   rpc::FutureGroup g;
   for (auto w : workers_) {
     Log_debug("Shutting down %s:%d", w->addr.host.c_str(), w->addr.port);
+    Log_info("Worker %d: %f", w->id, w->total_runtime);
     g.add(w->proxy->async_shutdown());
   }
   g.wait_all();
@@ -353,9 +356,11 @@ int Master::dispatch_work(Kernel* k) {
       continue;
     }
 
+    double start_time = Now();
+
     auto callback = [=](rpc::Future *future) {
       Log_debug("MASTER: Kernel %d:%d finished", w_req.table, w_req.shard);
-      w->set_finished(ShardId(w_req.table, w_req.shard));
+      w->set_finished(ShardId(w_req.table, w_req.shard), Now() - start_time);
     };
 
     rpc::Future *f = w->proxy->async_run_kernel(w_req,

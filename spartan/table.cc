@@ -66,6 +66,8 @@ int Table::flush() {
 }
 
 bool Table::get_remote(int shard, const RefPtr& k, RefPtr* v) {
+  Timer t;
+
   GetRequest req;
   TableData resp;
   req.key = k;
@@ -75,8 +77,14 @@ bool Table::get_remote(int shard, const RefPtr& k, RefPtr* v) {
     Log_fatal("get_remote() failed: helper() undefined.");
   }
   int peer = worker_for_shard(shard);
+
+  CHECK_NE(peer, ctx()->id());
+
   //    Log_debug("Sending get request to: (%d, %d)", peer, shard);
   workers[peer]->get(req, &resp);
+
+  Log_debug("Remote get %d -> %d finished in %.9f seconds.",
+      peer, ctx()->id(), t.elapsed());
   if (resp.missing_key) {
     return false;
   }
@@ -124,6 +132,7 @@ void Table::update(int shard, const RefPtr& k, const RefPtr& v) {
   Shard& s = typed_shard(shard);
   typename Shard::iterator i = s.find(k);
   GRAB_LOCK;
+
   if (is_local_shard(shard)) {
     CHECK_NE(k.get(), NULL);
     if (i == s.end() || reducer == NULL) {
@@ -144,6 +153,8 @@ void Table::update(int shard, const RefPtr& k, const RefPtr& v) {
     return;
   }
   ++pending_updates_;
+
+
   TableData put;
   put.table = this->id();
   put.shard = shard;

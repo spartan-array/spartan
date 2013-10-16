@@ -41,6 +41,7 @@ Worker::~Worker() {
 }
 
 void Worker::run_kernel(const RunKernelReq& kreq, RunKernelResp* resp) {
+  Timer t;
   TableContext::set_context(this);
 
   CHECK(id_ != -1);
@@ -59,7 +60,7 @@ void Worker::run_kernel(const RunKernelReq& kreq, RunKernelResp* resp) {
   k->init(this, kreq.args);
   k->run();
 
-  Log_debug("WORKER: Finished kernel: %d:%d", kreq.table, kreq.shard);
+  Log_debug("WORKER: Finished kernel: %d:%d; %f", kreq.table, kreq.shard, t.elapsed());
 }
 
 void Worker::flush() {
@@ -71,7 +72,7 @@ void Worker::flush() {
 }
 
 void Worker::get(const GetRequest& req, TableData* resp) {
-  Log_debug("WORKER %d: handling get.", id_);
+  //Log_debug("WORKER %d: handling get.", id_);
   resp->source = id_;
   resp->table = req.table;
   resp->shard = -1;
@@ -84,7 +85,7 @@ void Worker::get(const GetRequest& req, TableData* resp) {
     resp->missing_key = false;
     resp->kv_data.push_back( { req.key, t->get(req.shard, req.key) });
   }
-  Log_debug("WORKER %d: done handling get.", id_);
+  // Log_debug("WORKER %d: done handling get.", id_);
 }
 
 void Worker::get_iterator(const IteratorReq& req, IteratorResp* resp) {
@@ -233,6 +234,7 @@ Worker* start_worker(const std::string& master_addr, int port) {
   delete master;
 
   worker->set_server(server);
+  worker->wait_for_registration();
 
   return worker;
 }

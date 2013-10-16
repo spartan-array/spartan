@@ -70,13 +70,14 @@ extern std::string repr(RefPtr p);
 
 
 class Pickler {
-  RefPtr cPickle;
-  RefPtr cloudpickle;
-  RefPtr loads;
-  RefPtr cloud_dump;
-  RefPtr cpickle_dump;
-  RefPtr cStringIO;
-  RefPtr cStringIO_stringIO;
+  RefPtr _cPickle;
+  RefPtr _cloudpickle;
+  RefPtr _load;
+  RefPtr _loads;
+  RefPtr _cloud_dump;
+  RefPtr _cpickle_dump;
+  RefPtr _cStringIO;
+  RefPtr _cStringIO_stringIO;
 
 public:
   Pickler();

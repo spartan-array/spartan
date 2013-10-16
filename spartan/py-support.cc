@@ -21,37 +21,41 @@ Pickler& get_pickler() {
 }
 
 std::string repr(RefPtr p) {
+  GILHelper lock;
   return std::string(PyString_AsString(PyObject_Repr(p.get())));
 }
 
 Pickler::Pickler() {
   GILHelper lock;
-  cStringIO = to_ref(PyImport_ImportModule("cStringIO"));
-  cPickle = to_ref(PyImport_ImportModule("cPickle"));
-  cloudpickle = to_ref(PyImport_ImportModule("spartan.cloudpickle"));
-  loads = to_ref(PyObject_GetAttrString(cPickle.get(), "loads"));
-  cStringIO_stringIO = to_ref(
-      PyObject_GetAttrString(cStringIO.get(), "StringIO"));
-  cpickle_dump = to_ref(PyObject_GetAttrString(cPickle.get(), "dump"));
-  cloud_dump = to_ref(PyObject_GetAttrString(cloudpickle.get(), "dump"));
+  _cStringIO = to_ref(PyImport_ImportModule("cStringIO"));
+  _cPickle = to_ref(PyImport_ImportModule("cPickle"));
+  _cloudpickle = to_ref(PyImport_ImportModule("spartan.cloudpickle"));
+  _loads = to_ref(PyObject_GetAttrString(_cPickle.get(), "loads"));
+  _load = to_ref(PyObject_GetAttrString(_cPickle.get(), "load"));
+  _cStringIO_stringIO = to_ref(
+      PyObject_GetAttrString(_cStringIO.get(), "StringIO"));
+  _cpickle_dump = to_ref(PyObject_GetAttrString(_cPickle.get(), "dump"));
+  _cloud_dump = to_ref(PyObject_GetAttrString(_cloudpickle.get(), "dump"));
 }
 
 RefPtr Pickler::load(const RefPtr& py_str) {
   GILHelper lock;
   //Log_info("Loading %d bytes", PyString_Size(py_str.get()));
-  return to_ref(PyObject_CallFunction(loads.get(), W("O"), py_str.get()));
+  return to_ref(PyObject_CallFunction(_loads.get(), W("O"), py_str.get()));
 }
 
 RefPtr Pickler::load(const std::string& data) {
   GILHelper lock;
-  RefPtr py_str = to_ref(PyString_FromStringAndSize(data.data(), data.size()));
-  return load(py_str);
+  RefPtr buffer = to_ref(PyBuffer_FromMemory((void*)data.data(), data.size()));
+  auto in = to_ref(PyObject_CallFunction(_cStringIO_stringIO.get(),
+                                         W("O"), buffer.get()));
+  return to_ref(PyObject_CallFunction(_load.get(), W("O"), in.get()));
 }
 
 std::string Pickler::store(const RefPtr& p) {
   GILHelper lock;
-  auto out = to_ref(PyObject_CallFunction(cStringIO_stringIO.get(), W("")));
-  auto result = PyObject_CallFunction(cpickle_dump.get(), W("OOi"), p.get(),
+  auto out = to_ref(PyObject_CallFunction(_cStringIO_stringIO.get(), W("")));
+  auto result = PyObject_CallFunction(_cpickle_dump.get(), W("OOi"), p.get(),
       out.get(), -1);
   if (result != NULL) {
     auto c_out = (IOobject*) out.get();
@@ -59,9 +63,9 @@ std::string Pickler::store(const RefPtr& p) {
   }
 
   PyErr_Clear();
-  out = to_ref(PyObject_CallFunction(cStringIO_stringIO.get(), W("")));
+  out = to_ref(PyObject_CallFunction(_cStringIO_stringIO.get(), W("")));
   check(
-      PyObject_CallFunction(cloud_dump.get(), W("OOi"), p.get(), out.get(),
+      PyObject_CallFunction(_cloud_dump.get(), W("OOi"), p.get(), out.get(),
           -1));
   auto c_out = (IOobject*) out.get();
   return std::string(c_out->buf, c_out->pos);

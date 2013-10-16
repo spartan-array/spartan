@@ -47,6 +47,11 @@ public:
   }
 
   void wait_for_shutdown();
+  void wait_for_registration() {
+    while (id_ == -1) {
+      Sleep(0.01);
+    }
+  }
 
   void set_server(rpc::Server* s) {
     server_ = s;
