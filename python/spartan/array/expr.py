@@ -8,14 +8,14 @@ into a series of primitive array operations.
 from .node import Node
 from prims import NotShapeable
 from spartan import util
-from spartan.dense import extent, distarray
+from spartan.dense import extent
 from spartan.dense.extent import index_for_reduction, shapes_match
 from spartan.util import Assert
 import numpy as np
 import spartan
 import types
 
-def _apply_binary_op(inputs, binary_op=None):
+def _apply_binary_op(inputs, binary_op=None, numpy_expr=None):
   assert len(inputs) == 2
   return binary_op(*inputs)
 
@@ -23,40 +23,40 @@ class Expr(object):
   _dag = None
   
   def __add__(self, other):
-    return map_tiles((self, other), _apply_binary_op, binary_op=np.add)
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.add, numpy_expr='+')
 
   def __sub__(self, other):
-    return map_tiles((self, other), _apply_binary_op, binary_op=np.subtract)
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.subtract, numpy_expr='-')
 
   def __mul__(self, other):
-    return map_tiles((self, other), _apply_binary_op, binary_op=np.multiply)
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.multiply, numpy_expr='*')
 
   def __mod__(self, other):
-    return map_tiles((self, other), _apply_binary_op, binary_op=np.mod)
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.mod, numpy_expr='%')
 
   def __div__(self, other):
-    return map_tiles((self, other), _apply_binary_op, binary_op=np.divide)
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.divide, numpy_expr='/')
 
   def __eq__(self, other):
-    return map_tiles((self, other), _apply_binary_op, binary_op=np.equal)
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.equal, numpy_expr='==')
 
   def __ne__(self, other):
-    return map_tiles((self, other), _apply_binary_op, binary_op=np.not_equal)
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.not_equal, numpy_expr='!=')
 
   def __lt__(self, other):
-    return map_tiles((self, other), _apply_binary_op, binary_op=np.less)
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.less, numpy_expr='<')
 
   def __gt__(self, other):
-    return map_tiles((self, other), _apply_binary_op, binary_op=np.greater)
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.greater, numpy_expr='>')
 
   def __pow__(self, other):
-    return map_tiles((self, other), _apply_binary_op, binary_op=np.power)
+    return map_tiles((self, other), _apply_binary_op, binary_op=np.power, numpy_expr='**')
 
   def __getitem__(self, idx):
     return IndexExpr(src=self, idx=lazify(idx))
 
   def __setitem__(self, k, val):
-    raise Exception, '__setitem__ not supported.'
+    raise Exception, 'Expressions are read-only.'
   
   @property
   def shape(self):

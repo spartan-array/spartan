@@ -15,20 +15,6 @@ try:
 except:
   numexpr = None
 
-# mapping from numpy functions to arithmetic operators
-# this is used for numexpr folding
-BINARY_OPS = { np.add : '+', 
-               np.subtract : '-', 
-               np.multiply : '*', 
-               np.divide : '/', 
-               np.mod : '%',
-               np.power : '**',
-               np.equal : '==', 
-               np.less : '<', 
-               np.less_equal : '<=', 
-               np.greater : '>', 
-               np.greater_equal : '>=' }
-
 class OpToPrim(object):
   def compile_IndexExpr(self, op):
     src = self.compile_op(op.src)
@@ -204,9 +190,9 @@ class FoldMapPass(OptimizePass):
     
     map_fn = op.map_fn
     map_kw = op.fn_kw
-    #util.log('Map function: %s, kw: %s', map_fn, map_kw)
+    #util.log_info('Map function: %s, kw: %s', map_fn, map_kw)
     
-    #util.log('Created fold mapper with %d inputs', len(inputs))
+    #util.log_info('Created fold mapper with %d inputs', len(inputs))
     return prims.MapTiles(inputs=inputs, 
                           map_fn = _fold_mapper,
                           fn_kw = { 'fns' : fns,
@@ -214,12 +200,13 @@ class FoldMapPass(OptimizePass):
                                     'map_kw' : map_kw })
   
 
-def _numexpr_mapper(inputs, var_map=None, expr=None):
+def _numexpr_mapper(inputs, var_map=None, numpy_expr=None):
   gdict = {}
   for k, v in var_map.iteritems():
     gdict[k] = inputs[v]
     
-  result = numexpr.evaluate(expr, global_dict = gdict)
+  numexpr.ncores = 1 
+  result = numexpr.evaluate(numpy_expr, global_dict = gdict)
   return result
 
 
@@ -235,14 +222,12 @@ class FoldNumexprPass(OptimizePass):
   def visit_MapTiles(self, op):
     map_inputs = [self.visit(v) for v in op.inputs]
     all_maps = np.all([map_like(v) for v in map_inputs])
-    
-    if (not all_maps or 
-        len(map_inputs) > 2 or
-        op.map_fn != _apply_binary_op):
+   
+    if not (all_maps and 'numpy_expr' in op.fn_kw):
       return super(FoldNumexprPass, self).visit_MapTiles(op)
     
     a, b = map_inputs
-    operation = op.fn_kw['binary_op']
+    operation = op.fn_kw['numpy_expr']
    
     # mapping from variable name to input index 
     var_map = {}
@@ -257,7 +242,7 @@ class FoldNumexprPass(OptimizePass):
         for k, v in child.fn_kw['var_map'].iteritems():
           var_map[k] = len(inputs)
           inputs.append(child.inputs[v])
-        expr.extend(['(' + child.fn_kw['expr'] + ')'])
+        expr.extend(['(' + child.fn_kw['numpy_expr'] + ')'])
       else:
         v = new_var()
         var_map[v] = len(inputs)
@@ -265,7 +250,7 @@ class FoldNumexprPass(OptimizePass):
         expr.append(v)
     
     _add_expr(a)
-    expr.append(BINARY_OPS[operation])
+    expr.append(operation)
     _add_expr(b)
     
     expr = ' '.join(expr)
@@ -273,13 +258,13 @@ class FoldNumexprPass(OptimizePass):
     return prims.MapTiles(inputs=inputs,
                           map_fn = _numexpr_mapper,
                           fn_kw = { 
-                                    'expr' : expr,
+                                    'numpy_expr' : expr,
                                     'var_map' : var_map,
                                   })
 
 def apply_pass(klass, dag):
   if not getattr(flags, 'opt_' + klass.name):
-    util.log('Pass %s disabled', klass.name)
+    util.log_info('Pass %s disabled', klass.name)
     return dag
   
   p = klass()
@@ -292,12 +277,14 @@ def compile(expr):
 
 
 def optimize(dag):
-  if not flags.opt:
-    util.log('Optimizations disabled')
+  if not flags.optimization:
+    util.log_info('Optimizations disabled')
     return dag
   
   #print dag
-  #dag = apply_pass(FoldNumexprPass, dag)
+  if numexpr is not None:
+    dag = apply_pass(FoldNumexprPass, dag)
+  
   dag = apply_pass(FoldMapPass, dag)
-  #util.log('%s', dag)
+  #util.log_info('%s', dag)
   return dag
