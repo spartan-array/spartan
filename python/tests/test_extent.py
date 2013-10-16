@@ -20,7 +20,7 @@ def test_intersection():
 def test_local_offset():
   a = extent.TileExtent((0, 0), (5, 5), None)
   b = extent.TileExtent((2, 2), (1, 1), None)
-  util.log('%s', extent.offset_from(a, b))
+  util.log_info('%s', extent.offset_from(a, b))
   
 def test_ravelled_pos():
   a = extent.TileExtent((2, 2), (5, 5), (10, 10))

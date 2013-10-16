@@ -79,6 +79,7 @@ class TableContext {
 private:
   TableContext();
 public:
+  int id();
   static TableContext* get_context();
 };
 
@@ -109,6 +110,7 @@ public:
 class Worker {
   Worker();
 public:
+  int id();
   void wait_for_shutdown();
 };
 

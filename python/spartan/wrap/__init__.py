@@ -12,22 +12,23 @@ sys.path += [abspath('../build/.libs'),
              abspath('../build/python/spartan/wrap'), 
              abspath('.')]
 
-import spartan_wrap
-
-from spartan_wrap import set_log_level
 from spartan.config import flags
+from spartan_wrap import set_log_level, TableContext
+import atexit
 import cPickle
 import cProfile
+import os
 import pstats
+import spartan_wrap
 import threading
 import traceback
 
 
 log_mutex = threading.RLock()
-def log(msg, *args, **kw):
+def _log(msg, *args, **kw):
   level = kw.get('level', spartan_wrap.INFO)
   with log_mutex:
-    caller = sys._getframe(1)
+    caller = sys._getframe(2)
     filename = caller.f_code.co_filename
     lineno = caller.f_lineno
     if 'exc_info' in kw:
@@ -47,19 +48,19 @@ def log(msg, *args, **kw):
 
 def log_info(msg, *args, **kw):
   kw['level'] = spartan_wrap.INFO
-  return log(msg, *args, **kw)
+  return _log(msg, *args, **kw)
 
 def log_debug(msg, *args, **kw):
   kw['level'] = spartan_wrap.DEBUG
-  return log(msg, *args, **kw)
+  return _log(msg, *args, **kw)
 
 def log_error(msg, *args, **kw):
   kw['level'] = spartan_wrap.ERROR
-  return log(msg, *args, **kw)
+  return _log(msg, *args, **kw)
 
 def log_warn(msg, *args, **kw):
   kw['level'] = spartan_wrap.WARN
-  return log(msg, *args, **kw)
+  return _log(msg, *args, **kw)
 
 class Sharder(object):
   def __call__(self, k, num_shards):
@@ -67,7 +68,7 @@ class Sharder(object):
 
 class ModSharder(Sharder):
   def __call__(self, k, num_shards):
-    return k.shard() % num_shards
+    return hash(k) % num_shards
 
 def replace_accum(key, cur, update):
   return update
@@ -157,7 +158,7 @@ class Kernel(object):
   def current_shard(self):
     return int(self.args()['shard'])
     
-PROF = None
+KERNEL_PROF = None
 
 def _bootstrap_kernel(handle):
   kernel= Kernel(handle)
@@ -167,15 +168,17 @@ def _bootstrap_kernel(handle):
     return fn(kernel, args)
   
   p = cProfile.Profile()
-  p.enable()  
+  p.enable() 
+   
   result = fn(kernel, args)
+  
   p.disable()
   stats = pstats.Stats(p)
-  global PROF
-  if PROF is None:
-    PROF = stats
+  global KERNEL_PROF
+  if KERNEL_PROF is None:
+    KERNEL_PROF = stats
   else:
-    PROF.add(stats)
+    KERNEL_PROF.add(stats)
   
   return result
 
@@ -233,6 +236,7 @@ def mapper_kernel(kernel, args):
     if result is not None:
       for k, v in result:
         dst.update(shard, k, v)
+        #dst.update(-1, k, v)
 
 
 def foreach_kernel(kernel, args):
@@ -249,16 +253,17 @@ def foreach_kernel(kernel, args):
       fn(sk, sv)
 
 
-def map_items(table, fn, **kw):
+def map_items(table, mapper_fn, combine_fn=None, reduce_fn=None, **kw):
   src = table
   master = get_master()
   
-  dst = master.create_table(table.sharder(), 
-                            table.combiner(), 
-                            table.reducer(),
+  dst = master.create_table(table.sharder(),
+                            combine_fn,
+                            reduce_fn,
                             table.selector())
+  
   master.foreach_shard(table, mapper_kernel, 
-                       (src.id(), dst.id(), fn, kw))
+                       (src.id(), dst.id(), mapper_fn, kw))
   return dst
 
 

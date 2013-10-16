@@ -21,7 +21,7 @@ def int_index_mapper(ex, tile, src, idx, dst):
   '''Map over the index array, fetching rows from the data array.'''
   idx_vals = idx.fetch(extent.drop_axis(ex, -1))
   
-  util.log('Dest shape: %s, idx: %s, %s', tile.shape, ex, idx_vals)
+  util.log_info('Dest shape: %s, idx: %s, %s', tile.shape, ex, idx_vals)
   for dst_idx, src_idx in enumerate(idx_vals):
     tile[dst_idx] = src.fetch(extent.from_slice(int(src_idx), src.shape))
   return [(ex, tile)]
@@ -66,7 +66,7 @@ def stencil_mapper(region, local, filters=None, image=None, target=None):
   num_img, w, h = image.shape
   num_filt, fw, fh = filters.shape
   
-  util.log('Stencil(%s), image: %s, filter: %s (%s, %s)',
+  util.log_info('Stencil(%s), image: %s, filter: %s (%s, %s)',
            region,
            local_image.shape, local_filters.shape,
            image.shape, filters.shape)
@@ -78,7 +78,7 @@ def stencil_mapper(region, local, filters=None, image=None, target=None):
 
   result = convolve(local_image, local_filters)
   
-  util.log('Updating: %s', target_region)
+  util.log_info('Updating: %s', target_region)
   target.update(target_region, result)
    
  
@@ -92,17 +92,17 @@ class Backend(object):
     map_fn = prim.map_fn
     fn_kw = prim.fn_kw or {}
     
-    util.log('Mapping %s over %d inputs; largest = %s', 
+    util.log_info('Mapping %s over %d inputs; largest = %s', 
              map_fn, len(inputs), largest.shape)
     
     def mapper(ex, _):
-      #util.log('MapTiles: %s', map_fn)
-      #util.log('Fetching %d inputs', len(inputs))
-      #util.log('%s %s', inputs, ex)
+      #util.log_info('MapTiles: %s', map_fn)
+      #util.log_info('Fetching %d inputs', len(inputs))
+      #util.log_info('%s %s', inputs, ex)
       local_values = [input.fetch(ex) for input in inputs]
-      #util.log('Mapping...')
+      #util.log_info('Mapping...')
       result = map_fn(local_values,  **fn_kw)
-      #util.log('Done.')
+      #util.log_info('Done.')
       assert isinstance(result, np.ndarray), result
       return [(ex, tile.from_data(result))]
     
@@ -189,12 +189,12 @@ class Backend(object):
     slice_region = extent.from_slice(idx, src.shape)
     matching_extents = dict(extent.extents_for_region(src.extents, slice_region))
     
-    util.log('Taking slice: %s from %s', idx, src.shape)
-    #util.log('Matching: %s', matching_extents)
+    util.log_info('Taking slice: %s from %s', idx, src.shape)
+    #util.log_info('Matching: %s', matching_extents)
     result = distarray.map_to_array(
       src, lambda k, v: slice_mapper(k, v, slice_region, matching_extents))
     
-    util.log('Done.')
+    util.log_info('Done.')
     return result
   
   def eval_Index(self, ctx, prim, inputs):
@@ -240,12 +240,12 @@ class Backend(object):
   
   def _evaluate(self, ctx, prim):
     inputs = [self.evaluate(ctx, v) for v in prim.dependencies()]
-    #util.log('Evaluating: %s', prim.typename())
+    #util.log_info('Evaluating: %s', prim.typename())
     return getattr(self, 'eval_' + prim.typename())(ctx, prim, inputs)    
       
   
   def evaluate(self, ctx, prim):
-    #util.log('Evaluating: %s', prim)
+    #util.log_info('Evaluating: %s', prim)
     Assert.isinstance(prim, prims.Primitive) 
     if prim.cached_value is None:
       prim.cached_value = self._evaluate(ctx, prim)

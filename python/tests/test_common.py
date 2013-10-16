@@ -1,5 +1,5 @@
 from os.path import basename, splitext
-from spartan import util, config
+from spartan import util, config, wrap
 from spartan.cluster import start_cluster
 from spartan.config import flags
 import cProfile
@@ -37,14 +37,10 @@ def run_benchmarks(module, benchmarks, master, timer):
     getattr(module, benchname)(master, timer)
   
 def run(filename):
-  util.log('Loading tests from %s', filename)
-  _, argv = config.parse_known_args(sys.argv)
-  
-  util.log('Rest: %s', argv)
-  
+  config.parse_known_args(sys.argv)
   mod_name, _ = splitext(basename(filename))
   module = imp.load_source(mod_name, filename)
-  util.log('Running tests for module: %s (%s)', module, filename)
+  util.log_info('Running benchmarks for module: %s (%s)', module, filename)
  
   if flags.profile_master:
     prof = cProfile.Profile()
@@ -56,16 +52,17 @@ def run(filename):
           ]
  
   if benchmarks:
-    # header
+    # csv header
     print 'num_workers,bench,time'
     if flags.cluster:
       workers = [1, 2, 4, 8, 16, 32, 64, 80]
+      #workers = [1, 4, 16, 64, 81]
     else:
       workers = [flags.num_workers]
     
     for i in workers:
       timer = BenchTimer(i)
-      util.log('Running benchmarks on %d workers', i)
+      util.log_info('Running benchmarks on %d workers', i)
       master = start_cluster(i, local=not flags.cluster)
       run_benchmarks(module, benchmarks, master, timer)
       
@@ -76,7 +73,7 @@ def run(filename):
     prof.dump_stats('master_prof.out')
   
   if flags.profile_kernels:
-    spartan.PROF.dump_stats('kernel_prof.out')
+    join_profiles('./_kernel-profiles')
 
 
 def with_ctx(fn):
@@ -90,7 +87,12 @@ def with_ctx(fn):
       
   test_fn.__name__ = fn.__name__
   return test_fn
-  
+ 
+ 
+def join_profiles(dir):
+  import glob
+  import pstats
+  return pstats.Stats(*glob.glob(dir + '/*')).dump_stats('./kernel-prof.out')
 
 if __name__ == '__main__':
   raise Exception, 'Should not be run directly.'

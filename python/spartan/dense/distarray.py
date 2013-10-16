@@ -17,7 +17,7 @@ def find_shape(extents):
   necessary to fit all of them.
   :param extents:
   '''
-  #util.log('Finding shape... %s', extents)
+  #util.log_info('Finding shape... %s', extents)
   return np.max([ex.lr for ex in extents], axis=0)
 
 def find_matching_tile(array, tile_extent):
@@ -25,7 +25,7 @@ def find_matching_tile(array, tile_extent):
     ul_diff = tile_extent.ul - ex.ul
     lr_diff = ex.lr - tile_extent.lr
     if np.all(ul_diff >= 0) and np.all(lr_diff >= 0):
-      # util.log('%s matches %s', ex, tile_extent)
+      # util.log_info('%s matches %s', ex, tile_extent)
       return array.tile_for_extent(ex)
   
   raise Exception, 'No matching tile_extent!' 
@@ -164,7 +164,7 @@ def create(master, shape,
            dtype=np.float, 
            sharder=spartan.ModSharder(),
            combiner=None,
-           reducer=accum_replace,
+           reducer=None,
            tile_hint=None):
   dtype = np.dtype(dtype)
   shape = tuple(shape)
@@ -172,7 +172,7 @@ def create(master, shape,
   table = master.create_table(sharder, combiner, reducer, TileSelector())
   extents = compute_splits(shape, tile_hint, table.num_shards())
 
-  util.log('Creating array of shape %s with %d tiles', shape, len(extents))
+  util.log_info('Creating array of shape %s with %d tiles', shape, len(extents))
   for ex, shard in extents.iteritems():
     ex_tile = tile.from_shape(ex.shape, dtype=dtype)
     table.update(shard, ex, ex_tile)
@@ -188,15 +188,26 @@ class DistArray(object):
     self.dtype = dtype
     self.table = table
     
-    #util.log('%s', extents)
+    #util.log_info('%s', extents)
     Assert.isinstance(extents, dict)
     self.extents = extents
   
   def id(self):
     return self.table.id()
+  
+  def tile_shape(self):
+    scounts = collections.defaultdict(int)
+    for ex in self.extents.iterkeys():
+      scounts[ex.shape] += 1
+    
+    return sorted(scounts.items(), key=lambda kv: kv[1])[-1][0]
+    
    
-  def map_to_table(self, fn):
-    return spartan.map_items(self.table, fn)
+  def map_to_table(self, mapper_fn, combine_fn=None, reduce_fn=None):
+    return spartan.map_items(self.table, 
+                             mapper_fn = mapper_fn,
+                             combine_fn = combine_fn,
+                             reduce_fn = reduce_fn)
   
   def foreach(self, fn):
     return spartan.foreach(self.table, fn)
@@ -219,14 +230,14 @@ class DistArray(object):
     
     # special case exact match against a tile 
     if region in self.extents:
-      #util.log('Exact match.')
+      #util.log_info('Exact match.')
       ex, intersection = region, region
       shard = self.extents[region]
       return self.table.get(shard, NestedSlice(ex, extent.offset_slice(ex, intersection)))
 
     splits = list(extent.extents_for_region(self.extents.iterkeys(), region))
     
-    #util.log('Target shape: %s, %d splits', region.shape, len(splits))
+    #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
     tgt = np.ndarray(region.shape, dtype=self.dtype)
     for ex, intersection in splits:
       dst_slice = extent.offset_slice(region, intersection)
@@ -240,17 +251,17 @@ class DistArray(object):
     Assert.isinstance(region, extent.TileExtent)
     Assert.eq(region.shape, data.shape)
 
-    #util.log('%s %s', self.table.id(), self.extents)
+    #util.log_info('%s %s', self.table.id(), self.extents)
     # exact match
     if region in self.extents:
-      #util.log('EXACT: %d %s ', self.table.id(), region)
+      #util.log_info('EXACT: %d %s ', self.table.id(), region)
       shard = self.extents[region]
       self.table.update(shard, region, tile.from_data(data))
       return
     
     splits = list(extent.extents_for_region(self.extents, region))
     for dst_key, intersection in splits:
-      #util.log('%d %s %s %s', self.table.id(), region, dst_key, intersection)
+      #util.log_info('%d %s %s %s', self.table.id(), region, dst_key, intersection)
       shard = self.extents[dst_key]
       src_slice = extent.offset_slice(region, intersection)
       update_tile = tile.from_intersection(dst_key, intersection, data[src_slice])
@@ -274,12 +285,13 @@ class DistArray(object):
     return self.fetch(ex)
   
   def glom(self):
-    util.log('Glomming: %s', self.shape)
+    util.log_info('Glomming: %s', self.shape)
     return self.select(np.index_exp[:])
 
 
-def map_to_array(array, fn):
-  return from_table(array.map_to_table(fn))
+def map_to_array(array, mapper_fn, reduce_fn=None):
+  return from_table(array.map_to_table(mapper_fn=mapper_fn,
+                                       reduce_fn=reduce_fn))
 
   
 def best_locality(array, ex):
@@ -311,8 +323,8 @@ def slice_mapper(ex, tile, **kw):
   :param mapper_fn: User mapper function.
   :param slice: `TileExtent` representing the slice of the input array.
   '''
-  mapper_fn = kw['mapper_fn']
-  slice_extent = kw['slice_extent']
+  mapper_fn = kw['_slice_fn']
+  slice_extent = kw['_slice_extent']
   kernel = kw['kernel']
   
   intersection = extent.intersection(slice_extent, ex)
@@ -348,11 +360,13 @@ class Slice(object):
                                mapper_fn = mapper_fn,
                                slice_extent = self.base)
   
-  def map_to_table(self, mapper_fn):
+  def map_to_table(self, mapper_fn, combine_fn=None, reduce_fn=None):
     return spartan.map_items(self.darray.table, 
-                             slice_mapper,
-                             mapper_fn = mapper_fn,
-                             slice_extent = self.base)
+                             mapper_fn = slice_mapper,
+                             combine_fn = combine_fn,
+                             reduce_fn = reduce_fn,
+                             _slice_extent = self.base,
+                             _slice_fn = mapper_fn)
     
   def fetch(self, idx):
     offset = extent.compute_slice(self.base, idx.to_slice())
@@ -478,7 +492,7 @@ def _create_randn(extent, data):
   data[:] = np.random.randn(*extent.shape)
   
 def _create_ones(extent, data):
-  util.log('Updating %s, %s', extent, data)
+  util.log_info('Updating %s, %s', extent, data)
   data[:] = 1
 
 def _create_zeros(extent, data):

@@ -155,7 +155,7 @@ def lazify(val):
   :param val:
   '''
   if isinstance(val, Expr): return val
-  #util.log('Lazifying... %s', val)
+  #util.log_info('Lazifying... %s', val)
   return LazyVal(val)
 
 
@@ -265,8 +265,8 @@ def _sum_reducer(a, b):
 def sum(x, axis=None):
   return reduce_extents(x, axis=axis,
                        dtype_fn = lambda input: input.dtype,
-                       local_reducer_fn = _sum_local,
-                       combiner_fn = lambda a, b: a + b)
+                       local_reduce_fn = _sum_local,
+                       combine_fn = lambda a, b: a + b)
     
 
 def _to_structured_array(**kw):
@@ -283,7 +283,7 @@ def _argmin_local(index, tile, axis):
   local_idx = np.argmin(tile[:], axis)
   local_min = np.min(tile[:], axis)
 
-#  util.log('Index for reduction: %s %s %s',
+#  util.log_info('Index for reduction: %s %s %s',
 #           index.array_shape,
 #           axis,
 #           index_for_reduction(index, axis))
@@ -314,8 +314,8 @@ def argmin(x, axis=None):
   x = x.evaluate()
   compute_min = reduce_extents(x, axis,
                                dtype_fn = _argmin_dtype,
-                               local_reducer_fn = _argmin_local,
-                               combiner_fn = _argmin_reducer)
+                               local_reduce_fn = _argmin_local,
+                               combine_fn = _argmin_reducer)
   
   take_indices = map_tiles(compute_min, _take_idx_mapper)
   return take_indices

@@ -24,12 +24,16 @@ def add_bool_flag(name, default):
 class Flags(object):
   opt_fold = add_bool_flag('opt_fold', True)
   opt_numexpr = add_bool_flag('opt_numexpr', False)
-  opt = add_bool_flag('optimization', default=True)
+  optimization = add_bool_flag('optimization', default=True)
   profile_kernels = add_bool_flag('profile_kernels', default=False)
   profile_master = add_bool_flag('profile_master', default=False)
   log_level = add_flag('log_level', default=3, type=int)
   num_workers = add_flag('num_workers', default=4, type=int)
   cluster = add_bool_flag('cluster', default=False)
+  
+  def __iter__(self):
+    return iter([(k, getattr(self, k)) for k in dir(self)
+                 if not k.startswith('_')])
 
 flags = Flags()
 
@@ -43,16 +47,16 @@ def parse_known_args(argv):
 #HOSTS = [ ('localhost', 8) ]
 
 HOSTS = [
-  ('beaker-14', 8),
-  ('beaker-15', 8),
- # ('beaker-16', 8),
-  ('beaker-17', 8),
-  ('beaker-18', 8),
-  ('beaker-19', 8),
   ('beaker-20', 8),
-  ('beaker-21', 8),
+  #('beaker-21', 8),
   ('beaker-22', 8),
   ('beaker-23', 8),
   ('beaker-24', 8),
   ('beaker-25', 8),
+  ('beaker-14', 8),
+  ('beaker-15', 8),
+  ('beaker-16', 8),
+  ('beaker-17', 8),
+  ('beaker-18', 8),
+  ('beaker-19', 8),
 ]

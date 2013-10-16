@@ -34,7 +34,7 @@ def test_slice_map_tiles(ctx):
   Assert.all_eq(val.glom(), nx[5:8, 5:8] + 1)
 
 def add_one_extent(inputs, ex):
-  util.log('Mapping: %s', ex)
+  util.log_info('Mapping: %s', ex)
   return (ex, inputs[0].fetch(ex) + 1)
 
 @with_ctx

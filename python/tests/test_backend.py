@@ -72,7 +72,7 @@ def test_sum(ctx):
 @with_ctx 
 def test_compile_sum(ctx):
   def _(axis):
-    util.log('Testing sum over axis %s', axis)
+    util.log_info('Testing sum over axis %s', axis)
     a = expr.ones((TEST_SIZE, TEST_SIZE))
     b = a.sum(axis=axis)
     val = b.evaluate()

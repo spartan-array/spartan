@@ -13,7 +13,7 @@ def get_shard_kernel(kernel, args):
   s_id = kernel.current_shard()
   t_id = kernel.current_table()
   for s, k, v in kernel.table(t_id).iter(s_id):
-    #util.log('%s, %s', k, v)
+    #util.log_info('%s, %s', k, v)
     pass
 
 @with_ctx
@@ -34,7 +34,7 @@ def test_distarray_empty(ctx):
   
 
 def map_array(k, v):
-  # util.log('Extent: %s', k)
+  # util.log_info('Extent: %s', k)
   return []
   
 @with_ctx

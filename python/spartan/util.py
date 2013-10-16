@@ -12,7 +12,7 @@ import threading
 import time
 import traceback
 
-from wrap import log, log_info, log_debug, log_warn, log_error
+from wrap import log_info, log_debug, log_warn, log_error
 
 class FileWatchdog(threading.Thread):
   """Watchdog for a file (typically `sys.stdin` or `sys.stdout`).
@@ -24,7 +24,6 @@ class FileWatchdog(threading.Thread):
     threading.Thread.__init__(self, name='WatchdogThread')
     self.setDaemon(True)
     self.file_handle = file_handle
-    self.log = sys.stderr
     self.on_closed = on_closed
 
   def run(self):
@@ -32,11 +31,6 @@ class FileWatchdog(threading.Thread):
     while 1:
       r, w, x = select.select(f, f, f, 1.0)
       if r:
-        try:
-          print >>self.log, 'Watchdog: file closed.  Shutting down.'
-        except:
-          pass
-        
         self.on_closed()
         return
       
@@ -76,7 +70,7 @@ def collect_time(f, name=None, timings={}):
 
   if ed - timings['_last_log'] > 5:
     for k, v in timings.items():
-      log('Timing: %s %s', k, v)
+      log_info('Timing: %s %s', k, v)
     timings['_last_log'] = time.time()
 
   return res
@@ -184,9 +178,9 @@ class Assert(object):
 def trace_fn(fn):
   '''Function decorator: log on entry and exit to ``fn``.'''
   def tracer(*args, **kw):
-    log('TRACE: >> %s with args: %s %s', fn, args, kw)
+    log_info('TRACE: >> %s with args: %s %s', fn, args, kw)
     result = fn(*args, **kw)
-    log('TRACE: << %s (%s)', fn, result)
+    log_info('TRACE: << %s (%s)', fn, result)
     return result
   return tracer
    

@@ -64,7 +64,9 @@ class OpToPrim(object):
   def compile_NdArrayExpr(self, op):
     return prims.NewArray(array_shape=op.shape, 
                           dtype=op.dtype, 
-                          tile_hint=op.tile_hint)
+                          tile_hint=op.tile_hint,
+                          combine_fn=op.combine_fn,
+                          reduce_fn=op.reduce_fn)
     
   def compile_op(self, op):
     '''Convert a numpy expression tree in an Op tree.
@@ -73,6 +75,9 @@ class OpToPrim(object):
     '''
     if isinstance(op, expr.LazyVal):
       return prims.Value(op.val)
+    
+    if op is None:
+      return None
     
     return getattr(self, 'compile_' + op.node_type())(op)
 
@@ -106,7 +111,9 @@ class OptimizePass(object):
   def visit_NewArray(self, op):
     return prims.NewArray(array_shape = self.visit(op.shape()),
                           dtype = self.visit(op.dtype),
-                          tile_hint = op.tile_hint)
+                          tile_hint = op.tile_hint,
+                          combine_fn = op.combine_fn,
+                          reduce_fn = op.reduce_fn)
   
   def visit_Value(self, op):
     return prims.Value(op.value)
@@ -142,7 +149,7 @@ def _fold_mapper(inputs, fns=None, map_fn=None, map_kw=None):
     assert isinstance(result, np.ndarray), result
     results.append(result)
   
-  #util.log('%s %s %s', map_fn, results, map_kw)
+  #util.log_info('%s %s %s', map_fn, results, map_kw)
   return map_fn(results, **map_kw)
     
 

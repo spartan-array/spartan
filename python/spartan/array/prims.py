@@ -106,7 +106,7 @@ class Index(Primitive):
 
 @node_type
 class Reduce(Primitive):
-  _members = ['input', 'axis', 'dtype_fn', 'local_reducer_fn', 'combiner_fn']
+  _members = ['input', 'axis', 'dtype_fn', 'local_reduce_fn', 'combine_fn']
     
   def dependencies(self):
     return [self.input]

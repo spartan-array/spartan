@@ -107,7 +107,7 @@ def drop_axis(ex, axis):
   del sz[axis]
   del shape[axis]
 
-#    util.log('%s -> %s, %s -> %s', ex.ul, ul, ex.sz, sz)
+#    util.log_info('%s -> %s, %s -> %s', ex.ul, ul, ex.sz, sz)
   return TileExtent(ul, sz, shape)
   
 def ravelled_pos(idx, array_shape):
