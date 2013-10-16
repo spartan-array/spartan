@@ -83,3 +83,15 @@ rpc::Marshal& operator >>(rpc::Marshal& m, RefPtr& p) {
   p.swap(r);
   return m;
 }
+
+std::string format_exc(const PyException* p) {
+  GILHelper gil;
+  RefPtr tb = to_ref(PyImport_ImportModule("traceback"));
+  RefPtr list = to_ref(PyObject_CallMethod(tb.get(),
+      "format_exception", "OOO", p->type, p->value, p->traceback));
+  RefPtr empty = to_ref(PyUnicode_FromString(""));
+  RefPtr pystr = to_ref(PyUnicode_Join(empty.get(), list.get()));
+  return std::string(
+      PyString_AsString(PyUnicode_AsLatin1String(pystr.get())));
+}
+

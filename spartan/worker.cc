@@ -57,8 +57,12 @@ void Worker::run_kernel(const RunKernelReq& kreq, RunKernelResp* resp) {
   }
 
   std::unique_ptr<Kernel> k(TypeRegistry<Kernel>::get_by_id(kreq.kernel));
-  k->init(this, kreq.args);
-  k->run();
+  try {
+    k->init(this, kreq.args);
+    k->run();
+  } catch (PyException* exc) {
+    resp->error = format_exc(exc);
+  }
 
   Log_debug("WORKER: Finished kernel: %d:%d; %f", kreq.table, kreq.shard, t.elapsed());
 }

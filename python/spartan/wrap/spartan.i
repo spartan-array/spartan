@@ -11,6 +11,15 @@ using namespace spartan;
 %} // end helpers
 
 
+%exception {
+  try {
+    $action
+  } catch (PyException* p) {
+    PyErr_SetObject(p->type, p->value);
+    SWIG_fail;
+  }
+}
+
 typedef boost::intrusive_ptr<PyObject> RefPtr;
 namespace spartan {
 

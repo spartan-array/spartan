@@ -6,6 +6,7 @@
 #include "spartan/table.h"
 #include "spartan/master.h"
 #include "spartan/util/registry.h"
+#include "spartan/py-support.h"
 
 using std::map;
 using std::vector;
@@ -19,6 +20,8 @@ public:
   TaskMap pending;
   TaskMap active;
   TaskMap finished;
+
+  map<ShardId, string> errors;
 
   ShardSet shards;
 
@@ -88,10 +91,16 @@ public:
     pending.clear();
     active.clear();
     finished.clear();
+    errors.clear();
   }
 
-  void set_finished(const ShardId& id, double kernel_time) {
+  void set_finished(const ShardId& id, double kernel_time, string error) {
     rpc::ScopedLock sl(&lock);
+
+    if (!error.empty()) {
+      Log_info("Error detected for task %d.%d", id.table, id.shard);
+      errors[id] = error;
+    }
 
     auto it = active.find(id);
     finished.insert(*it);
@@ -359,8 +368,13 @@ int Master::dispatch_work(Kernel* k) {
     double start_time = Now();
 
     auto callback = [=](rpc::Future *future) {
+      RunKernelResp resp;
+      future->get_reply() >> resp;
+
       Log_debug("MASTER: Kernel %d:%d finished", w_req.table, w_req.shard);
-      w->set_finished(ShardId(w_req.table, w_req.shard), Now() - start_time);
+      w->set_finished(ShardId(w_req.table, w_req.shard),
+                      Now() - start_time,
+                      resp.error);
     };
 
     rpc::Future *f = w->proxy->async_run_kernel(w_req,
@@ -477,6 +491,12 @@ void Master::wait_for_completion(Kernel* k) {
 
   // Force workers to flush outputs.
   flush();
+  for (size_t i = 0; i < workers_.size(); ++i) {
+    WorkerState* w = workers_[i];
+    if (!w->errors.empty()) {
+      throw new PyException(w->errors.begin()->second);
+    }
+  }
   Log_info("Kernel finished in %f", Now() - start);
 }
 

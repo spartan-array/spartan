@@ -3,6 +3,7 @@
 
 #include <Python.h>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/noncopyable.hpp>
 #include "util/common.h"
 
 typedef boost::intrusive_ptr<PyObject> RefPtr;
@@ -36,12 +37,29 @@ static inline void intrusive_ptr_release(PyObject* p) {
   }
 }
 
+struct PyException : private boost::noncopyable {
+  PyException() {
+    //Log_warn("Exceptin!");
+    GILHelper gil;
+    PyErr_Fetch(&type, &value, &traceback);
+  }
+
+  PyException(std::string value_str) {
+    //Log_warn("Exceptin!");
+    GILHelper gil;
+    PyErr_SetString(PyExc_SystemError, value_str.c_str());
+    PyErr_Fetch(&type, &value, &traceback);
+  }
+
+  PyObject* traceback;
+  PyObject* value;
+  PyObject* type;
+};
+
 template<class T>
 T check(T result) {
   if (PyErr_Occurred()) {
-    PyErr_Print();
-    spartan::print_backtrace();
-    Log_fatal("Python error, aborting.");
+    throw new PyException();
   }
   return result;
 }
@@ -67,7 +85,7 @@ static inline bool operator==(const RefPtr& a, const RefPtr& b) {
 // to incref these when turning them into a RefPtr.
 extern RefPtr to_ref(PyObject* o);
 extern std::string repr(RefPtr p);
-
+extern std::string format_exc(const PyException* p);
 
 class Pickler {
   RefPtr _cPickle;
