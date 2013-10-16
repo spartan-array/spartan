@@ -224,7 +224,11 @@ def map_tiles(v, fn, **kw):
   return MapTilesExpr(v, map_fn=fn, fn_kw=kw)
 
 
-def ndarray(shape, dtype=np.float, tile_hint=None):
+def ndarray(shape, 
+            dtype=np.float, 
+            tile_hint=None,
+            combine_fn=None, 
+            reduce_fn=None):
   '''
   Lazily create a new distributed array.
   :param shape:
@@ -383,7 +387,15 @@ def dot(a, b):
   
   #av, bv = distarray.broadcast([av, bv])
   Assert.eq(a.shape[1], b.shape[0])
-  return map_extents((av, bv), _dot_mapper)
+  target = ndarray((a.shape[0], b.shape[1]),
+                   dtype=av.dtype,
+                   tile_hint=av.tile_shape(),
+                   combine_fn=np.add,
+                   reduce_fn=np.add)
+  
+  return map_extents((av, bv), 
+                     _dot_mapper,
+                     target=target)
             
 
 def map(v, fn, axis=None, **kw):

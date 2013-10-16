@@ -142,7 +142,7 @@ class Outer(Primitive):
 
 @node_type
 class NewArray(Primitive):
-  _members = ['array_shape', 'dtype', 'tile_hint']
+  _members = ['array_shape', 'dtype', 'tile_hint', 'combine_fn', 'reduce_fn']
   
   def dependencies(self):
     return []
