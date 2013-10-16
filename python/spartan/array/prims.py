@@ -70,7 +70,14 @@ class MapTiles(Map):
 
 @node_type
 class MapExtents(Map):
-  _members = ['inputs', 'map_fn', 'fn_args', 'fn_kw']
+  _members = ['inputs', 'map_fn', 'reduce_fn', 'target', 'fn_args', 'fn_kw']
+  
+  def dependencies(self):
+    if self.target is not None:
+      return self.inputs + [self.target]
+  
+    return self.inputs
+  
   def _shape(self):
     raise NotShapeable
 

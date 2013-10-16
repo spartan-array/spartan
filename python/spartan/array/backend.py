@@ -110,16 +110,30 @@ class Backend(object):
     return result
   
   def eval_MapExtents(self, ctx, prim, inputs):
+    if prim.target is not None:
+      inputs, target = inputs[:-1], inputs[-1]
+    else:
+      target = None
+            
     map_fn = prim.map_fn
+    reduce_fn = prim.reduce_fn
     fn_kw = prim.fn_kw or {}
     
-    def mapper(ex, _):
-      #util.log('MapExtents: %s', map_fn)
-      new_extent, result = map_fn(inputs, ex, **fn_kw)
-      # util.log('MapExtents: %s, %s', ex, new_extent)
-      return [(new_extent, tile.from_data(result))]
-    
-    return distarray.map_to_array(inputs[0], mapper)
+    if target is not None:
+      def mapper(ex, _):
+        new_extent, result = map_fn(inputs, ex, **fn_kw)
+        target.update(new_extent, result)
+        
+      inputs[0].foreach(mapper)
+      return target
+    else:
+      def mapper(ex, _):
+        #util.log_info('MapExtents: %s', map_fn)
+        new_extent, result = map_fn(inputs, ex, **fn_kw)
+        return [(new_extent, tile.from_data(result))]
+      return distarray.map_to_array(inputs[0], 
+                                    mapper_fn = mapper,
+                                    reduce_fn = reduce_fn)
   
   
   def eval_NewArray(self, ctx, prim, inputs):
@@ -127,24 +141,37 @@ class Backend(object):
     dtype = prim.dtype
     tile_hint = prim.tile_hint
     
-    return distarray.create(ctx, shape, dtype, tile_hint=tile_hint)
+    if prim.combine_fn is not None:
+      combiner = tile.TileAccum(prim.combine_fn)
+    else:
+      combiner = None
+      
+    if prim.reduce_fn is not None:
+      reducer = tile.TileAccum(prim.reduce_fn)
+    else:
+      reducer = None
+       
+    return distarray.create(ctx, shape, dtype,
+                            combiner=combiner,
+                            reducer=reducer,
+                            tile_hint=tile_hint)
   
   def eval_Reduce(self, ctx, prim, inputs):
     input_array = inputs[0]
     dtype = prim.dtype_fn(input_array)
     axis = prim.axis
-    util.log('Reducing %s over axis %s', input_array.shape, prim.axis)
+    util.log_info('Reducing %s over axis %s', input_array.shape, prim.axis)
     shape = extent.shape_for_reduction(input_array.shape, prim.axis)
-    tile_accum = tile.TileAccum(prim.combiner_fn)
+    tile_accum = tile.TileAccum(prim.combine_fn)
     output_array = distarray.create(ctx, shape, dtype,
                                     combiner=tile_accum, 
                                     reducer=tile_accum)
-    local_reducer = prim.local_reducer_fn
+    local_reducer = prim.local_reduce_fn
     
-    util.log('Reducing into array %d', output_array.table.id())
+    util.log_info('Reducing into array %d', output_array.table.id())
     
     def mapper(ex, tile):
-      #util.log('Reduce: %s', local_reducer)
+      #util.log_info('Reduce: %s', local_reducer)
       reduced = local_reducer(ex, tile, axis)
       dst_extent = extent.index_for_reduction(ex, axis)
       output_array.update(dst_extent, reduced)

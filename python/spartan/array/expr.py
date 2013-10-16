@@ -176,19 +176,19 @@ class IndexExpr(Expr, Node):
   _members = ['src', 'idx']
 
 class ReduceExtentsExpr(Op, Node):
-  _members = ['children', 'axis', 'dtype_fn', 'local_reducer_fn', 'combiner_fn']
+  _members = ['children', 'axis', 'dtype_fn', 'local_reduce_fn', 'combine_fn']
  
 class MapTilesExpr(Op, Node):
   _members = ['children', 'map_fn', 'fn_kw']
 
 class MapExtentsExpr(Op, Node):
-  _members = ['children', 'map_fn', 'fn_kw']
+  _members = ['children', 'map_fn', 'reduce_fn', 'target', 'fn_kw']
 
 class OuterProductExpr(Op, Node):
   _members = ['children', 'map_fn', 'map_fn_kw', 'reduce_fn', 'reduce_fn_kw']
   
 class NdArrayExpr(Expr, Node):
-  _members = ['_shape', 'dtype', 'tile_hint']
+  _members = ['_shape', 'dtype', 'tile_hint', 'combine_fn', 'reduce_fn']
   
 class StencilExpr(Expr, Node):
   _members = ['images', 'filters', 'stride']
@@ -197,7 +197,7 @@ def stencil(image, filters, stride=1):
   return StencilExpr(image, filters, stride)
 
 
-def map_extents(v, fn, shape_hint=None, **kw):
+def map_extents(v, fn, reduce_fn=None, shape_hint=None, target=None, **kw):
   '''
   Evaluate ``fn`` over each extent of the input.
   
@@ -206,7 +206,11 @@ def map_extents(v, fn, shape_hint=None, **kw):
   :param v:
   :param fn:
   '''
-  return MapExtentsExpr(v, map_fn=fn, fn_kw=kw)
+  return MapExtentsExpr(v, 
+                        map_fn=fn, 
+                        reduce_fn=reduce_fn,
+                        target=target, 
+                        fn_kw=kw)
 
 
 def map_tiles(v, fn, **kw):
@@ -229,21 +233,24 @@ def ndarray(shape, dtype=np.float, tile_hint=None):
   '''
   return NdArrayExpr(_shape = shape,
                      dtype = dtype,
-                     tile_hint = tile_hint) 
+                     tile_hint = tile_hint,
+                     combine_fn = combine_fn,
+                     reduce_fn = reduce_fn) 
 
 
 def reduce_extents(v, axis,
                    dtype_fn,
-                   local_reducer_fn,
-                   combiner_fn):
-  return ReduceExtentsExpr(v, axis, dtype_fn, local_reducer_fn, combiner_fn)
+                   local_reduce_fn,
+                   combine_fn):
+  return ReduceExtentsExpr(v, axis, dtype_fn, local_reduce_fn, combine_fn)
 
 
-def outer_product(a, b, map_fn, reducer_fn):
-  return OuterProductExpr(a, b, map_fn, reducer_fn)
+def outer_product(a, b, map_fn, reduce_fn):
+  return OuterProductExpr(a, b, map_fn, reduce_fn)
 
 def outer(a, b):
-  return OuterProductExpr(a, b, map_fn=np.dot, reducer_fn=np.add)
+  return OuterProductExpr(a, b, map_fn=np.dot, 
+                          reduce_fn=np.add)
 
 def _sum_local(index, tile, axis):
   return np.sum(tile[:], axis)
@@ -402,13 +409,13 @@ def zeros(shape, dtype=np.float, tile_hint=None):
                      fn = lambda inputs, ex: (ex, np.zeros(ex.shape, dtype)))
 
 def ones(shape, dtype=np.float, tile_hint=None):
-  return map_extents(ndarray(shape, dtype=np.float, tile_hint=tile_hint), 
-                     fn = lambda inputs, ex: (ex, np.ones(ex.shape, dtype)))
+  return map_tiles(ndarray(shape, dtype=np.float, tile_hint=tile_hint), 
+                   fn = lambda inputs: np.ones(inputs[0].shape, dtype))
 
 
 def _arange_mapper(inputs, ex, dtype=None):
   pos = extent.ravelled_pos(ex.ul, ex.array_shape)
-  #util.log('Extent: %s, pos: %s', ex, pos)
+  #util.log_info('Extent: %s, pos: %s', ex, pos)
   sz = np.prod(ex.shape)
   return (ex, np.arange(pos, pos+sz, dtype=dtype).reshape(ex.shape))
 

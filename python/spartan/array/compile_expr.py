@@ -55,13 +55,15 @@ class OpToPrim(object):
     return prims.Reduce(children[0],
                         axis=op.axis,
                         dtype_fn = op.dtype_fn,
-                        local_reducer_fn = op.local_reducer_fn,
-                        combiner_fn = op.combiner_fn)
+                        local_reduce_fn = op.local_reduce_fn,
+                        combine_fn = op.combine_fn)
                         
   def compile_MapExtentsExpr(self, op):
     children = [self.compile_op(c) for c in op.children]
     return prims.MapExtents(children,
                             map_fn = op.map_fn,
+                            reduce_fn = op.reduce_fn,
+                            target = self.compile_op(op.target),
                             fn_kw = op.fn_kw)
                               
   
@@ -100,12 +102,14 @@ class OptimizePass(object):
     return prims.Reduce(input = self.visit(op.input),
                         axis = op.axis,
                         dtype_fn = op.dtype_fn,
-                        local_reducer_fn = op.local_reducer_fn,
-                        combiner_fn = op.combiner_fn)
+                        local_reduce_fn = op.local_reduce_fn,
+                        combine_fn = op.combine_fn)
                         
   def visit_MapExtents(self, op):
     return prims.MapExtents(inputs = [self.visit(v) for v in op.inputs],
                             map_fn = op.map_fn,
+                            reduce_fn = op.reduce_fn,
+                            target = op.target,
                             fn_kw = op.fn_kw) 
   
   def visit_MapTiles(self, op):
