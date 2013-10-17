@@ -3,32 +3,31 @@ from spartan.util import Assert
 import numpy as np
 
 class TileExtent(object):
-  '''A rectangular tile of a distributed array.'''
-  def __init__(self, ul, sz, array_shape):
-    #print 'Creating: %s %s %s %s' % (ul, sz, array_shape, index)
-    self.ul = tuple(ul)
-    self.sz = tuple(sz)
-    
-    if array_shape is not None:
-      self.array_shape = tuple(array_shape)
-    else:
-      self.array_shape = None
-      
-    self.shape = self.sz
-    
-    # cache some values as numpy arrays for faster access
-    self.ul_array = np.asarray(self.ul, dtype=np.int)
-    self.sz_array = np.asarray(self.sz, dtype=np.int)
-    self.lr_array = self.ul_array + self.sz_array
-    
-    self.lr = tuple(self.lr_array)
-    
-  def __reduce__(self):
-    return (TileExtent, (self.ul, self.sz, self.array_shape))
+  '''A rectangular tile of a distributed array.
+  
+  Extents are represented by an upper-left corner (inclusive) and
+  a lower right corner (exclusive): [ul, lr).  In addition, they
+  carry the shape of the array they are a part of; this is used to
+  compute global position information.
+  '''
+  
+  @property
+  def size(self):
+    return np.prod(self.shape)
+  
+  @property
+  def shape(self):
+    result = self.lr_array - self.ul_array
+    result[result == 0] = 1
+    #util.log_info('Shape: %s', result)
+    return tuple(result)
   
   @property
   def ndim(self):
-    return len(self.sz)
+    return len(self.lr)
+  
+  def __reduce__(self):
+    return (create, (self.ul, self.lr, self.array_shape))
   
   def to_slice(self):
     return tuple([slice(ul, lr, None) for ul, lr in zip(self.ul, self.lr)])
@@ -38,23 +37,21 @@ class TileExtent(object):
 
   
   def __getitem__(self, idx):
-    return TileExtent([self.ul[idx]], 
-                      [self.sz[idx]], 
-                      [self.array_shape[idx]])
+    return create([self.ul[idx]], 
+                  [self.lr[idx]], 
+                  [self.array_shape[idx]])
                       
-  def add_dim(self):
-    return TileExtent(self.ul + (0,), 
-                      self.sz + (1,), 
-                      self.array_shape + (1,))
-
   def __hash__(self):
     return hash(self.ul)
     #return hash(self.ul[-2:])
     #return ravelled_pos(self.ul, self.array_shape)
     
   def __eq__(self, other):
-    return np.all(self.ul_array == other.ul_array) and np.all(self.sz_array == other.sz_array)
+    return (np.all(self.ul_array == other.ul_array) and 
+            np.all(self.lr_array == other.lr_array))
 
+  def ravelled_pos(self):
+    return ravelled_pos(self.ul, self.array_shape)
   
   def to_global(self, idx, axis):
     '''Convert ``idx`` from a local offset in this tile to a global offset.'''
@@ -64,52 +61,73 @@ class TileExtent(object):
     # first unravel idx to a local position
     local_idx = idx
     unravelled = []
-    for i in range(len(self.sz)):
-      unravelled.append(local_idx % self.sz[i])
-      local_idx /= self.sz[i]
+    shp = self.shape
+    for i in range(len(shp)):
+      unravelled.append(local_idx % shp[i])
+      local_idx /= shp[i]
     
     unravelled = np.array(list(reversed(unravelled)))
     unravelled += self.ul
     return ravelled_pos(unravelled, self.array_shape)
 
-  def start(self, axis):
-    if axis is None:
-      return self.ravelled_pos(self.ul)
-    return self.ul[axis]
+  def add_dim(self):
+    return create(self.ul + (0,), 
+                             self.lr + (0,), 
+                             self.array_shape + (1,))
 
-  def stop(self, axis):
-    if axis is None:
-      return self.ravelled_pos(self.lr)
-    return self.ul[axis] + self.sz[axis]
-
-  @property
-  def size(self):
-    mul = 1
-    res = 0
-    for s in reversed(self.sz):
-      res += mul * s
-      if s > 0: mul *= s
-    
-    return res
-  
   def clone(self):
-    return TileExtent(self.ul, self.sz, self.array_shape)
+    return create(self.ul, self.lr, self.array_shape)
  
+  
+def create(ul, lr, array_shape):
+  ex = TileExtent()
+  ex.ul = tuple(ul)
+  ex.lr = tuple(lr)
+  
+    
+  assert np.all(np.array(ex.lr) >= np.array(ex.ul)),\
+    'Negative extent size: (%s, %s)' % (ul, lr)
+  
+  if array_shape is not None:
+    ex.array_shape = tuple(array_shape)
+    assert np.all(np.array(ex.lr) <= np.array(array_shape)),\
+      'Extent lr (%s) falls outside of the array(%s)' % (lr, array_shape)
+  else:
+    ex.array_shape = None
+  
+  # cache some values as numpy arrays for faster access
+  ex.ul_array = np.asarray(ex.ul, dtype=np.int)
+  ex.lr_array = np.asarray(ex.lr, dtype=np.int)
+  return ex
  
 def drop_axis(ex, axis):
-  if axis is None: return TileExtent((), (), ())
+  if axis is None: return create((), (), ())
   if axis < 0: axis = len(ex.ul) + axis
   
   ul = list(ex.ul)
-  sz = list(ex.sz)
+  lr = list(ex.lr)
   shape = list(ex.array_shape)
   del ul[axis]
-  del sz[axis]
+  del lr[axis]
   del shape[axis]
-
-#    util.log_info('%s -> %s, %s -> %s', ex.ul, ul, ex.sz, sz)
-  return TileExtent(ul, sz, shape)
+  return create(ul, lr, shape)
+ 
+def unravelled_pos(idx, array_shape): 
+  '''
+  Unravel ``idx`` into an index into an array of shape ``array_shape``.
+  :param idx: `int`
+  :param array_shape: `tuple`
+  :rtype: `tuple` indexing into ``array_shape``
+  '''
   
+  unravelled = []
+  for dim in array_shape:
+    unravelled.append(idx % dim)
+    idx /= dim
+  util.log_info('Unravel: %s %s %s',
+                idx, unravelled, array_shape)
+  return tuple(unravelled)
+    
 def ravelled_pos(idx, array_shape):
   rpos = 0
   mul = 1
@@ -139,19 +157,19 @@ def compute_slice(base, idx):
     idx = (idx,)
     
   ul = []
-  sz = []
+  lr = []
   array_shape = base.array_shape
   
   for i in range(len(base.ul)):
     if i >= len(idx):
       ul.append(base.ul[i])
-      sz.append(base.sz[i])
+      lr.append(base.lr[i])
     else:
-      start, stop, step = idx[i].indices(base.sz[i])
+      start, stop, step = idx[i].indices(base.shape[i])
       ul.append(base.ul[i] + start)
-      sz.append(stop - start)
+      lr.append(base.ul[i] + stop)
   
-  return TileExtent(ul, sz, array_shape)
+  return create(ul, lr, array_shape)
 
 
 def offset_from(base, other):
@@ -162,7 +180,9 @@ def offset_from(base, other):
   '''
   assert np.all(other.ul >= base.ul), (other, base)
   assert np.all(other.lr <= base.lr), (other, base)
-  return TileExtent(np.array(other.ul) - np.array(base.ul), other.sz, other.shape)
+  return create(np.array(other.ul) - np.array(base.ul), 
+                np.array(other.lr) - np.array(base.ul),
+                other.array_shape)
 
 
 
@@ -173,7 +193,6 @@ def offset_slice(base, other):
   :rtype: A slice representing the local offsets of ``other`` into this tile.
   '''
   return offset_from(base, other).to_slice()
-  # return tuple([slice(p, p + s, None) for (p, s) in zip(other.ul - self.ul, other.sz)])
   
 
 def from_slice(idx, shape):
@@ -191,7 +210,7 @@ def from_slice(idx, shape):
                              for _ in range(len(shape) - len(idx))])
     
   ul = []
-  sz = []
+  lr = []
  
   for i in range(len(shape)):
     dim = shape[i]
@@ -203,9 +222,9 @@ def from_slice(idx, shape):
     
     indices = slc.indices(dim)
     ul.append(indices[0])
-    sz.append(indices[1] - indices[0])
+    lr.append(indices[1])
     
-  return TileExtent(ul, sz, shape)
+  return create(ul, lr, shape)
 
 
 def intersection(a, b):
@@ -216,11 +235,14 @@ def intersection(a, b):
   for i in range(len(a.lr)):
     if b.lr[i] < a.ul[i]: return None
     if a.lr[i] < b.ul[i]: return None
+    
+  Assert.eq(a.array_shape, b.array_shape)
+  
   # if np.any(b.lr_array <= a.ul_array): return None
   # if np.any(a.lr_array <= b.ul_array): return None
-  return TileExtent(np.maximum(b.ul_array, a.ul_array),
-                    np.minimum(b.lr_array, a.lr_array) - np.maximum(b.ul_array, a.ul_array),
-                    a.array_shape)
+  return create(np.maximum(b.ul_array, a.ul_array),
+                np.minimum(b.lr_array, a.lr_array),
+                a.array_shape)
 
 TileExtent.intersection = intersection
 
@@ -244,11 +266,18 @@ def shapes_match(offset, data):
   :param offset:
   :param data:
   '''
-  return np.all(offset.sz == data.shape)
+  return np.all(offset.shape == data.shape)
 
 def index_for_reduction(index, axis):
   return drop_axis(index, axis)
-
-def shape_for_slice(input_shape, slc):
-  raise NotImplementedError
         
+def find_shape(extents):
+  '''
+  Given a list of extents, return the shape of the array
+  necessary to fit all of them.
+  :param extents:
+  '''
+  #util.log_info('Finding shape... %s', extents)
+  shape = np.max([ex.lr for ex in extents], axis=0)
+  shape[shape == 0] = 1
+  return tuple(shape)

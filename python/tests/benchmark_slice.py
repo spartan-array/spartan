@@ -1,5 +1,4 @@
-from spartan import util, flags
-from spartan.array import prims, compile_expr, backend, expr
+from spartan import util, flags, expr
 from spartan.dense import distarray
 import test_common
 

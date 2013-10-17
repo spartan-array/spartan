@@ -13,4 +13,5 @@ distarray.TILE_SIZE = TEST_SIZE
 def test_ravel(ctx):
   x = expr.arange((TEST_SIZE, TEST_SIZE))
   n = np.arange(TEST_SIZE * TEST_SIZE).reshape((TEST_SIZE, TEST_SIZE))
-  Assert.all_eq(n.ravel(), x.ravel())
+ 
+  Assert.all_eq(n.ravel(), x.ravel().glom())

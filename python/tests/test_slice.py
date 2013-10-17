@@ -55,7 +55,7 @@ def test_slice_map_tiles2(ctx):
   y = x[:, :, 0]
   z = expr.map_tiles(y, lambda tiles: tiles[0] + 13)
   val = z.glom()
-  
+ 
   Assert.all_eq(val.reshape(10, 10), nx[:, :, 0] + 13)
   
 @with_ctx

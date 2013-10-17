@@ -11,15 +11,6 @@ import collections
 # number of elements per tile
 TILE_SIZE = 100000
 
-def find_shape(extents):
-  '''
-  Given a list of extents, return the shape of the array
-  necessary to fit all of them.
-  :param extents:
-  '''
-  #util.log_info('Finding shape... %s', extents)
-  return np.max([ex.lr for ex in extents], axis=0)
-
 def find_matching_tile(array, tile_extent):
   for ex in array.extents():
     ul_diff = tile_extent.ul - ex.ul
@@ -48,6 +39,7 @@ class NestedSlice(object):
     
     self.extent = ex
     self.subslice = subslice
+    #util.log_info('Nested: %s[%s]', ex, subslice)
    
   def __eq__(self, other):
     Assert.isinstance(other, extent.TileExtent)
@@ -85,7 +77,7 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
   if tile_hint is None:
     # try to make reasonable tiles
     if len(shape) == 0:
-      return { extent.TileExtent([], [], ()) :  0 }
+      return { extent.create([], [], ()) :  0 }
    
     weight = 1
     
@@ -95,7 +87,7 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
       step = max(1, TILE_SIZE / weight)
       dim_splits = []
       for i in range(0, shape[dim], step):
-        dim_splits.append((i, min(shape[dim] - i,  step)))
+        dim_splits.append((i, min(shape[dim], i + step)))
         
       splits[dim] = dim_splits
       weight *= shape[dim]
@@ -106,7 +98,7 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
       step = tile_hint[dim]
       #Assert.le(step, shape[dim])
       for i in range(0, shape[dim], step):
-        dim_splits.append((i, min(shape[dim] - i,  step)))
+        dim_splits.append((i, min(shape[dim],  i + step)))
       splits[dim] = dim_splits
  
   result = {}
@@ -116,7 +108,7 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
       idx = idx % num_shards
       
     ul, lr = zip(*slc)
-    ex = extent.TileExtent(ul, lr, shape)
+    ex = extent.create(ul, lr, shape)
     result[ex] = idx
     idx += 1
   
@@ -143,7 +135,7 @@ def from_table(table):
   if not extents:
     shape = tuple()
   else:
-    shape = find_shape(extents.keys())
+    shape = extent.find_shape(extents.keys())
   
   if len(extents) > 0:
     # fetch a one element array in order to get the dtype
@@ -243,6 +235,7 @@ class DistArray(object):
       dst_slice = extent.offset_slice(region, intersection)
       shard = self.extents[ex]
       src_slice = self.table.get(shard, NestedSlice(ex, extent.offset_slice(ex, intersection)))
+      #util.log_info('%s %s', dst_slice, src_slice.shape)
       tgt[dst_slice] = src_slice
     return tgt
     #return tile.data[]
@@ -285,7 +278,7 @@ class DistArray(object):
     return self.fetch(ex)
   
   def glom(self):
-    util.log_info('Glomming: %s', self.shape)
+    #util.log_info('Glomming: %s', self.shape)
     return self.select(np.index_exp[:])
 
 
@@ -342,23 +335,25 @@ def slice_mapper(ex, tile, **kw):
 
 class Slice(object):
   def __init__(self, darray, idx):
+    util.log_info('New slice: %s', idx)
     if not isinstance(idx, extent.TileExtent):
       idx = extent.from_slice(idx, darray.shape)
+    util.log_info('New slice: %s', idx)
     
     Assert.isinstance(darray, DistArray)
     self.darray = darray
-    self.base = idx
-    self.shape = self.base.shape
-    intersections = [extent.intersection(self.base, ex) for ex in self.darray.extents]
+    self.slice = idx
+    self.shape = self.slice.shape
+    intersections = [extent.intersection(self.slice, ex) for ex in self.darray.extents]
     intersections = [ex for ex in intersections if ex is not None]
-    offsets = [extent.offset_from(self.base, ex) for ex in intersections]
+    offsets = [extent.offset_from(self.slice, ex) for ex in intersections]
     self.extents = offsets
     self.dtype = darray.dtype
     
   def foreach(self, mapper_fn):
     return spartan.map_inplace(self.darray.table,
                                fn=slice_mapper,
-                               _slice_extent = self.base,
+                               _slice_extent = self.slice,
                                _slice_fn = mapper_fn)
   
   def map_to_table(self, mapper_fn, combine_fn=None, reduce_fn=None):
@@ -366,18 +361,18 @@ class Slice(object):
                              mapper_fn = slice_mapper,
                              combine_fn = combine_fn,
                              reduce_fn = reduce_fn,
-                             _slice_extent = self.base,
+                             _slice_extent = self.slice,
                              _slice_fn = mapper_fn)
     
   def fetch(self, idx):
-    offset = extent.compute_slice(self.base, idx.to_slice())
+    offset = extent.compute_slice(self.slice, idx.to_slice())
     return self.darray.fetch(offset)
 
   def glom(self):
-    return self.darray.fetch(self.base)
+    return self.darray.fetch(self.slice)
 
   def __getitem__(self, idx):
-    ex = extent.compute_slice(self.base, idx)
+    ex = extent.compute_slice(self.slice, idx)
     return self.darray.fetch(ex)
 
 
@@ -408,17 +403,17 @@ class Broadcast(object):
       
     # fold down expanded dimensions
     ul = []
-    sz = []
+    lr = []
     for i in xrange(len(self.base.shape)):
       size = self.base.shape[i]
       if size == 1:
         ul.append(0)
-        sz.append(1)
+        lr.append(1)
       else:
         ul.append(ex.ul[i])
-        sz.append(ex.sz[i])
+        lr.append(ex.lr[i])
     
-    ex = extent.TileExtent(ul, sz, self.base.shape) 
+    ex = extent.create(ul, lr, self.base.shape) 
    
     template = np.ndarray(ex.shape, dtype=self.base.dtype)
     fetched = self.base.fetch(ex)

@@ -9,6 +9,7 @@ and imports all symbols from the SWIG generated code.
 from os.path import abspath
 import sys
 import collections
+import logging
 sys.path += [abspath('../build/.libs'), 
              abspath('../build/python/spartan/wrap'), 
              abspath('.')]
@@ -24,10 +25,34 @@ import spartan_wrap
 import threading
 import traceback
 
+PYLOG_TO_CLOG = {
+  logging.DEBUG : spartan_wrap.DEBUG,
+  logging.INFO : spartan_wrap.INFO,
+  logging.WARN : spartan_wrap.WARN,
+  logging.ERROR : spartan_wrap.ERROR,
+  logging.FATAL : spartan_wrap.FATAL,
+}
+
+logging.basicConfig(format='%(filename)s:%(lineno)s [%(funcName)s] %(message)s',
+                    level=logging.INFO)
+
+log_debug = logging.debug
+log_info = logging.info
+log_warn = logging.info
+log_error = logging.error
+
+def findCaller(obj):
+  f = sys._getframe(4)
+  co = f.f_code
+  filename = os.path.normcase(co.co_filename)
+  return (co.co_filename, f.f_lineno, co.co_name)
+
+root = logging.getLogger()
+logging.RootLogger.findCaller = findCaller
 
 log_mutex = threading.RLock()
 def _log(msg, *args, **kw):
-  level = kw.get('level', spartan_wrap.INFO)
+  level = kw.get('level', logging.INFO)
   with log_mutex:
     caller = sys._getframe(2)
     filename = caller.f_code.co_filename
@@ -36,32 +61,37 @@ def _log(msg, *args, **kw):
       exc = ''.join(traceback.format_exc())
     else:
       exc = None
-
+ 
     if isinstance(msg, str):
       msg = msg % args
     else:
       msg = repr(msg)
    
-    msg = str(msg) 
-    spartan_wrap.log(level, filename, lineno, msg)
-    if exc is not None:
-      spartan_wrap.log(level, filename, lineno, exc)
+        
+    msg = str(msg)
+    logging.log(level, msg)
+    
+    #level = PYLOG_TO_CLOG[level]
+    #spartan_wrap.log(level, filename, lineno, msg)
+    #if exc is not None:
+    #  spartan_wrap.log(level, filename, lineno, exc)
+ 
+# def log_info(msg, *args, **kw):
+#   kw['level'] = logging.INFO
+#   return _log(msg, *args, **kw)
+#  
+# def log_debug(msg, *args, **kw):
+#   kw['level'] = logging.DEBUG
+#   return _log(msg, *args, **kw)
+#  
+# def log_error(msg, *args, **kw):
+#   kw['level'] = logging.ERROR
+#   return _log(msg, *args, **kw)
+#  
+# def log_warn(msg, *args, **kw):
+#   kw['level'] = logging.WARN
+#   return _log(msg, *args, **kw)
 
-def log_info(msg, *args, **kw):
-  kw['level'] = spartan_wrap.INFO
-  return _log(msg, *args, **kw)
-
-def log_debug(msg, *args, **kw):
-  kw['level'] = spartan_wrap.DEBUG
-  return _log(msg, *args, **kw)
-
-def log_error(msg, *args, **kw):
-  kw['level'] = spartan_wrap.ERROR
-  return _log(msg, *args, **kw)
-
-def log_warn(msg, *args, **kw):
-  kw['level'] = spartan_wrap.WARN
-  return _log(msg, *args, **kw)
 
 class Sharder(object):
   def __call__(self, k, num_shards):

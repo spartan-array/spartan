@@ -141,7 +141,8 @@ class Assert(object):
     assert numpy.all(a == b), 'Failed: \n%s\n ==\n%s' % (a, b)
   
   @staticmethod
-  def eq(a, b): assert (a == b), 'Failed: %s == %s' % (a, b)
+  def eq(a, b, msg=''): 
+    assert (a == b), 'Failed: %s == %s (%s)' % (a, b, msg)
   
   @staticmethod
   def ne(a, b): assert (a == b), 'Failed: %s != %s' % (a, b)
@@ -202,7 +203,15 @@ def rtype_check(typeclass):
     checked_fn.__doc__ = fn.__doc__
     return checked_fn
   return wrap
+
+def locked_fn(fn):
+  lock = threading.RLock()
+  def _fn(*args, **kw):
+    with lock:
+      return fn(*args, **kw)
   
+  _fn.__name__ = fn.__name__
+  return _fn
   
 def count_calls(fn):
   count = [0]
@@ -219,4 +228,7 @@ def join_tuple(tuple_a, tuple_b):
   return tuple(list(tuple_a) + list(tuple_b))
 
 def divup(a, b):
+  if isinstance(a, tuple):
+    return tuple([divup(ta, b) for ta in a])
+  
   return int(ceil(float(a) / b))

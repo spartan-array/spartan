@@ -20,8 +20,9 @@ class Tile(object):
     if self.data is None:
       self.data = np.ndarray(self.shape, dtype=self.dtype)
 
-  def get(self, slc):
+  def get(self):
     self._initialize()
+    return self.data
     
   def __getitem__(self, idx):
     self._initialize()

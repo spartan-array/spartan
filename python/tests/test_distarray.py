@@ -80,5 +80,5 @@ def test_locality(ctx):
   dist = distarray.arange(ctx, ((100, 100)))
   for i in range(0, 100, 10):
     for j in range(0, 100, 10):
-      distarray.best_locality(dist, extent.TileExtent((i, j), (i + 10, j + 10), (100, 100)))
+      distarray.best_locality(dist, extent.create((i, j), (i + 10, j + 10), (100, 100)))
   
