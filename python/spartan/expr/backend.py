@@ -10,7 +10,7 @@ class Backend(object):
       assert isinstance(vs, list)
       deps[k] = [self.evaluate(ctx, v) for v in vs]
     
-    return prim.evaluate(ctx, prim, deps)
+    return prim.evaluate(ctx, deps)
   
   def evaluate(self, ctx, prim):
     from .base import Expr

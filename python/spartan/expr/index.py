@@ -8,19 +8,22 @@ import numpy as np
 
 class IndexExpr(Expr, Node):
   _members = ['src', 'idx']
+
+  def visit(self, visitor):
+    return IndexExpr(visitor.visit(self.src), visitor.visit(self.idx))
   
   def dependencies(self):
     return { 'src' : [self.src],
              'idx' : [self.idx] }
     
-  def evaluate(self, ctx, prim, deps):
+  def evaluate(self, ctx, deps):
     idx = deps['idx'][0]
     if isinstance(idx, tuple) or\
        isinstance(idx, slice) or\
        np.isscalar(idx):
-      return eval_Slice(ctx, prim, deps)
+      return eval_Slice(ctx, self, deps)
     
-    return eval_Index(ctx, prim, deps)
+    return eval_Index(ctx, self, deps)
      
 
 def slice_mapper(ex, val, region, matching_extents):

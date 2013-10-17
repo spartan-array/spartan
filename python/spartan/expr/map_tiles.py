@@ -21,12 +21,18 @@ def map_tiles(v, fn, **kw):
 class MapTilesExpr(Op, Node):
   _members = ['children', 'map_fn', 'fn_args', 'fn_kw']
   
+  def visit(self, visitor):
+    return MapTilesExpr(children=[visitor.visit(v) for v in self.children],
+                        map_fn=self.map_fn,
+                        fn_kw=self.fn_kw) 
+  
+      
   def compute_shape(self):
     '''MapTiles retains the shape of inputs.
     
     Broadcasting results in a map taking the shape of the largest input.
     '''
-    shapes = [i.shape for i in self.dependencies()]
+    shapes = [i.shape for i in self.children]
     output_shape = collections.defaultdict(int)
     for s in shapes:
       for i, v in enumerate(s):
@@ -36,12 +42,12 @@ class MapTilesExpr(Op, Node):
   def dependencies(self):
     return { 'children' : self.children }
 
-  def evaluate(self, ctx, prim, deps):
+  def evaluate(self, ctx, deps):
     children = deps['children']
     children = distarray.broadcast(children)
     largest = distarray.largest_value(children)
-    map_fn = prim.map_fn
-    fn_kw = prim.fn_kw or {}
+    map_fn = self.map_fn
+    fn_kw = self.fn_kw or {}
     
     #util.log_info('Mapping %s over %d inputs; largest = %s', map_fn, len(children), largest.shape)
     #util.log_info('%s', children)

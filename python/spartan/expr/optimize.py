@@ -1,18 +1,14 @@
 #!/usr/bin/env python
 
-'''Convert from numpy expression trees to the lower-level
-operations supported by the backends (see `prims`).
-
+'''
+Optimizations over an expression graph.
 '''
 
 from .. import util
 from .base import Expr, LazyVal
-from .index import IndexExpr
 from .map_extents import MapExtentsExpr
 from .map_tiles import MapTilesExpr
 from .ndarray import NdArrayExpr
-from .reduce_extents import ReduceExtentsExpr
-from .stencil import StencilExpr
 from spartan.config import flags
 import numpy as np
 
@@ -24,48 +20,9 @@ except:
 class OptimizePass(object):
   def visit(self, op):
     if isinstance(op, Expr):
-      return getattr(self, 'visit_%s' % op.node_type())(op)
+      return op.visit(self)
     return op
   
-  def visit_ReduceExtentsExpr(self, op):
-    return ReduceExtentsExpr(
-                        children=[self.visit(v) for v in op.children],
-                        axis=op.axis,
-                        dtype_fn=op.dtype_fn,
-                        local_reduce_fn=op.local_reduce_fn,
-                        combine_fn=op.combine_fn)
-                        
-  def visit_MapExtentsExpr(self, op):
-    return MapExtentsExpr(children=[self.visit(v) for v in op.children],
-                          map_fn=op.map_fn,
-                          reduce_fn=op.reduce_fn,
-                          target=op.target,
-                          fn_kw=op.fn_kw) 
-  
-  def visit_MapTilesExpr(self, op):
-    return MapTilesExpr(children=[self.visit(v) for v in op.children],
-                        map_fn=op.map_fn,
-                        fn_kw=op.fn_kw) 
-  
-  def visit_NdArrayExpr(self, op):
-    return NdArrayExpr(_shape=self.visit(op.shape),
-                       dtype=self.visit(op.dtype),
-                       tile_hint=op.tile_hint,
-                       combine_fn=op.combine_fn,
-                       reduce_fn=op.reduce_fn)
-  
-  def visit_LazyVal(self, op):
-    return op
-  
-  def visit_IndexExpr(self, op):
-    return IndexExpr(self.visit(op.src), self.visit(op.idx))
-  
-  def visit_StencilExpr(self, op):
-    return StencilExpr(self.visit(op.images),
-                         self.visit(op.filters),
-                         op.stride)
-
-
 
 def _fold_mapper(inputs, fns=None, map_fn=None, map_kw=None):
   '''Helper mapper function for folding.

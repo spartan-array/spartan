@@ -105,20 +105,23 @@ Expr.__rdiv__ = Expr.__div__
 class LazyVal(Expr, Node):
   _members = ['val']
   
+  def visit(self, visitor):
+    return self
+  
   def dependencies(self):
     return {}
   
   def compute_shape(self):
     return self.val.shape
   
-  def evaluate(self, ctx, prim, deps):
+  def evaluate(self, ctx, deps):
     return self.val
    
   def __reduce__(self):
     return evaluate(self).__reduce__()
 
 def eval_LazyVal(ctx, prim, deps):
-  return prim.val
+  return self.val
 
 def glom(node):    
   '''
@@ -144,8 +147,8 @@ def dag(node):
   if node._dag is not None:
     return node._dag
   
-  from . import compile_expr
-  dag = compile_expr.optimize(node)
+  from . import optimize
+  dag = optimize.optimize(node)
   node._dag = dag
   return node._dag
 

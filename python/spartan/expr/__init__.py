@@ -6,8 +6,8 @@ from .map_tiles import map_tiles
 from .ndarray import ndarray
 from .outer import outer
 from .reduce_extents import reduce_extents
-from .stencil import stencil
 from base import Expr, evaluate, dag, glom, eager, lazify, force
+from spartan import util
 import numpy as np
 
 def map(v, fn, axis=None, **kw):
@@ -117,13 +117,47 @@ def _ravel_mapper(inputs, ex):
   lr = 1 + extent.ravelled_pos(ex.lr_array - 1, ex.array_shape)
   shape = (np.prod(ex.array_shape),)
   
-  ravelled_ex = extent.TileExtent((ul,), (lr - ul,), shape)
+  ravelled_ex = extent.create((ul,), (lr,), shape)
   ravelled_data = inputs[0].fetch(ex).ravel()
   return ravelled_ex, ravelled_data
    
 def ravel(v):
-  return map_extents(v, _ravel_mapper)
+  return map_extents((v,), _ravel_mapper)
 
+def _reshape_mapper(inputs, ex, _dest_shape):
+  tile = inputs[0].fetch(ex)
+  
+  ravelled_ul = extent.ravelled_pos(ex.ul, ex.array_shape)
+  ravelled_lr = extent.ravelled_pos(ex.lr_array - 1, ex.array_shape)
+  
+  target_ul = extent.unravelled_pos(ravelled_ul, _dest_shape)
+  target_lr = extent.unravelled_pos(ravelled_lr, _dest_shape)
+  
+  util.log_info('%s + %s -> %s', ravelled_ul, _dest_shape, target_ul)
+  util.log_info('%s + %s -> %s', ravelled_lr, _dest_shape, target_lr)
+  
+  target_ex = extent.create(target_ul, np.array(target_lr) + 1, _dest_shape)
+  return target_ex, tile.reshape(target_ex.shape)
+
+def reshape(array, new_shape, tile_hint=None):
+  '''
+  Reshape/retile ``array``.
+  
+  Returns a new array with the given shape and tile size.
+  :param array: `Expr`
+  :param new_shape: `tuple`
+  :param tile_hint: `tuple` or None
+  '''
+  
+  old_size = np.prod(array.shape)
+  new_size = np.prod(new_shape)
+  
+  Assert.eq(old_size, new_size, 'Size mismatch')
+  
+  return map_extents((array,), 
+                     _reshape_mapper, 
+                     tile_hint=tile_hint,
+                     _dest_shape=new_shape) 
 
 Expr.outer = outer
 Expr.sum = sum
@@ -138,25 +172,30 @@ def _dot_mapper(inputs, ex):
   # read current tile of array 'a'
   a = inputs[0].fetch(ex_a)
 
-  target_shape = (inputs[0].shape[1], inputs[1].shape[0])
+  target_shape = (inputs[0].shape[0], inputs[1].shape[1])
   
   # fetch corresponding column tile of array 'b'
   # rows = ex_a.cols
   # cols = *
-  ex_b = extent.TileExtent((ex_a.ul[1], 0),
-                           (ex_a.lr[1] - ex_a.ul[1], inputs[1].shape[1]),
-                           inputs[1].shape)
+  ex_b = extent.create((ex_a.ul[1], 0),
+                       (ex_a.lr[1], inputs[1].shape[1]),
+                       inputs[1].shape)
   b = inputs[1].fetch(ex_b)
   result = np.dot(a, b)
-  out = extent.TileExtent([ex_a.ul[0], 0],
-                          result.shape,
-                          target_shape)
+  
+  ul = np.asarray([ex_a.ul[0], 0])
+  lr = ul + result.shape
+  util.log_info('%s %s %s', a.shape, b.shape, result.shape)
+  util.log_info('%s %s %s', ul, lr, target_shape)
+  out = extent.create(ul, lr, target_shape)
   
   return out, result
 
 def _dot_numpy(inputs, ex, numpy_data=None):
-  return (ex[0].add_dim(), 
-          np.dot(inputs[0].fetch(ex), numpy_data))
+  l = inputs[0].fetch(ex)
+  r = numpy_data
+  
+  return (ex[0].add_dim(), np.dot(l, r))
   
 
 def dot(a, b):

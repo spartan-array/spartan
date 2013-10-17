@@ -2,23 +2,24 @@ from .base import Op, NotShapeable
 from .node import Node
 from spartan.dense import distarray, tile
 
-def map_extents(v, fn, reduce_fn=None, shape_hint=None, target=None, **kw):
+def map_extents(inputs, fn, reduce_fn=None, tile_hint=None, target=None, **kw):
   '''
   Evaluate ``fn`` over each extent of the input.
   
-  ``fn`` should take (extent, [input_list], **kw)
+  ``fn`` should take arguments: (extent, [input_list], **kw)
   
-  :param v:
+  :param inputs:
   :param fn:
   '''
-  return MapExtentsExpr(v, 
+  return MapExtentsExpr(inputs, 
                         map_fn=fn, 
                         reduce_fn=reduce_fn,
+                        tile_hint=tile_hint,
                         target=target, 
                         fn_kw=kw)
 
 class MapExtentsExpr(Op, Node):
-  _members = ['children', 'map_fn', 'reduce_fn', 'target', 'fn_kw']
+  _members = ['children', 'map_fn', 'reduce_fn', 'target', 'tile_hint', 'fn_kw']
 
   def dependencies(self):
     return { 'children' : self.children, 
@@ -26,17 +27,25 @@ class MapExtentsExpr(Op, Node):
     
   def compute_shape(self):
     raise NotShapeable
+  
+  def visit(self, visitor):
+    return MapExtentsExpr(children=[visitor.visit(v) for v in self.children],
+                          map_fn=self.map_fn,
+                          reduce_fn=self.reduce_fn,
+                          target=self.target,
+                          fn_kw=self.fn_kw) 
     
-  def evaluate(self, ctx, prim, deps):
+    
+  def evaluate(self, ctx, deps):
     inputs = deps['children']
     if deps['target']:
       target = deps['target'][0]
     else:
       target = None
             
-    map_fn = prim.map_fn
-    reduce_fn = prim.reduce_fn
-    fn_kw = prim.fn_kw or {}
+    map_fn = self.map_fn
+    reduce_fn = self.reduce_fn
+    fn_kw = self.fn_kw or {}
     
     if target is not None:
       def mapper(ex, _):
