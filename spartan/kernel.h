@@ -25,15 +25,29 @@ public:
   typedef boost::scoped_ptr<Kernel> ScopedPtr;
 
 
-  ArgMap& args() {
-    return args_;
+  ArgMap args() {
+    ArgMap out;
+    for (auto i : kernel_args_) {
+      out[i.first] = i.second;
+    }
+    for (auto i : task_args_) {
+      out[i.first] = i.second;
+    }
+
+//    for (auto i : out) {
+//      Log_info("ArgMap: %s -> %s", i.first.c_str(), i.second.c_str());
+//    }
+    return out;
   }
 
   Table* get_table(int id);
 
-  void init(Worker *w, const ArgMap& args) {
+  void init(Worker *w,
+      const ArgMap& kernel_args,
+      const ArgMap& task_args) {
     w_ = w;
-    args_ = args;
+    kernel_args_ = kernel_args;
+    task_args_ = task_args;
   }
 
   virtual void run() = 0;
@@ -43,7 +57,8 @@ private:
   friend class Master;
 
   Worker *w_;
-  ArgMap args_;
+  ArgMap kernel_args_;
+  ArgMap task_args_;
 };
 
 #define REGISTER_KERNEL(klass)\

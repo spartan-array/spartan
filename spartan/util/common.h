@@ -29,6 +29,25 @@ void print_backtrace();
 
 void Sleep(double t);
 
+class SleepBackoff {
+public:
+  SleepBackoff(double max_time) : max_time_(max_time) {
+  }
+
+  void reset() {
+    sleep_time_ = 1e-9;
+  }
+
+  void sleep() {
+    Sleep(sleep_time_);
+    sleep_time_ = std::min(sleep_time_ * 1.1, max_time_);
+  }
+
+private:
+ double sleep_time_;
+ double max_time_;
+};
+
 class SpinLock {
 public:
   SpinLock() :

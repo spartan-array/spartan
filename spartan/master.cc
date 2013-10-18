@@ -84,6 +84,8 @@ public:
     pending.erase(pending.find(id));
   }
 
+
+
   void clear_tasks() {
     rpc::ScopedLock sl(&lock);
 
@@ -98,7 +100,7 @@ public:
     rpc::ScopedLock sl(&lock);
 
     if (!error.empty()) {
-      Log_info("Error detected for task %d.%d", id.table, id.shard);
+      Log_debug("Error detected for task %d.%d (%s)", id.table, id.shard, error.c_str());
       errors[id] = error;
     }
 
@@ -145,7 +147,7 @@ public:
     msg->shard = state.id.shard;
 
     for (auto i : state.args) {
-      msg->args.insert(i);
+      msg->task_args.insert(i);
     }
 
     return true;
@@ -350,29 +352,32 @@ void Master::assign_shards(Table* t) {
   send_table_assignments();
 }
 
-int Master::dispatch_work(Kernel* k) {
+int Master::dispatch_work(RunState &r) {
   int num_dispatched = 0;
-  for (size_t i = 0; i < workers_.size(); ++i) {
-    WorkerState* w = workers_[i];
-    RunKernelReq w_req;
 
-    // first setup kernel level arguments;
-    // task arguments will be filled in by get_next
-    w_req.args = k->args();
-    w_req.kernel = k->type_id();
+  for (size_t i = 0; i < workers_.size(); ++i) {
+    // setup kernel level arguments;
+    // task arguments are filled in by get_next
+    RunKernelReq w_req;
+    w_req.kernel_args = r.kernel_args;
+    w_req.kernel = r.kernel->type_id();
+
+    WorkerState* w = workers_[i];
 
     if (!w->get_next(&w_req)) {
       continue;
     }
 
     double start_time = Now();
+    int table = w_req.table;
+    int shard = w_req.shard;
 
     auto callback = [=](rpc::Future *future) {
       RunKernelResp resp;
       future->get_reply() >> resp;
 
-      Log_debug("MASTER: Kernel %d:%d finished", w_req.table, w_req.shard);
-      w->set_finished(ShardId(w_req.table, w_req.shard),
+      Log_debug("MASTER: Kernel %d:%d finished", table, shard);
+      w->set_finished(ShardId(table, shard),
                       Now() - start_time,
                       resp.error);
     };
@@ -424,6 +429,7 @@ void Master::destroy_table(int table_id) {
 }
 
 void Master::map_worklist(WorkList worklist, Kernel* k) {
+  Log_fatal("Not implemented...");
   wait_for_workers();
   flush();
 
@@ -437,20 +443,23 @@ void Master::map_worklist(WorkList worklist, Kernel* k) {
     workers_[worker]->assign_task(i.locality, i.args);
   }
 
-  wait_for_completion(k);
+  //wait_for_completion();
 }
 
-void Master::map_shards(Table* table, Kernel* k) {
+void Master::map_shards(Table* table, Kernel* k, ArgMap kernel_args) {
   wait_for_workers();
   flush();
 
   int kernel_id = k->type_id();
-  auto kernel_args = k->args();
+
+  RunState st;
+  st.kernel = k;
+  st.kernel_args = kernel_args;
 
   Kernel::ScopedPtr test_k(TypeRegistry<Kernel>::get_by_id(kernel_id));
   CHECK_NE(test_k.get(), (void*)NULL);
 
-  Log_info("Running: kernel %d against table %d", kernel_id, table->id());
+  Log_debug("Running: kernel %d against table %d", kernel_id, table->id());
 
   auto shards = range(0, table->num_shards());
   for (auto w : workers_) {
@@ -466,16 +475,20 @@ void Master::map_shards(Table* table, Kernel* k) {
     workers_[worker]->assign_task(ShardId(table->id(), i), task_args);
   }
 
-  wait_for_completion(k);
+  wait_for_completion(st);
 }
 
-void Master::wait_for_completion(Kernel* k) {
+void Master::wait_for_completion(RunState& r) {
   double start = Now();
-  dispatch_work(k);
+  SleepBackoff sleeper(0.01);
+  dispatch_work(r);
+
   while (num_pending() > 0) {
-    dispatch_work(k);
-//    Log_info("Dispatch loop: %d", running_kernels_.size());
-    Sleep(0);
+    if (dispatch_work(r) > 0) {
+      sleeper.reset();
+    } else {
+      sleeper.sleep();
+    }
   }
 
   int count = 0;
@@ -497,7 +510,7 @@ void Master::wait_for_completion(Kernel* k) {
       throw new PyException(w->errors.begin()->second);
     }
   }
-  Log_info("Kernel finished in %f", Now() - start);
+  Log_debug("Kernel finished in %f", Now() - start);
 }
 
 void Master::flush() {

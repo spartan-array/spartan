@@ -29,6 +29,7 @@ double rand_double() {
 
 void Sleep(double t) {
   timespec req;
+  bzero(&req, sizeof(req));
   req.tv_sec = (int) t;
   req.tv_nsec = (int64_t) (1e9 * (t - (int64_t) t));
   nanosleep(&req, NULL);

@@ -1,6 +1,7 @@
 #include "spartan/table.h"
 #include "spartan/util/registry.h"
 #include "spartan/util/timer.h"
+#include "spartan/py-support.h"
 
 using namespace spartan;
 

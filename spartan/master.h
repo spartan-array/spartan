@@ -73,6 +73,11 @@ Master* start_master(int port, int num_workers);
 int worker_id(WorkerState*);
 WorkerProxy* worker_proxy(WorkerState*);
 
+struct RunState {
+  Kernel* kernel;
+  ArgMap kernel_args;
+};
+
 class Master: public TableContext, public MasterService {
 public:
   Master(int num_workers);
@@ -98,12 +103,7 @@ public:
   Table* create_table(Sharder* sharder = NULL, Accumulator* combiner = NULL,
       Accumulator* reducer = NULL, Selector* selector = NULL);
 
-  void map_shards(Table* t, const std::string& kernel) {
-    map_shards(t, TypeRegistry<Kernel>::get_by_name(kernel));
-  }
-
-  void map_shards(Table* t, Kernel* k);
-
+  void map_shards(Table* t, Kernel* k, ArgMap kernel_args);
   void map_worklist(WorkList worklist, Kernel* k);
 
   Table* get_table(int id) const {
@@ -115,7 +115,6 @@ public:
   }
 
 private:
-  void wait_for_completion(Kernel* k);
   void register_worker(const RegisterReq& req);
 
   // Find a worker to run a kernel on the given table and shard.  If a worker
@@ -126,7 +125,9 @@ private:
   void send_table_assignments();
   void assign_shards(Table *t);
   void assign_tasks(Table* t, std::vector<int> shards);
-  int dispatch_work(Kernel* k);
+
+  int dispatch_work(RunState& r);
+  void wait_for_completion(RunState& r);
   int num_pending();
 
   int num_workers_;

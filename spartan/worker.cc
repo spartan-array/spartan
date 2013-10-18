@@ -11,6 +11,7 @@
 #include "spartan/util/stringpiece.h"
 #include "spartan/util/timer.h"
 #include "spartan/worker.h"
+#include "spartan/py-support.h"
 
 using boost::make_tuple;
 using boost::unordered_map;
@@ -58,7 +59,7 @@ void Worker::run_kernel(const RunKernelReq& kreq, RunKernelResp* resp) {
 
   std::unique_ptr<Kernel> k(TypeRegistry<Kernel>::get_by_id(kreq.kernel));
   try {
-    k->init(this, kreq.args);
+    k->init(this, kreq.kernel_args, kreq.task_args);
     k->run();
   } catch (PyException* exc) {
     resp->error = format_exc(exc);

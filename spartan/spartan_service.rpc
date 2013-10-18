@@ -1,7 +1,7 @@
-#include "spartan/py-support.h"
+#include "spartan/refptr.h"
 
 extern rpc::Marshal& operator <<(rpc::Marshal& m, const RefPtr& p);
-extern rpc::Marshal& operator >>(rpc::Marshal& m, RefPtr p);
+extern rpc::Marshal& operator >>(rpc::Marshal& m, RefPtr& p);
 
 %%
 
@@ -27,7 +27,8 @@ struct RunKernelReq {
   i32 kernel;
   i32 table;
   i32 shard;
-  map<string, string> args;
+  map<string, string> kernel_args;
+  map<string, string> task_args;
 }
 
 struct RunKernelResp {

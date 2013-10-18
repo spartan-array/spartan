@@ -1,5 +1,16 @@
 #include "spartan/py-support.h"
 
+#include "spartan/table.h"
+#include "spartan/master.h"
+#include "spartan/kernel.h"
+#include "spartan/worker.h"
+
+#include "spartan/util/common.h"
+
+#include "Python.h"
+#include <boost/intrusive_ptr.hpp>
+#include <string>
+
 typedef struct {
   PyObject_HEAD
   char *buf;
@@ -46,10 +57,15 @@ RefPtr Pickler::load(const RefPtr& py_str) {
 
 RefPtr Pickler::load(const std::string& data) {
   GILHelper lock;
-  RefPtr buffer = to_ref(PyBuffer_FromMemory((void*)data.data(), data.size()));
-  auto in = to_ref(PyObject_CallFunction(_cStringIO_stringIO.get(),
-                                         W("O"), buffer.get()));
-  return to_ref(PyObject_CallFunction(_load.get(), W("O"), in.get()));
+  try {
+    RefPtr buffer = to_ref(PyBuffer_FromMemory((void*) data.data(), data.size()));
+    auto in = to_ref(
+        PyObject_CallFunction(_cStringIO_stringIO.get(), W("O"), buffer.get()));
+    return to_ref(PyObject_CallFunction(_load.get(), W("O"), in.get()));
+  } catch(PyException* exc) {
+    Log_info("Exception while loading pickle.");
+    throw exc;
+  }
 }
 
 std::string Pickler::store(const RefPtr& p) {
@@ -87,11 +103,37 @@ rpc::Marshal& operator >>(rpc::Marshal& m, RefPtr& p) {
 std::string format_exc(const PyException* p) {
   GILHelper gil;
   RefPtr tb = to_ref(PyImport_ImportModule("traceback"));
-  RefPtr list = to_ref(PyObject_CallMethod(tb.get(),
-      "format_exception", "OOO", p->type, p->value, p->traceback));
+  RefPtr list = to_ref(
+      PyObject_CallMethod(tb.get(), W("format_exception"), W("OOO"),
+          p->type,
+          p->value ? p->value : Py_None,
+          p->traceback ? p->traceback : Py_None));
   RefPtr empty = to_ref(PyUnicode_FromString(""));
   RefPtr pystr = to_ref(PyUnicode_Join(empty.get(), list.get()));
-  return std::string(
-      PyString_AsString(PyUnicode_AsLatin1String(pystr.get())));
+  return std::string(PyString_AsString(PyUnicode_AsLatin1String(pystr.get())));
 }
 
+PyException::PyException() {
+  //Log_warn("Exceptin!");
+  GILHelper gil;
+  CHECK_NE(PyErr_Occurred(), NULL);
+  PyErr_Fetch(&type, &value, &traceback);
+  CHECK_NE(type, NULL);
+  Log_warn("%s", format_exc(this).c_str());
+}
+
+PyException::PyException(std::string value_str) {
+  //Log_warn("Exceptin!");
+  GILHelper gil;
+  PyErr_SetString(PyExc_SystemError, value_str.c_str());
+  PyErr_Fetch(&type, &value, &traceback);
+}
+
+namespace spartan {
+
+DEFINE_REGISTRY_HELPER(Sharder, PySharder);
+DEFINE_REGISTRY_HELPER(Accumulator, PyAccum);
+DEFINE_REGISTRY_HELPER(Selector, PySelector);
+DEFINE_REGISTRY_HELPER(Kernel, PyKernel);
+
+} // namespace spartan
