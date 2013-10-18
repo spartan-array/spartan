@@ -31,7 +31,7 @@ void Sleep(double t);
 
 class SleepBackoff {
 public:
-  SleepBackoff(double max_time) : max_time_(max_time) {
+  SleepBackoff(double max_time) : sleep_time_(0), max_time_(max_time) {
   }
 
   void reset() {

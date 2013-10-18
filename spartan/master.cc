@@ -127,17 +127,15 @@ public:
     return pending.size();
   }
 
+  bool can_schedule() const {
+    return !pending.empty() && active.empty();
+  }
+
   // Order pending tasks by our guess of how large they are
-  bool get_next(RunKernelReq* msg) {
+  void get_next(RunKernelReq* msg) {
     rpc::ScopedLock sl(&lock);
 
-    if (pending.empty()) {
-      return false;
-    }
-
-    if (!active.empty()) {
-      return false;
-    }
+    CHECK_EQ(can_schedule(), true);
 
     TaskState state = pending.begin()->second;
     active.insert(make_pair(state.id, state));
@@ -149,8 +147,6 @@ public:
     for (auto i : state.args) {
       msg->task_args.insert(i);
     }
-
-    return true;
   }
 };
 
@@ -206,7 +202,8 @@ void Master::shutdown() {
   rpc::FutureGroup g;
   for (auto w : workers_) {
     Log_debug("Shutting down %s:%d", w->addr.host.c_str(), w->addr.port);
-    Log_info("Worker %d: %f", w->id, w->total_runtime);
+    Log_info("Worker %d (%s:%d) %f",
+        w->id, w->addr.host.c_str(), w->addr.port, w->total_runtime);
     g.add(w->proxy->async_shutdown());
   }
   g.wait_all();
@@ -282,7 +279,7 @@ Table* Master::create_table(Sharder* sharder, Accumulator* combiner,
   }
   futures.wait_all();
   assign_shards(t);
-  // Log_info("Table created in %f seconds", timer.elapsed());
+  Log_debug("Table created in %f seconds", timer.elapsed());
   return t;
 }
 WorkerState* Master::assign_shard(int table, int shard) {
@@ -356,17 +353,17 @@ int Master::dispatch_work(RunState &r) {
   int num_dispatched = 0;
 
   for (size_t i = 0; i < workers_.size(); ++i) {
+    WorkerState* w = workers_[i];
+    if (!w->can_schedule()) {
+      continue;
+    }
+
     // setup kernel level arguments;
     // task arguments are filled in by get_next
     RunKernelReq w_req;
     w_req.kernel_args = r.kernel_args;
     w_req.kernel = r.kernel->type_id();
-
-    WorkerState* w = workers_[i];
-
-    if (!w->get_next(&w_req)) {
-      continue;
-    }
+    w->get_next(&w_req);
 
     double start_time = Now();
     int table = w_req.table;
@@ -376,7 +373,8 @@ int Master::dispatch_work(RunState &r) {
       RunKernelResp resp;
       future->get_reply() >> resp;
 
-      Log_debug("MASTER: Kernel %d:%d finished", table, shard);
+      Log_debug("%d(%s:%d) %f",
+          w->id, w->addr.host.c_str(), w->addr.port, resp.elapsed);
       w->set_finished(ShardId(table, shard),
                       Now() - start_time,
                       resp.error);
@@ -447,14 +445,14 @@ void Master::map_worklist(WorkList worklist, Kernel* k) {
 }
 
 void Master::map_shards(Table* table, Kernel* k, ArgMap kernel_args) {
+  RunState st;
+  st.kernel = k;
+  st.kernel_args = kernel_args;
+
   wait_for_workers();
   flush();
 
   int kernel_id = k->type_id();
-
-  RunState st;
-  st.kernel = k;
-  st.kernel_args = kernel_args;
 
   Kernel::ScopedPtr test_k(TypeRegistry<Kernel>::get_by_id(kernel_id));
   CHECK_NE(test_k.get(), (void*)NULL);
@@ -479,8 +477,7 @@ void Master::map_shards(Table* table, Kernel* k, ArgMap kernel_args) {
 }
 
 void Master::wait_for_completion(RunState& r) {
-  double start = Now();
-  SleepBackoff sleeper(0.01);
+  SleepBackoff sleeper(0.001);
   dispatch_work(r);
 
   while (num_pending() > 0) {
@@ -510,7 +507,7 @@ void Master::wait_for_completion(RunState& r) {
       throw new PyException(w->errors.begin()->second);
     }
   }
-  Log_debug("Kernel finished in %f", Now() - start);
+  Log_debug("Kernel finished in %f", r.elapsed());
 }
 
 void Master::flush() {

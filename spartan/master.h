@@ -74,8 +74,13 @@ int worker_id(WorkerState*);
 WorkerProxy* worker_proxy(WorkerState*);
 
 struct RunState {
+  Timer runtime;
   Kernel* kernel;
   ArgMap kernel_args;
+
+  double elapsed() {
+    return runtime.elapsed();
+  }
 };
 
 class Master: public TableContext, public MasterService {

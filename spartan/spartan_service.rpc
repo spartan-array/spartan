@@ -32,6 +32,7 @@ struct RunKernelReq {
 }
 
 struct RunKernelResp {
+  double elapsed;
   string error;
 };
 

@@ -65,6 +65,7 @@ void Worker::run_kernel(const RunKernelReq& kreq, RunKernelResp* resp) {
     resp->error = format_exc(exc);
   }
 
+  resp->elapsed = t.elapsed();
   Log_debug("WORKER: Finished kernel: %d:%d; %f", kreq.table, kreq.shard, t.elapsed());
 }
 
