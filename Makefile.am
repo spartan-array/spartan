@@ -60,6 +60,5 @@ libspartan_la_SOURCES =\
 
 
 _spartan_wrap_la_SOURCES =\
-    python/spartan/wrap/wrap.cc\
 	python/spartan/wrap/_spartan_wrap.cc 
 

@@ -1,5 +1,5 @@
 AC_INIT([spartan], [0.1])
-LT_INIT
+LT_INIT([disable-static])
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([configure.ac])
