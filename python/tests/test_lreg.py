@@ -16,7 +16,7 @@ def test_linear_regression(ctx):
   y = expr.eager(expr.rand(N_EXAMPLES, 1, tile_hint=(N_EXAMPLES / 10, 1)))
   w = np.random.rand(N_DIM, 1)
   
-  for i in range(10):
+  for i in range(1):
     yp = expr.dot(x, w)
     Assert.all_eq(yp.shape, y.shape)
     

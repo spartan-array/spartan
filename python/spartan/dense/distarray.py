@@ -92,7 +92,8 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
       splits[dim] = dim_splits
       weight *= shape[dim]
   else:
-    Assert.eq(len(tile_hint), len(shape))
+    Assert.eq(len(tile_hint), len(shape),
+              '#dimensions in tile hint does not match shape %s vs %s' % (tile_hint, shape))
     for dim in range(len(shape)):
       dim_splits = []
       step = tile_hint[dim]
@@ -166,6 +167,7 @@ def create(master, shape,
 
   util.log_info('Creating array of shape %s with %d tiles', shape, len(extents))
   for ex, shard in extents.iteritems():
+#     util.log_info('%s', ex)
     ex_tile = tile.from_shape(ex.shape, dtype=dtype)
     table.update(shard, ex, ex_tile)
   
@@ -242,7 +244,8 @@ class DistArray(object):
     
   def update(self, region, data):
     Assert.isinstance(region, extent.TileExtent)
-    Assert.eq(region.shape, data.shape)
+    Assert.eq(region.shape, data.shape,
+              'Size of extent does not match size of data')
 
     #util.log_info('%s %s', self.table.id(), self.extents)
     # exact match

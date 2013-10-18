@@ -20,7 +20,13 @@ except:
 class OptimizePass(object):
   def visit(self, op):
     if isinstance(op, Expr):
-      return op.visit(self)
+      #util.log_info('VISIT %s', op.typename())
+      if hasattr(self, 'visit_%s' % op.typename()):
+        return getattr(self, 'visit_%s' % op.typename())(op)
+      else:
+        return op.visit(self)
+    
+    #util.log_info("? %s", op)
     return op
   
 
@@ -180,7 +186,6 @@ def optimize(dag):
     util.log_info('Optimizations disabled')
     return dag
   
-  # print dag
   if numexpr is not None:
     dag = apply_pass(FoldNumexprPass, dag)
   

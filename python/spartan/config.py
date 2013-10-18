@@ -15,7 +15,7 @@ def add_flag(name, *args, **kw):
 def add_bool_flag(name, default):
   _names.add(name)
   
-  parser.add_argument('--' + name, default=default, type=bool, dest=name)
+  parser.add_argument('--' + name, default=default, type=int, dest=name)
   parser.add_argument('--enable_' + name, action='store_true', dest=name)
   parser.add_argument('--disable_' + name, action='store_false', dest=name)
   
@@ -30,6 +30,13 @@ class Flags(object):
   log_level = add_flag('log_level', default=3, type=int)
   num_workers = add_flag('num_workers', default=4, type=int)
   cluster = add_bool_flag('cluster', default=False)
+  oprofile = add_bool_flag('oprofile', default=False)
+  
+  def __repr__(self):
+    result = []
+    for k, v in iter(self):
+      result.append('%s : %s' % (k, v))
+    return '\n'.join(result)
   
   def __iter__(self):
     return iter([(k, getattr(self, k)) for k in dir(self)
@@ -41,22 +48,22 @@ def parse_known_args(argv):
   parsed_flags, rest = parser.parse_known_args(argv)
   for flagname in _names:
     setattr(flags, flagname, getattr(parsed_flags, flagname))
-    
+ 
   return flags, rest
 
 #HOSTS = [ ('localhost', 8) ]
 
 HOSTS = [
-  ('beaker-20', 8),
-  #('beaker-21', 8),
-  ('beaker-22', 8),
-  ('beaker-23', 8),
-  ('beaker-24', 8),
-  ('beaker-25', 8),
-  ('beaker-14', 8),
-  ('beaker-15', 8),
-  ('beaker-16', 8),
-  ('beaker-17', 8),
-  ('beaker-18', 8),
-  ('beaker-19', 8),
+  ('beaker-14', 7),
+  ('beaker-15', 7),
+  ('beaker-16', 7),
+  ('beaker-17', 7),
+  ('beaker-18', 7),
+  ('beaker-19', 7),
+  ('beaker-20', 10),
+  #('beaker-21', 10),
+  ('beaker-22', 10),
+  ('beaker-23', 10),
+  ('beaker-24', 10),
+  ('beaker-25', 10),
 ]

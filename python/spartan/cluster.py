@@ -7,30 +7,31 @@ import subprocess
 import threading
 import time
 
-def start_local_worker(master, port):
-  wthread = threading.Thread(target=spartan.start_worker,
-                             args=(master,port,))
-  wthread.daemon = True
-  wthread.start()
-  return wthread
-  
 def start_remote_worker(worker, st, ed):
   util.log_info('Starting worker %d:%d on host %s', st, ed, worker)
   
-  #os.system('mkdir operf.%s' % worker)
+  if flags.oprofile:
+    os.system('mkdir operf.%s' % worker)
+    
   args = ['ssh', 
           '-oForwardX11=no',
           worker,
-          'cd %s && ' % os.path.abspath(os.path.curdir),
+          'cd %s && ' % os.path.abspath(os.path.curdir) ]
+  
+  if flags.oprofile:
+    args += ['operf -e CPU_CLK_UNHALTED:100000000', '-g', '-d', 'operf.%s' % worker]
+  
+  args += [          
           #'xterm', '-e',
           #'gdb', '-ex', 'run', '--args',
-          #'operf -e CPU_CLK_UNHALTED:100000000', '-g', '-d', 'operf.%s' % worker,
           'python', '-m spartan.worker',
           '--master=%s:9999' % socket.gethostname(),
           '--count=%d' % (ed - st),
           '--port=%d' % (10000)]
   
   for name, value in config.flags:
+    if isinstance(value, bool):
+      value = int(value)
     args.append('--%s=%s' % (name, value))
   
   #print args
@@ -44,15 +45,14 @@ def start_cluster(num_workers, local=not flags.cluster):
   time.sleep(0.1)
 
   if local:
-    for i in range(num_workers):  
-      start_local_worker('%s:9999' % socket.gethostname(),  10000 + i)
+    start_remote_worker('localhost', 0, num_workers)
     return master
   
   count = 0
   num_hosts = len(config.HOSTS)
   for worker, total_tasks in config.HOSTS:
-    sz = util.divup(num_workers, num_hosts)
-    #sz = total_tasks
+    #sz = util.divup(num_workers, num_hosts)
+    sz = total_tasks
     sz = min(sz, num_workers - count)
     start_remote_worker(worker, count, count + sz)
     count += sz

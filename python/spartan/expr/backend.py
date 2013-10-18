@@ -11,6 +11,7 @@ class Backend(object):
       deps[k] = [self.evaluate(ctx, v) for v in vs]
     
     return prim.evaluate(ctx, deps)
+    #return util.timeit(lambda: prim.evaluate(ctx, deps), 'eval: %s' % prim)
   
   def evaluate(self, ctx, prim):
     from .base import Expr

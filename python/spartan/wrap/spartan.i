@@ -5,7 +5,7 @@
 %include <std_string.i>
 
 %{
-#include "spartan/wrap/wrap.h"
+#include "spartan/py-support.h"
 using namespace spartan;
 
 %} // end helpers
@@ -164,9 +164,11 @@ public:
   
   void foreach_shard(Table* t, PyObject* fn, PyObject* args) {
     auto p = new PyKernel();
-    p->args()["map_fn"] = get_pickler().store(fn);
-    p->args()["map_args"] = get_pickler().store(args);
-    $self->map_shards(t, p);
+    ArgMap kernel_args;
+    ArgMap task_args;
+    kernel_args["map_fn"] = get_pickler().store(fn);
+    kernel_args["map_args"] = get_pickler().store(args);
+    $self->map_shards(t, p, kernel_args);
   }
 
   void foreach_worklist(PyObject* worklist, PyObject* fn) {

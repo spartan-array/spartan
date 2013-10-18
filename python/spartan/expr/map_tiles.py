@@ -53,6 +53,7 @@ class MapTilesExpr(Op, Node):
     #util.log_info('%s', children)
     
     def mapper(ex, _):
+      #with util.timer_ctx('MapTiles(%s) %s' % (map_fn, ex)):
       #util.log_info('MapTiles: %s', map_fn)
       #util.log_info('Fetching %d inputs', len(children))
       #util.log_info('%s %s', inputs, ex)

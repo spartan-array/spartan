@@ -1,12 +1,13 @@
 from spartan import expr, util
-from spartan.expr import stencil
 from spartan.dense import distarray
+from spartan.expr import stencil
 from spartan.util import Assert, divup
 from test_common import with_ctx
 import math
 import numpy as np
 import pickle
 import test_common
+import time
 
 
 
@@ -31,4 +32,13 @@ def test_stencil(ctx):
   
   result = stencil.stencil(images, filters, 1)
   print result[0:1].glom()[0]
-  
+
+@with_ctx
+def test_local_convolve(ctx):
+  F = 16
+  filters = np.ones((F, 3, 5, 5))
+  for N in [1, 4, 16, 32, 64, 128, 256, 512]:
+    images = np.ones((N, 3, 128, 128))
+    st = time.time()
+    stencil.convolve(images, filters)
+    print N, F, time.time() - st

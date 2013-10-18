@@ -10,9 +10,9 @@ import socket
 import sys
 
 def _dump_kernel_prof(worker_id):
-  if spartan.wrap.KERNEL_PROF is not None:
+  if spartan.wrap.PROFILER is not None:
     os.system('mkdir -p ./_kernel-profiles')
-    spartan.wrap.KERNEL_PROF.dump_stats('./_kernel-profiles/%d' % worker_id)
+    spartan.wrap.PROFILER.dump_stats('./_kernel-profiles/%d' % worker_id)
 
 def _start_worker(master, port):
   worker = spartan.start_worker(master, port)

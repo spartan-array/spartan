@@ -14,7 +14,7 @@ sys.path += [abspath('../build/.libs'),
              abspath('../build/python/spartan/wrap'), 
              abspath('.')]
 
-from spartan.config import flags
+from spartan import config
 from spartan_wrap import set_log_level, TableContext
 import atexit
 import cPickle
@@ -36,10 +36,10 @@ PYLOG_TO_CLOG = {
 logging.basicConfig(format='%(filename)s:%(lineno)s [%(funcName)s] %(message)s',
                     level=logging.INFO)
 
-log_debug = logging.debug
-log_info = logging.info
-log_warn = logging.info
-log_error = logging.error
+# log_debug = logging.debug
+# log_info = logging.info
+# log_warn = logging.warn
+# log_error = logging.error
 
 def findCaller(obj):
   f = sys._getframe(4)
@@ -69,28 +69,26 @@ def _log(msg, *args, **kw):
    
         
     msg = str(msg)
-    logging.log(level, msg)
-    
-    #level = PYLOG_TO_CLOG[level]
-    #spartan_wrap.log(level, filename, lineno, msg)
-    #if exc is not None:
-    #  spartan_wrap.log(level, filename, lineno, exc)
+    level = PYLOG_TO_CLOG[level]
+    spartan_wrap.log(level, filename, lineno, msg)
+    if exc is not None:
+      spartan_wrap.log(level, filename, lineno, exc)
  
-# def log_info(msg, *args, **kw):
-#   kw['level'] = logging.INFO
-#   return _log(msg, *args, **kw)
-#  
-# def log_debug(msg, *args, **kw):
-#   kw['level'] = logging.DEBUG
-#   return _log(msg, *args, **kw)
-#  
-# def log_error(msg, *args, **kw):
-#   kw['level'] = logging.ERROR
-#   return _log(msg, *args, **kw)
-#  
-# def log_warn(msg, *args, **kw):
-#   kw['level'] = logging.WARN
-#   return _log(msg, *args, **kw)
+def log_info(msg, *args, **kw):
+  kw['level'] = logging.INFO
+  return _log(msg, *args, **kw)
+  
+def log_debug(msg, *args, **kw):
+  kw['level'] = logging.DEBUG
+  return _log(msg, *args, **kw)
+  
+def log_error(msg, *args, **kw):
+  kw['level'] = logging.ERROR
+  return _log(msg, *args, **kw)
+  
+def log_warn(msg, *args, **kw):
+  kw['level'] = logging.WARN
+  return _log(msg, *args, **kw)
 
 
 class Sharder(object):
@@ -189,29 +187,34 @@ class Kernel(object):
   def current_shard(self):
     return int(self.args()['shard'])
     
-KERNEL_PROF = None
+PROFILER = None #cProfile.Profile()
+
+def _with_profile(fn):
+  if not config.flags.profile_kernels:
+    return fn()
+  
+  global PROFILER
+  
+  if PROFILER is None:
+    PROFILER = cProfile.Profile()
+  
+  PROFILER.enable() 
+  result = fn()
+  PROFILER.disable()
+  return result
 
 def _bootstrap_kernel(handle):
   kernel= Kernel(handle)
   fn, args = cPickle.loads(kernel.args()['map_args'])
- 
-  if not flags.profile_kernels:
-    return fn(kernel, args)
+  return _with_profile(lambda: fn(kernel, args))
+
+class BootstrapCombiner(object):
+  def __init__(self, fn):
+    self.fn = fn
+    
+  def __call__(self, *args, **kw):
+    return _with_profile(lambda: self.fn(*args, **kw))
   
-  p = cProfile.Profile()
-  p.enable() 
-   
-  result = fn(kernel, args)
-  
-  p.disable()
-  stats = pstats.Stats(p)
-  global KERNEL_PROF
-  if KERNEL_PROF is None:
-    KERNEL_PROF = stats
-  else:
-    KERNEL_PROF.add(stats)
-  
-  return result
 
 class Master(object):
   def __init__(self, master, shutdown_on_del=False):
@@ -233,6 +236,9 @@ class Master(object):
         self.destroy_table(k)
         del _table_refs[k]
         
+    combiner = BootstrapCombiner(combiner)
+    reducer = BootstrapCombiner(reducer)
+    
     t = self._master.create_table(sharder, combiner, reducer, selector)
     return Table(t.id())
    
@@ -282,7 +288,8 @@ def foreach_kernel(kernel, args):
   kw['kernel'] = kernel
   
   src = kernel.table(src_id)
-  for _, sk, sv in src.iter(kernel.current_shard()):
+  for shard, sk, sv in src.iter(kernel.current_shard()):
+#     log_info('Processing %s %s %s', shard, sk, sv)
     if has_kw_args(fn):
       fn(sk, sv, **kw)
     else:

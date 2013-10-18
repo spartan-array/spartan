@@ -37,6 +37,7 @@ def run_benchmarks(module, benchmarks, master, timer):
     getattr(module, benchname)(master, timer)
   
 def run(filename):
+  config.add_flag('worker_list', type=str, default='4,8,16,32,64,80')
   config.parse_known_args(sys.argv)
   mod_name, _ = splitext(basename(filename))
   module = imp.load_source(mod_name, filename)
@@ -55,8 +56,9 @@ def run(filename):
     # csv header
     print 'num_workers,bench,time'
     if flags.cluster:
-      workers = [1, 2, 4, 8, 16, 32, 64, 80]
-      #workers = [1, 4, 16, 64, 81]
+      workers = [int(w) for w in flags.worker_list.split(',')]
+      #workers = [4, 16, 25, 36, 64, 81]
+      #workers = [flags.num_workers]
     else:
       workers = [flags.num_workers]
     

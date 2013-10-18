@@ -3,6 +3,8 @@ from spartan import util
 from spartan.util import Assert
 import numpy as np
 
+NONE_VALID = 0
+ALL_VALID = 1
 
 class Tile(object):
   '''
@@ -14,8 +16,11 @@ class Tile(object):
     if len(self.shape) == 0:
       return
   
-    if self.valid is None:
+    if self.valid is NONE_VALID:
       self.valid = np.zeros(self.shape, dtype=np.bool)
+      
+    if self.valid is ALL_VALID:
+      self.valid = np.ones(self.shape, dtype=np.bool)
       
     if self.data is None:
       self.data = np.ndarray(self.shape, dtype=self.dtype)
@@ -26,6 +31,7 @@ class Tile(object):
     
   def __getitem__(self, idx):
     self._initialize()
+    
     if len(self.shape) == 0:
       return self.data
     
@@ -35,10 +41,10 @@ class Tile(object):
     
     return self.data[idx] 
   
-  def __setitem__(self, idx, val):
-    self._initialize()
-    self.valid[idx] = 1
-    self.data[idx] = val
+#   def __setitem__(self, idx, val):
+#     self._initialize()
+#     self.valid[idx] = 1
+#     self.data[idx] = val
     
   def __repr__(self):
     return 'tile(%s, %s)' % (self.shape, self.dtype)
@@ -47,7 +53,7 @@ def from_data(data):
   t = Tile()
   t.data = data
   t.dtype = data.dtype
-  t.valid = np.ones(data.shape, dtype=np.bool)
+  t.valid = 1 #np.ones(data.shape, dtype=np.bool)
   t.shape = data.shape
   return t
 
@@ -55,7 +61,7 @@ def from_shape(shape, dtype):
   t = Tile()
   t.shape = shape
   t.data = None
-  t.valid = None
+  t.valid = NONE_VALID
   t.dtype = dtype
   return t
 

@@ -53,7 +53,7 @@ def timeit(f, name=None):
   ed = time.time()
   if name is None:
     name = f
-  log('Operation %s completed in %.3f seconds', name, ed - st)
+  log_info('Operation %s completed in %.3f seconds', name, ed - st)
   return res
 
 def collect_time(f, name=None, timings={}):
@@ -90,9 +90,9 @@ def timer_ctx(name='Operation'):
   st = time.time()
   yield
   ed = time.time()
-  print('%3.5f:: %s' % (ed - st, name))
+  log_info('%3.5f:: %s' % (ed - st, name))
 
-class Timer(object):
+class EZTimer(object):
   '''Lazy timer.
 
   Prints elapsed time when destroyed.
@@ -204,7 +204,11 @@ def rtype_check(typeclass):
     return checked_fn
   return wrap
 
-def locked_fn(fn):
+def synchronized(fn):
+  '''
+  Execution of this function is serialized.
+  :param fn:
+  '''
   lock = threading.RLock()
   def _fn(*args, **kw):
     with lock:
