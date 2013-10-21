@@ -81,7 +81,7 @@ public:
 
 class Shard {
 private:
-  typedef boost::unordered_multimap<RefPtr, RefPtr> Map;
+  typedef boost::unordered_map<RefPtr, RefPtr> Map;
   Map data_;
 public:
   typedef typename Map::iterator iterator;
@@ -99,8 +99,8 @@ public:
 
   void insert(const RefPtr& k, const RefPtr& v) {
     CHECK_NE(k.get(), NULL);
-
-    data_.insert(make_pair(k, v));
+    data_[k] = v;
+    // data_.insert(make_pair(k, v));
   }
 
   bool empty() const {

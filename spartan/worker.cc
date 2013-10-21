@@ -129,6 +129,8 @@ void Worker::get_iterator(const IteratorReq& req, IteratorResp* resp) {
 void Worker::create_table(const CreateTableReq& req) {
   CHECK(id_ != -1);
   rpc::ScopedLock sl(lock_);
+  TableContext::set_context(this);
+
   Log_debug("Creating table: %d", req.id);
   Table* t = new Table;
   t->init(req.id, req.num_shards);
@@ -222,16 +224,16 @@ Worker* start_worker(const std::string& master_addr, int port) {
     port = rpc::find_open_port();
   }
 
-  RegisterReq req;
-  req.addr.host = rpc::get_host_name();
-  req.addr.port = port;
-
   Log_info("Starting worker on port %d", port);
   rpc::Server* server = new rpc::Server(manager, threadpool);
   auto worker = new Worker(manager);
   server->reg(worker);
-  std::string hostport  = StringPrintf("%s:%d", req.addr.host.c_str(), req.addr.port);
+  std::string hostport  = StringPrintf("%s:%d", rpc::get_host_name().c_str(), port);
   CHECK_EQ(server->start(hostport.c_str()), 0);
+
+  RegisterReq req;
+  req.addr.host = rpc::get_host_name();
+  req.addr.port = port;
 
   MasterProxy* master = connect<MasterProxy>(manager, master_addr);
   Log_info("Registering worker (%d)", port);

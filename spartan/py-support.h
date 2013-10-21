@@ -105,7 +105,7 @@ public:
 
   void init(const std::string& opts) {
     opts_ = opts;
-    code = get_pickler().load(opts);
+   code = get_pickler().load(opts);
   }
 
   PyInitableT() {
@@ -138,13 +138,18 @@ class PyAccum: public PyInitableT<Accumulator> {
 public:
   void accumulate(const RefPtr& k, RefPtr* v, const RefPtr& update) const {
     GILHelper lock;
-    RefPtr result = to_ref(
-        PyObject_CallFunction(code.get(), W("OOO"), k.get(), v->get(),
-            update.get()));
-    CHECK(result.get() != Py_None);
-    CHECK(result.get() != NULL);
+    try {
+      RefPtr result = to_ref(
+          PyObject_CallFunction(code.get(), W("OOO"), k.get(), v->get(),
+              update.get()));
+      CHECK(result.get() != Py_None);
+      CHECK(result.get() != NULL);
 
-    *v = result;
+      *v = result;
+    } catch (PyException* e) {
+      Log_warn("Error during accumulate.");
+      throw e;
+    }
   }
   DECLARE_REGISTRY_HELPER(Accumulator, PyAccum);
 };
