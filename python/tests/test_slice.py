@@ -34,7 +34,7 @@ def test_slice_map_tiles(ctx):
 
 def add_one_extent(inputs, ex):
   util.log_info('Mapping: %s', ex)
-  return (ex, inputs[0].fetch(ex) + 1)
+  yield (ex, inputs[0].fetch(ex) + 1)
 
 @with_ctx
 def test_slice_map_extents(ctx):

@@ -103,8 +103,8 @@ class FoldMapPass(OptimizePass):
     return MapTilesExpr(children=children,
                         map_fn=_fold_mapper,
                         fn_kw={ 'fns' : fns,
-                                  'map_fn' : map_fn,
-                                  'map_kw' : map_kw })
+                                'map_fn' : map_fn,
+                                'map_kw' : map_kw })
   
 
 def _numexpr_mapper(inputs, var_map=None, numpy_expr=None):
@@ -164,10 +164,7 @@ class FoldNumexprPass(OptimizePass):
     
     return MapTilesExpr(children=inputs,
                         map_fn=_numexpr_mapper,
-                        fn_kw={ 
-                                  'numpy_expr' : expr,
-                                  'var_map' : var_map,
-                                })
+                        fn_kw={ 'numpy_expr' : expr, 'var_map' : var_map, })
 
 def apply_pass(klass, dag):
   if not getattr(flags, 'opt_' + klass.name):

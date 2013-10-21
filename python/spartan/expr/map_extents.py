@@ -2,11 +2,11 @@ from .base import Op, NotShapeable
 from .node import Node
 from spartan.dense import distarray, tile
 
-def map_extents(inputs, fn, reduce_fn=None, tile_hint=None, target=None, **kw):
+def map_extents(inputs, fn, reduce_fn=None, tile_hint=None, target=None, kw=None):
   '''
   Evaluate ``fn`` over each extent of the input.
   
-  ``fn`` should take arguments: (extent, [input_list], **kw)
+  ``fn`` should take arguments: ([inputs], extent, **kw)
   
   :param inputs:
   :param fn:
@@ -17,6 +17,20 @@ def map_extents(inputs, fn, reduce_fn=None, tile_hint=None, target=None, **kw):
                         tile_hint=tile_hint,
                         target=target, 
                         fn_kw=kw)
+
+def _target_mapper(ex, _, map_fn=None, inputs=None, target=None, fn_kw=None):
+  result = map_fn(inputs, ex, **fn_kw)
+  if result is not None:
+    for ex, v in result:
+      target.update(ex, v)
+
+        
+def _notarget_mapper(ex, _, map_fn=None, inputs=None, fn_kw=None):
+  #util.log_info('MapExtents: %s', map_fn)
+  result = map_fn(inputs, ex, **fn_kw)
+  if result is not None:
+    for ex, v in result:
+      yield (ex, tile.from_data(v))
 
 class MapExtentsExpr(Op, Node):
   _members = ['children', 'map_fn', 'reduce_fn', 'target', 'tile_hint', 'fn_kw']
@@ -48,17 +62,16 @@ class MapExtentsExpr(Op, Node):
     fn_kw = self.fn_kw or {}
     
     if target is not None:
-      def mapper(ex, _):
-        new_extent, result = map_fn(inputs, ex, **fn_kw)
-        target.update(new_extent, result)
-        
-      inputs[0].foreach(mapper)
+      inputs[0].foreach(_target_mapper,
+                        kw = dict(map_fn=map_fn,
+                                  inputs=inputs,
+                                  target=target,
+                                  fn_kw=fn_kw))
       return target
     else:
-      def mapper(ex, _):
-        #util.log_info('MapExtents: %s', map_fn)
-        new_extent, result = map_fn(inputs, ex, **fn_kw)
-        return [(new_extent, tile.from_data(result))]
       return distarray.map_to_array(inputs[0], 
-                                    mapper_fn = mapper,
-                                    reduce_fn = reduce_fn)
+                                    mapper_fn = _notarget_mapper,
+                                    reduce_fn = reduce_fn,
+                                    kw = dict(inputs=inputs,
+                                              map_fn=map_fn,
+                                              fn_kw=fn_kw))

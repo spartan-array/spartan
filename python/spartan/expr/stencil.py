@@ -49,8 +49,8 @@ def _divup(a, b):
 @jit
 def _maxpool(array, pool_size, stride):
   n, c, w, h = array.shape
-  target = np.ones((n, c, 
-                    _divup(w, stride), 
+  target = np.ones((n, c,
+                    _divup(w, stride),
                     _divup(h, stride))) * -1e12
   
   for img in xrange(n):
@@ -60,8 +60,8 @@ def _maxpool(array, pool_size, stride):
           for i in xrange(0, pool_size):
             for j in xrange(0, pool_size):
               if x + i < w and y + j < h:
-                target[0,0,0,0] = 0
-                #target[img, color, (x + i) / stride, (y + j) / stride] = \
+                target[0, 0, 0, 0] = 0
+                # target[img, color, (x + i) / stride, (y + j) / stride] = \
                 #  max(array[img, color, x + i, y + j],
                 #      target[img, color, x + i, y + j])
   
@@ -69,8 +69,8 @@ def _maxpool(array, pool_size, stride):
                       
 def stencil_mapper(inputs, ex, filters=None, images=None, target_shape=None):
   local_filters = filters.glom()
-  #util.log_info('R:%s', region)
-  #util.log_info('F:%s', local_filters.shape)
+  # util.log_info('R:%s', region)
+  # util.log_info('F:%s', local_filters.shape)
   local_image = images.fetch(ex)
   
   num_img, n_col, w, h = images.shape
@@ -91,7 +91,7 @@ def stencil_mapper(inputs, ex, filters=None, images=None, target_shape=None):
   result = convolve(local_image, local_filters)
   
   util.log_info('Updating: %s', target_ex)
-  return target_ex, result
+  yield (target_ex, result)
 
 
 def stencil(images, filters, stride=1):
@@ -117,17 +117,17 @@ def stencil(images, filters, stride=1):
                    combine_fn=np.sum,
                    tile_hint=tile_hint)
   
-  return map_extents(images, 
+  return map_extents(images,
                      stencil_mapper,
                      target=target,
-                     images=images,
-                     filters=filters,
-                     target_shape=target.shape)
+                     kw=dict(images=images,
+                             filters=filters,
+                             target_shape=target.shape))
 
 
 def _maxpool_mapper(inputs, ex, pool_size, stride, target_shape):
   region = inputs[0].fetch(ex)
-  #util.log_info('%s %s', inputs[0].shape, region.shape)
+  # util.log_info('%s %s', inputs[0].shape, region.shape)
   pooled = _maxpool(region, pool_size, stride)
   ul = ex.ul
   lr = ex.lr
@@ -138,9 +138,9 @@ def _maxpool_mapper(inputs, ex, pool_size, stride, target_shape):
   
   target_ex = extent.create(t_ul, t_lr, target_shape)
   
-  #util.log_info('%s %s %s', ex, target_ex, pooled.shape)
+  # util.log_info('%s %s %s', ex, target_ex, pooled.shape)
   
-  return target_ex, pooled
+  yield (target_ex, pooled)
   
 def maxpool(images, pool_size=2, stride=2):
   from .map_extents import map_extents
@@ -151,10 +151,10 @@ def maxpool(images, pool_size=2, stride=2):
   tgt_shape = divup(images.shape[2:], stride)
   tile_hint = tiles_like(images, (n_img, n_col,) + tgt_shape)
   
-  util.log_info('%s %s %s %s', 
+  util.log_info('%s %s %s %s',
                 images.shape[2:], tgt_shape, images.tile_shape(), tile_hint)
   target = ndarray((n_img, n_col) + tgt_shape,
-                   dtype = images.dtype,
+                   dtype=images.dtype,
                    tile_hint=tile_hint,
                    combine_fn=np.maximum,
                    reduce_fn=np.maximum)
@@ -162,10 +162,10 @@ def maxpool(images, pool_size=2, stride=2):
   return map_extents([images],
                     _maxpool_mapper,
                     target=target,
-                    target_shape=target.shape,
-                    stride=stride,
-                    pool_size=pool_size)
-
+                    kw=dict(target_shape=target.shape,
+                            stride=stride,
+                            pool_size=pool_size))
+        
 
 
     

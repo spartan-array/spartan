@@ -204,16 +204,9 @@ def _with_profile(fn):
   return result
 
 def _bootstrap_kernel(handle):
-  kernel= Kernel(handle)
+  kernel = Kernel(handle)
   fn, args = cPickle.loads(kernel.args()['map_args'])
   return _with_profile(lambda: fn(kernel, args))
-
-# class BootstrapCombiner(object):
-#   def __init__(self, fn):
-#     self.fn = fn
-#     
-#   def __call__(self, *args, **kw):
-#     return _with_profile(lambda: self.fn(*args, **kw))
   
 
 class Master(object):
@@ -259,23 +252,20 @@ def has_kw_args(fn):
 def mapper_kernel(kernel, args):
   src_id, dst_id, fn, kw = args
   
+  if kw is None: 
+    kw = {}
+  
   src = kernel.table(src_id)
   dst = kernel.table(dst_id)
   
-  assert not 'kernel' in kw
-  kw['kernel'] = kernel
-  
-#   log('MAPPING: Function: %s, args: %s', fn, fn_args)
+  #assert not 'kernel' in kw
+  #kw['kernel'] = kernel
   
   shard = kernel.current_shard()
   
   for _, sk, sv in src.iter(kernel.current_shard()):
-    if has_kw_args(fn):
-      result = fn(sk, sv, **kw)
-    else:
-      assert len(kw) == 1, 'Arguments passed but function does not support **kw'
-      result = fn(sk, sv)
-      
+    result = fn(sk, sv, **kw)
+    
     if result is not None:
       for k, v in result:
         dst.update(shard, k, v)
@@ -284,20 +274,14 @@ def mapper_kernel(kernel, args):
 
 def foreach_kernel(kernel, args):
   src_id, fn, kw = args
-  assert not 'kernel' in kw
-  kw['kernel'] = kernel
   
   src = kernel.table(src_id)
   for shard, sk, sv in src.iter(kernel.current_shard()):
 #     log_info('Processing %s %s %s', shard, sk, sv)
-    if has_kw_args(fn):
-      fn(sk, sv, **kw)
-    else:
-      assert len(kw) == 1, 'Arguments passed but function does not support **kw'
-      fn(sk, sv)
+    fn(sk, sv, **kw)
 
 
-def map_items(table, mapper_fn, combine_fn=None, reduce_fn=None, **kw):
+def map_items(table, mapper_fn, combine_fn=None, reduce_fn=None, kw=None):
   master = get_master()
   
   dst = master.create_table(table.sharder(),
@@ -310,7 +294,7 @@ def map_items(table, mapper_fn, combine_fn=None, reduce_fn=None, **kw):
   return dst
 
 
-def map_inplace(table, fn, **kw):
+def map_inplace(table, fn, kw):
   src = table
   dst = src
   master = get_master()
@@ -319,7 +303,7 @@ def map_inplace(table, fn, **kw):
   return dst
 
 
-def foreach(table, fn, **kw):
+def foreach(table, fn, kw):
   src = table
   master = get_master()
   master.foreach_shard(table, foreach_kernel, 

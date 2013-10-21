@@ -39,7 +39,7 @@ class ReduceExtentsExpr(Op, Node):
       util.log_info('Update: %s %s', dst_extent, reduced)
       output_array.update(dst_extent, reduced)
     
-    input_array.foreach(mapper)
+    input_array.foreach(mapper, kw={})
     
     return output_array
  

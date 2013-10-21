@@ -69,7 +69,8 @@ def eval_Index(ctx, prim, deps):
                            dtype = src.dtype)
     
     # map over it, replacing existing items.
-    dst.foreach(lambda k, v: int_index_mapper(k, v, src, idx, dst))
+    dst.foreach(lambda k, v: int_index_mapper(k, v, src, idx, dst),
+                kw={})
     return dst
   
     

@@ -1,6 +1,7 @@
 from . import extent
 from spartan import util
 from spartan.util import Assert
+import scipy.sparse
 import numpy as np
 
 NONE_VALID = 0
@@ -19,11 +20,15 @@ class Tile(object):
     if self.data is None:
       self.data = np.ndarray(self.shape, dtype=self.dtype)
 
+    if scipy.sparse.issparse(self.data):
+      return 
+      
     if self.valid is NONE_VALID:
       self.valid = np.zeros(self.shape, dtype=np.bool)
-      
-    if self.valid is ALL_VALID:
+    elif self.valid is ALL_VALID:
       self.valid = np.ones(self.shape, dtype=np.bool)
+    else:
+      assert isinstance(self.valid, np.ndarray)
     
   def get(self):
     self._initialize()

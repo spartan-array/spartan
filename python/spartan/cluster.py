@@ -10,7 +10,7 @@ import time
 
 def start_remote_worker(worker, st, ed):
   util.log_info('Starting worker %d:%d on host %s', st, ed, worker)
-  if flags.use_threads:
+  if flags.use_threads and worker == 'localhost':
     for i in range(st, ed):
       p = threading.Thread(target=spartan.worker._start_worker,
                            args=('%s:%d' % (socket.gethostname(), 9999),
@@ -53,12 +53,12 @@ def start_remote_worker(worker, st, ed):
     
   return p
 
-def start_cluster(num_workers, local=not flags.cluster):
+def start_cluster(num_workers, cluster):
   master = spartan.start_master(9999, num_workers)
   spartan.set_log_level(flags.log_level)
   time.sleep(0.1)
 
-  if local:
+  if not cluster:
     start_remote_worker('localhost', 0, num_workers)
     return master
   

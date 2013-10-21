@@ -157,7 +157,7 @@ def reshape(array, new_shape, tile_hint=None):
   return map_extents((array,), 
                      _reshape_mapper, 
                      tile_hint=tile_hint,
-                     _dest_shape=new_shape) 
+                     kw = { '_dest_shape' : new_shape})
 
 Expr.outer = outer
 Expr.sum = sum
@@ -203,7 +203,7 @@ def dot(a, b):
   bv = force(b)
   
   if isinstance(bv, np.ndarray):
-    return map_extents((av,), _dot_numpy, numpy_data=bv)
+    return map_extents((av,), _dot_numpy, kw = { 'numpy_data' : bv })
   
   #av, bv = distarray.broadcast([av, bv])
   Assert.eq(a.shape[1], b.shape[0])
@@ -213,9 +213,7 @@ def dot(a, b):
                    combine_fn=np.add,
                    reduce_fn=np.add)
   
-  return map_extents((av, bv), 
-                     _dot_mapper,
-                     target=target)
+  return map_extents((av, bv), _dot_mapper, target=target)
             
 
 def _arange_mapper(inputs, ex, dtype=None):
@@ -226,6 +224,4 @@ def _arange_mapper(inputs, ex, dtype=None):
 
 
 def arange(shape, dtype=np.float):
-  return map_extents(ndarray(shape, dtype=dtype), 
-                     fn = _arange_mapper,
-                     dtype=dtype)
+  return map_extents(ndarray(shape, dtype=dtype), fn = _arange_mapper, dtype=dtype)

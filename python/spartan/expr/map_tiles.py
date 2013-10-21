@@ -15,11 +15,24 @@ def map_tiles(v, fn, **kw):
   :param v:
   :param fn:
   '''
-  return MapTilesExpr(v, map_fn=fn, fn_kw=kw)
+  return MapTilesExpr(v,  map_fn=fn, fn_kw=kw)
 
+
+
+def tile_mapper(ex, _, children, map_fn, fn_kw):
+  #util.log_info('MapTiles: %s', map_fn)
+  #util.log_info('Fetching %d inputs', len(children))
+  #util.log_info('%s %s', inputs, ex)
+  local_values = [c.fetch(ex) for c in children]
+  #util.log_info('Mapping...')
+  result = map_fn(local_values, **fn_kw)
+  #util.log_info('Done.')
+  assert isinstance(result, np.ndarray), result
+  return [(ex, tile.from_data(result))]
+    
 
 class MapTilesExpr(Op, Node):
-  _members = ['children', 'map_fn', 'fn_args', 'fn_kw']
+  _members = ['children', 'map_fn', 'fn_kw']
   
   def visit(self, visitor):
     return MapTilesExpr(children=[visitor.visit(v) for v in self.children],
@@ -47,22 +60,15 @@ class MapTilesExpr(Op, Node):
     children = distarray.broadcast(children)
     largest = distarray.largest_value(children)
     map_fn = self.map_fn
-    fn_kw = self.fn_kw or {}
+    fn_kw = self.fn_kw
+    
+    assert fn_kw is not None
     
     #util.log_info('Mapping %s over %d inputs; largest = %s', map_fn, len(children), largest.shape)
     #util.log_info('%s', children)
-    
-    def mapper(ex, _):
-      #with util.timer_ctx('MapTiles(%s) %s' % (map_fn, ex)):
-      #util.log_info('MapTiles: %s', map_fn)
-      #util.log_info('Fetching %d inputs', len(children))
-      #util.log_info('%s %s', inputs, ex)
-      local_values = [c.fetch(ex) for c in children]
-      #util.log_info('Mapping...')
-      result = map_fn(local_values,  **fn_kw)
-      #util.log_info('Done.')
-      assert isinstance(result, np.ndarray), result
-      return [(ex, tile.from_data(result))]
-    
-    result = distarray.map_to_array(largest, mapper)
+    result = distarray.map_to_array(largest, 
+                                    tile_mapper,
+                                    kw = { 'children' : children,
+                                           'map_fn' : map_fn,
+                                           'fn_kw' : fn_kw })
     return result

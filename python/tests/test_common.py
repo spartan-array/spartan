@@ -15,7 +15,8 @@ def get_cluster_ctx():
   global CTX
   if CTX is None:
     config.parse_known_args(sys.argv)
-    CTX = start_cluster(flags.num_workers, not flags.cluster)
+    print flags.cluster
+    CTX = start_cluster(flags.num_workers, flags.cluster)
     
   return CTX
 

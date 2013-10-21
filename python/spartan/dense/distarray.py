@@ -55,7 +55,7 @@ class NestedSlice(object):
 class TileSelector(object):
   def __call__(self, k, v):
     if isinstance(k, extent.TileExtent): 
-      return v[:]
+      return v.get()
     
     if isinstance(k, NestedSlice):
       result = v[k.subslice]
@@ -197,14 +197,15 @@ class DistArray(object):
     return sorted(scounts.items(), key=lambda kv: kv[1])[-1][0]
     
    
-  def map_to_table(self, mapper_fn, combine_fn=None, reduce_fn=None):
+  def map_to_table(self, mapper_fn, combine_fn=None, reduce_fn=None, kw=None):
     return spartan.map_items(self.table, 
                              mapper_fn = mapper_fn,
                              combine_fn = combine_fn,
-                             reduce_fn = reduce_fn)
+                             reduce_fn = reduce_fn,
+                             kw=kw)
   
-  def foreach(self, fn):
-    return spartan.foreach(self.table, fn)
+  def foreach(self, fn, kw):
+    return spartan.foreach(self.table, fn, kw)
   
   def __repr__(self):
     return 'DistArray(shape=%s, dtype=%s)' % (self.shape, self.dtype)
@@ -227,7 +228,7 @@ class DistArray(object):
       #util.log_info('Exact match.')
       ex, intersection = region, region
       shard = self.extents[region]
-      return self.table.get(shard, NestedSlice(ex, extent.offset_slice(ex, intersection)))
+      return self.table.get(shard, ex)
 
     splits = list(extent.extents_for_region(self.extents.iterkeys(), region))
     
@@ -241,7 +242,11 @@ class DistArray(object):
       tgt[dst_slice] = src_slice
     return tgt
     #return tile.data[]
-    
+   
+  def update_slice(self, slc, data):
+    return self.update(extent.from_slice(slc, self.shape),
+                       data)
+     
   def update(self, region, data):
     Assert.isinstance(region, extent.TileExtent)
     Assert.eq(region.shape, data.shape,
@@ -285,10 +290,11 @@ class DistArray(object):
     return self.select(np.index_exp[:])
 
 
-def map_to_array(array, mapper_fn, combine_fn=None, reduce_fn=None):
+def map_to_array(array, mapper_fn, combine_fn=None, reduce_fn=None, kw=None):
   return from_table(array.map_to_table(mapper_fn=mapper_fn,
                                        combine_fn=combine_fn,
-                                       reduce_fn=reduce_fn))
+                                       reduce_fn=reduce_fn,
+                                       kw=kw))
 
   
 def best_locality(array, ex):
@@ -322,7 +328,8 @@ def slice_mapper(ex, tile, **kw):
   '''
   mapper_fn = kw['_slice_fn']
   slice_extent = kw['_slice_extent']
-  kernel = kw['kernel']
+  fn_kw = kw['fn_kw']
+  if fn_kw is None: fn_kw = {}
   
   intersection = extent.intersection(slice_extent, ex)
   if intersection is None:
@@ -333,7 +340,7 @@ def slice_mapper(ex, tile, **kw):
   subslice = extent.offset_slice(ex, intersection)
   subtile = tile[subslice]
   
-  return mapper_fn(offset, subtile)
+  return mapper_fn(offset, subtile, **fn_kw)
 
 
 class Slice(object):
@@ -353,19 +360,21 @@ class Slice(object):
     self.extents = offsets
     self.dtype = darray.dtype
     
-  def foreach(self, mapper_fn):
-    return spartan.map_inplace(self.darray.table,
-                               fn=slice_mapper,
-                               _slice_extent = self.slice,
-                               _slice_fn = mapper_fn)
+  def foreach(self, mapper_fn, kw):
+    return spartan.foreach(self.darray.table,
+                           fn=slice_mapper,
+                           kw={'_slice_extent' : self.slice,
+                               '_slice_fn' : mapper_fn,
+                               'fn_kw' : kw })
   
-  def map_to_table(self, mapper_fn, combine_fn=None, reduce_fn=None):
+  def map_to_table(self, mapper_fn, kw, combine_fn=None, reduce_fn=None):
     return spartan.map_items(self.darray.table, 
                              mapper_fn = slice_mapper,
                              combine_fn = combine_fn,
                              reduce_fn = reduce_fn,
-                             _slice_extent = self.slice,
-                             _slice_fn = mapper_fn)
+                             kw={'fn_kw' : kw,
+                                 '_slice_extent' : self.slice,
+                                 '_slice_fn' : mapper_fn })
     
   def fetch(self, idx):
     offset = extent.compute_slice(self.slice, idx.to_slice())
@@ -424,7 +433,7 @@ class Broadcast(object):
     _, bcast = np.broadcast_arrays(template, fetched)
     return bcast 
   
-  def map_to_table(self, mapper_fn, combine_fn=None, reduce_fn=None):
+  def map_to_table(self, mapper_fn, combine_fn=None, reduce_fn=None, kw=None):
     raise NotImplementedError
   
   def foreach(self, fn):
@@ -488,7 +497,7 @@ def largest_value(vals):
 # at some point.
 def create_with(master, shape, init_fn):
   d = create(master, shape)
-  spartan.map_inplace(d.table, init_fn)
+  spartan.map_inplace(d.table, init_fn, kw={})
   return d 
 
 def _create_rand(extent, data):

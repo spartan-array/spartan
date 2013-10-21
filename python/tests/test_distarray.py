@@ -40,7 +40,7 @@ def map_array(k, v):
 @with_ctx
 def test_distarray_slice(ctx):
   array = distarray.create(ctx, (200, 200))
-  spartan.map_inplace(array.table, map_array)
+  spartan.map_inplace(array.table, map_array, {})
   
 @with_ctx
 def test_distarray_random(ctx):
