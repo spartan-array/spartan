@@ -208,12 +208,12 @@ def _bootstrap_kernel(handle):
   fn, args = cPickle.loads(kernel.args()['map_args'])
   return _with_profile(lambda: fn(kernel, args))
 
-class BootstrapCombiner(object):
-  def __init__(self, fn):
-    self.fn = fn
-    
-  def __call__(self, *args, **kw):
-    return _with_profile(lambda: self.fn(*args, **kw))
+# class BootstrapCombiner(object):
+#   def __init__(self, fn):
+#     self.fn = fn
+#     
+#   def __call__(self, *args, **kw):
+#     return _with_profile(lambda: self.fn(*args, **kw))
   
 
 class Master(object):
@@ -236,8 +236,8 @@ class Master(object):
         self.destroy_table(k)
         del _table_refs[k]
         
-    combiner = BootstrapCombiner(combiner)
-    reducer = BootstrapCombiner(reducer)
+    #combiner = BootstrapCombiner(combiner)
+    #reducer = BootstrapCombiner(reducer)
     
     t = self._master.create_table(sharder, combiner, reducer, selector)
     return Table(t.id())

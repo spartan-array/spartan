@@ -15,7 +15,8 @@ using namespace spartan;
   try {
     $action
   } catch (PyException* p) {
-    PyErr_SetObject(p->type, p->value);
+    PyErr_Restore(p->type, p->value, p->traceback);
+    //PyErr_SetObject(p->type, p->value);
     SWIG_fail;
   }
 }

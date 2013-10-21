@@ -10,6 +10,15 @@ import time
 
 def start_remote_worker(worker, st, ed):
   util.log_info('Starting worker %d:%d on host %s', st, ed, worker)
+  if flags.use_threads:
+    for i in range(st, ed):
+      p = threading.Thread(target=spartan.worker._start_worker,
+                           args=('%s:%d' % (socket.gethostname(), 9999),
+                                 10000 + i))
+      p.daemon = True
+      p.start()
+    time.sleep(0.1)
+    return
   
   if flags.oprofile:
     os.system('mkdir operf.%s' % worker)
@@ -40,11 +49,7 @@ def start_remote_worker(worker, st, ed):
   if worker != 'localhost':
     p = subprocess.Popen(ssh_args + args, executable='ssh')
   else:
-    if flags.use_threads:
-      p = subprocess.Popen(' '.join(args), shell=True, stdin=subprocess.PIPE)
-    else:
-      p = threading.Thread(target=spartan.worker._start_worker,
-                           args=(socket.gethostname(), 10000))
+    p = subprocess.Popen(' '.join(args), shell=True, stdin=subprocess.PIPE)
     
   return p
 

@@ -8,6 +8,8 @@ import multiprocessing
 import os
 import resource
 import socket
+import spartan
+import spartan.wrap
 import sys
 
 
