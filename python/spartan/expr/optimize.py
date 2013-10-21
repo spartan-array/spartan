@@ -72,7 +72,7 @@ class FoldMapPass(OptimizePass):
     
     util.log_info('Folding: %s %s', [type(v) for v in map_children], all_maps)
     if not all_maps:
-      return super(FoldMapPass, self).visit_MapTilesExpr(op)
+      return op.visit(self)
     
     children = []
     fns = []
@@ -131,7 +131,7 @@ class FoldNumexprPass(OptimizePass):
     all_maps = np.all([map_like(v) for v in map_children])
    
     if not (all_maps and 'numpy_expr' in op.fn_kw):
-      return super(FoldNumexprPass, self).visit_MapTiles(op)
+      return op.visit(self)
     
     a, b = map_children
     operation = op.fn_kw['numpy_expr']

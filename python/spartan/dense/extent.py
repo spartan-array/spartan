@@ -100,18 +100,6 @@ def create(ul, lr, array_shape):
   ex.lr_array = np.asarray(ex.lr, dtype=np.int)
   return ex
  
-def drop_axis(ex, axis):
-  if axis is None: return create((), (), ())
-  if axis < 0: axis = len(ex.ul) + axis
-  
-  ul = list(ex.ul)
-  lr = list(ex.lr)
-  shape = list(ex.array_shape)
-  del ul[axis]
-  del lr[axis]
-  del shape[axis]
-  return create(ul, lr, shape)
- 
 def unravelled_pos(idx, array_shape): 
   '''
   Unravel ``idx`` into an index into an array of shape ``array_shape``.
@@ -268,6 +256,18 @@ def shapes_match(offset, data):
   '''
   return np.all(offset.shape == data.shape)
 
+def drop_axis(ex, axis):
+  if axis is None: return create((), (), ())
+  if axis < 0: axis = len(ex.ul) + axis
+  
+  ul = list(ex.ul)
+  lr = list(ex.lr)
+  shape = list(ex.array_shape)
+  del ul[axis]
+  del lr[axis]
+  del shape[axis]
+  return create(ul, lr, shape)
+ 
 def index_for_reduction(index, axis):
   return drop_axis(index, axis)
         

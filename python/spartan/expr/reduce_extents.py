@@ -36,6 +36,7 @@ class ReduceExtentsExpr(Op, Node):
       #util.log_info('Reduce: %s', local_reducer)
       reduced = local_reducer(ex, tile, axis)
       dst_extent = extent.index_for_reduction(ex, axis)
+      util.log_info('Update: %s %s', dst_extent, reduced)
       output_array.update(dst_extent, reduced)
     
     input_array.foreach(mapper)

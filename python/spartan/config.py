@@ -32,6 +32,8 @@ class Flags(object):
   cluster = add_bool_flag('cluster', default=False)
   oprofile = add_bool_flag('oprofile', default=False)
   
+  use_threads = add_bool_flag('use_threads', default=True)
+  
   def __repr__(self):
     result = []
     for k, v in iter(self):

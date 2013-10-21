@@ -78,10 +78,10 @@ def stencil_mapper(inputs, ex, filters=None, images=None, target_shape=None):
   
   Assert.eq(n_col, f_col)
   
-#   util.log_info('Stencil(%s), image: %s, filter: %s (%s, %s)',
-#             ex,
-#             local_image.shape, local_filters.shape,
-#             images.shape, filters.shape)
+  util.log_info('Stencil(%s), image: %s, filter: %s (%s, %s)',
+            ex,
+            local_image.shape, local_filters.shape,
+            images.shape, filters.shape)
   
   target_ex = extent.create(
       (ex.ul[0], 0, ex.ul[2], ex.ul[3]),
@@ -90,7 +90,7 @@ def stencil_mapper(inputs, ex, filters=None, images=None, target_shape=None):
 
   result = convolve(local_image, local_filters)
   
-#   util.log_info('Updating: %s', target_region)
+  util.log_info('Updating: %s', target_ex)
   return target_ex, result
 
 

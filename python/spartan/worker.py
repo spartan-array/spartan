@@ -6,8 +6,10 @@ from spartan.config import flags
 import atexit
 import multiprocessing
 import os
+import resource
 import socket
 import sys
+
 
 def _dump_kernel_prof(worker_id):
   if spartan.wrap.PROFILER is not None:
@@ -28,6 +30,9 @@ if __name__ == '__main__':
   config.add_flag('master', type=str)
   config.add_flag('port', type=int)
   config.add_flag('count', type=int)
+  
+  resource.setrlimit(resource.RLIMIT_AS, (2 * 1000 * 1000 * 1000,
+                                          2 * 1000 * 1000 * 1000))
     
   config.parse_known_args(sys.argv)
   assert flags.master is not None

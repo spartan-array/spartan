@@ -5,7 +5,7 @@ from spartan.util import Assert
 from test_common import with_ctx
 import numpy as np
 
-TEST_SIZE = 1000
+TEST_SIZE = 10
 distarray.TILE_SIZE = TEST_SIZE ** 2 / 4
 
   

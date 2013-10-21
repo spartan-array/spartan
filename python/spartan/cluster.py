@@ -3,6 +3,7 @@ from spartan.config import flags
 import os.path
 import socket
 import spartan
+import spartan.worker
 import subprocess
 import threading
 import time
@@ -13,11 +14,10 @@ def start_remote_worker(worker, st, ed):
   if flags.oprofile:
     os.system('mkdir operf.%s' % worker)
     
-  args = ['ssh', 
-          '-oForwardX11=no',
-          worker,
-          'cd %s && ' % os.path.abspath(os.path.curdir) ]
-  
+  ssh_args = ['ssh', '-oForwardX11=no', worker ]
+ 
+  args = ['cd %s && ' % os.path.abspath(os.path.curdir)]
+   
   if flags.oprofile:
     args += ['operf -e CPU_CLK_UNHALTED:100000000', '-g', '-d', 'operf.%s' % worker]
   
@@ -36,7 +36,16 @@ def start_remote_worker(worker, st, ed):
   
   #print args
   time.sleep(0.1)
-  p = subprocess.Popen(args, executable='ssh')
+  
+  if worker != 'localhost':
+    p = subprocess.Popen(ssh_args + args, executable='ssh')
+  else:
+    if flags.use_threads:
+      p = subprocess.Popen(' '.join(args), shell=True, stdin=subprocess.PIPE)
+    else:
+      p = threading.Thread(target=spartan.worker._start_worker,
+                           args=(socket.gethostname(), 10000))
+    
   return p
 
 def start_cluster(num_workers, local=not flags.cluster):

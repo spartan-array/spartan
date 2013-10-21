@@ -15,16 +15,16 @@ class Tile(object):
     # check if this is a scalar...
     if len(self.shape) == 0:
       return
-  
+
+    if self.data is None:
+      self.data = np.ndarray(self.shape, dtype=self.dtype)
+
     if self.valid is NONE_VALID:
       self.valid = np.zeros(self.shape, dtype=np.bool)
       
     if self.valid is ALL_VALID:
       self.valid = np.ones(self.shape, dtype=np.bool)
-      
-    if self.data is None:
-      self.data = np.ndarray(self.shape, dtype=self.dtype)
-
+    
   def get(self):
     self._initialize()
     return self.data
@@ -41,10 +41,10 @@ class Tile(object):
     
     return self.data[idx] 
   
-#   def __setitem__(self, idx, val):
-#     self._initialize()
-#     self.valid[idx] = 1
-#     self.data[idx] = val
+  def __setitem__(self, idx, val):
+    self._initialize()
+    self.valid[idx] = 1
+    self.data[idx] = val
     
   def __repr__(self):
     return 'tile(%s, %s)' % (self.shape, self.dtype)
@@ -53,7 +53,7 @@ def from_data(data):
   t = Tile()
   t.data = data
   t.dtype = data.dtype
-  t.valid = 1 #np.ones(data.shape, dtype=np.bool)
+  t.valid = ALL_VALID
   t.shape = data.shape
   return t
 
@@ -94,6 +94,7 @@ class TileAccum(object):
     Assert.isinstance(new_tile, Tile)
     
     old_tile._initialize()
+    new_tile._initialize()
  
     # zero-dimensional arrays; just use 
     # data == None as a mask. 
@@ -107,9 +108,12 @@ class TileAccum(object):
     Assert.eq(old_tile.shape, new_tile.shape)
     replaced = ~old_tile.valid & new_tile.valid    
     updated = old_tile.valid & new_tile.valid
-    
+
     old_tile.data[replaced] = new_tile.data[replaced]
     old_tile.valid[replaced] = 1
+
+#     util.log_info('Accum: %s', new_tile.data)
+#     util.log_info('Accum: %s', old_tile.data)
     
     if np.any(updated):
       old_tile.data[updated] = self.accum(
