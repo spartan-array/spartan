@@ -1,16 +1,6 @@
-from ..dense import extent
-from ..dense.extent import index_for_reduction, shapes_match
-from ..util import Assert
-from .map_extents import map_extents
-from .map_tiles import map_tiles
-from .ndarray import ndarray
-from .outer import outer
-from .reduce_extents import reduce_extents
-from base import Expr, evaluate, dag, glom, eager, lazify, force
-from spartan import util
-import numpy as np
+#!/usr/bin/env python
 
-__doc__ = """
+"""
 Lazy expression DAGs.
 
 All expression operations are subclasses of the `Expr` class, which
@@ -28,6 +18,19 @@ live in their own modules:
 Optimizations on DAGs live in `spartan.expr.optimize`.
 
 """
+
+from ..dense import extent
+from ..dense.extent import index_for_reduction, shapes_match
+from ..util import Assert
+from .map_extents import map_extents
+from .map_tiles import map_tiles
+from .ndarray import ndarray
+from .outer import outer
+from .reduce_extents import reduce_extents
+from base import Expr, evaluate, dag, glom, eager, lazify, force
+from spartan import util
+import numpy as np
+
 
 def map(v, fn, axis=None, **kw):
   return map_tiles(v, fn, **kw)
@@ -76,7 +79,11 @@ def sum(x, axis=None):
     
 
 def _to_structured_array(**kw):
-  '''Create a structured array from the given input arrays.'''
+  '''Create a structured array from the given input arrays.
+  
+  :param kw: A dictionary from field_name -> `np.ndarray`.
+  :rtype: A structured array with fields from ``kw``.
+  '''
   out = np.ndarray(kw.values()[0].shape, 
                   dtype=','.join([a.dtype.str for a in kw.itervalues()]))
   out.dtype.names = kw.keys()
@@ -120,6 +127,8 @@ def argmin(x, axis=None):
   '''
   Compute argmin over ``axis``.
   
+  See `numpy.ndarray.argmin`.
+  
   :param x: `Expr` to compute a minimum over. 
   :param axis: Axis (integer or None).
   '''
@@ -134,12 +143,35 @@ def argmin(x, axis=None):
   
 
 def size(x):
+  '''
+  Return the size (product of the size of all axes) of ``x``.
+  
+  See `numpy.ndarray.size`.
+  
+  :param x: `Expr` to compute the size of.
+  '''
   return np.prod(x.shape)
 
 def mean(x, axis=None):
+  '''
+  Compute the mean of ``x`` over ``axis``.
+  
+  See `numpy.ndarray.mean`.
+  
+  :param x: `Expr`
+  :param axis: integer or ``None``
+  '''
   return sum(x, axis) / x.shape[axis]
 
 def astype(x, dtype):
+  '''
+  Convert ``x`` to a new dtype.
+  
+  See `numpy.ndarray.astype`.
+  
+  :param x:
+  :param dtype:
+  '''
   assert x is not None
   return map_tiles(x, lambda inputs: inputs[0].astype(dtype))
 
@@ -154,6 +186,12 @@ def _ravel_mapper(inputs, ex):
   yield ravelled_ex, ravelled_data
    
 def ravel(v):
+  '''
+  "Ravel" ``v`` to a one-dimensional array of shape (size(v),).
+  
+  See `numpy.ndarray.ravel`.
+  :param v:
+  '''
   return map_extents((v,), _ravel_mapper)
 
 def _reshape_mapper(inputs, ex, _dest_shape):
@@ -176,6 +214,7 @@ def reshape(array, new_shape, tile_hint=None):
   Reshape/retile ``array``.
   
   Returns a new array with the given shape and tile size.
+  
   :param array: `Expr`
   :param new_shape: `tuple`
   :param tile_hint: `tuple` or None
@@ -231,6 +270,13 @@ def _dot_numpy(inputs, ex, numpy_data=None):
   
 
 def dot(a, b):
+  '''
+  Compute the dot product (matrix multiplication) of 2 arrays.
+  
+  :param a: `Expr` or `numpy.ndarray` 
+  :param b: `Expr` or `numpy.ndarray`
+  :rtype: `Expr`
+  '''
   av = force(a)
   bv = force(b)
   

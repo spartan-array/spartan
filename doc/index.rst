@@ -6,11 +6,17 @@
 Welcome to Spartan's documentation!
 ===================================
 
-Contents:
+Packages:
 
 .. toctree::
    :maxdepth: 2
-
+   
+   spartan
+   spartan.dense
+   spartan.expr
+   spartan.sparse
+   spartan.wrap
+   
 
 
 Indices and tables

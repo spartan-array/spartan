@@ -21,6 +21,11 @@ class FileWatchdog(threading.Thread):
   (This occurs when an ssh connection is terminated, for example.)
   """
   def __init__(self, file_handle=sys.stdin, on_closed=lambda: os._exit(1)):
+    '''
+    
+    :param file_handle:
+    :param on_closed:
+    '''
     threading.Thread.__init__(self, name='WatchdogThread')
     self.setDaemon(True)
     self.file_handle = file_handle
@@ -48,6 +53,12 @@ def flatten(lst, depth=1):
 
 
 def timeit(f, name=None):
+  '''
+  Run ``f`` and log the amount of time taken.
+   
+  :param f:
+  :param name:
+  '''
   st = time.time()
   res = f()
   ed = time.time()
@@ -55,26 +66,6 @@ def timeit(f, name=None):
     name = f
   log_info('Operation %s completed in %.3f seconds', name, ed - st)
   return res
-
-def collect_time(f, name=None, timings={}):
-  st = time.time()
-  res = f()
-  ed = time.time()
-
-  if not '_last_log' in timings:
-    timings['_last_log'] = ed
-
-  if not name in timings:
-    timings[name] = 0
-  timings[name] += ed - st
-
-  if ed - timings['_last_log'] > 5:
-    for k, v in timings.items():
-      log_info('Timing: %s %s', k, v)
-    timings['_last_log'] = time.time()
-
-  return res
-
 
 @contextmanager
 def timer_ctx(name='Operation'):
@@ -132,6 +123,17 @@ def stack_signal():
 
 
 class Assert(object):
+  '''Assertion helper functions.
+  
+  ::
+  
+    a = 'foo'
+    b = 'bar'
+    
+    Assert.eq(a, b) 
+    # equivalent to:
+    # assert a == b, 'a == b failed (%s vs %s)' % (a, b) 
+  '''
   @staticmethod
   def all_eq(a, b):
     import numpy
@@ -189,9 +191,11 @@ def trace_fn(fn):
 def rtype_check(typeclass):
   '''Function decorator to check return type.
   
-  @rtype_check(int)
-  def fn(x, y, z):
-    return x + y
+  Usage::
+  
+    @rtype_check(int)
+    def fn(x, y, z):
+      return x + y
   '''
   
   def wrap(fn):
@@ -206,7 +210,7 @@ def rtype_check(typeclass):
 
 def synchronized(fn):
   '''
-  Execution of this function is serialized.
+  Decorator: execution of this function is serialized by an `threading.RLock`.
   :param fn:
   '''
   lock = threading.RLock()
@@ -218,6 +222,10 @@ def synchronized(fn):
   return _fn
   
 def count_calls(fn):
+  '''
+  Decorator: count calls to ``fn`` and print after each 100.
+  :param fn:
+  '''
   count = [0]
   def wrapped(*args, **kw):
     count[0] += 1
