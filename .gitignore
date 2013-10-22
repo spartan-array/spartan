@@ -14,10 +14,6 @@
 *.log
 .svn
 
-config.log
-config.status
-libtool
-
 #runtime files
 logs/
 checkpoints/
@@ -37,24 +33,7 @@ Makefile.dep
 .libs/
 .settings
 
+# build
+doc/_build
 build/
 
-# automake
-Makefile.in
-aclocal.m4
-autom4te.cache/
-config.guess
-config.sub
-configure
-depcomp
-install-sh
-ltmain.sh
-m4/libtool.m4
-m4/ltoptions.m4
-m4/ltsugar.m4
-m4/ltversion.m4
-m4/lt~obsolete.m4
-missing
-spartan-config.h.in
-spartan-config.h.in~
-spartan/spartan_service.h

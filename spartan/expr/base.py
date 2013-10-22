@@ -139,7 +139,8 @@ def glom(node):
 def dag(node):
   '''
   Compile and return the DAG representing this expression.
-  :param node:
+  
+  :param node: The node to compute a DAG for.
   '''
   if not isinstance(node, Expr):
     raise TypeError
@@ -157,7 +158,7 @@ def evaluate(node):
   '''
   Evaluate this expression.
   
-  :param node:
+  :param node: `Expr` to evaluate.
   '''
   if not isinstance(node, Expr):
     return node
@@ -172,8 +173,8 @@ force = evaluate
 def eager(node):
   '''
   Eagerly evaluate ``node``.
-  
   Convert the result back into an `Expr`.
+  
   :param node: `Expr` to evaluate.
   '''
   return lazify(force(node))

@@ -10,6 +10,25 @@ from base import Expr, evaluate, dag, glom, eager, lazify, force
 from spartan import util
 import numpy as np
 
+__doc__ = """
+Lazy expression DAGs.
+
+All expression operations are subclasses of the `Expr` class, which
+by default performs all operations lazily.
+
+Operations are built up using a few high-level operations -- these all
+live in their own modules:
+
+* Create a new distributed array `spartan.expr.ndarray`
+* Map over an array :py:mod:`spartan.expr.map_tiles` and `spartan.expr.map_extents`
+* Reduce over an array `spartan.expr.reduce_extents`
+* Apply a stencil/convolution to an array `spartan.expr.stencil`
+* Slicing/indexing `spartan.expr.index`.   
+
+Optimizations on DAGs live in `spartan.expr.optimize`.
+
+"""
+
 def map(v, fn, axis=None, **kw):
   return map_tiles(v, fn, **kw)
 
@@ -43,6 +62,13 @@ def _sum_reducer(a, b):
   return a + b
 
 def sum(x, axis=None):
+  '''
+  Sum ``x`` over ``axis``.
+  
+  
+  :param x: The array to sum.
+  :param axis: Either an integer or ``None``.
+  '''
   return reduce_extents(x, axis=axis,
                        dtype_fn = lambda input: input.dtype,
                        local_reduce_fn = _sum_local,
@@ -91,6 +117,12 @@ def _argmin_dtype(input):
   return dtype 
 
 def argmin(x, axis=None):
+  '''
+  Compute argmin over ``axis``.
+  
+  :param x: `Expr` to compute a minimum over. 
+  :param axis: Axis (integer or None).
+  '''
   x = x.force()
   compute_min = reduce_extents(x, axis,
                                dtype_fn = _argmin_dtype,
