@@ -115,6 +115,10 @@ def create(ul, lr, array_shape):
   ex.ul_array = np.asarray(ex.ul, dtype=np.int)
   ex.lr_array = np.asarray(ex.lr, dtype=np.int)
   return ex
+
+def from_shape(shp):
+  return create(tuple([0] * len(shp)), tuple(v for v in shp), shp)
+
  
 def unravelled_pos(idx, array_shape): 
   '''
