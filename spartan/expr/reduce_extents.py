@@ -22,6 +22,7 @@ class ReduceExtentsExpr(Op, Node):
     input_array = deps['children'][0]
     dtype = self.dtype_fn(input_array)
     axis = self.axis
+    
     util.log_info('Reducing %s over axis %s', input_array.shape, self.axis)
     shape = extent.shape_for_reduction(input_array.shape, self.axis)
     tile_accum = tile.TileAccum(self.combine_fn)

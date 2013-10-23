@@ -132,7 +132,6 @@ def argmin(x, axis=None):
   :param x: `Expr` to compute a minimum over. 
   :param axis: Axis (integer or None).
   '''
-  x = x.force()
   compute_min = reduce_extents(x, axis,
                                dtype_fn = _argmin_dtype,
                                local_reduce_fn = _argmin_local,
@@ -256,8 +255,8 @@ def _dot_mapper(inputs, ex):
   
   ul = np.asarray([ex_a.ul[0], 0])
   lr = ul + result.shape
-  util.log_info('%s %s %s', a.shape, b.shape, result.shape)
-  util.log_info('%s %s %s', ul, lr, target_shape)
+  #util.log_info('%s %s %s', a.shape, b.shape, result.shape)
+  #util.log_info('%s %s %s', ul, lr, target_shape)
   out = extent.create(ul, lr, target_shape)
   
   yield out, result

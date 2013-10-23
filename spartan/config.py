@@ -17,8 +17,8 @@ def add_bool_flag(name, default, **kw):
   _names.add(name)
   
   parser.add_argument('--' + name, default=default, type=int, dest=name, **kw)
-  parser.add_argument('--enable_' + name, action='store_true', dest=name, **kw)
-  parser.add_argument('--disable_' + name, action='store_false', dest=name, **kw)
+  parser.add_argument('--enable_' + name, action='store_true', dest=name)
+  parser.add_argument('--disable_' + name, action='store_false', dest=name)
   
   return default
 
@@ -33,7 +33,7 @@ class Flags(object):
   profile_kernels = add_bool_flag('profile_kernels', default=False)
   profile_master = add_bool_flag('profile_master', default=False)
   log_level = add_flag('log_level', default=3, type=int)
-  num_workers = add_flag('num_workers', default=4, type=int)
+  num_workers = add_flag('num_workers', default=1, type=int)
   cluster = add_bool_flag('cluster', default=False)
   oprofile = add_bool_flag('oprofile', default=False)
   
@@ -43,7 +43,7 @@ class Flags(object):
   use_threads = add_bool_flag(
     'use_threads',
     help='When running locally, use threads instead of forking. (slow, for debugging)', 
-    default=False)
+    default=True)
   
   assign_mode = AssignMode.BY_NODE
   add_flag('bycore', dest='assign_mode', action='store_const', const=AssignMode.BY_CORE)
@@ -72,16 +72,16 @@ def parse_known_args(argv):
 #HOSTS = [ ('localhost', 8) ]
 
 HOSTS = [
-#   ('beaker-14', 7),
-#   ('beaker-15', 7),
-#   ('beaker-16', 7),
-#   ('beaker-17', 7),
-#   ('beaker-18', 7),
-#   ('beaker-19', 7),
-  ('beaker-20', 16),
-  #('beaker-21', 16),
-  ('beaker-22', 16),
-  ('beaker-23', 16),
-  ('beaker-24', 16),
-  ('beaker-25', 16),
+  ('beaker-20', 8),
+  #('beaker-21', 8),
+  ('beaker-22', 8),
+  ('beaker-23', 8),
+  ('beaker-24', 8),
+  ('beaker-25', 8),
+  ('beaker-14', 7),
+  ('beaker-15', 7),
+  ('beaker-16', 8),
+  ('beaker-17', 7),
+  ('beaker-18', 4),
+  ('beaker-19', 7),
 ]
