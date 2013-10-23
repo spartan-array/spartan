@@ -5,11 +5,16 @@ from spartan.util import Assert
 
 class Backend(object):
   def _evaluate(self, ctx, prim):
+    if prim._cached_value is not None:
+      return prim._cached_value
+  
+    #util.log_info('Evaluting deps for %s', prim)
     deps = {}
     for k, vs in prim.dependencies().iteritems():
       assert isinstance(vs, list)
       deps[k] = [self.evaluate(ctx, v) for v in vs]
     
+    #util.log_info('Evaluting %s', prim.typename())
     return prim.evaluate(ctx, deps)
     #return util.timeit(lambda: prim.evaluate(ctx, deps), 'eval: %s' % prim)
   

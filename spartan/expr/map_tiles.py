@@ -31,7 +31,7 @@ def tile_mapper(ex, _, children, map_fn, fn_kw):
   return [(ex, tile.from_data(result))]
     
 
-class MapTilesExpr(Op, Node):
+class MapTilesExpr(Op):
   _members = ['children', 'map_fn', 'fn_kw']
   
   def visit(self, visitor):

@@ -32,7 +32,7 @@ def _notarget_mapper(ex, _, map_fn=None, inputs=None, fn_kw=None):
     for ex, v in result:
       yield (ex, tile.from_data(v))
 
-class MapExtentsExpr(Op, Node):
+class MapExtentsExpr(Op):
   _members = ['children', 'map_fn', 'reduce_fn', 'target', 'tile_hint', 'fn_kw']
 
   def dependencies(self):
@@ -47,7 +47,8 @@ class MapExtentsExpr(Op, Node):
                           map_fn=self.map_fn,
                           reduce_fn=self.reduce_fn,
                           target=self.target,
-                          fn_kw=self.fn_kw) 
+                          fn_kw=self.fn_kw,
+                          expr_id=self.expr_id)
     
     
   def evaluate(self, ctx, deps):

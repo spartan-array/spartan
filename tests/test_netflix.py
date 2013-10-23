@@ -1,36 +1,57 @@
 from spartan import util
+from spartan.examples import netflix
 from spartan.util import Assert, divup
-from test_common import with_ctx
-import netflix
+import math
 import numpy as np
 import spartan
+import test_common
 
-d = 20
-r = 1
-P_RATING = 1e8 / (netflix.N_USERS * netflix.N_MOVIES)  
+import pyximport; pyximport.install()
 
-@with_ctx
-def disabled_netflix(ctx):
-  V = spartan.ndarray((netflix.N_USERS, netflix.N_MOVIES),
-                      tile_hint=(divup(netflix.N_USERS, d), divup(netflix.N_MOVIES, d)))
+r = 100
+d = 32
+
+# how much to scale up matrix size by.
+NUM_MOVIES = 2649429
+NUM_USERS = 17770
+P_RATING = 1e8 / (NUM_USERS * NUM_MOVIES)
+
+SCALE = 2
+
+U = NUM_USERS * SCALE
+M = NUM_MOVIES * SCALE
+
+def benchmark_netflix_sgd(ctx, timer):
+  V = spartan.ndarray((U, M),
+                      tile_hint=(divup(U, d), divup(M, d)))
   
-  M = spartan.rand(netflix.N_MOVIES, r).force()
-  U = spartan.rand(netflix.N_USERS, r).force()
+  Mfactor = spartan.eager(spartan.rand(M, r))
+  Ufactor = spartan.eager(spartan.rand(U, r))
   
 #   V = spartan.map_extents(V, netflix.load_netflix_mapper,
 #                           kw={ 'load_file' : '/big1/netflix.zip' })  
   
-  V = spartan.eager(
+  V = timer.time_op('prep', lambda: spartan.eager(
         spartan.map_extents(V, netflix.fake_netflix_mapper, 
-                          target=V, kw = { 'p_rating' : P_RATING }))
+                          target=V, kw = { 'p_rating' : P_RATING })))
+  
+  for i in range(2):
+    util.log_info('%d', i)
+    _ = netflix.sgd(V, Mfactor, Ufactor)
+    timer.time_op('netflix', lambda: _.force())
+    
+
+def test_sgd_inner():
+  N_ENTRIES = 2 * 1000 * 1000
+  rows = np.random.randint(0, U, N_ENTRIES).astype(np.int64)
+  cols = np.random.randint(0, M, N_ENTRIES).astype(np.int64)
+  
+  vals = np.random.randint(0, 5, N_ENTRIES).astype(np.float)
+  u = np.random.randn(U, r)
+  m = np.random.randn(M, r)
   
   for i in range(5):
-    util.log_info('%d', i)
-    _ = spartan.map_extents(V, netflix.sgd_netflix_mapper,
-                        kw = { 'V' : V,
-                               'M' : M,
-                               'U' : U })
-    _.force()
-    
+    util.timeit(lambda: netflix._sgd_inner(rows, cols, vals, u, m), 'sgd')
+  
 if __name__ == '__main__':
-  test_netflix()
+  test_common.run(__file__)

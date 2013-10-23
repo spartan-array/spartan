@@ -47,8 +47,10 @@ class TileExtent(object):
     #return ravelled_pos(self.ul, self.array_shape)
     
   def __eq__(self, other):
-    return (np.all(self.ul_array == other.ul_array) and 
-            np.all(self.lr_array == other.lr_array))
+    for i in range(len(self.ul)):
+      if other.ul[i] != self.ul[i] or other.lr[i] != self.lr[i]:
+        return False
+    return True
 
   def ravelled_pos(self):
     return ravelled_pos(self.ul, self.array_shape)
@@ -126,20 +128,25 @@ def ravelled_pos(idx, array_shape):
   
   return rpos
 
-def extents_for_region(extents, tile_extent):
+def find_overlapping(extents, region):
   '''
-  Return the extents that comprise ``tile_extent``.   
-  :param extents: 
-  :param tile_extent:
+  Return the extents that overlap with ``region``.   
+  
+  :param extents: List of extents to search over.
+  :param region: `Extent` to match.
   '''
   for ex in extents:
-    overlap = intersection(ex, tile_extent)
+    overlap = intersection(ex, region)
     if overlap is not None:
       yield (ex, overlap)
       
 
 def compute_slice(base, idx):
-  '''Slice ``base`` by ``idx``, returning a new `TileExtent`.'''
+  '''Return a new ``TileExtent`` representing ``base[idx]``
+  
+  :param base: `TileExtent`
+  :param idx: int, slice, or tuple(slice,...)
+  '''
   assert not np.isscalar(idx)
   if not isinstance(idx, tuple):
     idx = (idx,)
@@ -193,6 +200,7 @@ def from_slice(idx, shape):
   '''
   if not isinstance(idx, tuple):
     idx = (idx,)
+  
   if len(idx) < len(shape):
     idx = tuple(list(idx) + [slice(None, None, None) 
                              for _ in range(len(shape) - len(idx))])
@@ -207,6 +215,9 @@ def from_slice(idx, shape):
     if np.isscalar(slc):
       slc = int(slc)
       slc = slice(slc, slc + 1, None)
+    
+    if slc.start > 0: assert slc.start <= dim
+    if slc.stop > 0: assert slc.stop <= dim
     
     indices = slc.indices(dim)
     ul.append(indices[0])

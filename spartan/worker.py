@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 '''Bootstrap code for starting a worker process.'''
+
 from spartan import config, util
 from spartan.config import flags
 import atexit
@@ -11,6 +12,11 @@ import socket
 import spartan
 import spartan.wrap
 import sys
+
+try:
+  import pyximport; pyximport.install()
+except ImportError:
+  pass
 
 
 def _dump_kernel_prof(worker_id):
@@ -33,8 +39,8 @@ if __name__ == '__main__':
   config.add_flag('port', type=int)
   config.add_flag('count', type=int)
   
-  resource.setrlimit(resource.RLIMIT_AS, (2 * 1000 * 1000 * 1000,
-                                          2 * 1000 * 1000 * 1000))
+  resource.setrlimit(resource.RLIMIT_AS, (8 * 1000 * 1000 * 1000,
+                                          8 * 1000 * 1000 * 1000))
     
   config.parse_known_args(sys.argv)
   assert flags.master is not None

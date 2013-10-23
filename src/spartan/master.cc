@@ -224,8 +224,11 @@ void Master::register_worker(const RegisterReq& req) {
   workers_.push_back(w);
 }
 
-Table* Master::create_table(Sharder* sharder, Accumulator* combiner,
-    Accumulator* reducer, Selector* selector) {
+Table* Master::create_table(
+    Sharder* sharder,
+    Accumulator* combiner,
+    Accumulator* reducer,
+    Selector* selector) {
   Timer timer;
   wait_for_workers();
   Table* t = new Table;
@@ -235,7 +238,9 @@ Table* Master::create_table(Sharder* sharder, Accumulator* combiner,
   int table_id = table_id_counter_++;
   Log_debug("Creating table %d", table_id);
   req.id = table_id;
-  req.num_shards = workers_.size() * 2 + 1;
+
+  req.num_shards = workers_.size();
+
   if (combiner != NULL) {
     delete TypeRegistry<Accumulator>::get_by_id(combiner->type_id());
     req.combiner.type_id = combiner->type_id();

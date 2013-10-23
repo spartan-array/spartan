@@ -27,9 +27,10 @@ class BenchTimer(object):
      
   def time_op(self, key, fn):
     st = time.time()
-    fn()
+    result = fn()
     ed = time.time()
     print '%d,"%s",%f' % (self.num_workers, key, ed - st)
+    return result
     
 
 def run_benchmarks(module, benchmarks, master, timer):
@@ -56,17 +57,12 @@ def run(filename):
   if benchmarks:
     # csv header
     print 'num_workers,bench,time'
-    if flags.cluster:
-      workers = [int(w) for w in flags.worker_list.split(',')]
-      #workers = [4, 16, 25, 36, 64, 81]
-      #workers = [flags.num_workers]
-    else:
-      workers = [flags.num_workers]
+    workers = [int(w) for w in flags.worker_list.split(',')]
     
     for i in workers:
       timer = BenchTimer(i)
       util.log_info('Running benchmarks on %d workers', i)
-      master = start_cluster(i, local=not flags.cluster)
+      master = start_cluster(i, flags.cluster)
       run_benchmarks(module, benchmarks, master, timer)
       
       del master

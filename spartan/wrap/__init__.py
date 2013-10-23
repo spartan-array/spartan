@@ -272,7 +272,7 @@ def mapper_kernel(kernel, args):
         #dst.update(-1, k, v)
 
 
-def foreach_kernel(kernel, args):
+def _foreach_kernel(kernel, args):
   src_id, fn, kw = args
   
   src = kernel.table(src_id)
@@ -294,27 +294,11 @@ def map_items(table, mapper_fn, combine_fn=None, reduce_fn=None, kw=None):
   return dst
 
 
-def map_inplace(table, fn, kw):
-  src = table
-  dst = src
-  master = get_master()
-  master.foreach_shard(table, mapper_kernel, 
-                       (src.id(), dst.id(), fn, kw))
-  return dst
-
-
 def foreach(table, fn, kw):
   src = table
   master = get_master()
-  master.foreach_shard(table, foreach_kernel, 
+  master.foreach_shard(table, _foreach_kernel, 
                        (src.id(), fn, kw))
-
-
-def fetch(table):
-  out = []
-  for s, k, v in table:
-    out.append((k, v))
-  return out
 
 
 def get_master():

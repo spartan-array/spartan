@@ -230,7 +230,7 @@ class DistArray(object):
       shard = self.extents[region]
       return self.table.get(shard, ex)
 
-    splits = list(extent.extents_for_region(self.extents.iterkeys(), region))
+    splits = list(extent.find_overlapping(self.extents.iterkeys(), region))
     
     #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
     tgt = np.ndarray(region.shape, dtype=self.dtype)
@@ -260,7 +260,7 @@ class DistArray(object):
       self.table.update(shard, region, tile.from_data(data))
       return
     
-    splits = list(extent.extents_for_region(self.extents, region))
+    splits = list(extent.find_overlapping(self.extents, region))
     for dst_key, intersection in splits:
       #util.log_info('%d %s %s %s', self.table.id(), region, dst_key, intersection)
       shard = self.extents[dst_key]
@@ -303,7 +303,7 @@ def best_locality(array, ex):
   :param table:
   :param ex:
   '''
-  splits = extent.extents_for_region(array.extents, ex)
+  splits = extent.find_overlapping(array.extents, ex)
   counts = collections.defaultdict(int)
   for key, overlap in splits:
     shard = array.extents[key]
@@ -488,49 +488,4 @@ def _size(v):
 
 def largest_value(vals):
   return sorted(vals, key=lambda v: _size(v))[-1]
-
-# TODO(rjp)
-# These functions shouldn't be needed, as they are 
-# all available via expression level operations.
-# At the moment, they're being used by various tests,
-# but they should be moved to some common testing module
-# at some point.
-def create_with(master, shape, init_fn):
-  d = create(master, shape)
-  spartan.map_inplace(d.table, init_fn, kw={})
-  return d 
-
-def _create_rand(extent, data):
-  data[:] = np.random.rand(*extent.shape)
-
-def _create_randn(extent, data):
-  data[:] = np.random.randn(*extent.shape)
-  
-def _create_ones(extent, data):
-  util.log_info('Updating %s, %s', extent, data)
-  data[:] = 1
-
-def _create_zeros(extent, data):
-  data[:] = 0
-
-def _create_range(ex, data):
-  Assert.eq(ex.shape, data.shape)
-  pos = extent.ravelled_pos(ex.ul, ex.array_shape)
-  sz = np.prod(ex.shape)
-  data[:] = np.arange(pos, pos+sz).reshape(ex.shape)
-  
-def randn(master, *shape):
-  return create_with(master, shape, _create_randn)
-
-def rand(master, *shape):
-  return create_with(master, shape, _create_rand)
-
-def ones(master, shape):
-  return create_with(master, shape, _create_ones)
-
-def zeros(master, shape):
-  return create_with(master, shape, _create_zeros)
-  
-def arange(master, shape):
-  return create_with(master, shape, _create_range)
 

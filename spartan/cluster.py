@@ -13,8 +13,8 @@ def start_remote_worker(worker, st, ed):
   if flags.use_threads and worker == 'localhost':
     for i in range(st, ed):
       p = threading.Thread(target=spartan.worker._start_worker,
-                           args=('%s:%d' % (socket.gethostname(), 9999),
-                                 10000 + i))
+                           args=('%s:%d' % (socket.gethostname(), flags.port_base),
+                                 flags.port_base + 1 + i))
       p.daemon = True
       p.start()
     time.sleep(0.1)
@@ -34,9 +34,9 @@ def start_remote_worker(worker, st, ed):
           #'xterm', '-e',
           #'gdb', '-ex', 'run', '--args',
           'python', '-m spartan.worker',
-          '--master=%s:9999' % socket.gethostname(),
+          '--master=%s:%d' % (socket.gethostname(), flags.port_base),
           '--count=%d' % (ed - st),
-          '--port=%d' % (10000)]
+          '--port=%d' % (flags.port_base + 1)]
   
   for name, value in config.flags:
     if isinstance(value, bool):
@@ -54,7 +54,7 @@ def start_remote_worker(worker, st, ed):
   return p
 
 def start_cluster(num_workers, cluster):
-  master = spartan.start_master(9999, num_workers)
+  master = spartan.start_master(flags.port_base, num_workers)
   spartan.set_log_level(flags.log_level)
   time.sleep(0.1)
 
@@ -65,8 +65,11 @@ def start_cluster(num_workers, cluster):
   count = 0
   num_hosts = len(config.HOSTS)
   for worker, total_tasks in config.HOSTS:
-    #sz = util.divup(num_workers, num_hosts)
-    sz = total_tasks
+    if flags.assign_mode == config.AssignMode.BY_CORE:
+      sz = total_tasks
+    else:
+      sz = util.divup(num_workers, num_hosts)
+    
     sz = min(sz, num_workers - count)
     start_remote_worker(worker, count, count + sz)
     count += sz

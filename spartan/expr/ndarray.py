@@ -3,7 +3,7 @@ from .node import Node
 from spartan.dense import tile, distarray
 import numpy as np
 
-class NdArrayExpr(Expr, Node):
+class NdArrayExpr(Expr):
   _members = ['_shape', 'dtype', 'tile_hint', 'combine_fn', 'reduce_fn']
   
   def visit(self, visitor):
@@ -11,7 +11,8 @@ class NdArrayExpr(Expr, Node):
                        dtype=visitor.visit(self.dtype),
                        tile_hint=self.tile_hint,
                        combine_fn=self.combine_fn,
-                       reduce_fn=self.reduce_fn)
+                       reduce_fn=self.reduce_fn,
+                       expr_id=self.expr_id)
   
   def dependencies(self):
     return {}

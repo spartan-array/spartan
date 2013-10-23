@@ -17,14 +17,20 @@ def _apply_binary_op(inputs, binary_op=None, numpy_expr=None):
 class NotShapeable(Exception):
   pass
 
+unique_id = iter(xrange(10000000))
 
-class Expr(object):
-  _dag = None
+class Expr(Node):
   _cached_value = None
+  _optimized = None
+  
+  _members = ['expr_id']
+  
+  def node_init(self):
+    if self.expr_id is None:
+      self.expr_id = unique_id.next()
     
   def typename(self):
     return self.__class__.__name__
-    
   
   def __add__(self, other):
     from .map_tiles import map_tiles
@@ -102,7 +108,7 @@ Expr.__rmul__ = Expr.__mul__
 Expr.__rdiv__ = Expr.__div__
 
 
-class LazyVal(Expr, Node):
+class LazyVal(Expr):
   _members = ['val']
   
   def visit(self, visitor):
@@ -120,8 +126,6 @@ class LazyVal(Expr, Node):
   def __reduce__(self):
     return evaluate(self).__reduce__()
 
-def eval_LazyVal(ctx, prim, deps):
-  return self.val
 
 def glom(node):    
   '''
@@ -145,13 +149,13 @@ def dag(node):
   if not isinstance(node, Expr):
     raise TypeError
   
-  if node._dag is not None:
-    return node._dag
+  if node._optimized is not None:
+    return node._optimized
   
   from . import optimize
   dag = optimize.optimize(node)
-  node._dag = dag
-  return node._dag
+  node._optimized = dag
+  return node._optimized
 
   
 def evaluate(node):

@@ -6,7 +6,7 @@ from spartan.util import Assert, join_tuple
 import numpy as np
 
 
-class IndexExpr(Expr, Node):
+class IndexExpr(Expr):
   _members = ['src', 'idx']
 
   def visit(self, visitor):
@@ -81,7 +81,7 @@ def eval_Slice(ctx, prim, deps):
   return distarray.Slice(src, idx)
   
   slice_region = extent.from_slice(idx, src.shape)
-  matching_extents = dict(extent.extents_for_region(src.extents, slice_region))
+  matching_extents = dict(extent.find_overlapping(src.extents, slice_region))
   
   util.log_info('Taking slice: %s from %s', idx, src.shape)
   #util.log_info('Matching: %s', matching_extents)

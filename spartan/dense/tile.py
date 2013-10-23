@@ -20,7 +20,8 @@ class Tile(object):
     if self.data is None:
       self.data = np.ndarray(self.shape, dtype=self.dtype)
 
-    if scipy.sparse.issparse(self.data):
+    # sparse matrix
+    if not isinstance(self.data, np.ndarray):
       return 
       
     if self.valid is NONE_VALID:

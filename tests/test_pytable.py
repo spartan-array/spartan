@@ -1,8 +1,15 @@
 #!/usr/bin/env python
 
-from spartan import ModSharder, replace_accum, fetch
+from spartan import ModSharder, replace_accum
 from spartan.util import Assert
 from test_common import with_ctx
+
+def fetch(table):
+  out = []
+  for s, k, v in table:
+    out.append((k, v))
+  return out
+
   
 @with_ctx
 def test_init(master):

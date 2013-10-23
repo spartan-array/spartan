@@ -27,7 +27,7 @@ from .map_tiles import map_tiles
 from .ndarray import ndarray
 from .outer import outer
 from .reduce_extents import reduce_extents
-from base import Expr, evaluate, dag, glom, eager, lazify, force
+from base import Expr, Op, evaluate, dag, glom, eager, lazify, force
 from spartan import util
 import numpy as np
 
