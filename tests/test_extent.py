@@ -40,11 +40,9 @@ def test_ravelled_pos():
   
 def test_unravel():
   for i in range(100):
-    shp = (100, 100)
-    ul = (random.randint(0, 90),
-          random.randint(0, 90))
-    lr = (random.randint(ul[0] + 1, 100),
-          random.randint(ul[1] + 1, 100))
+    shp = (20, 77)
+    ul = (random.randint(0, 19), random.randint(0, 76))
+    lr = (random.randint(ul[0] + 1, 20), random.randint(ul[1] + 1, 77))
                          
     a = extent.create(ul, lr, shp)
     ravelled = a.ravelled_pos()

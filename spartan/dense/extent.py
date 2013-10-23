@@ -125,12 +125,11 @@ def unravelled_pos(idx, array_shape):
   '''
   
   unravelled = []
-  for dim in array_shape:
+  for dim in reversed(array_shape):
     unravelled.append(idx % dim)
     idx /= dim
-  util.log_info('Unravel: %s %s %s',
-                idx, unravelled, array_shape)
-  return tuple(unravelled)
+  
+  return tuple(reversed(unravelled))
     
 def ravelled_pos(idx, array_shape):
   rpos = 0
