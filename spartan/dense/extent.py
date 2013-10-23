@@ -5,6 +5,13 @@ import numpy as np
 class TileExtent(object):
   '''A rectangular tile of a distributed array.
   
+  These correspond (roughly) to a `slice` taken from an array
+  (without any step component).
+  
+  Arrays are indexed from the upper-left; for an array of shape
+  (sx, sy, sz): (0,0...) is the upper-left corner of an array, 
+  and (sx,sy,sz...) the lower-right.
+  
   Extents are represented by an upper-left corner (inclusive) and
   a lower right corner (exclusive): [ul, lr).  In addition, they
   carry the shape of the array they are a part of; this is used to
@@ -74,14 +81,21 @@ class TileExtent(object):
 
   def add_dim(self):
     return create(self.ul + (0,), 
-                             self.lr + (0,), 
-                             self.array_shape + (1,))
+                  self.lr + (0,), 
+                  self.array_shape + (1,))
 
   def clone(self):
     return create(self.ul, self.lr, self.array_shape)
  
   
 def create(ul, lr, array_shape):
+  '''
+  Create a new extent with the given coordinates and array shape.
+  
+  :param ul: `tuple`: 
+  :param lr:
+  :param array_shape:
+  '''
   ex = TileExtent()
   ex.ul = tuple(ul)
   ex.lr = tuple(lr)

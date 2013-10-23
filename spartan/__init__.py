@@ -1,5 +1,8 @@
-from wrap import *
-from cluster import start_cluster
-from expr import *
+"""
+Spartan: A distributed array language.
 
-__doc__ = ''
+"""
+
+from cluster import start_cluster
+from wrap import *
+from expr import *
