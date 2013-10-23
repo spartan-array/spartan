@@ -24,7 +24,9 @@ def _dump_kernel_prof(worker_id):
     os.system('mkdir -p ./_kernel-profiles')
     spartan.wrap.PROFILER.dump_stats('./_kernel-profiles/%d' % worker_id)
 
-def _start_worker(master, port):
+def _start_worker(master, port, local_id):
+  pid = os.getpid()
+  os.system('taskset -pc %d %d > /dev/null' % (local_id, pid))
   worker = spartan.start_worker(master, port)
   worker_id = worker.id()
   worker.wait_for_shutdown()
@@ -52,7 +54,8 @@ if __name__ == '__main__':
   
   workers = []
   for i in range(flags.count):
-    p = multiprocessing.Process(target=_start_worker, args=(flags.master, flags.port + i))
+    p = multiprocessing.Process(target=_start_worker, 
+                                args=(flags.master, flags.port + i, i))
     p.start()
     workers.append(p)
     
