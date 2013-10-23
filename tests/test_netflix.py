@@ -1,3 +1,4 @@
+from nose.tools import nottest
 from spartan import util
 from spartan.examples import netflix
 from spartan.util import Assert, divup
@@ -5,6 +6,7 @@ import math
 import numpy as np
 import spartan
 import test_common
+
 
 import pyximport; pyximport.install()
 
@@ -41,6 +43,7 @@ def benchmark_netflix_sgd(ctx, timer):
     timer.time_op('netflix', lambda: _.force())
     
 
+@nottest
 def test_sgd_inner():
   N_ENTRIES = 2 * 1000 * 1000
   rows = np.random.randint(0, U, N_ENTRIES).astype(np.int64)
