@@ -354,16 +354,16 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, WorkerInitReq& o) {
 class WorkerService: public rpc::Service {
 public:
     enum {
-        INITIALIZE = 0x557a6518,
-        CREATE_TABLE = 0x579ad77a,
-        DESTROY_TABLE = 0x4b7230c0,
-        GET = 0x41376342,
-        ASSIGN_SHARDS = 0x135226d4,
-        RUN_KERNEL = 0x21e4ac2b,
-        GET_ITERATOR = 0x11ddcbac,
-        PUT = 0x15091f49,
-        FLUSH = 0x6bfbb6ca,
-        SHUTDOWN = 0x42e5eaa8,
+        INITIALIZE = 0x0,
+        CREATE_TABLE = 0x1,
+        DESTROY_TABLE = 0x2,
+        GET = 0x3,
+        ASSIGN_SHARDS = 0x4,
+        RUN_KERNEL = 0x5,
+        GET_ITERATOR = 0x6,
+        PUT = 0x7,
+        FLUSH = 0x8,
+        SHUTDOWN = 0x9,
     };
     int reg_to(rpc::Server* svr) {
         int ret = 0;
@@ -731,7 +731,7 @@ public:
 class MasterService: public rpc::Service {
 public:
     enum {
-        REGISTER_WORKER = 0x508ac6dc,
+        REGISTER_WORKER = 0x0,
     };
     int reg_to(rpc::Server* svr) {
         int ret = 0;
