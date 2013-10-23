@@ -55,7 +55,7 @@ def _log(msg, *args, **kw):
   level = kw.get('level', logging.INFO)
   with log_mutex:
     caller = sys._getframe(2)
-    filename = caller.f_code.co_filename
+    filename = caller.f_code.co_name
     lineno = caller.f_lineno
     if 'exc_info' in kw:
       exc = ''.join(traceback.format_exc())
@@ -145,14 +145,23 @@ def keys(src):
 _table_refs = collections.defaultdict(int)
 
 class Table(spartan_wrap.Table):
-  def __init__(self, id):
+  def __init__(self, id, destroy_on_del=False):
+    if destroy_on_del:
+      log_debug('Creating table %d', id)
+    
+    self.destroy_on_del = destroy_on_del
+    
     _table_refs[id] += 1
     spartan_wrap.Table.__init__(self, id)
     self.thisown = False
+    
       
   def __del__(self):
     _table_refs[self.id()] -= 1
-          
+    if self.destroy_on_del:
+      log_debug('Destroy: %s', self.id())
+      get_master().destroy_table(self.id())
+  
   def __reduce__(self):
     return (Table, (self.id(),))
   
@@ -223,19 +232,15 @@ class Master(object):
       self._master.shutdown()
   
   def create_table(self, sharder, combiner, reducer, selector):
-    for k, v in _table_refs.items():
-      if v == 0:
-        log_debug('GC, destroying table %s', k)
-        self.destroy_table(k)
-        del _table_refs[k]
-        
     #combiner = BootstrapCombiner(combiner)
     #reducer = BootstrapCombiner(reducer)
     
     t = self._master.create_table(sharder, combiner, reducer, selector)
-    return Table(t.id())
+    return Table(t.id(), destroy_on_del=True)
    
   def foreach_shard(self, table, kernel, args):
+    #log_info('Mapping %d', table.id())
+    assert table.id() in _table_refs, table.id()
     return self._master.foreach_shard(table, _bootstrap_kernel, (kernel, args))
 
   def foreach_worklist(self, worklist, mapper):
@@ -288,6 +293,8 @@ def map_items(table, mapper_fn, combine_fn=None, reduce_fn=None, kw=None):
                             combine_fn,
                             reduce_fn,
                             table.selector())
+  
+  #log_info('Map items: created table %d', dst.id())
   
   master.foreach_shard(table, mapper_kernel, 
                        (table.id(), dst.id(), mapper_fn, kw))

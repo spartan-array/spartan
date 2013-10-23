@@ -11,7 +11,16 @@ class Tile(object):
   '''
   A tile of an array: an extent (offset + size) and data for that extent.
   '''
-    
+  @property
+  def data(self):
+    return self._data
+  
+  @data.setter
+  def data(self, val):
+    if val is not None:
+      Assert.eq(val.dtype, self.dtype)
+    self._data = val
+  
   def _initialize(self):
     # check if this is a scalar...
     if len(self.shape) == 0:
@@ -57,18 +66,18 @@ class Tile(object):
 
 def from_data(data):
   t = Tile()
-  t.data = data
   t.dtype = data.dtype
+  t.data = data
   t.valid = ALL_VALID
   t.shape = data.shape
   return t
 
 def from_shape(shape, dtype):
   t = Tile()
+  t.dtype = dtype
   t.shape = shape
   t.data = None
   t.valid = NONE_VALID
-  t.dtype = dtype
   return t
 
 def from_intersection(src, overlap, data):
@@ -80,10 +89,10 @@ def from_intersection(src, overlap, data):
   :param data:
   '''
   t = Tile()
-  t.data = np.ndarray(src.shape)
+  t.dtype = data.dtype
+  t.data = np.ndarray(src.shape, dtype=data.dtype)
   t.valid = np.zeros(src.shape, dtype=np.bool)
   t.shape = src.shape
-  t.dtype = data.dtype
   
   slc = extent.offset_slice(src, overlap)
   t.data[slc] = data
@@ -99,9 +108,15 @@ class TileAccum(object):
     Assert.isinstance(old_tile, Tile)
     Assert.isinstance(new_tile, Tile)
     
+    Assert.eq(old_tile.dtype, new_tile.dtype)
+    Assert.eq(old_tile.shape, new_tile.shape)
+    
     old_tile._initialize()
     new_tile._initialize()
  
+    #util.log_info('OLD: %s', old_tile.data)
+    #util.log_info('NEW: %s', new_tile.data)
+    
     # zero-dimensional arrays; just use 
     # data == None as a mask. 
     if len(old_tile.shape) == 0:
@@ -118,9 +133,6 @@ class TileAccum(object):
     old_tile.data[replaced] = new_tile.data[replaced]
     old_tile.valid[replaced] = 1
 
-#     util.log_info('Accum: %s', new_tile.data)
-#     util.log_info('Accum: %s', old_tile.data)
-    
     if np.any(updated):
       old_tile.data[updated] = self.accum(
                   old_tile.data[updated],

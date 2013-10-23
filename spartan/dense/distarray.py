@@ -116,42 +116,6 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
   return result
     
 
-def from_table(table):
-  '''
-  Construct a distarray from an existing table.
-  Keys must be of type `Extent`, values of type `Tile`.
-  
-  Shape is computed as the maximum range of all extents.
-  
-  Dtype is taken from the dtype of the tiles.
-  
-  :param table:
-  '''
-  extents = {}
-  for shard, k, v in table.keys():
-    extents[k] = shard
-    
-  Assert.no_duplicates(extents)
-  
-  if not extents:
-    shape = tuple()
-  else:
-    shape = extent.find_shape(extents.keys())
-  
-  if len(extents) > 0:
-    # fetch a one element array in order to get the dtype
-    key, shard = extents.iteritems().next() 
-    fetch = NestedSlice(key, np.index_exp[0:1])
-    t = table.get(shard, fetch)
-    # (We're not actually returning a tile, as the selector instead
-    #  is returning just the underlying array.  Sigh).  
-    # Assert.isinstance(t, tile.Tile)
-    dtype = t.dtype
-  else:
-    # empty table; default dtype.
-    dtype = np.float
-  
-  return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
 
 def create(master, shape, 
            dtype=np.float, 
@@ -244,8 +208,7 @@ class DistArray(object):
     #return tile.data[]
    
   def update_slice(self, slc, data):
-    return self.update(extent.from_slice(slc, self.shape),
-                       data)
+    return self.update(extent.from_slice(slc, self.shape), data)
      
   def update(self, region, data):
     Assert.isinstance(region, extent.TileExtent)
@@ -266,6 +229,7 @@ class DistArray(object):
       shard = self.extents[dst_key]
       src_slice = extent.offset_slice(region, intersection)
       update_tile = tile.from_intersection(dst_key, intersection, data[src_slice])
+      #util.log_info('%s', update_tile)
       self.table.update(shard, dst_key, update_tile)
     
   
@@ -289,6 +253,43 @@ class DistArray(object):
     #util.log_info('Glomming: %s', self.shape)
     return self.select(np.index_exp[:])
 
+
+def from_table(table):
+  '''
+  Construct a distarray from an existing table.
+  Keys must be of type `Extent`, values of type `Tile`.
+  
+  Shape is computed as the maximum range of all extents.
+  
+  Dtype is taken from the dtype of the tiles.
+  
+  :param table:
+  '''
+  extents = {}
+  for shard, k, v in table.keys():
+    extents[k] = shard
+    
+  Assert.no_duplicates(extents)
+  
+  if not extents:
+    shape = tuple()
+  else:
+    shape = extent.find_shape(extents.keys())
+  
+  if len(extents) > 0:
+    # fetch a one element array in order to get the dtype
+    key, shard = extents.iteritems().next() 
+    fetch = NestedSlice(key, np.index_exp[0:1])
+    t = table.get(shard, fetch)
+    # (We're not actually returning a tile, as the selector instead
+    #  is returning just the underlying array.  Sigh).  
+    # Assert.isinstance(t, tile.Tile)
+    dtype = t.dtype
+  else:
+    # empty table; default dtype.
+    dtype = np.float
+  
+  return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
 
 def map_to_array(array, mapper_fn, combine_fn=None, reduce_fn=None, kw=None):
   return from_table(array.map_to_table(mapper_fn=mapper_fn,

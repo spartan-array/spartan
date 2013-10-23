@@ -43,6 +43,7 @@ public:
   }
 
   Table* get_table(int id) const {
+    CHECK(tables_.find(id) != tables_.end());
     return tables_.find(id)->second;
   }
 

@@ -108,7 +108,7 @@ bool Table::_get(int shard, const RefPtr& k, RefPtr* v) {
     Shard& s = (Shard&) (*shards_[shard]);
     typename Shard::iterator i = s.find(k);
     if (i == s.end()) {
-      Log_fatal("WTF:: %s", repr(k).c_str());
+      throw new PyException("Missing key");
       return false;
     }
 
@@ -129,6 +129,7 @@ void Table::update(int shard, const RefPtr& k, const RefPtr& v) {
   if (shard == -1) {
     shard = this->shard_for_key(k);
   }
+
   CHECK_LT(shard, num_shards());
   Shard& s = typed_shard(shard);
   typename Shard::iterator i = s.find(k);

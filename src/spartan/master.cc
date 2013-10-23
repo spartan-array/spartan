@@ -450,6 +450,8 @@ void Master::map_worklist(WorkList worklist, Kernel* k) {
 }
 
 void Master::map_shards(Table* table, Kernel* k, ArgMap kernel_args) {
+  CHECK(tables_.find(table->id()) != tables_.end());
+
   RunState st;
   st.kernel = k;
   st.kernel_args = kernel_args;

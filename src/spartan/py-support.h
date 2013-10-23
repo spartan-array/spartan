@@ -37,7 +37,6 @@ struct GILHelper {
 
 struct PyException : private boost::noncopyable {
   PyException();
-
   PyException(std::string value_str);
 
   PyObject* traceback;
