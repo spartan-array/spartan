@@ -14,6 +14,7 @@ class IndexExpr(Expr):
 
   def node_init(self):
     Expr.node_init(self)
+    assert not isinstance(self.src, LazyList)
     assert not isinstance(self.idx, LazyList)
     assert not isinstance(self.idx, list)
     

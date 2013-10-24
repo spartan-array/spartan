@@ -5,7 +5,9 @@ Optimizations over an expression graph.
 '''
 
 import numpy as np
-from spartan.config import flags
+from spartan.config import flags, Flags, add_bool_flag, add_flag
+from spartan.dense import extent
+from spartan.expr.reduce_extents import ReduceExtents
 from spartan.util import Assert
 
 from .. import util
@@ -13,6 +15,7 @@ from .base import Expr, LazyVal, LazyList
 from .map_extents import MapExtentsExpr
 from .map_tiles import MapTilesExpr
 from .ndarray import NdArrayExpr
+from spartan.dense.distarray import broadcast
 
 
 try:
@@ -72,13 +75,13 @@ def _take_first(lst):
 def map_like(v):
   return isinstance(v, (MapTilesExpr, MapExtentsExpr, NdArrayExpr, LazyVal))
 
-class FoldMapPass(OptimizePass):
+class MapMapFusion(OptimizePass):
   '''Fold sequences of Map operations together.
   
   map(f, map(g, map(h, x))) -> map(f . g . h, x)
   '''
   
-  name = 'fold'
+  name = 'map_fusion'
    
   def visit_MapTilesExpr(self, op):
     #util.log_info('Map tiles: %s', op.children)
@@ -121,7 +124,40 @@ class FoldMapPass(OptimizePass):
                         fn_kw={ 'fns' : fns,
                                 'map_fn' : map_fn,
                                 'map_kw' : map_kw })
+
+def _folded_reduce(ex, tile, axis,
+                   map_inputs, map_fn, map_kw,
+                   reduce_fn, reduce_kw,):
+  map_inputs = broadcast(map_inputs)
+  local_values = [v.fetch(ex) for v in map_inputs]
+  map_output = map_fn(local_values, **map_kw)
+  return reduce_fn(ex, map_output, axis, **reduce_kw)
+
+class ReduceMapFusion(OptimizePass):
+  name = 'reduce_fusion'
   
+  def visit_ReduceExtents(self, op):
+    array = self.visit(op.array)
+    
+    if isinstance(array, MapTilesExpr):
+      children = array.children
+      Assert.isinstance(children, LazyList)
+      return ReduceExtents(array=children[0],
+                           axis=op.axis,
+                           dtype_fn=op.dtype_fn,
+                           reduce_fn=_folded_reduce,
+                           combine_fn=op.combine_fn,
+                           fn_kw={'map_kw' : array.fn_kw,
+                                  'map_fn' : array.map_fn,
+                                  'reduce_fn' : op.reduce_fn,
+                                  'reduce_kw' : op.fn_kw,
+                                  'map_inputs' : children })
+    else:
+      return op.visit(self)
+                               
+                               
+      
+      
 
 def _numexpr_mapper(inputs, var_map=None, numpy_expr=None):
   gdict = {}
@@ -138,9 +174,9 @@ def new_var():
   return 'input_%d' % _COUNTER.next()
     
 
-class FoldNumexprPass(OptimizePass):
+class NumexprFusionPass(OptimizePass):
   '''Fold binary operations compatible with numexpr into a single numexpr operator.'''
-  name = 'numexpr'
+  name = 'numexpr_fusion'
   
   def visit_MapTilesExpr(self, op):
     map_children = [self.visit(v) for v in op.children]
@@ -190,18 +226,27 @@ def apply_pass(klass, dag):
   p = klass()
   return p.visit(dag)
 
-
-def compile(expr):
-  return expr
+passes = []
 
 def optimize(dag):
   if not flags.optimization:
     util.log_info('Optimizations disabled')
     return dag
   
-  if numexpr is not None:
-    dag = apply_pass(FoldNumexprPass, dag)
+  for p in passes:
+    dag = apply_pass(p, dag)
   
-  dag = apply_pass(FoldMapPass, dag)
-  # util.log_info('%s', dag)
   return dag
+
+def add_optimization(klass, default):
+  passes.append(klass)
+  
+  flagname = 'opt_' + klass.name
+  #setattr(Flags, flagname, add_bool_flag(flagname, default=default))
+  setattr(Flags, flagname, add_flag(flagname, default=default, type=bool))
+  
+Flags.optimization = add_bool_flag('optimization', default=True)
+
+add_optimization(MapMapFusion, True)
+add_optimization(ReduceMapFusion, True)
+add_optimization(NumexprFusionPass, False)
