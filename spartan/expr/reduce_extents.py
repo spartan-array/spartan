@@ -1,17 +1,16 @@
-from .base import Op
-from .node import Node
+from .base import Expr
 from spartan import util
 from spartan.dense import extent, tile, distarray
 
-class ReduceExtentsExpr(Op, Node):
-  _members = ['children', 'axis', 'dtype_fn', 'local_reduce_fn', 'combine_fn']
+class ReduceExtentsExpr(Expr):
+  _members = ['array', 'axis', 'dtype_fn', 'local_reduce_fn', 'combine_fn']
   
   def dependencies(self):
-    return { 'children' : self.children }
+    return { 'array' : self.array }
   
   def visit(self, visitor):
     return ReduceExtentsExpr(
-                        children=[visitor.visit(v) for v in self.children],
+                        array=visitor.visit(self.array),
                         axis=self.axis,
                         dtype_fn=self.dtype_fn,
                         local_reduce_fn=self.local_reduce_fn,
@@ -19,7 +18,7 @@ class ReduceExtentsExpr(Op, Node):
     
 
   def evaluate(self, ctx, deps):
-    input_array = deps['children'][0]
+    input_array = deps['array']
     dtype = self.dtype_fn(input_array)
     axis = self.axis
     
@@ -48,4 +47,7 @@ def reduce_extents(v, axis,
                    dtype_fn,
                    local_reduce_fn,
                    combine_fn):
-  return ReduceExtentsExpr([v], axis, dtype_fn, local_reduce_fn, combine_fn)
+  return ReduceExtentsExpr(array=v, axis=axis, 
+                           dtype_fn=dtype_fn, 
+                           local_reduce_fn=local_reduce_fn, 
+                           combine_fn=combine_fn)

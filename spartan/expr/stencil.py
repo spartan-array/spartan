@@ -67,7 +67,7 @@ def _maxpool(array, pool_size, stride):
   
   return target
                       
-def stencil_mapper(inputs, ex, filters=None, images=None, target_shape=None):
+def stencil_mapper(array, ex, filters=None, images=None, target_shape=None):
   local_filters = filters.glom()
   # util.log_info('R:%s', region)
   # util.log_info('F:%s', local_filters.shape)
@@ -125,8 +125,8 @@ def stencil(images, filters, stride=1):
                              target_shape=target.shape))
 
 
-def _maxpool_mapper(inputs, ex, pool_size, stride, target_shape):
-  region = inputs[0].fetch(ex)
+def _maxpool_mapper(array, ex, pool_size, stride, target_shape):
+  region = array.fetch(ex)
   # util.log_info('%s %s', inputs[0].shape, region.shape)
   pooled = _maxpool(region, pool_size, stride)
   ul = ex.ul
@@ -159,7 +159,7 @@ def maxpool(images, pool_size=2, stride=2):
                    combine_fn=np.maximum,
                    reduce_fn=np.maximum)
    
-  return map_extents([images],
+  return map_extents(images,
                     _maxpool_mapper,
                     target=target,
                     kw=dict(target_shape=target.shape,

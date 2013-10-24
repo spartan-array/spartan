@@ -89,6 +89,7 @@ class Node(object):
     return get_members(cls)
   
   def __init__(self, *args, **kw):
+    assert len(args) == 0, 'Node objects must be initialized with keywords.'
     node_initializer(self, *args, **kw)
  
   def iteritems(self):
@@ -101,7 +102,6 @@ class Node(object):
   
   def items(self):
     return [(k,getattr(self,k)) for k in self.members()]
-
 
   def __hash__(self):
     # print "Warning: __hash__ not implemented for %s" % self

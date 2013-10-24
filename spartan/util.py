@@ -163,7 +163,10 @@ class Assert(object):
   
   @staticmethod
   def true(expr): assert expr, 'Failed: %s == True' % (expr)
-  
+ 
+  @staticmethod
+  def iterable(expr): assert iterable(expr), 'Not iterable: %s' % expr
+   
   @staticmethod
   def isinstance(expr, klass): 
     assert isinstance(expr, klass), 'Failed: isinstance(%s, %s) [type = %s]' % (expr, klass, type(expr))
@@ -244,3 +247,12 @@ def divup(a, b):
     return tuple([divup(ta, b) for ta in a])
   
   return int(ceil(float(a) / b))
+
+def iterable(x):
+  return hasattr(x, '__iter__')
+
+def as_list(x):
+  if isinstance(x, list): return x
+  if iterable(x): return list(x)
+  
+  return [x]

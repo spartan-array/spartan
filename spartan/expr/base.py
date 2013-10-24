@@ -8,6 +8,7 @@ into a series of primitive array operations.
 from .node import Node
 import numpy as np
 import spartan
+from spartan import util
 
 def _apply_binary_op(inputs, binary_op=None, numpy_expr=None):
   assert len(inputs) == 2
@@ -22,12 +23,24 @@ unique_id = iter(xrange(10000000))
 class Expr(Node):
   _cached_value = None
   _optimized = None
+  _expr_id = None
   
-  _members = ['expr_id']
+  def dependencies(self):
+    '''
+    Return a dictionary mapping from name -> dependency.
+    
+    Dependencies may either be a list or single value.
+    Dependencies of type `Expr` are recursively evaluated.
+    '''
+    raise NotImplementedError
   
   def node_init(self):
-    if self.expr_id is None:
-      self.expr_id = unique_id.next()
+    #assert self.expr_id is not None
+    if self._expr_id is None:
+      self._expr_id = unique_id.next()
+  
+  def __hash__(self):
+    return self._expr_id
     
   def typename(self):
     return self.__class__.__name__
@@ -101,6 +114,9 @@ class Expr(Node):
   
   def glom(self):
     return glom(self)
+   
+  def __reduce__(self):
+    return evaluate(self).__reduce__()
 
 Expr.__rsub__ = Expr.__sub__
 Expr.__radd__ = Expr.__add__
@@ -122,9 +138,37 @@ class LazyVal(Expr):
   
   def evaluate(self, ctx, deps):
     return self.val
-   
-  def __reduce__(self):
-    return evaluate(self).__reduce__()
+
+class LazyCollection(Expr):
+  _members = ['vals']
+  
+  def dependencies(self):
+    return { 'vals' : self.vals }
+  
+  def compute_shape(self):
+    raise NotShapeable
+  
+  def evaluate(self, ctx, deps):
+    return deps['vals']
+  
+  def __iter__(self):
+    return iter(self.vals)
+
+
+class LazyDict(LazyCollection):
+  def visit(self, visitor):
+    return LazyDict(vals=dict([(k, visitor.visit(v)) 
+                               for (k, v) in self.vals.iteritems()]))
+  
+
+class LazyList(LazyCollection):
+  def visit(self, visitor):
+    return LazyList(vals=[visitor.visit(v) for v in self.vals])
+
+
+class LazyTuple(LazyCollection):
+  def visit(self, visitor):
+    return LazyTuple(vals=tuple([visitor.visit(v) for v in self.vals]))
 
 
 def glom(node):    
@@ -192,19 +236,22 @@ def lazify(val):
    
   :param val:
   '''
-  if isinstance(val, Expr): return val
   #util.log_info('Lazifying... %s', val)
-  return LazyVal(val)
+  if isinstance(val, Expr): 
+    return val
+  
+  if isinstance(val, dict):
+    return LazyDict(vals=val)
+  
+  if isinstance(val, list):
+    return LazyList(vals=val)
+  
+  if isinstance(val, tuple):
+    return LazyTuple(vals=val)
+  
+  return LazyVal(val=val)
 
 
 def val(x):
   return lazify(x)
 
-  
-class Op(Expr):
-  def node_init(self):
-    if self.children is None: self.children = tuple()
-    if isinstance(self.children, list): self.children = tuple(self.children)
-    if not isinstance(self.children, tuple): self.children = (self.children,)
-    
-    self.children = [lazify(c) for c in self.children]

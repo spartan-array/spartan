@@ -224,7 +224,7 @@ Worker* start_worker(const std::string& master_addr, int port) {
     port = rpc::find_open_port();
   }
 
-  Log_info("Starting worker on port %d", port);
+  // Log_info("Starting worker on port %d", port);
   rpc::Server* server = new rpc::Server(manager, threadpool);
   auto worker = new Worker(manager);
   server->reg(worker);

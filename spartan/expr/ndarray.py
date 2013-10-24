@@ -11,8 +11,7 @@ class NdArrayExpr(Expr):
                        dtype=visitor.visit(self.dtype),
                        tile_hint=self.tile_hint,
                        combine_fn=self.combine_fn,
-                       reduce_fn=self.reduce_fn,
-                       expr_id=self.expr_id)
+                       reduce_fn=self.reduce_fn)
   
   def dependencies(self):
     return {}

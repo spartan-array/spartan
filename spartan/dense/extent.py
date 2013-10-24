@@ -164,7 +164,7 @@ def compute_slice(base, idx):
   :param base: `TileExtent`
   :param idx: int, slice, or tuple(slice,...)
   '''
-  assert not np.isscalar(idx)
+  assert not np.isscalar(idx), idx
   if not isinstance(idx, tuple):
     idx = (idx,)
     

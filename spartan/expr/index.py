@@ -1,5 +1,4 @@
-from .base import Expr
-from .node import Node
+from .base import Expr, LazyList
 from spartan import util
 from spartan.dense import extent, tile, distarray
 from spartan.util import Assert, join_tuple
@@ -8,16 +7,24 @@ import numpy as np
 
 class IndexExpr(Expr):
   _members = ['src', 'idx']
-
-  def visit(self, visitor):
-    return IndexExpr(visitor.visit(self.src), visitor.visit(self.idx))
   
+  def visit(self, visitor):
+    return IndexExpr(src=visitor.visit(self.src), 
+                     idx=visitor.visit(self.idx))
+
+  def node_init(self):
+    Expr.node_init(self)
+    assert not isinstance(self.idx, LazyList)
+    assert not isinstance(self.idx, list)
+    
   def dependencies(self):
-    return { 'src' : [self.src],
-             'idx' : [self.idx] }
+    return { 'src' : self.src, 
+             'idx' : self.idx }
     
   def evaluate(self, ctx, deps):
-    idx = deps['idx'][0]
+    idx = deps['idx']
+    assert not isinstance(idx, list) 
+    util.log_info('%s', idx)
     if isinstance(idx, tuple) or\
        isinstance(idx, slice) or\
        np.isscalar(idx):
@@ -49,8 +56,8 @@ def bool_index_mapper(ex, tile, src, idx):
   return [(ex, local_val[local_idx])]
 
 def eval_Index(ctx, prim, deps):
-  src = deps['src'][0]
-  idx = deps['idx'][0]
+  src = deps['src']
+  idx = deps['idx']
   
   Assert.isinstance(idx, (np.ndarray, distarray.DistArray))
   
@@ -75,11 +82,13 @@ def eval_Index(ctx, prim, deps):
   
     
 def eval_Slice(ctx, prim, deps):
-  src = deps['src'][0]
-  idx = deps['idx'][0]
+  src = deps['src']
+  idx = deps['idx']
   
   return distarray.Slice(src, idx)
-  
+  #return _eager_slice(src, idx)
+
+def _eager_slice(src, idx):  
   slice_region = extent.from_slice(idx, src.shape)
   matching_extents = dict(extent.find_overlapping(src.extents, slice_region))
   
@@ -90,5 +99,5 @@ def eval_Slice(ctx, prim, deps):
   
   util.log_info('Done.')
   return result
-
+  
  

@@ -67,11 +67,11 @@ def run(num_pts, num_centers, num_dim):
   
   for i in range(10):
     _ = expr.map_extents(pts, 
-                     _find_cluster_mapper,
-                     kw={'d_pts' : pts, 
-                         'old_centers' : centers,
-                         'new_centers' : new_centers, 
-                         'new_counts' : new_counts })
+                         _find_cluster_mapper,
+                         kw={'d_pts' : pts, 
+                             'old_centers' : centers,
+                             'new_centers' : new_centers, 
+                             'new_counts' : new_counts })
     _.force()
     
     new_centers = lazify(new_centers) / lazify(new_counts)

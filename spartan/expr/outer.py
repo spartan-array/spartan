@@ -1,8 +1,7 @@
-from .base import Op
-from .node import Node
+from .base import Expr
 import numpy as np
 
-class OuterProductExpr(Op, Node):
+class OuterProductExpr(Expr):
   _members = ['children', 'map_fn', 'map_fn_kw', 'reduce_fn', 'reduce_fn_kw']
   
 def outer_product(a, b, map_fn, reduce_fn):

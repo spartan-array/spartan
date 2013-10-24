@@ -4,13 +4,16 @@
 Optimizations over an expression graph.
 '''
 
+import numpy as np
+from spartan.config import flags
+from spartan.util import Assert
+
 from .. import util
-from .base import Expr, LazyVal
+from .base import Expr, LazyVal, LazyList
 from .map_extents import MapExtentsExpr
 from .map_tiles import MapTilesExpr
 from .ndarray import NdArrayExpr
-from spartan.config import flags
-import numpy as np
+
 
 try:
   import numexpr
@@ -18,22 +21,33 @@ except:
   numexpr = None
 
 class OptimizePass(object):
+  def __init__(self):
+    self.visited = {}
+  
   def visit(self, op):
-    if isinstance(op, Expr):
-      #util.log_info('VISIT %s', op.typename())
-      if hasattr(self, 'visit_%s' % op.typename()):
-        return getattr(self, 'visit_%s' % op.typename())(op)
-      else:
-        return op.visit(self)
+    if not isinstance(op, Expr):
+      return op
     
-    #util.log_info("? %s", op)
-    return op
+    if op in self.visited:
+      return self.visited[op]
+    
+    #assert not op in self.visited, 'Infinite recursion during optimization %s' % op
+    #self.visited.add(op)
+    
+    #util.log_info('VISIT %s: %s', op.typename(), hash(op))
+    if hasattr(self, 'visit_%s' % op.typename()):
+      self.visited[op] = getattr(self, 'visit_%s' % op.typename())(op)
+    else:
+      self.visited[op] = op.visit(self)
+      
+    return self.visited[op]
   
 
 def _fold_mapper(inputs, fns=None, map_fn=None, map_kw=None):
   '''Helper mapper function for folding.
   
-  Runs each fn in `fns` on a number of the input tiles.
+  Runs each callable in `fns` on a number of the input tiles.
+  
   :param inputs: Input values for folded mappers
   :param fns: A list of dictionaries containing { 'fn', 'fn_kw', 'range' }
   :param map_fn:
@@ -67,10 +81,12 @@ class FoldMapPass(OptimizePass):
   name = 'fold'
    
   def visit_MapTilesExpr(self, op):
-    map_children = [self.visit(v) for v in op.children]
+    #util.log_info('Map tiles: %s', op.children)
+    Assert.iterable(op.children)
+    map_children = self.visit(op.children)
     all_maps = np.all([map_like(v) for v in map_children])
     
-    util.log_info('Folding: %s %s', [type(v) for v in map_children], all_maps)
+    #util.log_info('Folding: %s %s', [type(v) for v in map_children], all_maps)
     if not all_maps:
       return op.visit(self)
     
@@ -80,7 +96,7 @@ class FoldMapPass(OptimizePass):
       op_st = len(children)
       
       if isinstance(v, MapTilesExpr):
-        op_in = [self.visit(child) for child in v.children]
+        op_in = self.visit(v.children)
         children.extend(op_in)
         map_fn = v.map_fn
         fn_kw = v.fn_kw
@@ -100,7 +116,7 @@ class FoldMapPass(OptimizePass):
     # util.log_info('Map function: %s, kw: %s', map_fn, map_kw)
     
     # util.log_info('Created fold mapper with %d children', len(children))
-    return MapTilesExpr(children=children,
+    return MapTilesExpr(children=LazyList(vals=children),
                         map_fn=_fold_mapper,
                         fn_kw={ 'fns' : fns,
                                 'map_fn' : map_fn,

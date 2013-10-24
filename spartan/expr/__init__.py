@@ -27,7 +27,7 @@ from .map_tiles import map_tiles
 from .ndarray import ndarray
 from .outer import outer
 from .reduce_extents import reduce_extents
-from base import Expr, Op, evaluate, dag, glom, eager, lazify, force
+from base import Expr, evaluate, dag, glom, eager, lazify, force
 from spartan import util
 import numpy as np
 
@@ -174,14 +174,13 @@ def astype(x, dtype):
   assert x is not None
   return map_tiles(x, lambda inputs: inputs[0].astype(dtype))
 
-def _ravel_mapper(inputs, ex):
-  assert len(inputs) == 1
+def _ravel_mapper(array, ex):
   ul = extent.ravelled_pos(ex.ul, ex.array_shape)
   lr = 1 + extent.ravelled_pos(ex.lr_array - 1, ex.array_shape)
   shape = (np.prod(ex.array_shape),)
   
   ravelled_ex = extent.create((ul,), (lr,), shape)
-  ravelled_data = inputs[0].fetch(ex).ravel()
+  ravelled_data = array.fetch(ex).ravel()
   yield ravelled_ex, ravelled_data
    
 def ravel(v):
@@ -191,10 +190,10 @@ def ravel(v):
   See `numpy.ndarray.ravel`.
   :param v:
   '''
-  return map_extents((v,), _ravel_mapper)
+  return map_extents(v, _ravel_mapper)
 
-def _reshape_mapper(inputs, ex, _dest_shape):
-  tile = inputs[0].fetch(ex)
+def _reshape_mapper(array, ex, _dest_shape):
+  tile = array.fetch(ex)
   
   ravelled_ul = extent.ravelled_pos(ex.ul, ex.array_shape)
   ravelled_lr = extent.ravelled_pos(ex.lr_array - 1, ex.array_shape)
@@ -202,8 +201,8 @@ def _reshape_mapper(inputs, ex, _dest_shape):
   target_ul = extent.unravelled_pos(ravelled_ul, _dest_shape)
   target_lr = extent.unravelled_pos(ravelled_lr, _dest_shape)
   
-  util.log_info('%s + %s -> %s', ravelled_ul, _dest_shape, target_ul)
-  util.log_info('%s + %s -> %s', ravelled_lr, _dest_shape, target_lr)
+  #util.log_info('%s + %s -> %s', ravelled_ul, _dest_shape, target_ul)
+  #util.log_info('%s + %s -> %s', ravelled_lr, _dest_shape, target_lr)
   
   target_ex = extent.create(target_ul, np.array(target_lr) + 1, _dest_shape)
   yield target_ex, tile.reshape(target_ex.shape)
@@ -224,7 +223,7 @@ def reshape(array, new_shape, tile_hint=None):
   
   Assert.eq(old_size, new_size, 'Size mismatch')
   
-  return map_extents((array,), 
+  return map_extents(array, 
                      _reshape_mapper, 
                      tile_hint=tile_hint,
                      kw = { '_dest_shape' : new_shape})
@@ -237,20 +236,20 @@ Expr.ravel = ravel
 Expr.argmin = argmin
 
 
-def _dot_mapper(inputs, ex):
+def _dot_mapper(inputs, ex, av, bv):
   ex_a = ex
   # read current tile of array 'a'
-  a = inputs[0].fetch(ex_a)
+  a = av.fetch(ex_a)
 
-  target_shape = (inputs[0].shape[0], inputs[1].shape[1])
+  target_shape = (av.shape[0], bv.shape[1])
   
   # fetch corresponding column tile of array 'b'
   # rows = ex_a.cols
   # cols = *
   ex_b = extent.create((ex_a.ul[1], 0),
-                       (ex_a.lr[1], inputs[1].shape[1]),
-                       inputs[1].shape)
-  b = inputs[1].fetch(ex_b)
+                       (ex_a.lr[1], bv.shape[1]),
+                       bv.shape)
+  b = bv.fetch(ex_b)
   result = np.dot(a, b)
   
   ul = np.asarray([ex_a.ul[0], 0])
@@ -261,8 +260,8 @@ def _dot_mapper(inputs, ex):
   
   yield out, result
 
-def _dot_numpy(inputs, ex, numpy_data=None):
-  l = inputs[0].fetch(ex)
+def _dot_numpy(array, ex, numpy_data=None):
+  l = array.fetch(ex)
   r = numpy_data
   
   yield (ex[0].add_dim(), np.dot(l, r))
@@ -280,7 +279,7 @@ def dot(a, b):
   bv = force(b)
   
   if isinstance(bv, np.ndarray):
-    return map_extents((av,), _dot_numpy, kw = { 'numpy_data' : bv })
+    return map_extents(av, _dot_numpy, kw = { 'numpy_data' : bv })
   
   #av, bv = distarray.broadcast([av, bv])
   Assert.eq(a.shape[1], b.shape[0])
@@ -290,7 +289,8 @@ def dot(a, b):
                    combine_fn=np.add,
                    reduce_fn=np.add)
   
-  return map_extents((av, bv), _dot_mapper, target=target)
+  return map_extents(av, _dot_mapper, target=target,
+                     kw = dict(av=av, bv=bv))
             
 
 def _arange_mapper(inputs, ex, dtype=None):
@@ -301,5 +301,6 @@ def _arange_mapper(inputs, ex, dtype=None):
 
 
 def arange(shape, dtype=np.float):
-  return map_extents(ndarray(shape, dtype=dtype), fn = _arange_mapper, 
+  return map_extents(ndarray(shape, dtype=dtype), 
+                     fn = _arange_mapper, 
                      kw = {'dtype' : dtype })

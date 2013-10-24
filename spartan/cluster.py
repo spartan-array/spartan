@@ -13,8 +13,9 @@ def start_remote_worker(worker, st, ed):
   if flags.use_threads and worker == 'localhost':
     for i in range(st, ed):
       p = threading.Thread(target=spartan.worker._start_worker,
-                           args=('%s:%d' % (socket.gethostname(), flags.port_base),
-                                 flags.port_base + 1 + i))
+                           args=('%s:%d' % (socket.gethostname(), flags.port_base), 
+                                 flags.port_base + 1 + i,
+                                 i))
       p.daemon = True
       p.start()
     time.sleep(0.1)

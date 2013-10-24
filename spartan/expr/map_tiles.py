@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 
-from .base import Op
-from .node import Node
+import collections
+
+import numpy as np
 from spartan import util
 from spartan.dense import distarray, tile
-import collections
-import numpy as np
+from spartan.util import Assert
+from .base import Expr, lazify, LazyList
 
-def map_tiles(v, fn, **kw):
+
+def map_tiles(inputs, fn, **kw):
   '''
   Evaluate ``fn`` over each tile of the input.
   
@@ -15,7 +17,14 @@ def map_tiles(v, fn, **kw):
   :param v:
   :param fn:
   '''
-  return MapTilesExpr(v,  map_fn=fn, fn_kw=kw)
+  
+  if not util.iterable(inputs):
+    inputs = [inputs]
+
+  inputs = lazify(inputs)
+  kw = lazify(kw)
+  
+  return MapTilesExpr(children=inputs, map_fn=fn, fn_kw=kw)
 
 
 
@@ -31,13 +40,17 @@ def tile_mapper(ex, _, children, map_fn, fn_kw):
   return [(ex, tile.from_data(result))]
     
 
-class MapTilesExpr(Op):
+class MapTilesExpr(Expr):
   _members = ['children', 'map_fn', 'fn_kw']
   
+  def node_init(self):
+    Expr.node_init(self)
+    #Assert.isinstance(self.children, LazyList)
+  
   def visit(self, visitor):
-    return MapTilesExpr(children=[visitor.visit(v) for v in self.children],
+    return MapTilesExpr(children=visitor.visit(self.children),
                         map_fn=self.map_fn,
-                        fn_kw=self.fn_kw) 
+                        fn_kw=visitor.visit(self.fn_kw)) 
   
       
   def compute_shape(self):
@@ -53,19 +66,21 @@ class MapTilesExpr(Op):
     return tuple([output_shape[i] for i in range(len(output_shape))])
   
   def dependencies(self):
-    return { 'children' : self.children }
+    return { 'children' : self.children,
+             'fn_kw' : self.fn_kw }
 
   def evaluate(self, ctx, deps):
     children = deps['children']
     children = distarray.broadcast(children)
     largest = distarray.largest_value(children)
     map_fn = self.map_fn
-    fn_kw = self.fn_kw
+    fn_kw = deps['fn_kw']
     
     assert fn_kw is not None
     
     #util.log_info('Mapping %s over %d inputs; largest = %s', map_fn, len(children), largest.shape)
     #util.log_info('%s', children)
+    
     result = distarray.map_to_array(largest, 
                                     tile_mapper,
                                     kw = { 'children' : children,
