@@ -139,6 +139,7 @@ class LazyVal(Expr):
   def evaluate(self, ctx, deps):
     return self.val
 
+
 class LazyCollection(Expr):
   _members = ['vals']
   
@@ -170,6 +171,29 @@ class LazyTuple(LazyCollection):
   def visit(self, visitor):
     return LazyTuple(vals=tuple([visitor.visit(v) for v in self.vals]))
 
+
+def make_primitive(name, arg_names, evaluate_fn):
+  class NewPrimitive(Expr):
+    _members = arg_names
+    
+    def dependencies(self):
+      return dict([(k, getattr(self, k)) for k in arg_names])
+    
+    def evaluate(self, ctx, deps):
+      return evaluate_fn(ctx, **deps)
+    
+    def compute_shape(self):
+      raise NotShapeable
+    
+    def visit(self, visitor):
+      deps = {}
+      for k in arg_names:
+        deps[k] = visitor.visit(getattr(self, k))
+      return NewPrimitive(**deps) 
+  
+  NewPrimitive.__name__= name
+  return NewPrimitive
+    
 
 def glom(node):    
   '''
