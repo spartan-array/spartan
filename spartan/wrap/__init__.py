@@ -142,7 +142,7 @@ def key_mapper(k, v):
 def keys(src):
   return map_items(src, key_mapper)
 
-_table_refs = collections.defaultdict(int)
+_dead_tables = {}
 
 class Table(spartan_wrap.Table):
   def __init__(self, id, destroy_on_del=False):
@@ -151,16 +151,18 @@ class Table(spartan_wrap.Table):
     
     self.destroy_on_del = destroy_on_del
     
-    _table_refs[id] += 1
     spartan_wrap.Table.__init__(self, id)
     self.thisown = False
     
       
   def __del__(self):
-    _table_refs[self.id()] -= 1
     if self.destroy_on_del:
       log_debug('Destroy: %s', self.id())
-      get_master().destroy_table(self.id())
+      
+      # we have to delay this, as __del__ might be called
+      # during an RPC call, which currently causes a deadlock.
+      #get_master().destroy_table(self.id())
+      _dead_tables[self.id()] = 1
   
   def __reduce__(self):
     return (Table, (self.id(),))
@@ -234,13 +236,18 @@ class Master(object):
   def create_table(self, sharder, combiner, reducer, selector):
     #combiner = BootstrapCombiner(combiner)
     #reducer = BootstrapCombiner(reducer)
+   
+    if _dead_tables: 
+      for k in _dead_tables.iterkeys():
+        self._master.destroy_table(k)
+      _dead_tables.clear()
     
     t = self._master.create_table(sharder, combiner, reducer, selector)
     return Table(t.id(), destroy_on_del=True)
    
   def foreach_shard(self, table, kernel, args):
     #log_info('Mapping %d', table.id())
-    assert table.id() in _table_refs, table.id()
+    #assert table.id() in _table_refs, table.id()
     return self._master.foreach_shard(table, _bootstrap_kernel, (kernel, args))
 
   def foreach_worklist(self, worklist, mapper):
