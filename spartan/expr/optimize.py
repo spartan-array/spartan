@@ -154,10 +154,8 @@ class ReduceMapFusion(OptimizePass):
                                   'map_inputs' : children })
     else:
       return op.visit(self)
-                               
-                               
-      
-      
+
+
 
 def _numexpr_mapper(inputs, var_map=None, numpy_expr=None):
   gdict = {}
@@ -217,6 +215,7 @@ class NumexprFusionPass(OptimizePass):
     return MapTilesExpr(children=inputs,
                         map_fn=_numexpr_mapper,
                         fn_kw={ 'numpy_expr' : expr, 'var_map' : var_map, })
+
 
 def apply_pass(klass, dag):
   if not getattr(flags, 'opt_' + klass.name):

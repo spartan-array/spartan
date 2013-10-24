@@ -7,21 +7,13 @@ import numpy as np
 
 class IndexExpr(Expr):
   _members = ['src', 'idx']
-  
-  def visit(self, visitor):
-    return IndexExpr(src=visitor.visit(self.src), 
-                     idx=visitor.visit(self.idx))
 
   def node_init(self):
     Expr.node_init(self)
     assert not isinstance(self.src, LazyList)
     assert not isinstance(self.idx, LazyList)
     assert not isinstance(self.idx, list)
-    
-  def dependencies(self):
-    return { 'src' : self.src, 
-             'idx' : self.idx }
-    
+
   def evaluate(self, ctx, deps):
     idx = deps['idx']
     assert not isinstance(idx, list) 
@@ -72,9 +64,9 @@ def eval_Index(ctx, prim, deps):
     raise NotImplementedError
   else:
     # create destination of the appropriate size
-    dst = distarray.create(ctx, 
+    dst = distarray.create(ctx,
                            join_tuple([idx.shape[0]], src.shape[1:]),
-                           dtype = src.dtype)
+                           dtype=src.dtype)
     
     # map over it, replacing existing items.
     dst.foreach(lambda k, v: int_index_mapper(k, v, src, idx, dst),
@@ -87,14 +79,14 @@ def eval_Slice(ctx, prim, deps):
   idx = deps['idx']
   
   return distarray.Slice(src, idx)
-  #return _eager_slice(src, idx)
+  # return _eager_slice(src, idx)
 
 def _eager_slice(src, idx):  
   slice_region = extent.from_slice(idx, src.shape)
   matching_extents = dict(extent.find_overlapping(src.extents, slice_region))
   
   util.log_info('Taking slice: %s from %s', idx, src.shape)
-  #util.log_info('Matching: %s', matching_extents)
+  # util.log_info('Matching: %s', matching_extents)
   result = distarray.map_to_array(
     src, lambda k, v: slice_mapper(k, v, slice_region, matching_extents))
   

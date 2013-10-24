@@ -47,18 +47,6 @@ def _notarget_mapper(ex, _, map_fn=None, inputs=None, fn_kw=None):
 class MapExtentsExpr(Expr):
   _members = ['array', 'map_fn', 'reduce_fn', 'target', 'tile_hint', 'fn_kw']
 
-  def dependencies(self):
-    return { 'array' : self.array, 
-             'target' : self.target,
-             'fn_kw' : self.fn_kw }
-    
-  def visit(self, visitor):
-    return MapExtentsExpr(array=visitor.visit(self.array),
-                          map_fn=self.map_fn,
-                          reduce_fn=self.reduce_fn,
-                          target=self.target,
-                          fn_kw=visitor.visit(self.fn_kw))
-    
     
   def evaluate(self, ctx, deps):
     v = deps['array']

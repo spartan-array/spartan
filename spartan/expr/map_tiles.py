@@ -27,7 +27,6 @@ def map_tiles(inputs, fn, **kw):
   return MapTilesExpr(children=inputs, map_fn=fn, fn_kw=kw)
 
 
-
 def tile_mapper(ex, _, children, map_fn, fn_kw):
   #util.log_info('MapTiles: %s', map_fn)
   #util.log_info('Fetching %d inputs', len(children))
@@ -43,16 +42,6 @@ def tile_mapper(ex, _, children, map_fn, fn_kw):
 class MapTilesExpr(Expr):
   _members = ['children', 'map_fn', 'fn_kw']
   
-  def node_init(self):
-    Expr.node_init(self)
-    #Assert.isinstance(self.children, LazyList)
-  
-  def visit(self, visitor):
-    return MapTilesExpr(children=visitor.visit(self.children),
-                        map_fn=self.map_fn,
-                        fn_kw=visitor.visit(self.fn_kw)) 
-  
-      
   def compute_shape(self):
     '''MapTiles retains the shape of inputs.
     
@@ -65,10 +54,6 @@ class MapTilesExpr(Expr):
         output_shape[i] = max(output_shape[i], v)
     return tuple([output_shape[i] for i in range(len(output_shape))])
   
-  def dependencies(self):
-    return { 'children' : self.children,
-             'fn_kw' : self.fn_kw }
-
   def evaluate(self, ctx, deps):
     children = deps['children']
     children = distarray.broadcast(children)
