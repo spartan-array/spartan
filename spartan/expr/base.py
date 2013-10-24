@@ -32,12 +32,35 @@ class Expr(Node):
     Dependencies may either be a list or single value.
     Dependencies of type `Expr` are recursively evaluated.
     '''
-    raise NotImplementedError
+    return dict([(k, getattr(self, k)) for k in self.members()])
+  
+  def compute_shape(self):
+    '''
+    Compute the shape of this expression.
+    
+    If the shape is not available (data dependent), raises `NotShapeable`.
+    '''
+    raise NotShapeable
+  
+  def visit(self, visitor):
+    '''
+    Apply visitor to all children of this node, returning a new `Expr` of the same type. 
+    :param visitor: `OptimizePass`
+    '''
+    deps = {}
+    for k in self.members():
+      deps[k] = visitor.visit(getattr(self, k))
+    
+    return self.__class__(**deps) 
+  
   
   def node_init(self):
     #assert self.expr_id is not None
     if self._expr_id is None:
       self._expr_id = unique_id.next()
+       
+  def evaluate(self, ctx, deps):
+    raise NotImplementedError
   
   def __hash__(self):
     return self._expr_id
@@ -142,16 +165,13 @@ class LazyVal(Expr):
 
 class LazyCollection(Expr):
   _members = ['vals']
-  
-  def dependencies(self):
-    return { 'vals' : self.vals }
-  
-  def compute_shape(self):
-    raise NotShapeable
-  
+
   def evaluate(self, ctx, deps):
     return deps['vals']
   
+  def __getitem__(self, idx):
+    return self.vals[idx]
+    
   def __iter__(self):
     return iter(self.vals)
 
@@ -160,8 +180,8 @@ class LazyDict(LazyCollection):
   def visit(self, visitor):
     return LazyDict(vals=dict([(k, visitor.visit(v)) 
                                for (k, v) in self.vals.iteritems()]))
-  
 
+  
 class LazyList(LazyCollection):
   def visit(self, visitor):
     return LazyList(vals=[visitor.visit(v) for v in self.vals])
@@ -176,21 +196,10 @@ def make_primitive(name, arg_names, evaluate_fn):
   class NewPrimitive(Expr):
     _members = arg_names
     
-    def dependencies(self):
-      return dict([(k, getattr(self, k)) for k in arg_names])
-    
     def evaluate(self, ctx, deps):
       return evaluate_fn(ctx, **deps)
     
-    def compute_shape(self):
-      raise NotShapeable
-    
-    def visit(self, visitor):
-      deps = {}
-      for k in arg_names:
-        deps[k] = visitor.visit(getattr(self, k))
-      return NewPrimitive(**deps) 
-  
+
   NewPrimitive.__name__= name
   return NewPrimitive
     
@@ -275,7 +284,4 @@ def lazify(val):
   
   return LazyVal(val=val)
 
-
-def val(x):
-  return lazify(x)
 

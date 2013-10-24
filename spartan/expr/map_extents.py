@@ -52,9 +52,6 @@ class MapExtentsExpr(Expr):
              'target' : self.target,
              'fn_kw' : self.fn_kw }
     
-  def compute_shape(self):
-    raise NotShapeable
-  
   def visit(self, visitor):
     return MapExtentsExpr(array=visitor.visit(self.array),
                           map_fn=self.map_fn,
