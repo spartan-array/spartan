@@ -3,7 +3,7 @@
 '''
 Evalution for `Expr` nodes.
 
-`backend.evaluate` evaluates a nodes dependencies, caching
+`evaluate` evaluates a nodes dependencies, caching
 results, then evaluates nodes themselves.
 '''
 

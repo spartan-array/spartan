@@ -58,7 +58,7 @@ def ones(shape, dtype=np.float, tile_hint=None):
   return map_tiles(ndarray(shape, dtype=np.float, tile_hint=tile_hint), 
                    fn = lambda inputs: np.ones(inputs[0].shape, dtype))
 
-def _sum_local(index, tile, axis):
+def _sum_local(ex, tile, axis):
   return np.sum(tile[:], axis)
 
 def _sum_reducer(a, b):
