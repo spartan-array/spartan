@@ -5,16 +5,40 @@ from spartan.expr import lazify
 import spartan
 from spartan.util import divup
 
+import parakeet
+
+@util.synchronized
+@parakeet.jit
+def _find_closest(pts, centers):
+  idxs = np.zeros(pts.shape[0])
+
+  for i in range(pts.shape[0]):
+    min_dist = 1e9
+    min_idx = 0
+    p = pts[i]
+    for j in range(len(centers.shape)):
+      c = centers[j]
+      dist = np.dot(p, c) 
+      if dist < min_dist:
+        min_dist = dist
+        min_idx = j
+    
+    idxs[i] = min_idx
+  return idxs
+
+
 def _find_cluster_mapper(inputs, ex, d_pts, old_centers, 
                          new_centers, new_counts):
   #util.log_info('Mapping...')
   centers = old_centers.glom()
   pts = d_pts.fetch(ex)
+
+  closest = _find_closest(pts, centers)
   
-  dists = np.dot(pts, centers.T)
+  #dists = np.dot(pts, centers.T)
   
   # assign points to nearest centroid
-  closest = np.argmin(dists, axis=1)
+  #closest = np.argmin(dists, axis=1)
   
   l_counts = np.zeros((centers.shape[0], 1))
   l_centers = np.zeros_like(centers)
