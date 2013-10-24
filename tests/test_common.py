@@ -9,6 +9,7 @@ import sys
 import time
 import types
 import unittest
+from spartan.dense import distarray
 
 CTX = None
 def get_cluster_ctx():
@@ -75,18 +76,36 @@ def run(filename):
     join_profiles('./_kernel-profiles')
 
 
+class ClusterTest(unittest.TestCase):
+  '''
+  Helper class for running cluster tests.
+  
+  Ensures a cluster instance is available before running any test
+  cases, and resets the TILE_SIZE for distarray between test runs.
+  '''
+  TILE_SIZE = None
+  
+  @classmethod
+  def setUpClass(cls):
+    cls.ctx = get_cluster_ctx()
+    
+  def setUp(self):
+    self.old_tilesize = distarray.TILE_SIZE
+    if self.TILE_SIZE is not None:
+      distarray.TILE_SIZE = self.TILE_SIZE
+  
+  def tearDown(self):
+    distarray.TILE_SIZE = self.old_tilesize
+
+
 def with_ctx(fn):
-  '''
-  Decorator: invoke this test using a cluster instance.
-  :param fn:
-  '''
   def test_fn():
-    ctx = get_cluster_ctx()
-    fn(ctx)
+      ctx = get_cluster_ctx()
+      fn(ctx)
       
   test_fn.__name__ = fn.__name__
   return test_fn
- 
+    
  
 def join_profiles(dir):
   import glob

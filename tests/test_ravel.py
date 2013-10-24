@@ -7,11 +7,11 @@ from spartan.dense import distarray
 from test_common import with_ctx
 
 TEST_SIZE = 100
-distarray.TILE_SIZE = TEST_SIZE
 
-@with_ctx
-def test_ravel(ctx):
-  x = expr.arange((TEST_SIZE, TEST_SIZE))
-  n = np.arange(TEST_SIZE * TEST_SIZE).reshape((TEST_SIZE, TEST_SIZE))
- 
-  Assert.all_eq(n.ravel(), x.ravel().glom())
+class RavelTest(test_common.ClusterTest):
+  TILE_SIZE = 47
+  def test_ravel(self):
+    x = expr.arange((TEST_SIZE, TEST_SIZE))
+    n = np.arange(TEST_SIZE * TEST_SIZE).reshape((TEST_SIZE, TEST_SIZE))
+   
+    Assert.all_eq(n.ravel(), x.ravel().glom())

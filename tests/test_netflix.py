@@ -7,23 +7,17 @@ import numpy as np
 import spartan
 import test_common
 
-
 import pyximport; pyximport.install()
+from test_common import with_ctx
 
-r = 100
-d = 32
-
-# how much to scale up matrix size by.
-NUM_MOVIES = 2649429
-NUM_USERS = 17770
-P_RATING = 1e8 / (NUM_USERS * NUM_MOVIES)
-
-SCALE = 2
-
-U = NUM_USERS * SCALE
-M = NUM_MOVIES * SCALE
-
-def benchmark_netflix_sgd(ctx, timer):
+@with_ctx
+def test_netflix_sgd(ctx):
+  U = 1000
+  M = 1000*1000
+  r = 20
+  d = 8
+  P_RATING = 1000.0 / (U * M)
+  
   V = spartan.ndarray((U, M),
                       tile_hint=(divup(U, d), divup(M, d)))
   
@@ -33,19 +27,18 @@ def benchmark_netflix_sgd(ctx, timer):
 #   V = spartan.map_extents(V, netflix.load_netflix_mapper,
 #                           kw={ 'load_file' : '/big1/netflix.zip' })  
   
-  V = timer.time_op('prep', lambda: spartan.eager(
+  V = spartan.eager(
         spartan.map_extents(V, netflix.fake_netflix_mapper, 
-                          target=V, kw = { 'p_rating' : P_RATING })))
+                          target=V, kw = { 'p_rating' : P_RATING }))
   
   for i in range(2):
-    util.log_info('%d', i)
-    _ = netflix.sgd(V, Mfactor, Ufactor)
-    timer.time_op('netflix', lambda: _.force())
+    _ = netflix.sgd(V, Mfactor, Ufactor).force()
     
-
-@nottest
 def test_sgd_inner():
   N_ENTRIES = 2 * 1000 * 1000
+  U = 10000
+  M = 1000*1000
+  r = 20
   rows = np.random.randint(0, U, N_ENTRIES).astype(np.int64)
   cols = np.random.randint(0, M, N_ENTRIES).astype(np.int64)
   

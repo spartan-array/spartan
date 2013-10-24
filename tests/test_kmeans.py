@@ -1,14 +1,12 @@
-from spartan.dense import distarray
 from spartan.examples import kmeans
-from test_common import with_ctx
+import test_common
+
 
 N_PTS = 10*10
 N_CENTERS = 10
 N_DIM = 5
 
-distarray.TILE_SIZE = 5
-
-
-@with_ctx
-def test_kmeans_expr(ctx):
-  kmeans.run(N_PTS, N_CENTERS, N_DIM)
+class TestKmeans(test_common.ClusterTest):
+  TILE_SIZE = 10
+  def test_kmeans_expr(self):
+    kmeans.run(N_PTS, N_CENTERS, N_DIM)
