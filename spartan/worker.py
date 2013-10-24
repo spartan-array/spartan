@@ -44,7 +44,7 @@ if __name__ == '__main__':
   resource.setrlimit(resource.RLIMIT_AS, (8 * 1000 * 1000 * 1000,
                                           8 * 1000 * 1000 * 1000))
     
-  config.parse_known_args(sys.argv)
+  config.parse_args(sys.argv)
   assert flags.master is not None
   assert flags.port > 0
   assert flags.count > 0

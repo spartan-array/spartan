@@ -1,10 +1,14 @@
-from spartan import util
-from spartan.dense import distarray, extent
-from spartan import expr
-from spartan.util import Assert
 import math
+import sys
+import unittest
+
 import numpy as np
+from spartan import expr, util
+import spartan
+from spartan.dense import distarray, extent
+from spartan.util import Assert
 import test_common
+
 
 TEST_SIZE = 100
 
@@ -63,4 +67,7 @@ class SliceTest(test_common.ClusterTest):
     val = y.glom()
     
     Assert.all_eq(val, nx[:, :, 0].sum())
- 
+
+if __name__ == '__main__':
+  rest = spartan.config.parse_args(sys.argv)
+  unittest.main(argv=rest) 

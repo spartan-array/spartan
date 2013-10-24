@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+
+"""
+Configuration options and flags.
+
+"""
+
 import argparse
 import time
 
@@ -27,9 +33,8 @@ class AssignMode(object):
   BY_NODE = 2
 
 class Flags(object):
-  opt_fold = add_bool_flag('opt_fold', True)
-  opt_numexpr = add_bool_flag('opt_numexpr', False)
-  optimization = add_bool_flag('optimization', default=True)
+  _parsed = False
+  
   profile_kernels = add_bool_flag('profile_kernels', default=False)
   profile_master = add_bool_flag('profile_master', default=False)
   log_level = add_flag('log_level', default=3, type=int)
@@ -48,7 +53,10 @@ class Flags(object):
   assign_mode = AssignMode.BY_NODE
   add_flag('bycore', dest='assign_mode', action='store_const', const=AssignMode.BY_CORE)
   add_flag('bynode', dest='assign_mode', action='store_const', const=AssignMode.BY_NODE)
-    
+  
+  def __getattr__(self, name):
+    assert self.__dict__['_parsed'], 'Flags accessed before parse_args called.'
+    return self.__dict__[name]
   
   def __repr__(self):
     result = []
@@ -62,12 +70,13 @@ class Flags(object):
 
 flags = Flags()
 
-def parse_known_args(argv):
+def parse_args(argv):
   parsed_flags, rest = parser.parse_known_args(argv)
   for flagname in _names:
     setattr(flags, flagname, getattr(parsed_flags, flagname))
  
-  return flags, rest
+  flags._parsed = True
+  return rest
 
 #HOSTS = [ ('localhost', 8) ]
 

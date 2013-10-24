@@ -8,7 +8,7 @@ import subprocess
 import threading
 import time
 
-def start_remote_worker(worker, st, ed):
+def _start_remote_worker(worker, st, ed):
   util.log_info('Starting worker %d:%d on host %s', st, ed, worker)
   if flags.use_threads and worker == 'localhost':
     for i in range(st, ed):
@@ -54,13 +54,23 @@ def start_remote_worker(worker, st, ed):
     
   return p
 
-def start_cluster(num_workers, cluster):
+def start_cluster(num_workers, use_cluster_workers):
+  '''
+  Start a cluster with ``num_workers`` workers.
+  
+  If use_cluster_workers is True, then use the remote workers
+  defined in `spartan.config`.  Otherwise, workers are all
+  spawned on the localhost.
+  
+  :param num_workers:
+  :param use_cluster_workers:
+  '''
   master = spartan.start_master(flags.port_base, num_workers)
   spartan.set_log_level(flags.log_level)
   time.sleep(0.1)
 
-  if not cluster:
-    start_remote_worker('localhost', 0, num_workers)
+  if not use_cluster_workers:
+    _start_remote_worker('localhost', 0, num_workers)
     return master
   
   count = 0
@@ -72,7 +82,7 @@ def start_cluster(num_workers, cluster):
       sz = util.divup(num_workers, num_hosts)
     
     sz = min(sz, num_workers - count)
-    start_remote_worker(worker, count, count + sz)
+    _start_remote_worker(worker, count, count + sz)
     count += sz
     if count == num_workers:
       break

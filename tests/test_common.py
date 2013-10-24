@@ -15,7 +15,7 @@ CTX = None
 def get_cluster_ctx():
   global CTX
   if CTX is None:
-    config.parse_known_args(sys.argv)
+    config.parse_args(sys.argv)
     print flags.cluster
     CTX = start_cluster(flags.num_workers, flags.cluster)
     
@@ -41,7 +41,7 @@ def run_benchmarks(module, benchmarks, master, timer):
   
 def run(filename):
   config.add_flag('worker_list', type=str, default='4,8,16,32,64,80')
-  config.parse_known_args(sys.argv)
+  config.parse_args(sys.argv)
   mod_name, _ = splitext(basename(filename))
   module = imp.load_source(mod_name, filename)
   util.log_info('Running benchmarks for module: %s (%s)', module, filename)
