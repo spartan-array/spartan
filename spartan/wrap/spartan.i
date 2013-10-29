@@ -6,11 +6,15 @@
 
 %{
 #include "spartan/py-support.h"
+#include <vector>
+#include <map>
+  
+using namespace std;
 using namespace spartan;
 
-%} // end helpers
+%}
 
-
+// Catch exceptions and rethrow into Python.
 %exception {
   try {
     $action
@@ -22,8 +26,10 @@ using namespace spartan;
 }
 
 typedef boost::intrusive_ptr<PyObject> RefPtr;
+
 namespace spartan {
 
+// Conversion of RefPtr -> PyObject.
 %typemap(in) RefPtr {
   $1 = RefPtr($input);
 }
@@ -38,6 +44,20 @@ namespace spartan {
   Py_XINCREF($result);
   return $result;
 }
+
+typedef ::std::map<::std::string, ::std::string> ArgMap;
+
+struct ShardId {
+  int table;
+  int shard;
+};
+
+struct WorkItem {
+  ArgMap args;
+  ShardId locality;
+};
+
+typedef ::std::vector<WorkItem> WorkList;
 
 class TableIterator {
 private:
@@ -163,43 +183,16 @@ public:
     return $self->create_table(py_sharder, py_combiner, py_reducer, py_selector);
   }
   
-  void foreach_shard(Table* t, PyObject* fn, PyObject* args) {
-    auto p = new PyKernel();
-    ArgMap kernel_args;
-    ArgMap task_args;
-    kernel_args["map_fn"] = get_pickler().store(fn);
-    kernel_args["map_args"] = get_pickler().store(args);
-    $self->map_shards(t, p, kernel_args);
-  }
-
-  void foreach_worklist(PyObject* worklist, PyObject* fn) {
+  void foreach_shard(Table* t, PyObject* fn, ArgMap args) {
     auto p = new PyKernel();
     p->args()["map_fn"] = get_pickler().store(fn);
-    
-    WorkList w;
-    {
-      GILHelper h;
-      auto iter = to_ref(check(PyObject_GetIter(worklist)));
-      while (1) {
-        auto py_item = to_ref(PyIter_Next(iter.get()));
-        if (py_item.get() == NULL) {
-          break;
-        }
-        
-        PyObject* args = check(PyTuple_GetItem(py_item.get(), 0));
-  
-        int table, shard;
-        PyObject* locality = check(PyTuple_GetItem(py_item.get(), 1));
-        check(PyArg_ParseTuple(locality, "ii", &table, &shard));
-        
-        WorkItem w_item;
-        w_item.args["map_args"] = get_pickler().store(args);
-        w_item.locality = ShardId(table, shard);
-        w.push_back(w_item);
-      }
-    }
-    
-    $self->map_worklist(w, p);
+    $self->map_shards(t, p, args);
+  }
+
+  void foreach_worklist(PyObject* kernel_fn, ArgMap kernel_args, WorkList worklist) {
+    auto p = new PyKernel();
+    p->args()["map_fn"] = get_pickler().store(kernel_fn);
+    return $self->map_worklist(p, kernel_args, worklist);
   }
 } // extend Master
 
@@ -208,6 +201,12 @@ Worker* start_worker(const std::string& master, int port);
 
 } // namespace spartan
 
+
+namespace std {
+  %template() pair<string, string>;
+  %template(ArgMap) map<string, string>;
+  %template(WorkList) vector<::spartan::WorkItem>;
+}
 
 class Pickler {
 public:
@@ -246,5 +245,6 @@ static inline Kernel* cast_to_kernel(long kernel_handle) {
 }
 
 } // namespace spartan
+
 
 %} // inline
