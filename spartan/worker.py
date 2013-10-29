@@ -10,13 +10,63 @@ import os
 import resource
 import socket
 import spartan
-import spartan.wrap
 import sys
 
 try:
   import pyximport; pyximport.install()
 except ImportError:
   pass
+
+
+class Worker(object):
+  def __init__(self):
+    self.id = -1
+    self._initialized = False
+
+  def initialize(self, req, handle):
+    self.id = req.id
+    self._initialized = True
+    handle.done()
+
+  def create_table(self, req, handle):
+    self._tables[req.id] = {}
+
+  def destroy_table(self, req, handle):
+    del self._tables[req.id]
+
+  def get(self, req, handle):
+    return self._tables[req.key]
+  
+  def assign_shards(self, req, handle):
+    for table,shard,owner in req.assignments:
+        self._tables[table].shard[shard].owner = owner
+
+  def run_kernel(self, req, handle):
+    req.kernel(self._tables[table])
+
+  def get_iterator(self, req, handle):
+    resp = IterResp()
+    if req.id is None:
+      table_iter = iter(self._tables[req.table])
+      iter_id = id(table_iter)
+      self._iters[iter_id] = table_iter
+    else:
+      iter_id = req.id
+      table_iter = self._iters[iter_id] 
+    
+    resp.data = take_next(table_iter)
+    resp.id = iter_id
+    handle.done(resp)
+
+  def put(self, req, handle):
+    for table, shard, k, v in req.data:
+      self._tables[table].shard[shard].update(k, v)
+
+  def flush(self):
+    pass
+
+  def shutdown(self):
+    pass
 
 
 def _dump_kernel_prof(worker_id):
