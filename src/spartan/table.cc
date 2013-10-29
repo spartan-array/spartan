@@ -66,6 +66,14 @@ int Table::flush() {
   return count;
 }
 
+RefPtr Table::get(int shard, const RefPtr& k) {
+  RefPtr out;
+  if (!_get(shard, k, &out)) {
+    throw new PyException("Missing key");
+  }
+  return out;
+}
+
 bool Table::get_remote(int shard, const RefPtr& k, RefPtr* v) {
   Timer t;
 
@@ -99,6 +107,7 @@ bool Table::_get(int shard, const RefPtr& k, RefPtr* v) {
   if (shard == -1) {
     shard = this->shard_for_key(k);
   }
+
   while (tainted(shard)) {
     sched_yield();
   }
@@ -108,7 +117,6 @@ bool Table::_get(int shard, const RefPtr& k, RefPtr* v) {
     Shard& s = (Shard&) (*shards_[shard]);
     typename Shard::iterator i = s.find(k);
     if (i == s.end()) {
-      throw new PyException("Missing key");
       return false;
     }
 

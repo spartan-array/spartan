@@ -431,56 +431,50 @@ void Master::destroy_table(int table_id) {
   tables_.erase(tables_.find(table_id));
 }
 
-void Master::map_worklist(WorkList worklist, Kernel* k) {
-  Log_fatal("Not implemented...");
-  wait_for_workers();
-  flush();
-
+void Master::clear_tasks() {
   for (auto w : workers_) {
     w->clear_tasks();
   }
+}
 
-  for (auto i : worklist) {
-    auto t = tables_[i.locality.table];
-    int worker = t->shard_info(i.locality.shard)->owner;
-    workers_[worker]->assign_task(i.locality, i.args);
+void Master::map_worklist(Kernel *k, ArgMap kernel_args, WorkList worklist) {
+  wait_for_workers();
+  flush();
+  clear_tasks();
+
+  RunState st;
+  st.kernel = k;
+  st.kernel_args = kernel_args;
+  int kernel_id = k->type_id();
+
+  TypeRegistry<Kernel>::check_valid(kernel_id);
+
+  Log_debug("Assigning worklist with %d items", worklist.size());
+  for (auto v : worklist) {
+    int worker = tables_[v.locality.table]->shard_info(v.locality.shard)->owner;
+    workers_[worker]->assign_task(ShardId(v.locality.table, v.locality.shard), v.args);
   }
 
-  //wait_for_completion();
+  wait_for_completion(st);
+  clear_tasks();
 }
 
 void Master::map_shards(Table* table, Kernel* k, ArgMap kernel_args) {
   CHECK(tables_.find(table->id()) != tables_.end());
 
-  RunState st;
-  st.kernel = k;
-  st.kernel_args = kernel_args;
-
-  wait_for_workers();
-  flush();
-
-  int kernel_id = k->type_id();
-
-  Kernel::ScopedPtr test_k(TypeRegistry<Kernel>::get_by_id(kernel_id));
-  CHECK_NE(test_k.get(), (void*)NULL);
-
-  Log_debug("Running: kernel %d against table %d", kernel_id, table->id());
-
+  // Make a worklist for running over each shard.
   auto shards = range(0, table->num_shards());
-  for (auto w : workers_) {
-    w->clear_tasks();
+
+  WorkList wl;
+  for (int i = 0; i < table->num_shards(); ++i) {
+    WorkItem wi;
+    wi.args["table"] = StringPrintf("%d", table->id());
+    wi.args["shard"] = StringPrintf("%d", i);
+    wi.locality = { table->id(), i };
+    wl.push_back(wi);
   }
 
-  Log_debug("Assigning workers for %d shards.", shards.size());
-  for (auto i : shards) {
-    int worker = table->shard_info(i)->owner;
-    ArgMap task_args;
-    task_args["shard"] = StringPrintf("%d", i);
-    task_args["table"] = StringPrintf("%d", table->id());
-    workers_[worker]->assign_task(ShardId(table->id(), i), task_args);
-  }
-
-  wait_for_completion(st);
+  map_worklist(k, kernel_args, wl);
 }
 
 void Master::wait_for_completion(RunState& r) {

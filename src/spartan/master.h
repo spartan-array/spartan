@@ -66,6 +66,7 @@ struct WorkItem {
 };
 
 typedef std::vector<WorkItem> WorkList;
+
 typedef std::multimap<ShardId, TaskState> TaskMap;
 typedef std::set<ShardId> ShardSet;
 Master* start_master(int port, int num_workers);
@@ -108,8 +109,15 @@ public:
   Table* create_table(Sharder* sharder = NULL, Accumulator* combiner = NULL,
       Accumulator* reducer = NULL, Selector* selector = NULL);
 
-  void map_shards(Table* t, Kernel* k, ArgMap kernel_args);
-  void map_worklist(WorkList worklist, Kernel* k);
+  void map_shards(
+      Table* t,
+      Kernel* k,
+      ArgMap kernel_args);
+
+  void map_worklist(
+      Kernel* k,
+      ArgMap kernel_args,
+      WorkList worklist);
 
   Table* get_table(int id) const {
     return tables_.find(id)->second;
@@ -126,6 +134,9 @@ private:
   // already serves the given shard, return it.  Otherwise, find an eligible
   // worker and assign it to them.
   WorkerState* assign_shard(int table, int shard);
+
+
+  void clear_tasks();
 
   void send_table_assignments();
   void assign_shards(Table *t);

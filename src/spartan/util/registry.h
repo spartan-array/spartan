@@ -79,6 +79,10 @@ public:
     return NULL;
   }
 
+  static void check_valid(int id) {
+    CHECK(get_map()[id] != NULL);
+  }
+
   static T* get_by_id(int id) {
     if (id == -1) {
       return NULL;

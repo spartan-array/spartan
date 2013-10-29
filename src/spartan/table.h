@@ -335,11 +335,7 @@ public:
 
   bool _get(int shard, const RefPtr& k, RefPtr* v);
 
-  RefPtr get(int shard, const RefPtr& k) {
-    RefPtr out;
-    _get(shard, k, &out);
-    return out;
-  }
+  RefPtr get(int shard, const RefPtr& k);
 
   bool contains(int shard, const RefPtr& k) {
     return _get(shard, k, NULL);
