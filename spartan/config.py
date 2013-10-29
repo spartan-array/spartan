@@ -3,10 +3,14 @@
 """
 Configuration options and flags.
 
+Options may be specified on the command line, or via a configuration
+file.  Configuration files should be placed in $HOME/.config/spartanrc.
+
 """
 
 import argparse
 import time
+import os
 
 parser = argparse.ArgumentParser()
 _names = set() 
@@ -27,6 +31,7 @@ def add_bool_flag(name, default, **kw):
   parser.add_argument('--disable_' + name, action='store_false', dest=name)
   
   return default
+  
 
 class AssignMode(object):
   BY_CORE = 1
@@ -41,6 +46,8 @@ class Flags(object):
   num_workers = add_flag('num_workers', default=1, type=int)
   cluster = add_bool_flag('cluster', default=False)
   oprofile = add_bool_flag('oprofile', default=False)
+  
+  config_file = add_flag('config_file', default=None, type=str)
   
   port_base = add_flag('port_base', type=int, default=10000,
     help='Port to listen on (master = port_base, workers=port_base + N)')
@@ -76,21 +83,17 @@ def parse_args(argv):
     setattr(flags, flagname, getattr(parsed_flags, flagname))
  
   flags._parsed = True
+  
+  if flags.config_file is None:
+    import appdirs
+    flags.config_file = appdirs.user_data_dir('Spartan', 'rjpower.org') + '/spartanrc'
+    
+  if not os.path.exists(flags.config_file):
+    os.makedirs(os.path.dirname(flags.config_file), mode=0755)
+    open(flags.config_file, 'a').close()
+  
+  execfile(flags.config_file)
+    
   return rest
 
-#HOSTS = [ ('localhost', 8) ]
-
-HOSTS = [
-  ('beaker-20', 8),
-  #('beaker-21', 8),
-  ('beaker-22', 8),
-  ('beaker-23', 8),
-  ('beaker-24', 8),
-  ('beaker-25', 8),
-  ('beaker-14', 7),
-  ('beaker-15', 7),
-  ('beaker-16', 8),
-  ('beaker-17', 7),
-  ('beaker-18', 4),
-  ('beaker-19', 7),
-]
+HOSTS = [ ('localhost', 8) ]
