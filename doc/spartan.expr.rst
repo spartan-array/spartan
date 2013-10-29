@@ -9,6 +9,14 @@ expr Package
     :undoc-members:
     :show-inheritance:
 
+:mod:`builtins` Module
+---------------------
+
+.. automodule:: spartan.expr.builtins
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 :mod:`backend` Module
 ---------------------
 
