@@ -9,10 +9,10 @@ def map_extents(v, fn, reduce_fn=None, tile_hint=None, target=None, kw=None):
   '''
   Evaluate ``fn`` over each extent of the input.
   
-  ``fn`` should take arguments: (v, extent, **kw)
+  ``fn`` should take arguments: ``(v, extent, **kw)``
   
   :param v: `Expr` to map over.
-  :param fn: Callable with form (v, extent, **kw)
+  :param fn: Callable with form ``(v, extent, **kw)``
   '''
   if kw is None: kw = {}
   

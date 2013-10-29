@@ -2,9 +2,9 @@ import math
 import sys
 import unittest
 
+import spartan
 import numpy as np
 from spartan import expr, util
-import spartan
 from spartan.dense import distarray, extent
 from spartan.util import Assert
 import test_common

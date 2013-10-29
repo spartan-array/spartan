@@ -8,7 +8,7 @@ import numpy as np
 from spartan.config import flags, Flags, add_bool_flag, add_flag
 from spartan.dense import extent
 from spartan.expr.reduce_extents import ReduceExtents
-from spartan.util import Assert
+from spartan.util import Assert, iterable
 
 from .. import util
 from .base import Expr, LazyVal, LazyList
@@ -16,12 +16,53 @@ from .map_extents import MapExtentsExpr
 from .map_tiles import MapTilesExpr
 from .ndarray import NdArrayExpr
 from spartan.dense.distarray import broadcast
+import treelike
 
 
 try:
   import numexpr
 except:
   numexpr = None
+  
+# Local versions of expression graph operations.
+# These are used to build up fusion operations.
+
+class LocalOp(Expr):
+  _cached_value = None
+  def evaluate(self, ctx):
+    deps = {}
+    for k, v in self.dependencies():
+      if not iterable(v): deps[k] = v.evaluate()
+      else: deps[k] = [sv.evaluate() for sv in v]
+    
+    self._cached_value = self._evaluate(ctx, deps)
+    return self._cached_value
+      
+
+class LVal(LocalOp):
+  '''
+  A local value (a constant, or an input argument).
+  '''
+  _members = ['source', 'id']
+  
+  def dependencies(self): return {}
+   
+  def _evaluate(self, ctx, deps):
+    return ctx[self.source][self.id]
+
+
+class LMap(LocalOp):
+  _members = ['fn', 'inputs', 'kw']
+  
+  def _evaluate(self, ctx, deps):
+    return deps['fn'](deps['inputs'], **deps['kw'])
+    
+class LReduce(LocalOp):
+  _members = ['fn', 'inputs', 'kw']
+  
+  def _evaluate(self, ctx, deps):
+    return deps['fn'](deps['inputs'], ctx['extent'], **deps['kw'])
+
 
 class OptimizePass(object):
   def __init__(self):
@@ -44,7 +85,20 @@ class OptimizePass(object):
       self.visited[op] = op.visit(self)
       
     return self.visited[op]
+
+
+def _dag_eval(inputs, dag, kw_inputs):
+  '''
+  Function for evaluated folded operations.
   
+  Takes 
+  :param inputs:
+  :param dag:
+  '''
+  ctx = { 'kw' : kw_inputs,
+          'inputs' : inputs }
+  return dag.evaluate(ctx, {})
+    
 
 def _fold_mapper(inputs, fns=None, map_fn=None, map_kw=None):
   '''Helper mapper function for folding.
@@ -74,6 +128,7 @@ def _take_first(lst):
 
 def map_like(v):
   return isinstance(v, (MapTilesExpr, MapExtentsExpr, NdArrayExpr, LazyVal))
+
 
 class MapMapFusion(OptimizePass):
   '''Fold sequences of Map operations together.

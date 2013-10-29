@@ -13,11 +13,10 @@ def map_tiles(inputs, fn, **kw):
   '''
   Evaluate ``fn`` over each tile of the input.
   
-  ``fn`` should be of the form ([inputs], **kw).
-  :param v:
-  :param fn:
+  ``fn`` should be of the form ``([inputs], **kw)``.
+  :param v: `Expr`
+  :param fn: callable taking arguments ``(inputs, **kw)``
   '''
-  
   if not util.iterable(inputs):
     inputs = [inputs]
 
@@ -40,7 +39,7 @@ def tile_mapper(ex, _, children, map_fn, fn_kw):
     
 
 class MapTilesExpr(Expr):
-  _members = ['children', 'map_fn', 'fn_kw']
+  _members = ['children', 'map_fn', 'fn_kw', 'local_dag']
   
   def compute_shape(self):
     '''MapTiles retains the shape of inputs.

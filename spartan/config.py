@@ -78,6 +78,13 @@ class Flags(object):
 flags = Flags()
 
 def parse_args(argv):
+  # force configuration settings to load.
+  import spartan.expr
+  import spartan.expr.optimize
+  
+  
+  from spartan import wrap
+  
   parsed_flags, rest = parser.parse_known_args(argv)
   for flagname in _names:
     setattr(flags, flagname, getattr(parsed_flags, flagname))
@@ -93,7 +100,8 @@ def parse_args(argv):
     open(flags.config_file, 'a').close()
   
   execfile(flags.config_file)
-    
+  
+  wrap.set_log_level(flags.log_level)
   return rest
 
 HOSTS = [ ('localhost', 8) ]

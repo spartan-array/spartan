@@ -68,7 +68,7 @@ def fake_netflix_mapper(inputs, ex, p_rating=None):
   
   uids = np.random.randint(0, ex.shape[0], n_ratings)
   mids = np.random.randint(0, ex.shape[1], n_ratings)
-  ratings = np.random.randint(0, 5, n_ratings).astype(np.float)
+  ratings = np.random.randint(0, 5, n_ratings).astype(np.float32)
 
   data = scipy.sparse.coo_matrix((ratings, (uids, mids)), shape=ex.shape)
   yield ex, data

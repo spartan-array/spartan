@@ -8,12 +8,12 @@ cdef float EPSILON = 1e-6
 @cython.boundscheck(False)
 cpdef _sgd_inner(np.ndarray[np.int64_t, ndim=1] rows, 
                 np.ndarray[np.int64_t, ndim=1] cols,
-                np.ndarray[np.float64_t, ndim=1] vals,
-                np.ndarray[np.float64_t, ndim=2] u,
-                np.ndarray[np.float64_t, ndim=2] m):
+                np.ndarray[np.float32_t, ndim=1] vals,
+                np.ndarray[np.float32_t, ndim=2] u,
+                np.ndarray[np.float32_t, ndim=2] m):
    
   cdef unsigned int i, offset, mid, u_idx, m_idx
-  cdef np.float64_t guess, diff, rating
+  cdef np.float32_t guess, diff, rating
   cdef unsigned int rank = m.shape[1]
    
   for i in range(rows.shape[0]):

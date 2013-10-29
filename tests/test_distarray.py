@@ -1,11 +1,10 @@
 import numpy as np
-import spartan
-
 from spartan import ModSharder, replace_accum, util, sum_accum
+import spartan
 from spartan.dense import distarray, extent
 from spartan.dense.distarray import DistArray
 from spartan.util import Assert
-from spartan.wrap import get_master, mapper_kernel
+from spartan.wrap import get_master, _mapper_kernel
 import test_common
 
 
@@ -20,7 +19,7 @@ def map_inplace(table, fn, kw):
   src = table
   dst = src
   master = get_master()
-  master.foreach_shard(table, mapper_kernel, 
+  master.foreach_shard(table, _mapper_kernel, 
                        (src.id(), dst.id(), fn, kw))
   return dst
 

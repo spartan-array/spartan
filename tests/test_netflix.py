@@ -19,10 +19,11 @@ def test_netflix_sgd(ctx):
   P_RATING = 1000.0 / (U * M)
   
   V = spartan.ndarray((U, M),
-                      tile_hint=(divup(U, d), divup(M, d)))
+                      tile_hint=(divup(U, d), divup(M, d)),
+                      dtype=np.float32)
   
-  Mfactor = spartan.eager(spartan.rand(M, r))
-  Ufactor = spartan.eager(spartan.rand(U, r))
+  Mfactor = spartan.eager(spartan.rand(M, r).astype(np.float32))
+  Ufactor = spartan.eager(spartan.rand(U, r).astype(np.float32))
   
 #   V = spartan.map_extents(V, netflix.load_netflix_mapper,
 #                           kw={ 'load_file' : '/big1/netflix.zip' })  
@@ -42,9 +43,9 @@ def test_sgd_inner():
   rows = np.random.randint(0, U, N_ENTRIES).astype(np.int64)
   cols = np.random.randint(0, M, N_ENTRIES).astype(np.int64)
   
-  vals = np.random.randint(0, 5, N_ENTRIES).astype(np.float)
-  u = np.random.randn(U, r)
-  m = np.random.randn(M, r)
+  vals = np.random.randint(0, 5, N_ENTRIES).astype(np.float32)
+  u = np.random.randn(U, r).astype(np.float32)
+  m = np.random.randn(M, r).astype(np.float32)
   
   for i in range(5):
     util.timeit(lambda: netflix._sgd_inner(rows, cols, vals, u, m), 'sgd')
