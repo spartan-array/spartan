@@ -25,11 +25,11 @@ def test_netflix_sgd(ctx):
   Mfactor = spartan.eager(spartan.rand(M, r).astype(np.float32))
   Ufactor = spartan.eager(spartan.rand(U, r).astype(np.float32))
   
-#   V = spartan.map_extents(V, netflix.load_netflix_mapper,
+#   V = spartan.shuffle(V, netflix.load_netflix_mapper,
 #                           kw={ 'load_file' : '/big1/netflix.zip' })  
   
   V = spartan.eager(
-        spartan.map_extents(V, netflix.fake_netflix_mapper, 
+        spartan.shuffle(V, netflix.fake_netflix_mapper, 
                           target=V, kw = { 'p_rating' : P_RATING }))
   
   for i in range(2):

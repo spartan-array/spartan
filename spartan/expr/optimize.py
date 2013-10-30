@@ -7,13 +7,13 @@ Optimizations over an expression graph.
 import numpy as np
 from spartan.config import flags, Flags, add_bool_flag, add_flag
 from spartan.dense import extent
-from spartan.expr.reduce_extents import ReduceExtents
+from spartan.expr.reduce import ReduceExpr
 from spartan.util import Assert, iterable
 
 from .. import util
 from .base import Expr, LazyVal, LazyList
-from .map_extents import MapExtentsExpr
-from .map_tiles import MapTilesExpr
+from .shuffle import ShuffleExpr
+from .map import MapExpr
 from .ndarray import NdArrayExpr
 from spartan.dense.distarray import broadcast
 import treelike
@@ -127,7 +127,7 @@ def _take_first(lst):
   return lst[0]
 
 def map_like(v):
-  return isinstance(v, (MapTilesExpr, MapExtentsExpr, NdArrayExpr, LazyVal))
+  return isinstance(v, (MapExpr, ShuffleExpr, NdArrayExpr, LazyVal))
 
 
 class MapMapFusion(OptimizePass):
@@ -138,7 +138,7 @@ class MapMapFusion(OptimizePass):
   
   name = 'map_fusion'
    
-  def visit_MapTilesExpr(self, op):
+  def visit_MapExpr(self, op):
     #util.log_info('Map tiles: %s', op.children)
     Assert.iterable(op.children)
     map_children = self.visit(op.children)
@@ -153,7 +153,7 @@ class MapMapFusion(OptimizePass):
     for v in map_children:
       op_st = len(children)
       
-      if isinstance(v, MapTilesExpr):
+      if isinstance(v, MapExpr):
         op_in = self.visit(v.children)
         children.extend(op_in)
         map_fn = v.map_fn
@@ -174,7 +174,7 @@ class MapMapFusion(OptimizePass):
     # util.log_info('Map function: %s, kw: %s', map_fn, map_kw)
     
     # util.log_info('Created fold mapper with %d children', len(children))
-    return MapTilesExpr(children=LazyList(vals=children),
+    return MapExpr(children=LazyList(vals=children),
                         map_fn=_fold_mapper,
                         fn_kw={ 'fns' : fns,
                                 'map_fn' : map_fn,
@@ -191,13 +191,13 @@ def _folded_reduce(ex, tile, axis,
 class ReduceMapFusion(OptimizePass):
   name = 'reduce_fusion'
   
-  def visit_ReduceExtents(self, op):
+  def visit_ReduceExpr(self, op):
     array = self.visit(op.array)
     
-    if isinstance(array, MapTilesExpr):
+    if isinstance(array, MapExpr):
       children = array.children
       Assert.isinstance(children, LazyList)
-      return ReduceExtents(array=children[0],
+      return ReduceExpr(array=children[0],
                            axis=op.axis,
                            dtype_fn=op.dtype_fn,
                            reduce_fn=_folded_reduce,
@@ -231,7 +231,7 @@ class NumexprFusionPass(OptimizePass):
   '''Fold binary operations compatible with numexpr into a single numexpr operator.'''
   name = 'numexpr_fusion'
   
-  def visit_MapTilesExpr(self, op):
+  def visit_MapExpr(self, op):
     map_children = [self.visit(v) for v in op.children]
     all_maps = np.all([map_like(v) for v in map_children])
    
@@ -250,7 +250,7 @@ class NumexprFusionPass(OptimizePass):
     
     def _add_expr(child):
       # fold expression from the a mapper into this one.
-      if isinstance(child, MapTilesExpr) and child.map_fn == _numexpr_mapper:
+      if isinstance(child, MapExpr) and child.map_fn == _numexpr_mapper:
         for k, v in child.fn_kw['var_map'].iteritems():
           var_map[k] = len(inputs)
           inputs.append(child.children[v])
@@ -267,7 +267,7 @@ class NumexprFusionPass(OptimizePass):
     
     expr = ' '.join(expr)
     
-    return MapTilesExpr(children=inputs,
+    return MapExpr(children=inputs,
                         map_fn=_numexpr_mapper,
                         fn_kw={ 'numpy_expr' : expr, 'var_map' : var_map, })
 

@@ -2,7 +2,7 @@
 
 """Message definitions for RPC services."""
 
-from sparrow import core
+from spartan import core
 import cPickle
 import numpy as N
 

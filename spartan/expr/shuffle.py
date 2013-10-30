@@ -5,7 +5,7 @@ from spartan.util import Assert, iterable
 from .base import Expr, NotShapeable, lazify
 
 
-def map_extents(v, fn, reduce_fn=None, tile_hint=None, target=None, kw=None):
+def shuffle(v, fn, reduce_fn=None, tile_hint=None, target=None, kw=None):
   '''
   Evaluate ``fn`` over each extent of the input.
   
@@ -22,7 +22,7 @@ def map_extents(v, fn, reduce_fn=None, tile_hint=None, target=None, kw=None):
   
   assert not iterable(v)
   
-  return MapExtentsExpr(array=v,
+  return ShuffleExpr(array=v,
                         map_fn=fn, 
                         reduce_fn=reduce_fn,
                         tile_hint=tile_hint,
@@ -44,7 +44,7 @@ def _notarget_mapper(ex, _, map_fn=None, inputs=None, fn_kw=None):
     for ex, v in result:
       yield (ex, tile.from_data(v))
 
-class MapExtentsExpr(Expr):
+class ShuffleExpr(Expr):
   _members = ['array', 'map_fn', 'reduce_fn', 'target', 'tile_hint', 'fn_kw']
 
     

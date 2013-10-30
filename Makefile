@@ -1,8 +1,12 @@
+# N.B.  This Makefile just duplicates the behavior of setup.py build_ext,
+# but can be run in parallel (-j) and makes it easy to change flags
+# (-O0 etc).  Use setup.py for normal use.
+
 SRCDIR := src/
 OBJDIR := build/temp.linux-x86_64-2.7/
 
 CPPFLAGS := -I${SRCDIR} -I${SRCDIR}/simple-rpc -I/usr/include/python2.7
-CXXFLAGS := ${CPPFLAGS} -pthread -fno-strict-aliasing -DNDEBUG -g -fwrapv -O0 -Wall -fPIC -ggdb2 -std=c++0x
+CXXFLAGS := ${CPPFLAGS} -pthread -fno-strict-aliasing -DNDEBUG -g -fwrapv -O2 -Wall -fPIC -ggdb2 -std=c++0x
 CXX ?= g++ 
 
 SOURCES := $(shell find ${SRCDIR} -name '*.cc') spartan/wrap/spartan_wrap.cc
@@ -27,7 +31,6 @@ doc:
 
 clean:
 	rm -rf build
-	rm -rf build-opt
 
 .PHONY: all doc clean
 

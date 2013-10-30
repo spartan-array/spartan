@@ -120,7 +120,7 @@ def _evaluate_netflix(ctx, V, M, U):
     #for ex in stratum: print ex
     
     worklist = set(stratum)
-    expr.map_extents(V, sgd_netflix_mapper, 
+    expr.shuffle(V, sgd_netflix_mapper, 
                      target=None,
                      kw={'V' : lazify(V), 'M' : lazify(M), 'U' : lazify(U),
                          'worklist' : worklist }).force()

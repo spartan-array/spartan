@@ -23,10 +23,10 @@ def benchmark_netflix_sgd(ctx, timer):
                       tile_hint=(divup(U, d), divup(M, d)))
 
   V = timer.time_op('prep', lambda: spartan.eager(
-        spartan.map_extents(V, netflix.fake_netflix_mapper, 
+        spartan.shuffle(V, netflix.fake_netflix_mapper, 
                           target=V, kw = { 'p_rating' : P_RATING })))
  
-#   V = spartan.map_extents(V, netflix.load_netflix_mapper,
+#   V = spartan.shuffle(V, netflix.load_netflix_mapper,
 #                           kw={ 'load_file' : '/big1/netflix.zip' })  
 
   for r in [25,50,100,200,400]:

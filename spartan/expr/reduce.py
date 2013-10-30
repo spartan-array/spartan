@@ -10,7 +10,7 @@ def _reduce_mapper(ex, tile, reducer, axis, output, fn_kw):
   #util.log_info('Update: %s %s', dst_extent, reduced)
   output.update(dst_extent, reduced)
 
-class ReduceExtents(Expr):
+class ReduceExpr(Expr):
   _members = ['array', 'axis', 'dtype_fn', 'reduce_fn', 'combine_fn', 'fn_kw']
   
   def evaluate(self, ctx, deps):
@@ -39,7 +39,7 @@ class ReduceExtents(Expr):
     return output_array
 
  
-def reduce_extents(v, axis, dtype_fn, local_reduce_fn, combine_fn):
+def reduce(v, axis, dtype_fn, local_reduce_fn, combine_fn):
   '''
   Reduce ``v`` over axis ``axis``.
   
@@ -54,7 +54,7 @@ def reduce_extents(v, axis, dtype_fn, local_reduce_fn, combine_fn):
   :param local_reduce_fn: Callable: fn(extent, data, axis)
   :param combine_fn: Callable: fn(old_v, update_v) -> new_v 
   '''
-  return ReduceExtents(array=v, axis=axis, 
+  return ReduceExpr(array=v, axis=axis, 
                        dtype_fn=dtype_fn, 
                        reduce_fn=local_reduce_fn, 
                        combine_fn=combine_fn,

@@ -1,3 +1,6 @@
+'''
+Indexing operations (slicing and filtering).
+'''
 from .base import Expr, LazyList
 from spartan import util
 from spartan.dense import extent, tile, distarray

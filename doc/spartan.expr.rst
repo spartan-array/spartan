@@ -9,14 +9,6 @@ expr Package
     :undoc-members:
     :show-inheritance:
 
-:mod:`builtins` Module
----------------------
-
-.. automodule:: spartan.expr.builtins
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 :mod:`backend` Module
 ---------------------
 
@@ -33,6 +25,14 @@ expr Package
     :undoc-members:
     :show-inheritance:
 
+:mod:`builtins` Module
+----------------------
+
+.. automodule:: spartan.expr.builtins
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 :mod:`index` Module
 -------------------
 
@@ -41,18 +41,18 @@ expr Package
     :undoc-members:
     :show-inheritance:
 
-:mod:`map_extents` Module
--------------------------
+:mod:`loop` Module
+------------------
 
-.. automodule:: spartan.expr.map_extents
+.. automodule:: spartan.expr.loop
     :members:
     :undoc-members:
     :show-inheritance:
 
-:mod:`map_tiles` Module
------------------------
+:mod:`map` Module
+-----------------
 
-.. automodule:: spartan.expr.map_tiles
+.. automodule:: spartan.expr.map
     :members:
     :undoc-members:
     :show-inheritance:
@@ -89,10 +89,18 @@ expr Package
     :undoc-members:
     :show-inheritance:
 
-:mod:`reduce_extents` Module
-----------------------------
+:mod:`reduce` Module
+--------------------
 
-.. automodule:: spartan.expr.reduce_extents
+.. automodule:: spartan.expr.reduce
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+:mod:`shuffle` Module
+---------------------
+
+.. automodule:: spartan.expr.shuffle
     :members:
     :undoc-members:
     :show-inheritance:

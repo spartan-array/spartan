@@ -28,31 +28,31 @@ class SliceTest(test_common.ClusterTest):
     nx = np.arange(TEST_SIZE*TEST_SIZE).reshape(TEST_SIZE, TEST_SIZE)
     Assert.all_eq(val.glom(), nx[5:8, 5:8])
   
-  def test_slice_map_tiles(self):
+  def test_slice_map(self):
     x = expr.arange((TEST_SIZE, TEST_SIZE))
     z = x[5:8, 5:8]
-    z = expr.map_tiles(z, add_one_tile) 
+    z = expr.map(z, add_one_tile) 
     val = expr.force(z)
     nx = np.arange(TEST_SIZE*TEST_SIZE).reshape(TEST_SIZE, TEST_SIZE)
     
     Assert.all_eq(val.glom(), nx[5:8, 5:8] + 1)
   
   
-  def test_slice_map_extents(self):
+  def test_slice_shuffle(self):
     x = expr.arange((TEST_SIZE, TEST_SIZE))
     z = x[5:8, 5:8]
-    z = expr.map_extents(z, add_one_extent) 
+    z = expr.shuffle(z, add_one_extent) 
     val = z.force()
     nx = np.arange(TEST_SIZE*TEST_SIZE).reshape(TEST_SIZE, TEST_SIZE)
     
     Assert.all_eq(val.glom(), nx[5:8, 5:8] + 1)
     
-  def test_slice_map_tiles2(self):
+  def test_slice_map2(self):
     x = expr.arange((10, 10, 10), dtype=np.int)
     nx = np.arange(10 * 10 * 10, dtype=np.int).reshape((10, 10, 10))
     
     y = x[:, :, 0]
-    z = expr.map_tiles(y, lambda tiles: tiles[0] + 13)
+    z = expr.map(y, lambda tiles: tiles[0] + 13)
     val = z.glom()
    
     Assert.all_eq(val.reshape(10, 10), nx[:, :, 0] + 13)

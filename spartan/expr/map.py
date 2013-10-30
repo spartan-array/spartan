@@ -9,7 +9,7 @@ from spartan.util import Assert
 from .base import Expr, lazify, LazyList
 
 
-def map_tiles(inputs, fn, **kw):
+def map(inputs, fn, **kw):
   '''
   Evaluate ``fn`` over each tile of the input.
   
@@ -23,7 +23,7 @@ def map_tiles(inputs, fn, **kw):
   inputs = lazify(inputs)
   kw = lazify(kw)
   
-  return MapTilesExpr(children=inputs, map_fn=fn, fn_kw=kw)
+  return MapExpr(children=inputs, map_fn=fn, fn_kw=kw)
 
 
 def tile_mapper(ex, _, children, map_fn, fn_kw):
@@ -38,7 +38,7 @@ def tile_mapper(ex, _, children, map_fn, fn_kw):
   return [(ex, tile.from_data(result))]
     
 
-class MapTilesExpr(Expr):
+class MapExpr(Expr):
   _members = ['children', 'map_fn', 'fn_kw', 'local_dag']
   
   def compute_shape(self):

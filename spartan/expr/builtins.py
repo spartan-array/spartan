@@ -12,37 +12,33 @@ import numpy as np
 from ..dense import extent
 from ..dense.extent import index_for_reduction, shapes_match
 from .base import force
-from .map_extents import map_extents
-from .map_tiles import map_tiles
+from .shuffle import shuffle
+from .map import map
 from .ndarray import ndarray
-from .reduce_extents import reduce_extents
+from .reduce import reduce
 from ..util import Assert
-
-
-def map(v, fn, axis=None, **kw):
-  return map_tiles(v, fn, **kw)
 
 def rand(*shape, **kw):
   '''
   :param tile_hint: A tuple indicating the desired tile shape for this array.
   '''
-  return map_tiles(ndarray(shape, 
+  return map(ndarray(shape, 
                            dtype=np.float, 
                            tile_hint=kw.get('tile_hint', None)), 
                      fn = lambda inputs: np.random.rand(*inputs[0].shape))
   
 def randn(*shape, **kw):
-  return map_tiles(ndarray(shape, 
+  return map(ndarray(shape, 
                            dtype=np.float, 
                            tile_hint=kw.get('tile_hint', None)), 
                      fn = lambda inputs: np.random.randn(*inputs[0].shape))
 
 def zeros(shape, dtype=np.float, tile_hint=None):
-  return map_tiles(ndarray(shape, dtype=np.float, tile_hint=tile_hint), 
+  return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), 
                      fn = lambda inputs: np.zeros(inputs[0].shape))
 
 def ones(shape, dtype=np.float, tile_hint=None):
-  return map_tiles(ndarray(shape, dtype=np.float, tile_hint=tile_hint), 
+  return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), 
                    fn = lambda inputs: np.ones(inputs[0].shape, dtype))
 
 def _arange_mapper(inputs, ex, dtype=None):
@@ -53,7 +49,7 @@ def _arange_mapper(inputs, ex, dtype=None):
 
 
 def arange(shape, dtype=np.float):
-  return map_extents(ndarray(shape, dtype=dtype), 
+  return shuffle(ndarray(shape, dtype=dtype), 
                      fn = _arange_mapper, 
                      kw = {'dtype' : dtype })
 
@@ -68,7 +64,7 @@ def sum(x, axis=None):
   :param x: The array to sum.
   :param axis: Either an integer or ``None``.
   '''
-  return reduce_extents(x, axis=axis,
+  return reduce(x, axis=axis,
                        dtype_fn = lambda input: input.dtype,
                        local_reduce_fn = _sum_local,
                        combine_fn = lambda a, b: a + b)
@@ -139,12 +135,12 @@ def argmin(x, axis=None):
   :param x: `Expr` to compute a minimum over. 
   :param axis: Axis (integer or None).
   '''
-  compute_min = reduce_extents(x, axis,
+  compute_min = reduce(x, axis,
                                dtype_fn = _argmin_dtype,
                                local_reduce_fn = _argmin_local,
                                combine_fn = _argmin_reducer)
   
-  take_indices = map_tiles(compute_min, _take_idx_mapper)
+  take_indices = map(compute_min, _take_idx_mapper)
   return take_indices
   
 
@@ -170,7 +166,7 @@ def astype(x, dtype):
   :param dtype:
   '''
   assert x is not None
-  return map_tiles(x, lambda inputs: inputs[0].astype(dtype))
+  return map(x, lambda inputs: inputs[0].astype(dtype))
 
 def _ravel_mapper(array, ex):
   ul = extent.ravelled_pos(ex.ul, ex.array_shape)
@@ -188,7 +184,7 @@ def ravel(v):
   See `numpy.ndarray.ravel`.
   :param v:
   '''
-  return map_extents(v, _ravel_mapper)
+  return shuffle(v, _ravel_mapper)
 
 def _reshape_mapper(array, ex, _dest_shape):
   tile = array.fetch(ex)
@@ -221,7 +217,7 @@ def reshape(array, new_shape, tile_hint=None):
   
   Assert.eq(old_size, new_size, 'Size mismatch')
   
-  return map_extents(array, 
+  return shuffle(array, 
                      _reshape_mapper, 
                      tile_hint=tile_hint,
                      kw = { '_dest_shape' : new_shape})
@@ -269,7 +265,7 @@ def dot(a, b):
   bv = force(b)
   
   if isinstance(bv, np.ndarray):
-    return map_extents(av, _dot_numpy, kw = { 'numpy_data' : bv })
+    return shuffle(av, _dot_numpy, kw = { 'numpy_data' : bv })
   
   #av, bv = distarray.broadcast([av, bv])
   Assert.eq(a.shape[1], b.shape[0])
@@ -279,7 +275,7 @@ def dot(a, b):
                    combine_fn=np.add,
                    reduce_fn=np.add)
   
-  return map_extents(av, _dot_mapper, target=target,
+  return shuffle(av, _dot_mapper, target=target,
                      kw = dict(av=av, bv=bv))
             
 

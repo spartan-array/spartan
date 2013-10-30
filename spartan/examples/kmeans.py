@@ -66,7 +66,7 @@ def run(num_pts, num_centers, num_dim):
   new_counts = expr.ndarray((num_centers,1)).force()
   
   for i in range(10):
-    _ = expr.map_extents(pts, 
+    _ = expr.shuffle(pts, 
                          _find_cluster_mapper,
                          kw={'d_pts' : pts, 
                              'old_centers' : centers,

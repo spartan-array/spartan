@@ -97,7 +97,7 @@ def stencil_mapper(array, ex, filters=None, images=None, target_shape=None):
 def stencil(images, filters, stride=1):
   from .base import eager
   from .ndarray import ndarray
-  from .map_extents import map_extents
+  from .shuffle import shuffle
   images = eager(images)
   filters = eager(filters)
   
@@ -117,7 +117,7 @@ def stencil(images, filters, stride=1):
                    combine_fn=np.sum,
                    tile_hint=tile_hint)
   
-  return map_extents(images,
+  return shuffle(images,
                      stencil_mapper,
                      target=target,
                      kw=dict(images=images,
@@ -143,7 +143,7 @@ def _maxpool_mapper(array, ex, pool_size, stride, target_shape):
   yield (target_ex, pooled)
   
 def maxpool(images, pool_size=2, stride=2):
-  from .map_extents import map_extents
+  from .shuffle import shuffle
   from .ndarray import ndarray
   
   images = images.force()
@@ -159,7 +159,7 @@ def maxpool(images, pool_size=2, stride=2):
                    combine_fn=np.maximum,
                    reduce_fn=np.maximum)
    
-  return map_extents(images,
+  return shuffle(images,
                     _maxpool_mapper,
                     target=target,
                     kw=dict(target_shape=target.shape,

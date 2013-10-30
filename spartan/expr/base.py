@@ -20,9 +20,9 @@ class NotShapeable(Exception):
 
 unique_id = iter(xrange(10000000))
 
-def _map_tiles(*args, **kw):
-  from .map_tiles import map_tiles
-  return map_tiles(*args, **kw)
+def _map(*args, **kw):
+  from .map import map
+  return map(*args, **kw)
 
 class Expr(Node):
   _cached_value = None
@@ -73,34 +73,34 @@ class Expr(Node):
     return self.__class__.__name__
   
   def __add__(self, other):
-    return _map_tiles((self, other), _apply_binary_op, binary_op=np.add, numpy_expr='+')
+    return _map((self, other), _apply_binary_op, binary_op=np.add, numpy_expr='+')
 
   def __sub__(self, other):
-    return _map_tiles((self, other), _apply_binary_op, binary_op=np.subtract, numpy_expr='-')
+    return _map((self, other), _apply_binary_op, binary_op=np.subtract, numpy_expr='-')
 
   def __mul__(self, other):
-    return _map_tiles((self, other), _apply_binary_op, binary_op=np.multiply, numpy_expr='*')
+    return _map((self, other), _apply_binary_op, binary_op=np.multiply, numpy_expr='*')
 
   def __mod__(self, other):
-    return _map_tiles((self, other), _apply_binary_op, binary_op=np.mod, numpy_expr='%')
+    return _map((self, other), _apply_binary_op, binary_op=np.mod, numpy_expr='%')
 
   def __div__(self, other):
-    return _map_tiles((self, other), _apply_binary_op, binary_op=np.divide, numpy_expr='/')
+    return _map((self, other), _apply_binary_op, binary_op=np.divide, numpy_expr='/')
 
   def __eq__(self, other):
-    return _map_tiles((self, other), _apply_binary_op, binary_op=np.equal, numpy_expr='==')
+    return _map((self, other), _apply_binary_op, binary_op=np.equal, numpy_expr='==')
 
   def __ne__(self, other):
-    return _map_tiles((self, other), _apply_binary_op, binary_op=np.not_equal, numpy_expr='!=')
+    return _map((self, other), _apply_binary_op, binary_op=np.not_equal, numpy_expr='!=')
 
   def __lt__(self, other):
-    return _map_tiles((self, other), _apply_binary_op, binary_op=np.less, numpy_expr='<')
+    return _map((self, other), _apply_binary_op, binary_op=np.less, numpy_expr='<')
 
   def __gt__(self, other):
-    return _map_tiles((self, other), _apply_binary_op, binary_op=np.greater, numpy_expr='>')
+    return _map((self, other), _apply_binary_op, binary_op=np.greater, numpy_expr='>')
 
   def __pow__(self, other):
-    return _map_tiles((self, other), _apply_binary_op, binary_op=np.power, numpy_expr='**')
+    return _map((self, other), _apply_binary_op, binary_op=np.power, numpy_expr='**')
 
   def __getitem__(self, idx):
     from .index import IndexExpr
