@@ -25,19 +25,8 @@ public:
   typedef boost::scoped_ptr<Kernel> ScopedPtr;
 
 
-  ArgMap args() {
-    ArgMap out;
-    for (auto i : kernel_args_) {
-      out[i.first] = i.second;
-    }
-    for (auto i : task_args_) {
-      out[i.first] = i.second;
-    }
-
-//    for (auto i : out) {
-//      Log_info("ArgMap: %s -> %s", i.first.c_str(), i.second.c_str());
-//    }
-    return out;
+  const ArgMap& args() {
+    return args_;
   }
 
   Table* get_table(int id);
@@ -48,6 +37,13 @@ public:
     w_ = w;
     kernel_args_ = kernel_args;
     task_args_ = task_args;
+    
+    for (auto i : kernel_args_) {
+      args_[i.first] = i.second;
+    }
+    for (auto i : task_args_) {
+      args_[i.first] = i.second;
+    }
   }
 
   virtual void run() = 0;
@@ -57,6 +53,7 @@ private:
   friend class Master;
 
   Worker *w_;
+  ArgMap args_;
   ArgMap kernel_args_;
   ArgMap task_args_;
 };

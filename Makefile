@@ -1,19 +1,12 @@
-ifdef _REALBUILD
-SRCDIR := ../src
+SRCDIR := src/
+OBJDIR := build/temp.linux-x86_64-2.7/
 
 CPPFLAGS := -I${SRCDIR} -I${SRCDIR}/simple-rpc -I/usr/include/python2.7
-CXXFLAGS := ${CPPFLAGS} -pthread -fno-strict-aliasing -DNDEBUG -g -fwrapv -O2 -Wall -fPIC -ggdb2 -std=c++0x
+CXXFLAGS := ${CPPFLAGS} -pthread -fno-strict-aliasing -DNDEBUG -g -fwrapv -O0 -Wall -fPIC -ggdb2 -std=c++0x
 CXX ?= g++ 
 
-spartan_wrap.cc : ../spartan/wrap/spartan.i
-	swig -python -Isrc -modern -O -c++ -threads -o $@ $^
-
-SOURCES := $(shell find ${SRCDIR} -name '*.cc') spartan_wrap.cc
-OBJS := $(notdir $(patsubst %.cc,%.o,${SOURCES}))
-VPATH := ${SRCDIR} ${SRCDIR}/spartan ${SRCDIR}/spartan/util ${SRCDIR}/simple-rpc/rpc
-
-%.o : %.cc
-	${CXX} ${CXXFLAGS} -c $^ -o $@
+SOURCES := $(shell find ${SRCDIR} -name '*.cc') spartan/wrap/spartan_wrap.cc
+OBJS := $(addprefix ${OBJDIR},$(patsubst %.cc,%.o,$(SOURCES)))
 
 _spartan_wrap.so: ${OBJS}
 	${CXX} \
@@ -23,11 +16,10 @@ _spartan_wrap.so: ${OBJS}
 	-D_FORTIFY_SOURCE=2 -g -fstack-protector --param=ssp-buffer-size=4 \
 	-Wformat -Werror=format-security -o $@ $^
 
-else
+spartan/wrap/spartan_wrap.cc : spartan/wrap/spartan.i
+	swig -python -Isrc -modern -O -c++ -threads -o $@ $^
 
-all:
-	#mkdir -p build-opt
-	#cd build-opt && _REALBUILD=1 $(MAKE) -f../Makefile _spartan_wrap.so
+setup:
 	python setup.py develop --user
 
 doc:
@@ -39,4 +31,13 @@ clean:
 
 .PHONY: all doc clean
 
-endif
+define OBJ_template
+
+$(OBJDIR)$(patsubst %.cc,%.o,$(1)): $(1)
+	mkdir -p $$(dir $$@)
+	$(CXX) $(CXXFLAGS) -c $$< -o $$@
+
+endef
+
+$(foreach f,$(SOURCES), $(eval $(call OBJ_template,$f)))
+

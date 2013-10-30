@@ -169,7 +169,8 @@ class PyKernel: public Kernel {
 public:
   void run() {
     GILHelper lock;
-    RefPtr fn = get_pickler().load(args()["map_fn"]);
+    const std::string& fn_pickle = args().find("map_fn")->second;
+    RefPtr fn = get_pickler().load(fn_pickle);
     to_ref(PyObject_CallFunction(fn.get(), W("l"), this));
   }
   DECLARE_REGISTRY_HELPER(Kernel, PyKernel);

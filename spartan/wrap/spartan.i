@@ -26,6 +26,14 @@ using namespace spartan;
 }
 
 typedef boost::intrusive_ptr<PyObject> RefPtr;
+typedef std::map<std::string, std::string> ArgMap;
+
+namespace std {
+  %template(ArgMap) map<string, string>;
+  %template() pair<string, string>;
+  %template(WorkList) vector<::spartan::WorkItem>;
+}
+
 
 namespace spartan {
 
@@ -45,7 +53,7 @@ namespace spartan {
   return $result;
 }
 
-typedef ::std::map<::std::string, ::std::string> ArgMap;
+// typedef ::std::map<::std::string, ::std::string> ArgMap;
 
 struct ShardId {
   int table;
@@ -184,14 +192,13 @@ public:
   }
   
   void foreach_shard(Table* t, PyObject* fn, ArgMap args) {
-    auto p = new PyKernel();
-    p->args()["map_fn"] = get_pickler().store(fn);
-    $self->map_shards(t, p, args);
+    args["map_fn"] = get_pickler().store(fn);
+    $self->map_shards(t, new PyKernel, args);
   }
 
   void foreach_worklist(PyObject* kernel_fn, ArgMap kernel_args, WorkList worklist) {
     auto p = new PyKernel();
-    p->args()["map_fn"] = get_pickler().store(kernel_fn);
+    kernel_args["map_fn"] = get_pickler().store(kernel_fn);
     return $self->map_worklist(p, kernel_args, worklist);
   }
 } // extend Master
@@ -201,12 +208,6 @@ Worker* start_worker(const std::string& master, int port);
 
 } // namespace spartan
 
-
-namespace std {
-  %template() pair<string, string>;
-  %template(ArgMap) map<string, string>;
-  %template(WorkList) vector<::spartan::WorkItem>;
-}
 
 class Pickler {
 public:

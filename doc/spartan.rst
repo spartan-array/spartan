@@ -41,13 +41,3 @@ spartan Package
     :undoc-members:
     :show-inheritance:
 
-Subpackages
------------
-
-.. toctree::
-
-    spartan.dense
-    spartan.expr
-    spartan.sparse
-    spartan.wrap
-

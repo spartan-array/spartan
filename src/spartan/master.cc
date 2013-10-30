@@ -452,7 +452,11 @@ void Master::map_worklist(Kernel *k, ArgMap kernel_args, WorkList worklist) {
   Log_debug("Assigning worklist with %d items", worklist.size());
   for (auto v : worklist) {
     int worker = tables_[v.locality.table]->shard_info(v.locality.shard)->owner;
-    workers_[worker]->assign_task(ShardId(v.locality.table, v.locality.shard), v.args);
+    ArgMap tmp = kernel_args;
+    for (auto i : v.args) {
+      tmp[i.first] = i.second;
+    }
+    workers_[worker]->assign_task(ShardId(v.locality.table, v.locality.shard), tmp);
   }
 
   wait_for_completion(st);

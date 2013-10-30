@@ -14,7 +14,7 @@ sys.path += [abspath('../build/.libs'),
              abspath('../build/python/spartan/wrap'), 
              abspath('.')]
 
-from spartan import config
+from spartan import config, cloudpickle
 from spartan_wrap import set_log_level, TableContext
 import atexit
 import cPickle
@@ -24,6 +24,13 @@ import pstats
 import spartan_wrap
 import threading
 import traceback
+
+def pickle(obj):
+  try:
+    return cPickle.dumps(obj, -1)
+  except:
+    return cloudpickle.dumps(obj, -1)
+
 
 PYLOG_TO_CLOG = {
   logging.DEBUG : spartan_wrap.DEBUG,
@@ -216,7 +223,10 @@ def _with_profile(fn):
 
 def _bootstrap_kernel(handle):
   kernel = Kernel(handle)
-  fn, args = cPickle.loads(kernel.args()['map_args'])
+  kernel_args = kernel.args()
+  fn = cPickle.loads(kernel_args['_map_fn'])
+  args = cPickle.loads(kernel_args['_map_args'])
+
   return _with_profile(lambda: fn(kernel, args))
   
 
@@ -248,7 +258,10 @@ class Master(object):
   def foreach_shard(self, table, kernel, args):
     #log_info('Mapping %d', table.id())
     #assert table.id() in _table_refs, table.id()
-    return self._master.foreach_shard(table, _bootstrap_kernel, (kernel, args))
+    kernel_args = spartan_wrap.ArgMap()
+    kernel_args["_map_fn"] = pickle(kernel)
+    kernel_args["_map_args"] = pickle(args)
+    return self._master.foreach_shard(table, _bootstrap_kernel, kernel_args)
 
   def foreach_worklist(self, worklist, mapper):
     mod_wl = []

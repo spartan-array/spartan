@@ -63,7 +63,7 @@ RefPtr Pickler::load(const std::string& data) {
         PyObject_CallFunction(_cStringIO_stringIO.get(), W("O"), buffer.get()));
     return to_ref(PyObject_CallFunction(_load.get(), W("O"), in.get()));
   } catch(PyException* exc) {
-    Log_info("Exception while loading pickle.");
+    Log_info("Exception while loading pickled data.");
     throw exc;
   }
 }
