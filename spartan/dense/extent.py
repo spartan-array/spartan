@@ -32,9 +32,9 @@ class TileExtent(object):
   @property
   def ndim(self):
     return len(self.lr)
-  
+
   def __reduce__(self):
-    return (create, (self.ul, self.lr, self.array_shape))
+    return create, (self.ul, self.lr, self.array_shape)
   
   def to_slice(self):
     return tuple([slice(ul, lr, None) for ul, lr in zip(self.ul, self.lr)])
@@ -47,7 +47,7 @@ class TileExtent(object):
     return create([self.ul[idx]], 
                   [self.lr[idx]], 
                   [self.array_shape[idx]])
-                      
+
   def __hash__(self):
     return hash(self.ul)
     #return hash(self.ul[-2:])
@@ -58,6 +58,12 @@ class TileExtent(object):
       if other.ul[i] != self.ul[i] or other.lr[i] != self.lr[i]:
         return False
     return True
+
+  def __lt__(self, other):
+    for a, b in zip(self.ul, other.ul):
+      if a < b: return True
+      if b < a: return False
+    return False
 
   def ravelled_pos(self):
     return ravelled_pos(self.ul, self.array_shape)
@@ -99,8 +105,7 @@ def create(ul, lr, array_shape):
   ex = TileExtent()
   ex.ul = tuple(ul)
   ex.lr = tuple(lr)
-  
-    
+
   assert np.all(np.array(ex.lr) >= np.array(ex.ul)),\
     'Negative extent size: (%s, %s)' % (ul, lr)
   

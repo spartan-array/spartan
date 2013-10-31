@@ -56,3 +56,28 @@ class TestReduce(test_common.ClusterTest):
       y = x.argmin(axis)
       val = y.glom()
       Assert.all_eq(val, nx.argmin(axis))
+
+  def test_argmax_1d(self):
+    x = expr.arange((TEST_SIZE,), dtype=np.int)
+    nx = np.arange(TEST_SIZE, dtype=np.int)
+    y = x.argmax()
+    val = y.glom()
+    Assert.all_eq(val, nx.argmax())
+  
+  def test_argmax_2d(self):
+    for axis in [1]: #[None, 0, 1]:
+      x = expr.arange((TEST_SIZE, TEST_SIZE), dtype=np.int)
+      nx = np.arange(TEST_SIZE * TEST_SIZE, dtype=np.int).reshape((TEST_SIZE, TEST_SIZE))
+      y = x.argmax(axis=axis)
+      val = expr.glom(y)
+      Assert.all_eq(val, nx.argmax(axis=axis))
+    
+  def test_argmax_3d(self):
+    x = expr.arange((TEST_SIZE, TEST_SIZE, TEST_SIZE), dtype=np.int64)
+    nx = np.arange(TEST_SIZE * TEST_SIZE * TEST_SIZE, dtype=np.int64).reshape((TEST_SIZE, TEST_SIZE, TEST_SIZE))
+  
+    for axis in [None, 0, 1, 2]:  
+      y = x.argmax(axis)
+      val = y.glom()
+      print val
+      Assert.all_eq(val, nx.argmax(axis))

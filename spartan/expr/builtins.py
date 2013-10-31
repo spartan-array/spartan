@@ -9,13 +9,14 @@ These include --
 * Other: (`dot`).
 '''
 import numpy as np
-from ..dense import extent
+from ..dense import distarray, extent
 from ..dense.extent import index_for_reduction, shapes_match
 from .base import force
 from .shuffle import shuffle
 from .map import map
 from .ndarray import ndarray
 from .reduce import reduce
+from .loop import loop
 from ..util import Assert
 
 def rand(*shape, **kw):
@@ -81,50 +82,42 @@ def mean(x, axis=None):
   return sum(x, axis) / x.shape[axis]
 
 
-def _to_structured_array(**kw):
+def _to_structured_array(*vals):
   '''Create a structured array from the given input arrays.
   
-  :param kw: A dictionary from field_name -> `np.ndarray`.
+  :param vals: A list of (field_name, `np.ndarray`)
   :rtype: A structured array with fields from ``kw``.
   '''
-  out = np.ndarray(kw.values()[0].shape, 
-                  dtype=','.join([a.dtype.str for a in kw.itervalues()]))
-  out.dtype.names = kw.keys()
-  for k, v in kw.iteritems():
+  out = np.ndarray(vals[0][1].shape, 
+                  dtype=','.join([a.dtype.str for name, a in vals]))
+  out.dtype.names = [name for name, a in vals]
+  for k, v in vals:
     out[k] = v
   return out
-
-
-def _argmin_local(index, tile, axis):
-  local_idx = np.argmin(tile[:], axis)
-  local_min = np.min(tile[:], axis)
-
-#  util.log_info('Index for reduction: %s %s %s',
-#           index.array_shape,
-#           axis,
-#           index_for_reduction(index, axis))
-
-  global_idx = index.to_global(local_idx, axis)
-
-  new_idx = index_for_reduction(index, axis)
-  new_value = _to_structured_array(idx=global_idx, min=local_min)
-
-#   print index, value.shape, axis
-#   print local_idx.shape
-  assert shapes_match(new_idx, new_value), (new_idx, new_value.shape)
-  return new_value
-
-def _argmin_reducer(a, b):
-  reduced = np.where(a['min'] < b['min'], a, b)
-  return reduced
 
 def _take_idx_mapper(inputs):
   return inputs[0]['idx']
  
-def _argmin_dtype(input):
+
+def _dual_reducer(ex, tile, axis, idx_f=None, val_f=None):
+  local_idx = idx_f(tile[:], axis)
+  local_val = val_f(tile[:], axis)
+
+  global_idx = ex.to_global(local_idx, axis)
+  new_idx = index_for_reduction(ex, axis)
+  new_val = _to_structured_array(('idx', global_idx), ('val', local_val))
+  
+  assert shapes_match(new_idx, new_val), (new_idx, new_val.shape)
+  return new_val
+
+def _dual_combiner(a, b, op):
+  return np.where(op(a['val'], b['val']), a, b)
+
+def _dual_dtype(input):
   dtype = np.dtype('i8,%s' % input.dtype.str)
-  dtype.names = ('idx', 'min')
+  dtype.names = ('idx', 'val')
   return dtype 
+
 
 def argmin(x, axis=None):
   '''
@@ -136,11 +129,30 @@ def argmin(x, axis=None):
   :param axis: Axis (integer or None).
   '''
   compute_min = reduce(x, axis,
-                               dtype_fn = _argmin_dtype,
-                               local_reduce_fn = _argmin_local,
-                               combine_fn = _argmin_reducer)
+                       dtype_fn = _dual_dtype,
+                       local_reduce_fn = _dual_reducer,
+                       combine_fn = lambda a, b: _dual_combiner(a, b, np.less),
+                       fn_kw={'idx_f' : np.argmin, 'val_f' : np.min})
   
   take_indices = map(compute_min, _take_idx_mapper)
+  return take_indices
+
+def argmax(x, axis=None):
+  '''
+  Compute argmax over ``axis``.
+  
+  See `numpy.ndarray.argmax`.
+  
+  :param x: `Expr` to compute a maximum over. 
+  :param axis: Axis (integer or None).
+  '''
+  compute_max = reduce(x, axis,
+                       dtype_fn = _dual_dtype,
+                       local_reduce_fn = _dual_reducer,
+                       combine_fn = lambda a, b: _dual_combiner(a, b, np.greater),
+                       fn_kw={'idx_f' : np.argmax, 'val_f' : np.max})
+  
+  take_indices = map(compute_max, _take_idx_mapper)
   return take_indices
   
 

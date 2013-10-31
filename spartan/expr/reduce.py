@@ -39,7 +39,7 @@ class ReduceExpr(Expr):
     return output_array
 
  
-def reduce(v, axis, dtype_fn, local_reduce_fn, combine_fn):
+def reduce(v, axis, dtype_fn, local_reduce_fn, combine_fn, fn_kw=None):
   '''
   Reduce ``v`` over axis ``axis``.
   
@@ -54,8 +54,10 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, combine_fn):
   :param local_reduce_fn: Callable: fn(extent, data, axis)
   :param combine_fn: Callable: fn(old_v, update_v) -> new_v 
   '''
+
+  if fn_kw is None: fn_kw = {}
   return ReduceExpr(array=v, axis=axis, 
-                       dtype_fn=dtype_fn, 
-                       reduce_fn=local_reduce_fn, 
-                       combine_fn=combine_fn,
-                       fn_kw={})
+                     dtype_fn=dtype_fn, 
+                     reduce_fn=local_reduce_fn, 
+                     combine_fn=combine_fn,
+                     fn_kw=fn_kw)
