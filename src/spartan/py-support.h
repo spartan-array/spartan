@@ -23,50 +23,6 @@ static inline PyObject* get_code(T* obj) {
   return p.get();
 }
 
-// Python utility functions/classes
-struct GILHelper {
-  PyGILState_STATE gstate;
-  GILHelper() {
-    gstate = PyGILState_Ensure();
-  }
-
-  ~GILHelper() {
-    PyGILState_Release(gstate);
-  }
-};
-
-struct PyException : private boost::noncopyable {
-  PyException();
-  PyException(std::string value_str);
-
-  PyObject* traceback;
-  PyObject* value;
-  PyObject* type;
-};
-
-template<class T>
-T check(T result) {
-  if (PyErr_Occurred()) {
-    auto exc = new PyException();
-    throw exc;
-  }
-  return result;
-}
-
-// Hashing/equality for RefPtrs
-namespace boost {
-static inline size_t hash_value(const RefPtr& p) {
-  GILHelper lock;
-  return check(PyObject_Hash(p.get()));
-}
-} // namespace boost
-
-static inline bool operator==(const RefPtr& a, const RefPtr& b) {
-  GILHelper lock;
-  return check(PyObject_Compare(a.get(), b.get())) == 0;
-}
-
-
 // Get rid of annoying writable string warnings.
 #define W(str) (char*)str
 
