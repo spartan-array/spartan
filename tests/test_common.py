@@ -1,4 +1,5 @@
 from os.path import basename, splitext
+import signal
 from spartan import util, config
 from spartan.cluster import start_cluster
 from spartan.config import flags
@@ -20,6 +21,17 @@ def get_cluster_ctx():
     CTX = start_cluster(flags.num_workers, flags.cluster)
     
   return CTX
+
+def sig_handler(sig, frame):
+  import threading
+  import sys
+  import traceback
+
+  for thread_id, stack in sys._current_frames().items():
+    print '-' * 100
+    traceback.print_stack(stack)
+
+signal.signal(signal.SIGINT, sig_handler)
 
 class BenchTimer(object):
   def __init__(self, num_workers):

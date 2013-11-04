@@ -13,6 +13,7 @@ import spartan.master
 def _start_remote_worker(worker, st, ed):
   util.log_info('Starting worker %d:%d on host %s', st, ed, worker)
   if flags.use_threads and worker == 'localhost':
+    util.log_info('Using threads.')
     for i in range(st, ed):
       p = threading.Thread(target=spartan.worker._start_worker,
                            args=((socket.gethostname(), flags.port_base), flags.port_base + 1 + i, i))

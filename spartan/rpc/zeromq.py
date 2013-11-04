@@ -15,17 +15,19 @@ from .common import Group, SocketBase
 from spartan import util
 
 POLLER = None
+POLLER_LOCK = threading.Lock()
+
 def poller():
   global POLLER
-  if POLLER is None:
-    util.log_info('Started poller..')
-    POLLER = ZMQPoller()
-    POLLER.start()
-
-  return POLLER
+  with POLLER_LOCK:
+    if POLLER is None:
+      util.log_info('Started poller.. %s %s', os.getpid(), __file__)
+      POLLER = ZMQPoller()
+      POLLER.start()
+    return POLLER
 
 class Socket(SocketBase):
-  # __slots__ = ['_zmq', '_hostport', '_out', '_in', '_addr', '_closed', '_shutdown', '_lock']
+  __slots__ = ['_zmq', '_hostport', '_out', '_in', '_addr', '_closed', '_shutdown', '_lock']
   def __init__(self, ctx, sock_type, hostport):
     # util.log('New socket...')
     self._zmq = ctx.socket(sock_type)
@@ -54,6 +56,7 @@ class Socket(SocketBase):
 
   def send(self, msg):
     assert not self._closed
+    #util.log_info('SEND %s', len(msg))
     self._out.append(msg)
     poller().modify(self, zmq.POLLIN | zmq.POLLOUT)
 
@@ -69,7 +72,7 @@ class Socket(SocketBase):
   def connect(self):
     assert self._closed
     self._closed = False
-    util.log_info('Connecting: %s:%d' % self.addr)
+    #util.log_info('Connecting: %s:%d' % self.addr)
     self._zmq.connect('tcp://%s:%s' % self.addr)
     poller().add(self, zmq.POLLIN)
 
@@ -92,10 +95,10 @@ class Socket(SocketBase):
       while self._out:
         next = self._out.popleft()
         if isinstance(next, Group):
-          # util.log('Sending %s', next.args)
+          #util.log_info('Sending group. %s', len(next))
           self._zmq.send_multipart(next, copy=False)
         else:
-          # util.log('Sending %s', next)
+          #util.log_info('Sending %s', len(next))
           self._zmq.send(next, copy=False)
 
       poller().modify(self, zmq.POLLIN)

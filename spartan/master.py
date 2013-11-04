@@ -18,6 +18,7 @@ class Master(object):
 
   def shutdown(self):
     for id, w in self._workers.iteritems():
+      util.log_info('Shutting down worker %d', id)
       w.shutdown().wait()
 
     self._server.shutdown()

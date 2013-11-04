@@ -238,6 +238,8 @@ class Server(object):
     self._methods[name] = fn
 
   def handle_read(self, socket):
+    #util.log_info('Reading...')
+
     data = socket.recv()
     reader = cStringIO.StringIO(data)
     header = cPickle.load(reader)
