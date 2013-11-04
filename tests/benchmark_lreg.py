@@ -6,13 +6,13 @@ import test_common
 
   
 def benchmark_linear_regression(ctx, timer):
-  N_EXAMPLES = 5000000 * ctx.num_workers()
+  N_EXAMPLES = 500000 * ctx.num_workers
   N_DIM = 10
   x = expr.rand(N_EXAMPLES, N_DIM, 
-                tile_hint=(N_EXAMPLES / ctx.num_workers(), N_DIM))
+                tile_hint=(N_EXAMPLES / ctx.num_workers, N_DIM))
   
   y = expr.rand(N_EXAMPLES, 1, 
-                tile_hint=(N_EXAMPLES / ctx.num_workers(), 1))
+                tile_hint=(N_EXAMPLES / ctx.num_workers, 1))
   
   w = np.random.rand(N_DIM, 1)
   

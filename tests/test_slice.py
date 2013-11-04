@@ -10,7 +10,7 @@ from spartan.util import Assert
 import test_common
 
 
-TEST_SIZE = 100
+TEST_SIZE = 10
 
 def add_one_extent(v, ex):
   util.log_info('Mapping: %s', ex)
@@ -20,6 +20,7 @@ def add_one_tile(tiles):
   return tiles[0] + 1
 
 class SliceTest(test_common.ClusterTest):
+  TILE_SIZE = 10
   def test_slice_get(self):
     x = expr.arange((TEST_SIZE, TEST_SIZE))
     z = x[5:8, 5:8]

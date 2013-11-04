@@ -1,11 +1,11 @@
-from spartan import util
+from spartan import util, core
 from spartan.dense import distarray, tile
 from spartan.util import Assert, iterable
 
 from .base import Expr, NotShapeable, lazify
 
 
-def shuffle(v, fn, reduce_fn=None, tile_hint=None, target=None, kw=None):
+def shuffle(v, fn, tile_hint=None, target=None, kw=None):
   '''
   Evaluate ``fn`` over each extent of the input.
   
@@ -24,28 +24,31 @@ def shuffle(v, fn, reduce_fn=None, tile_hint=None, target=None, kw=None):
   
   return ShuffleExpr(array=v,
                         map_fn=fn, 
-                        reduce_fn=reduce_fn,
                         tile_hint=tile_hint,
                         target=target, 
                         fn_kw=kw)
 
 
-def _target_mapper(ex, _, map_fn=None, inputs=None, target=None, fn_kw=None):
+def _target_mapper(ex, data, map_fn=None, inputs=None, target=None, fn_kw=None):
   result = map_fn(inputs, ex, **fn_kw)
   if result is not None:
     for ex, v in result:
+      util.log_info('%s %s', ex, v)
       target.update(ex, v)
-
+  return []
         
-def _notarget_mapper(ex, _, map_fn=None, inputs=None, fn_kw=None):
+def _notarget_mapper(ex, data, array=None, map_fn=None, inputs=None, fn_kw=None):
   #util.log_info('MapExtents: %s', map_fn)
-  result = map_fn(inputs, ex, **fn_kw)
-  if result is not None:
-    for ex, v in result:
-      yield (ex, tile.from_data(v))
+  ctx = core.get_ctx()
+  result = []
+  for ex, v in map_fn(inputs, ex, **fn_kw):
+    v = tile.from_data(v)
+    blob_id = ctx.create(v).wait().id
+    result.append((ex, blob_id))
+  return result
 
 class ShuffleExpr(Expr):
-  _members = ['array', 'map_fn', 'reduce_fn', 'target', 'tile_hint', 'fn_kw']
+  _members = ['array', 'map_fn', 'target', 'tile_hint', 'fn_kw']
 
     
   def evaluate(self, ctx, deps):
@@ -54,8 +57,7 @@ class ShuffleExpr(Expr):
     target = deps['target']
     
     map_fn = self.map_fn
-    reduce_fn = self.reduce_fn
-    
+
     if target is not None:
       v.foreach(_target_mapper,
                 kw = dict(map_fn=map_fn, inputs=v, target=target, fn_kw=fn_kw))
@@ -63,5 +65,4 @@ class ShuffleExpr(Expr):
     else:
       return distarray.map_to_array(v, 
                                     mapper_fn = _notarget_mapper,
-                                    reduce_fn = reduce_fn,
                                     kw = dict(inputs=v, map_fn=map_fn, fn_kw=fn_kw))

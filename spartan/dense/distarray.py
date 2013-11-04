@@ -2,7 +2,7 @@
 
 from . import tile, extent
 import spartan
-from spartan import util
+from spartan import util, core
 from spartan.util import Assert
 import numpy as np
 import itertools
@@ -11,58 +11,9 @@ import collections
 # number of elements per tile
 TILE_SIZE = 100000
 
-def find_matching_tile(array, tile_extent):
-  for ex in array.extents():
-    ul_diff = tile_extent.ul - ex.ul
-    lr_diff = ex.lr - tile_extent.lr
-    if np.all(ul_diff >= 0) and np.all(lr_diff >= 0):
-      # util.log_info('%s matches %s', ex, tile_extent)
-      return array.tile_for_extent(ex)
-  
-  raise Exception, 'No matching tile_extent!' 
- 
- 
+
 def take_first(a,b):
   return a
-
-accum_replace = tile.TileAccum(take_first)
-accum_min = tile.TileAccum(np.minimum)
-accum_max = tile.TileAccum(np.maximum)
-accum_sum = tile.TileAccum(np.add)
-
-
-  
-class NestedSlice(object):
-  def __init__(self, ex, subslice):
-    Assert.isinstance(ex, extent.TileExtent)
-    Assert.isinstance(subslice, (tuple, int))
-    
-    self.extent = ex
-    self.subslice = subslice
-    #util.log_info('Nested: %s[%s]', ex, subslice)
-   
-  def __eq__(self, other):
-    Assert.isinstance(other, extent.TileExtent)
-    return self.extent == other 
-  
-  def __hash__(self):
-    return hash(self.extent)
-  
-  def shard(self):
-    return self.extent.shard()
-
-
-class TileSelector(object):
-  def __call__(self, k, v):
-    if isinstance(k, extent.TileExtent): 
-      return v.get()
-    
-    if isinstance(k, NestedSlice):
-      result = v[k.subslice]
-#       print k.extent, k.subslice, result.shape
-      return result
-    raise Exception, "Can't handle type %s" % type(k)
-  
 
 
 def compute_splits(shape, tile_hint=None, num_shards=-1):
@@ -117,60 +68,77 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
     
 
 
-def create(master, shape, 
+def create(shape,
            dtype=np.float, 
-           sharder=spartan.ModSharder(),
+           sharder=None,
            combiner=None,
            reducer=None,
            tile_hint=None):
+  ctx = core.get_ctx()
   dtype = np.dtype(dtype)
   shape = tuple(shape)
 
-  table = master.create_table(sharder, combiner, reducer, TileSelector())
-  extents = compute_splits(shape, tile_hint, table.num_shards())
+  extents = compute_splits(shape, tile_hint, -1).keys()
+  tiles = {}
+  for ex in extents:
+    tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype))
 
-  util.log_info('Creating array of shape %s with %d tiles', shape, len(extents))
-  for ex, shard in extents.iteritems():
-#     util.log_info('%s', ex)
-    ex_tile = tile.from_shape(ex.shape, dtype=dtype)
-    table.update(shard, ex, ex_tile)
-  
-  return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
+  for ex in extents:
+    tiles[ex] = tiles[ex].wait().id
+
+  return DistArray(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer)
 
 empty = create
 
+def _array_mapper(blob_id, blob, array=None, user_fn=None, **kw):
+  ex = array.extent_for_blob(blob_id)
+  return user_fn(ex, blob, **kw)
 
 class DistArray(object):
-  def __init__(self, shape, dtype, table, extents):
+  def __init__(self, shape, dtype, tiles, reducer_fn):
     self.shape = shape
     self.dtype = dtype
-    self.table = table
-    
+    self.reducer_fn = reducer_fn
+
     #util.log_info('%s', extents)
-    Assert.isinstance(extents, dict)
-    self.extents = extents
+    Assert.isinstance(tiles, dict)
+
+    self.blob_to_ex = {}
+    for k,v in tiles.iteritems():
+      Assert.isinstance(k, extent.TileExtent)
+      Assert.isinstance(v, core.BlobId)
+      self.blob_to_ex[v] = k
+
+    self.tiles = tiles
   
   def id(self):
     return self.table.id()
+
+  def extent_for_blob(self, id):
+    return self.blob_to_ex[id]
   
   def tile_shape(self):
     scounts = collections.defaultdict(int)
-    for ex in self.extents.iterkeys():
+    for ex in self.tiles.iterkeys():
       scounts[ex.shape] += 1
     
     return sorted(scounts.items(), key=lambda kv: kv[1])[-1][0]
-    
-   
-  def map_to_table(self, mapper_fn, combine_fn=None, reduce_fn=None, kw=None):
-    return spartan.map_items(self.table, 
-                             mapper_fn = mapper_fn,
-                             combine_fn = combine_fn,
-                             reduce_fn = reduce_fn,
-                             kw=kw)
+
+  def map_to_table(self, mapper_fn, kw=None):
+    ctx = core.get_ctx()
+
+    if kw is None: kw = {}
+    kw['array'] = self
+    kw['user_fn'] = mapper_fn
+
+    return ctx.map(self.tiles.values(),
+                   mapper_fn = _array_mapper,
+                   reduce_fn=None,
+                   kw=kw)
   
-  def foreach(self, fn, kw):
-    return spartan.foreach(self.table, fn, kw)
-  
+  def foreach(self, mapper_fn, kw):
+    return self.map_to_table(mapper_fn=mapper_fn, kw=kw)
+
   def __repr__(self):
     return 'DistArray(shape=%s, dtype=%s)' % (self.shape, self.dtype)
   
@@ -184,24 +152,30 @@ class DistArray(object):
     If necessary, data will be copied from remote hosts to fill the region.    
     :param region: `Extent` indicating the region to fetch.
     '''
+    Assert.eq(region.array_shape, self.shape)
+    Assert.eq(len(region.ul), len(self.shape))
+
+    #util.log_info('FETCH: %s %s', self.shape, region)
+
+    ctx = core.get_ctx()
     Assert.isinstance(region, extent.TileExtent)
     assert np.all(region.lr <= self.shape), (region, self.shape)
     
     # special case exact match against a tile 
-    if region in self.extents:
+    if region in self.tiles:
       #util.log_info('Exact match.')
       ex, intersection = region, region
-      shard = self.extents[region]
-      return self.table.get(shard, ex)
+      blob_id = self.tiles[region]
+      return ctx.get(blob_id, extent.offset_slice(ex, intersection))
 
-    splits = list(extent.find_overlapping(self.extents.iterkeys(), region))
+    splits = list(extent.find_overlapping(self.tiles.iterkeys(), region))
     
     #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
     tgt = np.ndarray(region.shape, dtype=self.dtype)
     for ex, intersection in splits:
       dst_slice = extent.offset_slice(region, intersection)
-      shard = self.extents[ex]
-      src_slice = self.table.get(shard, NestedSlice(ex, extent.offset_slice(ex, intersection)))
+      blob_id = self.tiles[ex]
+      src_slice = ctx.get(blob_id, extent.offset_slice(ex, intersection))
       #util.log_info('%s %s', dst_slice, src_slice.shape)
       tgt[dst_slice] = src_slice
     return tgt
@@ -211,27 +185,30 @@ class DistArray(object):
     return self.update(extent.from_slice(slc, self.shape), data)
      
   def update(self, region, data):
+    ctx = core.get_ctx()
     Assert.isinstance(region, extent.TileExtent)
     Assert.eq(region.shape, data.shape,
               'Size of extent does not match size of data')
 
-    #util.log_info('%s %s', self.table.id(), self.extents)
+    #util.log_info('%s %s', self.table.id(), self.tiles)
     # exact match
-    if region in self.extents:
+    if region in self.tiles:
       #util.log_info('EXACT: %d %s ', self.table.id(), region)
-      shard = self.extents[region]
-      self.table.update(shard, region, tile.from_data(data))
+      blob_id = self.tiles[region]
+      ctx.update(blob_id, tile.from_data(data), self.reducer_fn)
       return
     
-    splits = list(extent.find_overlapping(self.extents, region))
+    splits = list(extent.find_overlapping(self.tiles, region))
+    futures = []
     for dst_key, intersection in splits:
       #util.log_info('%d %s %s %s', self.table.id(), region, dst_key, intersection)
-      shard = self.extents[dst_key]
+      blob_id = self.tiles[dst_key]
       src_slice = extent.offset_slice(region, intersection)
       update_tile = tile.from_intersection(dst_key, intersection, data[src_slice])
-      #util.log_info('%s', update_tile)
-      self.table.update(shard, dst_key, update_tile)
-    
+      #util.log_info('%s %s %s %s', dst_key.shape, intersection.shape, blob_id, update_tile)
+      futures.append(ctx.update(blob_id, update_tile, self.reducer_fn, wait=False))
+
+    for f in futures: f.wait()
   
   def select(self, idx):
     '''
@@ -254,7 +231,7 @@ class DistArray(object):
     return self.select(np.index_exp[:])
 
 
-def from_table(table):
+def from_table(extents):
   '''
   Construct a distarray from an existing table.
   Keys must be of type `Extent`, values of type `Tile`.
@@ -265,10 +242,6 @@ def from_table(table):
   
   :param table:
   '''
-  extents = {}
-  for shard, k, v in table.keys():
-    extents[k] = shard
-    
   Assert.no_duplicates(extents)
   
   if not extents:
@@ -278,24 +251,25 @@ def from_table(table):
   
   if len(extents) > 0:
     # fetch a one element array in order to get the dtype
-    key, shard = extents.iteritems().next() 
-    fetch = NestedSlice(key, np.index_exp[0:1])
-    t = table.get(shard, fetch)
-    # (We're not actually returning a tile, as the selector instead
-    #  is returning just the underlying array.  Sigh).  
-    # Assert.isinstance(t, tile.Tile)
+    key, blob_id = extents.iteritems().next()
+    util.log_info('%s :: %s', key, blob_id)
+    t = core.get_ctx().get(blob_id, None)
+    Assert.isinstance(t, tile.Tile)
     dtype = t.dtype
   else:
     # empty table; default dtype.
     dtype = np.float
   
-  return DistArray(shape=shape, dtype=dtype, table=table, extents=extents)
+  return DistArray(shape=shape, dtype=dtype, tiles=extents, reducer_fn=None)
 
-def map_to_array(array, mapper_fn, combine_fn=None, reduce_fn=None, kw=None):
-  return from_table(array.map_to_table(mapper_fn=mapper_fn,
-                                       combine_fn=combine_fn,
-                                       reduce_fn=reduce_fn,
-                                       kw=kw))
+def map_to_array(array, mapper_fn, kw=None):
+  results = array.map_to_table(mapper_fn=mapper_fn, kw=kw)
+  extents = {}
+  for blob_id, d in results.iteritems():
+    for ex, id in d:
+      extents[ex] = id
+
+  return from_table(extents)
 
   
 def best_locality(array, ex):
@@ -315,7 +289,7 @@ def best_locality(array, ex):
   
 
 
-def slice_mapper(ex, tile, **kw):
+def _slice_mapper(ex, tile, **kw):
   '''
   Run when mapping over a slice.
   Computes the intersection of the current tile and a global slice.
@@ -329,15 +303,17 @@ def slice_mapper(ex, tile, **kw):
   '''
   mapper_fn = kw['_slice_fn']
   slice_extent = kw['_slice_extent']
+
   fn_kw = kw['fn_kw']
   if fn_kw is None: fn_kw = {}
-  
+
   intersection = extent.intersection(slice_extent, ex)
   if intersection is None:
     return []
   
   offset = extent.offset_from(slice_extent, intersection)
-  
+  offset.array_shape = slice_extent.shape
+
   subslice = extent.offset_slice(ex, intersection)
   subtile = tile[subslice]
   
@@ -355,28 +331,22 @@ class Slice(object):
     self.darray = darray
     self.slice = idx
     self.shape = self.slice.shape
-    intersections = [extent.intersection(self.slice, ex) for ex in self.darray.extents]
+    intersections = [extent.intersection(self.slice, ex) for ex in self.darray.tiles]
     intersections = [ex for ex in intersections if ex is not None]
     offsets = [extent.offset_from(self.slice, ex) for ex in intersections]
-    self.extents = offsets
+    self.tiles = offsets
     self.dtype = darray.dtype
     
   def foreach(self, mapper_fn, kw):
-    return spartan.foreach(self.darray.table,
-                           fn=slice_mapper,
-                           kw={'_slice_extent' : self.slice,
-                               '_slice_fn' : mapper_fn,
-                               'fn_kw' : kw })
+    return self.darray.foreach(mapper_fn=_slice_mapper,
+                               kw={'_slice_extent' : self.slice, '_slice_fn' : mapper_fn, 'fn_kw' : kw })
   
-  def map_to_table(self, mapper_fn, kw, combine_fn=None, reduce_fn=None):
-    return spartan.map_items(self.darray.table, 
-                             mapper_fn = slice_mapper,
-                             combine_fn = combine_fn,
-                             reduce_fn = reduce_fn,
-                             kw={'fn_kw' : kw,
-                                 '_slice_extent' : self.slice,
-                                 '_slice_fn' : mapper_fn })
-    
+  def map_to_table(self, mapper_fn, kw):
+    return self.darray.map_to_table(mapper_fn = _slice_mapper,
+                                    kw={'fn_kw' : kw,
+                                        '_slice_extent' : self.slice,
+                                        '_slice_fn' : mapper_fn })
+
   def fetch(self, idx):
     offset = extent.compute_slice(self.slice, idx.to_slice())
     return self.darray.fetch(offset)
@@ -427,7 +397,7 @@ class Broadcast(object):
         lr.append(ex.lr[i])
     
     ex = extent.create(ul, lr, self.base.shape) 
-   
+
     template = np.ndarray(ex.shape, dtype=self.base.dtype)
     fetched = self.base.fetch(ex)
     

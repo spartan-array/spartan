@@ -53,10 +53,8 @@ def _find_cluster_mapper(inputs, ex, d_pts, old_centers,
   new_counts.update(extent.from_shape(new_counts.shape), l_counts)
   
 def run(num_pts, num_centers, num_dim):
-  ctx = spartan.get_master()
-  
   pts = expr.rand(num_pts, num_dim,
-                  tile_hint=(divup(num_pts, ctx.num_workers()), num_dim)).force()
+                  tile_hint=(divup(num_pts, ctx.num_workers), num_dim)).force()
                              
   centers = expr.rand(num_centers, num_dim).force()
   

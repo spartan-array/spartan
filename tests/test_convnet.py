@@ -4,7 +4,7 @@ from test_common import with_ctx
 from math import sqrt
 
 N_COLORS = 3
-IMG_SIZE = (N_COLORS, 64, 64)
+IMG_SIZE = (N_COLORS, 16, 16)
 FILTER_SIZE = (5, 5)
 N_IMGS = 1
 N_FILTERS = 1
@@ -12,7 +12,7 @@ ONE_TILE = (10000, 10000, 10000, 10000)
 
 @with_ctx
 def test_convnet(ctx):
-  hint = util.divup(64, sqrt(ctx.num_workers()))
+  hint = util.divup(64, sqrt(ctx.num_workers))
    
   images = expr.eager(expr.ones((N_IMGS,) + IMG_SIZE,
                                 tile_hint=(N_IMGS, N_COLORS, hint, hint)))

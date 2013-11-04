@@ -1,11 +1,11 @@
-from .base import Expr
-from .node import Node
-from spartan import util
-from spartan.dense import extent, distarray
-from spartan.expr.base import NotShapeable
 import math
+
+from ..node import Node
+from spartan import util
+from spartan.dense import extent
 import numpy as np
 from spartan.util import divup, Assert
+
 
 try:
   import parakeet

@@ -1,5 +1,5 @@
 from .base import Expr
-from .node import Node
+from ..node import Node
 from spartan.dense import tile, distarray
 import numpy as np
 
@@ -24,19 +24,9 @@ class NdArrayExpr(Expr):
     dtype = self.dtype
     tile_hint = self.tile_hint
     
-    if self.combine_fn is not None:
-      combiner = tile.TileAccum(self.combine_fn)
-    else:
-      combiner = None
-      
-    if self.reduce_fn is not None:
-      reducer = tile.TileAccum(self.reduce_fn)
-    else:
-      reducer = None
-       
-    return distarray.create(ctx, shape, dtype,
-                            combiner=combiner,
-                            reducer=reducer,
+    return distarray.create(shape, dtype,
+                            combiner=self.combine_fn,
+                            reducer=self.reduce_fn,
                             tile_hint=tile_hint)
 
 
