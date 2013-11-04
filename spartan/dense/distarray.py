@@ -110,7 +110,13 @@ class DistArray(object):
       self.blob_to_ex[v] = k
 
     self.tiles = tiles
-  
+
+  def __del__(self):
+    if core.get_ctx().worker_id == core.MASTER_ID:
+      util.log_info('Destroying table...')
+    for ex, id in self.tiles.iteritems():
+      core.get_ctx().destroy(id)
+
   def id(self):
     return self.table.id()
 

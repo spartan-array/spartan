@@ -64,7 +64,8 @@ class Worker(object):
     handle.done(resp)
 
   def destroy(self, req, handle):
-    del self._blobs[req.id]
+    if req.id in self._blobs:
+      del self._blobs[req.id]
     handle.done()
 
   def update(self, req, handle):

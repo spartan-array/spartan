@@ -40,6 +40,9 @@ class GetResp(Message):
   _members = ['id', 'data']
 
 
+class DestroyReq(Message):
+  _members = ['id' ]
+
 class UpdateReq(Message):
   _members = ['id', 'data', 'reducer']
 
@@ -110,6 +113,12 @@ class BlobCtx(object):
       #  if f.wait() is not None:
       #    self.id_map[blob_id] = idx
     #return self.id_map[blob_id]
+
+  def destroy(self, blob_id):
+    if self.worker_id != MASTER_ID: return
+    #util.log_info('Destroy: %s', blob_id)
+    req = DestroyReq(id=blob_id)
+    self._send(blob_id, 'destroy', req)
 
   def get(self, blob_id, selector):
     Assert.isinstance(blob_id, BlobId)

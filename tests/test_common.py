@@ -31,8 +31,6 @@ def sig_handler(sig, frame):
     print '-' * 100
     traceback.print_stack(stack)
 
-signal.signal(signal.SIGINT, sig_handler)
-
 class BenchTimer(object):
   def __init__(self, num_workers):
     self.times = []
@@ -52,6 +50,8 @@ def run_benchmarks(module, benchmarks, master, timer):
     getattr(module, benchname)(master, timer)
   
 def run(filename):
+  signal.signal(signal.SIGINT, sig_handler)
+
   config.add_flag('worker_list', type=str, default='4,8,16,32,64,80')
   config.parse_args(sys.argv)
   mod_name, _ = splitext(basename(filename))
