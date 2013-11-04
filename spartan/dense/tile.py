@@ -27,8 +27,11 @@ class Tile(object):
   # BLOB INTERFACE
   def get(self, selector):
     self._initialize()
-    #util.log_info('SELECT: %s, %s', self._data.shape, selector)
-    return self.data[selector]
+    try:
+      return self.data[selector]
+    except:
+      util.log_info('SELECT FAILED: %s, %s', self._data.shape, selector)
+      raise
 
   def update(self, update, reducer):
     return merge_tiles(self, update, reducer)

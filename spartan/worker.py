@@ -58,14 +58,19 @@ class Worker(object):
     
   def create(self, req, handle):
     assert self._initialized
-    self._blobs[req.id] = req.data
+    if req.id == -1:
+      id = core.get_ctx().create(req.data)
+    else:
+      id = req.id
 
-    resp = core.CreateResp(id=req.id)
+    self._blobs[id] = req.data
+    resp = core.CreateResp(id=id)
     handle.done(resp)
 
   def destroy(self, req, handle):
     if req.id in self._blobs:
       del self._blobs[req.id]
+
     handle.done()
 
   def update(self, req, handle):

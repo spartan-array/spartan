@@ -26,8 +26,10 @@ def benchmark_linear_regression(ctx, timer):
     diff = x * (yp - y)
     grad = expr.sum(diff, axis=0).glom().reshape((N_DIM, 1))
     #w = w - grad * 1e-6
-     
+
   for i in range(5):
+    print '*' * 100
+    print i
     timer.time_op('linear-regression', _step)
   
 if __name__ == '__main__':

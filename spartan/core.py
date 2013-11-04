@@ -63,7 +63,8 @@ class CreateResp(Message):
   _members = ['id']
 
 
-BlobId = int
+class BlobId(Message):
+  _members = ['worker', 'id']
 
 
 class Blob(Node):
@@ -86,9 +87,13 @@ class BlobCtx(object):
     self.workers = workers
     self.id_map = {}
     self.local_worker = local_worker
-
+    self.active = True
 
   def _send(self, id, method, req, wait=True):
+    if self.active == False:
+      util.log_info('Ctx disabled.')
+      return None
+
     #util.log_info('%s %s', id, method)
     worker_id = self._lookup(id)
 
@@ -105,7 +110,7 @@ class BlobCtx(object):
     return pending_req
 
   def _lookup(self, blob_id):
-    worker_id = blob_id >> 32
+    worker_id = blob_id.worker
     return worker_id
     #if not blob_id in self.id_map:
       #futures = [(id, w.lookup(blob_id)) for id, w in self.workers.iteritems()]
@@ -131,15 +136,16 @@ class BlobCtx(object):
 
   def create(self, data):
     assert self.worker_id >= 0, self.worker_id
-    new_id = id_counter.next()
 
     if self.worker_id >= MASTER_ID:
-      worker_id = new_id % len(self.workers)
+      worker_id = id_counter.next() % len(self.workers)
+      id = -1
     else:
       worker_id = self.worker_id
+      id = id_counter.next()
 
     worker = self.workers[worker_id]
-    blob_id = worker_id << 32 | new_id
+    blob_id = BlobId(worker=worker_id, id=id)
     #util.log_info('%s %s %s %s', new_id, worker_id, data.shape, ''.join(traceback.format_stack()))
 
     req = CreateReq(id=blob_id, data=data)

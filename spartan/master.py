@@ -17,6 +17,8 @@ class Master(object):
     self._ctx = None
 
   def shutdown(self):
+    self._ctx.active = False
+
     for id, w in self._workers.iteritems():
       util.log_info('Shutting down worker %d', id)
       w.shutdown().wait()

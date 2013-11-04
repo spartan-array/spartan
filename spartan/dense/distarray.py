@@ -114,6 +114,7 @@ class DistArray(object):
   def __del__(self):
     if core.get_ctx().worker_id == core.MASTER_ID:
       util.log_info('Destroying table...')
+
     for ex, id in self.tiles.iteritems():
       core.get_ctx().destroy(id)
 
@@ -258,7 +259,7 @@ def from_table(extents):
   if len(extents) > 0:
     # fetch a one element array in order to get the dtype
     key, blob_id = extents.iteritems().next()
-    util.log_info('%s :: %s', key, blob_id)
+    #util.log_info('%s :: %s', key, blob_id)
     t = core.get_ctx().get(blob_id, None)
     Assert.isinstance(t, tile.Tile)
     dtype = t.dtype
