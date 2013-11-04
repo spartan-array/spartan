@@ -11,6 +11,8 @@ file.  Configuration files should be placed in $HOME/.config/spartanrc.
 import argparse
 import time
 import os
+import sys
+import traceback
 
 parser = argparse.ArgumentParser()
 _names = set() 
@@ -37,9 +39,11 @@ class AssignMode(object):
   BY_CORE = 1
   BY_NODE = 2
 
+HOSTS = [ ('localhost', 8) ]
+
 class Flags(object):
   _parsed = False
-  
+
   profile_kernels = add_bool_flag('profile_kernels', default=False)
   profile_master = add_bool_flag('profile_master', default=False)
   log_level = add_flag('log_level', default=3, type=int)
@@ -47,7 +51,7 @@ class Flags(object):
   cluster = add_bool_flag('cluster', default=False)
   oprofile = add_bool_flag('oprofile', default=False)
   
-  config_file = add_flag('config_file', default=None, type=str)
+  config_file = add_flag('config_file', default='', type=str)
   
   port_base = add_flag('port_base', type=int, default=10000,
     help='Port to listen on (master = port_base, workers=port_base + N)')
@@ -89,20 +93,27 @@ def parse_args(argv):
  
   flags._parsed = True
   
-  if flags.config_file is None:
+  if flags.config_file == '':
     try:
       import appdirs
       flags.config_file = appdirs.user_data_dir('Spartan', 'rjpower.org') + '/spartanrc'
 
-
       if not os.path.exists(flags.config_file):
         os.makedirs(os.path.dirname(flags.config_file), mode=0755)
         open(flags.config_file, 'a').close()
-
-      execfile(flags.config_file)
     except:
       print 'Missing appdirs package; spartanrc will not be processed.'
 
+  if flags.config_file:
+    print 'Loading configuration from %s' % (flags.config_file)
+    try:
+      eval(compile(open(flags.config_file).read(),
+                   flags.config_file,
+                   'exec'))
+    except:
+      print >>sys.stderr, 'Failed to parse config file: %s' % (flags.config_file)
+      traceback.print_exc()
+      sys.exit(1)
+
   return rest
 
-HOSTS = [ ('localhost', 8) ]

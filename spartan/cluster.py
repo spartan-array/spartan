@@ -46,7 +46,7 @@ def _start_remote_worker(worker, st, ed):
   
   #print args
   time.sleep(0.1)
-  
+
   if worker != 'localhost':
     p = subprocess.Popen(ssh_args + args, executable='ssh')
   else:
