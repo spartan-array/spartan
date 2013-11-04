@@ -41,3 +41,4 @@ Expr.mean = mean
 Expr.astype = astype
 Expr.ravel = ravel
 Expr.argmin = argmin
+Expr.argmax = argmax

@@ -65,28 +65,25 @@ def start_cluster(num_workers, use_cluster_workers):
   :param num_workers:
   :param use_cluster_workers:
   '''
-  master = spartan.master.Master(flags.port_base, num_workers)
-  time.sleep(0.1)
-
   if not use_cluster_workers:
     _start_remote_worker('localhost', 0, num_workers)
-    master.wait_for_initialization()
-    return master
-  
-  count = 0
-  num_hosts = len(config.HOSTS)
-  for worker, total_tasks in config.HOSTS:
-    if flags.assign_mode == config.AssignMode.BY_CORE:
-      sz = total_tasks
-    else:
-      sz = util.divup(num_workers, num_hosts)
-    
-    sz = min(sz, num_workers - count)
-    _start_remote_worker(worker, count, count + sz)
-    count += sz
-    if count == num_workers:
-      break
+  else:
+    count = 0
+    num_hosts = len(config.HOSTS)
+    for worker, total_tasks in config.HOSTS:
+      if flags.assign_mode == config.AssignMode.BY_CORE:
+        sz = total_tasks
+      else:
+        sz = util.divup(num_workers, num_hosts)
+      
+      sz = min(sz, num_workers - count)
+      _start_remote_worker(worker, count, count + sz)
+      count += sz
+      if count == num_workers:
+        break
 
+  master = spartan.master.Master(flags.port_base, num_workers)
+  time.sleep(0.1)
   master.wait_for_initialization()
   return master
 

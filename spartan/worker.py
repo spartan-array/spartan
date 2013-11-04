@@ -89,10 +89,10 @@ class Worker(object):
     for blob_id in req.blobs:
       #util.log_info('%s %s', blob_id, blob_id in self._blobs)
       if blob_id in self._blobs:
-        util.log_info('W%d kernel start', self.id)
+        #util.log_info('W%d kernel start', self.id)
         blob = self._blobs[blob_id]
         results[blob_id] = req.mapper_fn(blob_id, blob, **req.kw)
-        util.log_info('W%d kernel finish', self.id)
+        #util.log_info('W%d kernel finish', self.id)
     handle.done(results)
 
     self._kernel_prof.disable()

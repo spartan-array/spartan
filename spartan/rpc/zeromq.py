@@ -18,6 +18,7 @@ POLLER = None
 def poller():
   global POLLER
   if POLLER is None:
+    util.log_info('Started poller..')
     POLLER = ZMQPoller()
     POLLER.start()
 
@@ -248,16 +249,14 @@ class ZMQPoller(threading.Thread):
 def shutdown():
   poller().stop()
 
-CTX = zmq.Context()
-
 import atexit
 atexit.register(shutdown)
 
 def server_socket(addr):
   host, port = addr
-  return ServerSocket(CTX, zmq.ROUTER, (host, port))
+  return ServerSocket(zmq.Context.instance(), zmq.ROUTER, (host, port))
 
 
 def client_socket(addr):
   host, port = addr
-  return Socket(CTX, zmq.DEALER, (host, port))
+  return Socket(zmq.Context.instance(), zmq.DEALER, (host, port))

@@ -73,17 +73,8 @@ class TileExtent(object):
     if axis is not None:
       return idx + self.ul[axis]
 
-    # first unravel idx to a local position
-    local_idx = idx
-    unravelled = []
-    shp = self.shape
-    for i in range(len(shp)):
-      unravelled.append(local_idx % shp[i])
-      local_idx /= shp[i]
-    
-    unravelled = np.array(list(reversed(unravelled)))
-    unravelled += self.ul
-    return ravelled_pos(unravelled, self.array_shape)
+    local_idx = unravelled_pos(idx, self.shape)
+    return ravelled_pos(self.ul_array + local_idx, self.array_shape)
 
   def add_dim(self):
     return create(self.ul + (0,), 
