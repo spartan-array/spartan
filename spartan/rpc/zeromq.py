@@ -8,11 +8,20 @@ import threading
 import time
 import sys
 import traceback
-
+import socket
 import zmq
 
 from .common import Group, SocketBase
+from spartan import util
 
+POLLER = None
+def poller():
+  global POLLER
+  if POLLER is None:
+    POLLER = ZMQPoller()
+    POLLER.start()
+
+  return POLLER
 
 class Socket(SocketBase):
   # __slots__ = ['_zmq', '_hostport', '_out', '_in', '_addr', '_closed', '_shutdown', '_lock']
@@ -26,26 +35,26 @@ class Socket(SocketBase):
     self._lock = threading.RLock()
 
   def in_poll_loop(self):
-    return threading.current_thread() == POLLER
+    return threading.current_thread() == poller()
 
   def __repr__(self):
-    return 'Socket(%s)' % (self.addr)
+    return 'Socket(%s)' % ((self.addr,))
 
   def flush(self):
     self.handle_write()
 
   def close(self, *args):
     if self.in_poll_loop():
-      POLLER.remove(self)
+      poller().remove(self)
       self.handle_close()
     else:
       self._shutdown = True
-      POLLER.close(self)
+      poller().close(self)
 
   def send(self, msg):
     assert not self._closed
     self._out.append(msg)
-    POLLER.modify(self, zmq.POLLIN | zmq.POLLOUT)
+    poller().modify(self, zmq.POLLIN | zmq.POLLOUT)
 
   def zmq(self):
     return self._zmq
@@ -59,9 +68,9 @@ class Socket(SocketBase):
   def connect(self):
     assert self._closed
     self._closed = False
-    #    util.log('Connecting: %s:%d' % self.addr)
+    util.log_info('Connecting: %s:%d' % self.addr)
     self._zmq.connect('tcp://%s:%s' % self.addr)
-    POLLER.add(self, zmq.POLLIN)
+    poller().add(self, zmq.POLLIN)
 
   @property
   def port(self):
@@ -72,6 +81,7 @@ class Socket(SocketBase):
     return self.addr[0]
 
   def handle_close(self):
+    self.flush()
     self._closed = True
     self._zmq.close()
     del self._zmq
@@ -87,7 +97,7 @@ class Socket(SocketBase):
           # util.log('Sending %s', next)
           self._zmq.send(next, copy=False)
 
-      POLLER.modify(self, zmq.POLLIN)
+      poller().modify(self, zmq.POLLIN)
 
   def handle_read(self, socket):
     self._handler(socket)
@@ -107,14 +117,15 @@ class ServerSocket(Socket):
 
   def bind(self):
     assert self._closed
-    #    util.log('Binding...')
     self._closed = False
     host, port = self.addr
+    host = socket.gethostbyname(host)
+    util.log_info('Binding... %s', (host, port))
     if port == -1:
       self.addr = (host, self._zmq.bind_to_random_port('tcp://%s' % host))
     else:
-      self._zmq.bind('tcp://%s:%d' % self.addr)
-    POLLER.add(self, zmq.POLLIN)
+      self._zmq.bind('tcp://%s:%d' % (host, port))
+    poller().add(self, zmq.POLLIN)
 
   def handle_read(self, socket):
     packet = self._zmq.recv_multipart(copy=False, track=False)
@@ -168,6 +179,7 @@ class ZMQPoller(threading.Thread):
     self._sockets = {}
 
     self._closing = {}
+    self._running = False
     self.setDaemon(True)
 
   def _run(self):
@@ -176,6 +188,7 @@ class ZMQPoller(threading.Thread):
 
     while self._running:
       socks = dict(_poll(100))
+      #util.log_info('%s', self._sockets)
       with self._lock:
         for fd, event in socks.iteritems():
           if fd == self._pipe[0]:
@@ -233,11 +246,9 @@ class ZMQPoller(threading.Thread):
 
 
 def shutdown():
-  POLLER.stop()
+  poller().stop()
 
 CTX = zmq.Context()
-POLLER = ZMQPoller()
-POLLER.start()
 
 import atexit
 atexit.register(shutdown)

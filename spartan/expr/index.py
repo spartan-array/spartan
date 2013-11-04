@@ -67,8 +67,7 @@ def eval_Index(ctx, prim, deps):
     raise NotImplementedError
   else:
     # create destination of the appropriate size
-    dst = distarray.create(ctx,
-                           join_tuple([idx.shape[0]], src.shape[1:]),
+    dst = distarray.create(join_tuple([idx.shape[0]], src.shape[1:]),
                            dtype=src.dtype)
     
     # map over it, replacing existing items.

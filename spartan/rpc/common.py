@@ -5,15 +5,18 @@ The :class:`.Client` and :class:`.Server` classes here work with
 sockets which should implement the :class:`.Socket` interface.
 '''
 import weakref
-import cPickle
-
 import sys
 import threading
 import time
 import traceback
+import types
+import cStringIO
+import cPickle
 
-from . import msg, core
 from .. import util
+from spartan import cloudpickle
+from spartan.node import Node
+
 
 RPC_ID = xrange(1000000000).__iter__()
 
@@ -26,6 +29,9 @@ def set_default_timeout(seconds):
   DEFAULT_TIMEOUT = seconds
   util.log_info('Set default timeout to %s seconds.', DEFAULT_TIMEOUT)
 
+
+class RPCException(Node):
+  _members = ['py_exc']
 
 class SocketBase(object):
   def send(self, blob): pass
@@ -48,12 +54,20 @@ def capture_exception(exc_info=None):
   if exc_info is None:
     exc_info = sys.exc_info()
   tb = traceback.format_exception(*exc_info)
-  return msg.Exception(py_exc=''.join(tb).replace('\n', '\n:: '))
+  return RPCException(py_exc=''.join(tb).replace('\n', '\n:: '))
 
 
 class Group(tuple):
   pass
 
+def pickle(obj, writer):
+  try:
+    writer.write(cPickle.dumps(obj, -1))
+  except:
+    #util.log_warn('CPICKLE failed: %s (%s)', sys.exc_info(), obj)
+    writer.write(cloudpickle.dumps(obj, -1))
+
+NO_RESULT = object()
 
 class PendingRequest(object):
   '''An outstanding RPC request.
@@ -65,27 +79,32 @@ class PendingRequest(object):
     self.rpc_id = rpc_id
     self.created = time.time()
     self.finished = False
+    self.result = NO_RESULT
 
     SERVER_PENDING[self] = 1
 
+  def wait(self):
+    while self.result is NO_RESULT:
+      time.sleep(0.001)
+    return self.result
+
   def done(self, result=None):
     # util.log_info('RPC finished in %.3f seconds' % (time.time() - self.created))
-    if result is None:
-      result = msg.EMPTY
-
     self.finished = True
-    assert isinstance(result, msg.Message), 'Bad result type %s' % result
-    header = { 'rpc_id' : self.rpc_id, 'klass' : result.__class__ }
-    # util.log_info('Finished %s, %s', self.socket.addr, self.rpc_id)
-    w = core.Writer()
-    cPickle.dump(header, w, -1)
-    result.encode(w)
-    self.socket.send(w.getvalue())
+    self.result = result
+
+    if self.socket is not None:
+      header = { 'rpc_id' : self.rpc_id }
+      # util.log_info('Finished %s, %s', self.socket.addr, self.rpc_id)
+      w = cStringIO.StringIO()
+      cPickle.dump(header, w, -1)
+      pickle(result, w)
+      self.socket.send(w.getvalue())
 
   def __del__(self):
     if not self.finished:
-      logging.error('PendingRequest.done() not called before destruction (likely due to an exception.)')
-      self.done(result=msg.Exception('done() not called on request.'))
+      util.log_error('PendingRequest.done() not called before destruction (likely due to an exception.)')
+      self.done(result=RPCException(py_exc='done() not called on request.'))
 
 
 class RemoteException(Exception):
@@ -156,7 +175,7 @@ class Future(object):
       util.log_info('timed out!')
       raise Exception('Timed out on remote call (%s %s)', self.addr, self.rpc_id)
 
-    if isinstance(self.result, msg.Exception):
+    if isinstance(self.result, RPCException):
       raise RemoteException(self.result.py_exc)
     return self.result
 
@@ -187,7 +206,7 @@ class Server(object):
     self._socket.register_handler(self.handle_read)
     self._methods = {}
     self._running = False
-    self.register_method('diediedie', self._diediedie, msg.Empty, msg.Empty)
+    self.register_method('diediedie', self._diediedie)
 
   def _diediedie(self, handle, req):
     handle.done(None)
@@ -208,26 +227,35 @@ class Server(object):
     self._running = True
     self._socket.bind()
 
-  def register_method(self, name, fn, req_class, resp_class):
-    self._methods[name] = (fn, req_class, resp_class)
+  def register_object(self, obj):
+    for name in dir(obj):
+      if name.startswith('__'): continue
+      fn = getattr(obj, name)
+      if isinstance(fn, types.MethodType):
+        self.register_method(name, fn)
+  
+  def register_method(self, name, fn):
+    self._methods[name] = fn
 
   def handle_read(self, socket):
     data = socket.recv()
-    reader = core.Reader(data)
+    reader = cStringIO.StringIO(data)
     header = cPickle.load(reader)
 
-    # util.log_info('Starting: %s %s', self._socket.addr, header['rpc_id'])
+    #util.log_info('Reading: %s %s', self._socket.addr, header['rpc_id'])
     handle = PendingRequest(socket, header['rpc_id'])
     name = header['method']
+
     try:
-      fn, req_class, resp_class = self._methods[name]
+      fn = self._methods[name]
     except KeyError:
       handle.done(capture_exception())
       return
 
     try:
-      req = msg.Message.decode(reader)
-      fn(handle, req)
+      req = cPickle.load(reader)
+      result = fn(req, handle)
+      assert result is None, 'non-None result from RPC handler (use handle.done())'
     except:
       util.log_info('Caught exception in handler.', exc_info=1)
       handle.done(capture_exception())
@@ -247,21 +275,16 @@ class ProxyMethod(object):
   def __call__(self, request=None):
     rpc_id = RPC_ID.next()
 
-    if request is None:
-      request = msg.EMPTY
-
     header = { 'method' : self.method, 'rpc_id' : rpc_id }
 
     f = Future(self.socket.addr, rpc_id)
     self.client._futures[rpc_id] = f
-    w = core.Writer()
-    cPickle.dump(header, w, 0)
-    if isinstance(request, msg.Message):
-      request.encode(w)
-#      util.collect_time(lambda: request.encode(w), 'Encoding time')
-    else:
-      w.write(request)
-#    util.log_info('Sending %d bytes for %s', len(serialized), self.method)
+
+    w = cStringIO.StringIO()
+    cPickle.dump(header, w, -1)
+    pickle(request, w)
+
+    #util.log_info('Sending %s', self.method)
 #    if len(serialized) > 800000:
 #      util.log_info('%s::\n %s; \n\n\n %s', self.method, ''.join(traceback.format_stack()), request)
 
@@ -278,6 +301,9 @@ class Client(object):
   def __reduce__(self, *args, **kwargs):
     raise cPickle.PickleError('Not pickleable.')
 
+  def addr(self):
+    return self._socket.addr
+
   def __enter__(self):
     return self
 
@@ -292,10 +318,9 @@ class Client(object):
 
   def handle_read(self, socket):
     data = socket.recv()
-    import numpy as N
-    reader = core.Reader(N.frombuffer(data, dtype=N.uint8))
+    reader = cStringIO.StringIO(data)
     header = cPickle.load(reader)
-    resp = header['klass'].decode(reader)
+    resp = cPickle.load(reader)
     rpc_id = header['rpc_id']
     f = self._futures[rpc_id]
     f._set_result(resp)

@@ -5,10 +5,10 @@ and built into a control flow graph, which is then compiled
 into a series of primitive array operations.
 '''
 
-from .node import Node
+from ..node import Node
 import numpy as np
-import spartan
-from spartan import util
+from .. import core
+
 
 def _apply_binary_op(inputs, binary_op=None, numpy_expr=None):
   assert len(inputs) == 2
@@ -245,7 +245,7 @@ def evaluate(node):
     return node
   
   from . import backend
-  result = backend.evaluate(spartan.get_master(), dag(node))
+  result = backend.evaluate(core.get_ctx(), dag(node))
   node._cached_value = result
   return result
 

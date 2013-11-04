@@ -4,7 +4,7 @@ from spartan.dense import extent, tile, distarray
 from spartan.expr.base import make_primitive
 
 def _reduce_mapper(ex, tile, reducer, axis, output, fn_kw):
-  #util.log_info('Reduce: %s', local_reducer)
+  #util.log_info('Reduce: %s %s %s %s %s', reducer, ex, tile, axis, fn_kw)
   reduced = reducer(ex, tile, axis, **fn_kw)
   dst_extent = extent.index_for_reduction(ex, axis)
   #util.log_info('Update: %s %s', dst_extent, reduced)
@@ -23,14 +23,14 @@ class ReduceExpr(Expr):
     util.log_info('Reducing %s over axis %s', input_array.shape, axis)
     
     shape = extent.shape_for_reduction(input_array.shape, axis)
-    tile_accum = tile.TileAccum(deps['combine_fn'])
+    tile_accum = deps['combine_fn']
     
-    output_array = distarray.create(ctx, shape, dtype,
+    output_array = distarray.create(shape, dtype,
                                     combiner=tile_accum, 
                                     reducer=tile_accum)
     
     
-    util.log_info('Reducing into array %d', output_array.table.id())
+    util.log_info('Reducing into array %s', output_array)
     input_array.foreach(_reduce_mapper, kw={'reducer' : reducer,
                                             'axis' : axis,
                                             'output' : output_array,

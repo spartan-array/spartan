@@ -6,11 +6,11 @@ import test_common
 import math
 
 def benchmark_matmul(ctx, timer):
-  N = int(1000 * math.pow(ctx.num_workers(), 1.0 / 3.0))
-  T = util.divup(N, math.sqrt(ctx.num_workers()))
+  N = int(1000 * math.pow(ctx.num_workers, 1.0 / 3.0))
+  T = util.divup(N, math.sqrt(ctx.num_workers))
 
   util.log_info('Testing with %d workers, N = %d, tile_size=%s', 
-                ctx.num_workers(), N, T)
+                ctx.num_workers, N, T)
   
   x = expr.eager(expr.ones((N, N), dtype=np.double, tile_hint=(T, T)))
   y = expr.eager(expr.ones((N, N), dtype=np.double, tile_hint=(T, T)))

@@ -1,8 +1,7 @@
 from copy import copy
-from spartan import util, expr
+from spartan import util, expr, node
 from spartan.dense import extent
 from spartan.expr import NotShapeable, lazify, make_primitive
-from treelike import node
 import cPickle
 import numpy as np
 import random

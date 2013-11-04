@@ -43,7 +43,7 @@ class Flags(object):
   profile_kernels = add_bool_flag('profile_kernels', default=False)
   profile_master = add_bool_flag('profile_master', default=False)
   log_level = add_flag('log_level', default=3, type=int)
-  num_workers = add_flag('num_workers', default=1, type=int)
+  num_workers = add_flag('num_workers', default=3, type=int)
   cluster = add_bool_flag('cluster', default=False)
   oprofile = add_bool_flag('oprofile', default=False)
   
@@ -55,7 +55,7 @@ class Flags(object):
   use_threads = add_bool_flag(
     'use_threads',
     help='When running locally, use threads instead of forking. (slow, for debugging)', 
-    default=True)
+    default=False)
   
   assign_mode = AssignMode.BY_NODE
   add_flag('bycore', dest='assign_mode', action='store_const', const=AssignMode.BY_CORE)
@@ -83,8 +83,6 @@ def parse_args(argv):
   import spartan.expr.optimize
   
   
-  from spartan import wrap
-  
   parsed_flags, rest = parser.parse_known_args(argv)
   for flagname in _names:
     setattr(flags, flagname, getattr(parsed_flags, flagname))
@@ -92,16 +90,19 @@ def parse_args(argv):
   flags._parsed = True
   
   if flags.config_file is None:
-    import appdirs
-    flags.config_file = appdirs.user_data_dir('Spartan', 'rjpower.org') + '/spartanrc'
-    
-  if not os.path.exists(flags.config_file):
-    os.makedirs(os.path.dirname(flags.config_file), mode=0755)
-    open(flags.config_file, 'a').close()
-  
-  execfile(flags.config_file)
-  
-  wrap.set_log_level(flags.log_level)
+    try:
+      import appdirs
+      flags.config_file = appdirs.user_data_dir('Spartan', 'rjpower.org') + '/spartanrc'
+
+
+      if not os.path.exists(flags.config_file):
+        os.makedirs(os.path.dirname(flags.config_file), mode=0755)
+        open(flags.config_file, 'a').close()
+
+      execfile(flags.config_file)
+    except:
+      print 'Missing appdirs package; spartanrc will not be processed.'
+
   return rest
 
 HOSTS = [ ('localhost', 8) ]

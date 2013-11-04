@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 from contextlib import contextmanager
+import logging
 from math import ceil
 from os.path import basename
-import cStringIO
 import collections
 import os
 import select
@@ -12,7 +12,32 @@ import threading
 import time
 import traceback
 
-from wrap import log_info, log_debug, log_warn, log_error
+import cStringIO
+
+
+logging.basicConfig(format='%(filename)s:%(lineno)s [%(funcName)s] %(message)s',
+                    level=logging.INFO)
+
+def log_info(msg, *args):
+  msg = msg % args
+  print >>sys.stderr, msg
+
+
+log_debug = logging.debug
+log_info = logging.info
+log_warn = logging.warn
+log_error = logging.error
+log_fatal = logging.fatal
+
+def findCaller(obj):
+  f = sys._getframe(4)
+  co = f.f_code
+  filename = os.path.normcase(co.co_filename)
+  return co.co_filename, f.f_lineno, co.co_name
+
+root = logging.getLogger()
+logging.RootLogger.findCaller = findCaller
+
 
 class FileWatchdog(threading.Thread):
   """Watchdog for a file (typically `sys.stdin` or `sys.stdout`).
@@ -220,8 +245,12 @@ def synchronized(fn):
   def _fn(*args, **kw):
     with lock:
       return fn(*args, **kw)
-  
-  _fn.__name__ = fn.__name__
+
+  if hasattr(fn, '__name__'):
+    _fn.__name__ = fn.__name__
+  else:
+    _fn.__name__ = 'unnamed'
+
   return _fn
   
 def count_calls(fn):

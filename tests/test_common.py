@@ -1,5 +1,5 @@
 from os.path import basename, splitext
-from spartan import util, config, wrap
+from spartan import util, config
 from spartan.cluster import start_cluster
 from spartan.config import flags
 import cProfile
@@ -65,9 +65,8 @@ def run(filename):
       util.log_info('Running benchmarks on %d workers', i)
       master = start_cluster(i, flags.cluster)
       run_benchmarks(module, benchmarks, master, timer)
-      
-      del master
-  
+      master.shutdown()
+
   if flags.profile_master:  
     prof.disable()
     prof.dump_stats('master_prof.out')

@@ -1,21 +1,21 @@
-from spartan import config, util
-from spartan.config import flags
 import os.path
 import socket
-import spartan
-import spartan.worker
 import subprocess
 import threading
 import time
+
+from spartan import config, util
+from spartan.config import flags
+import spartan
+import spartan.worker
+import spartan.master
 
 def _start_remote_worker(worker, st, ed):
   util.log_info('Starting worker %d:%d on host %s', st, ed, worker)
   if flags.use_threads and worker == 'localhost':
     for i in range(st, ed):
       p = threading.Thread(target=spartan.worker._start_worker,
-                           args=('%s:%d' % (socket.gethostname(), flags.port_base), 
-                                 flags.port_base + 1 + i,
-                                 i))
+                           args=((socket.gethostname(), flags.port_base), flags.port_base + 1 + i, i))
       p.daemon = True
       p.start()
     time.sleep(0.1)
@@ -65,12 +65,12 @@ def start_cluster(num_workers, use_cluster_workers):
   :param num_workers:
   :param use_cluster_workers:
   '''
-  master = spartan.start_master(flags.port_base, num_workers)
-  spartan.set_log_level(flags.log_level)
+  master = spartan.master.Master(flags.port_base, num_workers)
   time.sleep(0.1)
 
   if not use_cluster_workers:
     _start_remote_worker('localhost', 0, num_workers)
+    master.wait_for_initialization()
     return master
   
   count = 0
@@ -86,6 +86,7 @@ def start_cluster(num_workers, use_cluster_workers):
     count += sz
     if count == num_workers:
       break
-    
+
+  master.wait_for_initialization()
   return master
 

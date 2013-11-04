@@ -11,9 +11,9 @@ N_FILTERS = 16
 ONE_TILE = (10000, 10000, 10000, 10000)
 
 def benchmark_convnet(ctx, timer):
-  hint = util.divup(IMG_SIZE, sqrt(ctx.num_workers()))
+  hint = util.divup(IMG_SIZE, sqrt(ctx.num_workers))
   tile_hint = (N_IMGS, N_COLORS, hint, hint)
-  #tile_hint = (util.divup(N_IMGS, ctx.num_workers()), N_COLORS, IMG_SIZE, IMG_SIZE)
+  #tile_hint = (util.divup(N_IMGS, ctx.num_workers), N_COLORS, IMG_SIZE, IMG_SIZE)
   util.log_info('Hint: %s', tile_hint)
     
   images = expr.eager(expr.ones((N_IMGS, N_COLORS, IMG_SIZE, IMG_SIZE),

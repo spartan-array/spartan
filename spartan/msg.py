@@ -4,14 +4,15 @@
 
 from spartan import core
 import cPickle
-import numpy as N
+from cloud.serialization import cloudpickle
+import numpy as np
 
 
 class Reduction(object):
   pass
 
 def write(obj, f):
-  if isinstance(obj, N.ndarray):
+  if isinstance(obj, np.ndarray):
     f.write('N')
     cPickle.dump(obj.dtype, f, protocol= -1)
     cPickle.dump(obj.shape, f, protocol= -1)
@@ -44,7 +45,6 @@ def write(obj, f):
       f.write(v)
     except cPickle.PickleError:
 #      print 'Using cloudpickle for ', obj
-      from cloud.serialization import cloudpickle
       cloudpickle.dump(obj, f, protocol= -1)
 
 def read(f):
@@ -105,6 +105,14 @@ class Message(object):
   def __cmp__(self, other):
     return cmp(self.__dict__, other.__dict__)
 
+
+class Register(Message):
+  worker_host = None
+  worker_port = None
+
+class Initialize(Message):
+  workers = None
+  
 
 class DelTable(Message):
   def __init__(self, name):
@@ -176,13 +184,6 @@ class IteratorResponse(Message):
 
 class KernelRequest(Message):
   def __init__(self, slices=None, kernel=None):
-    """
-    :param kernel: The kernel function to run.  Will be called with (tables, table_id, shard, idx)
-
-    :param slices: A list of 3-tuples (table_id, shard, idx).  The kernel function
-      will be run once for each tuple, on the worker which holds the data for
-      (table_id, shard).
-    """
     if slices is None: slices = []
     self.slices = slices
     self.kernel = kernel
@@ -194,15 +195,6 @@ class KernelResponse(Message):
       results = []
     self.results = results
 
-
-class Ping(Message):
-  def __init__(self, ping):
-    self.ping = ping
-
-
-class Pong(Message):
-  def __init__(self, pong):
-    self.pong = pong
 
 
 class Exception(Message):

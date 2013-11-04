@@ -4,7 +4,7 @@ import test_common
 
 def benchmark_slice(ctx, timer):
   distarray.TILE_SIZE = 10000 * 1000
-  TEST_SIZE = 1000 * ctx.num_workers()
+  TEST_SIZE = 1000 * ctx.num_workers
   
   # force arange to evaluate first.
   x = expr.lazify(

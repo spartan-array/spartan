@@ -16,8 +16,6 @@ from .shuffle import ShuffleExpr
 from .map import MapExpr
 from .ndarray import NdArrayExpr
 from spartan.dense.distarray import broadcast
-import treelike
-
 
 try:
   import numexpr
