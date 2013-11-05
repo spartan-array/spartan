@@ -1,4 +1,4 @@
-from spartan import util, flags, expr
+from spartan import util, config, expr
 from spartan.dense import distarray
 import test_common
 
@@ -7,8 +7,7 @@ def benchmark_slice(ctx, timer):
   TEST_SIZE = 1000 * ctx.num_workers
   
   # force arange to evaluate first.
-  x = expr.lazify(
-       expr.zeros((TEST_SIZE,10000)).evaluate())
+  x = expr.eager(expr.zeros((TEST_SIZE,10000)))
 
   for i in range(5): 
     timer.time_op('slice-rows', lambda: expr.evaluate(x[200:300, :].sum()))
