@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import cProfile
+import pstats
 import threading
 import time
 
@@ -107,19 +108,20 @@ class Worker(object):
     threading.Thread(target=self._run_kernel, args=(req, handle)).start()
 
   def shutdown(self, req, handle):
-    util.log_info('Shutdown worker %d', self.id)
-    self._running = False
     if flags.profile_kernels:
       os.system('mkdir -p ./_kernel-profiles/')
-      self._kernel_prof.dump_stats('./_kernel-profiles/%d' % self.id)
+      stats = pstats.Stats(self._kernel_prof)
+      stats.add(rpc.poller().profiler)
+      stats.dump_stats('./_kernel-profiles/%d' % self.id)
 
+    util.log_info('Shutdown worker %d (profile? %d)', self.id, flags.profile_kernels)
     handle.done()
-
     threading.Thread(target=self._shutdown).start()
 
   def _shutdown(self):
     time.sleep(0.1)
     util.log_info('Closing server...')
+    self._running = False
     self._server.shutdown()
 
   def wait_for_shutdown(self):

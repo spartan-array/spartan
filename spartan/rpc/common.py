@@ -4,6 +4,7 @@ Simple RPC library.
 The :class:`.Client` and :class:`.Server` classes here work with
 sockets which should implement the :class:`.Socket` interface.
 '''
+import cProfile
 import weakref
 import sys
 import threading

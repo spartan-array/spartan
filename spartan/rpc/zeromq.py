@@ -1,5 +1,6 @@
 '''ZeroMQ socket implementation.'''
 import atexit
+import cProfile
 
 import collections
 
@@ -181,6 +182,7 @@ class ZMQPoller(threading.Thread):
     self._pipe = os.pipe()
     self._poller.register(self._pipe[0], zmq.POLLIN)
     self._sockets = {}
+    self.profiler = cProfile.Profile()
 
     self._closing = {}
     self._running = False
@@ -191,8 +193,10 @@ class ZMQPoller(threading.Thread):
     _poll = self._poller.poll
 
     while self._running:
+      self.profiler.disable()
       socks = dict(_poll(100))
       #util.log_info('%s', self._sockets)
+      self.profiler.enable()
       with self._lock:
         for fd, event in socks.iteritems():
           if fd == self._pipe[0]:
