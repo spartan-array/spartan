@@ -15,9 +15,6 @@ import traceback
 import cStringIO
 
 
-logging.basicConfig(format='%(filename)s:%(lineno)s [%(funcName)s] %(message)s',
-                    level=logging.INFO)
-
 def log_info(msg, *args):
   msg = msg % args
   print >>sys.stderr, msg

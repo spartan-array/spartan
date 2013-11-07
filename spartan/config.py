@@ -9,13 +9,20 @@ file.  Configuration files should be placed in $HOME/.config/spartanrc.
 """
 
 import argparse
+import logging
 import time
 import os
 import sys
 import traceback
+from spartan import util
+
+HOSTS = [
+  ('localhost', 8),
+  ]
+
 
 parser = argparse.ArgumentParser()
-_names = set() 
+_names = set()
 
 def add_flag(name, *args, **kw):
   _names.add(kw.get('dest', name))
@@ -39,14 +46,12 @@ class AssignMode(object):
   BY_CORE = 1
   BY_NODE = 2
 
-HOSTS = [ ('localhost', 8) ]
-
 class Flags(object):
   _parsed = False
 
   profile_kernels = add_bool_flag('profile_kernels', default=False)
   profile_master = add_bool_flag('profile_master', default=False)
-  log_level = add_flag('log_level', default=3, type=int)
+  log_level = add_flag('log_level', default='INFO', type=str)
   num_workers = add_flag('num_workers', default=3, type=int)
   cluster = add_bool_flag('cluster', default=False)
   oprofile = add_bool_flag('oprofile', default=False)
@@ -85,14 +90,17 @@ def parse_args(argv):
   # force configuration settings to load.
   import spartan.expr
   import spartan.expr.optimize
-  
-  
+
   parsed_flags, rest = parser.parse_known_args(argv)
   for flagname in _names:
     setattr(flags, flagname, getattr(parsed_flags, flagname))
  
   flags._parsed = True
-  
+
+  logging.basicConfig(format='%(filename)s:%(lineno)s [%(funcName)s] %(message)s',
+                      level=getattr(logging, flags.log_level))
+
+
   if flags.config_file == '':
     try:
       import appdirs
@@ -105,15 +113,17 @@ def parse_args(argv):
       print 'Missing appdirs package; spartanrc will not be processed.'
 
   if flags.config_file:
-    print 'Loading configuration from %s' % (flags.config_file)
+    util.log_info('Loading configuration from %s' % (flags.config_file))
     try:
       eval(compile(open(flags.config_file).read(),
                    flags.config_file,
                    'exec'))
     except:
-      print >>sys.stderr, 'Failed to parse config file: %s' % (flags.config_file)
-      traceback.print_exc()
+      util.log_fatal('Failed to parse config file: %s' % (flags.config_file),
+                     exc_info=1)
       sys.exit(1)
+
+  util.log_info('Hostlist: %s', HOSTS)
 
   return rest
 
