@@ -22,7 +22,7 @@ def poller():
   global POLLER
   with POLLER_LOCK:
     if POLLER is None:
-      util.log_info('Started poller.. %s %s', os.getpid(), __file__)
+      #util.log_info('Started poller.. %s %s', os.getpid(), __file__)
       POLLER = ZMQPoller()
       POLLER.start()
     return POLLER

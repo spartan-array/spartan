@@ -4,6 +4,7 @@ Simple RPC library.
 The :class:`.Client` and :class:`.Server` classes here work with
 sockets which should implement the :class:`.Socket` interface.
 '''
+from cPickle import PickleError
 import cProfile
 import weakref
 import sys
@@ -34,6 +35,13 @@ def set_default_timeout(seconds):
 class RPCException(Node):
   _members = ['py_exc']
 
+class PickledData(Node):
+  '''
+  Helper class: indicates that this message has already been pickled,
+  and should be sent as is, rather than being re-pickled.
+  '''
+  _members = ['data']
+
 class SocketBase(object):
   def send(self, blob): pass
   def recv(self): pass
@@ -61,12 +69,20 @@ def capture_exception(exc_info=None):
 class Group(tuple):
   pass
 
-def pickle(obj, writer):
+def pickle_to(obj, writer):
   try:
-    writer.write(cPickle.dumps(obj, -1))
-  except:
+    pickled = cPickle.dumps(obj, -1)
+    writer.write(pickled)
+  except (PickleError, TypeError):
     #util.log_warn('CPICKLE failed: %s (%s)', sys.exc_info(), obj)
     writer.write(cloudpickle.dumps(obj, -1))
+
+def pickle(obj):
+  try:
+    return cPickle.dumps(obj, -1)
+  except (PickleError, TypeError):
+    return cloudpickle.dumps(obj, -1)
+
 
 NO_RESULT = object()
 
@@ -99,7 +115,7 @@ class PendingRequest(object):
       # util.log_info('Finished %s, %s', self.socket.addr, self.rpc_id)
       w = cStringIO.StringIO()
       cPickle.dump(header, w, -1)
-      pickle(result, w)
+      pickle_to(result, w)
       self.socket.send(w.getvalue())
 
   def __del__(self):
@@ -285,7 +301,11 @@ class ProxyMethod(object):
 
     w = cStringIO.StringIO()
     cPickle.dump(header, w, -1)
-    pickle(request, w)
+
+    if isinstance(request, PickledData):
+      w.write(request.data)
+    else:
+      pickle_to(request, w)
 
     #util.log_info('Sending %s', self.method)
 #    if len(serialized) > 800000:
@@ -331,3 +351,20 @@ class Client(object):
 
   def close(self):
     self._socket.close()
+
+
+def forall(clients, method, request):
+  '''Invoke ``method`` with ``request`` for each client in ``clients``
+
+  ``request`` is only serialized once, so this is more efficient when
+  targeting multiple workers with the same data.
+
+  Returns a future wrapping all of the requests.
+  '''
+  futures = []
+  pickled = PickledData(data=pickle(request))
+  for c in clients:
+    futures.append(getattr(c, method)(pickled))
+
+  return FutureGroup(futures)
+
