@@ -68,24 +68,28 @@ class CreateResp(Message):
   _members = ['blob_id']
 
 
-class BlobId(Message):
+cdef class BlobId(object):
+  cdef public int worker, id
+
   def __init__(self, worker, id):
     self.worker = worker
     self.id = id
 
-  def __hash__(self): return self.worker ^  self.id
-  def __eq__(self, other): return self.worker == other.worker and self.id == other.id
-  def __repr__(self): return 'B(%d.%d)' % (self.worker, self.id)
+  def __reduce__(self):
+    return (BlobId, (self.worker, self.id))
 
-class Blob(object):
-  __metaclass__ = Node
-  _members = ['data', 'id']
+  def __hash__(BlobId self):
+    return self.worker ^ self.id
 
-  def get(self, selector):
-    assert False
+  def __richcmp__(BlobId self, BlobId other, int op):
+    if op == 2:
+      return self.worker == other.worker and self.id == other.id
+    else:
+      raise Exception, 'WTF'
 
-  def update(self, value, reducer):
-    assert False
+  def __repr__(BlobId self):
+    return 'B(%d.%d)' % (self.worker, self.id)
+
 
 id_counter = iter(xrange(10000000))
 
@@ -100,6 +104,8 @@ class BlobCtx(object):
     self.id_map = {}
     self.local_worker = local_worker
     self.active = True
+
+    #util.log_info('New blob ctx.  Worker=%s', self.worker_id)
 
   def _send(self, id, method, req, wait=True):
     if self.active == False:
@@ -176,8 +182,8 @@ class BlobCtx(object):
       worker_id = self.worker_id
       id = id_counter.next()
 
-    worker = self.workers[worker_id]
     blob_id = BlobId(worker=worker_id, id=id)
+
     #util.log_info('%s %s %s %s', new_id, worker_id, data.shape, ''.join(traceback.format_stack()))
 
     req = CreateReq(blob_id=blob_id, data=data)

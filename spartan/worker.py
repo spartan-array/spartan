@@ -64,12 +64,12 @@ class Worker(object):
 
     if req.blob_id.id == -1:
       id = core.get_ctx().create_local()
-      #util.log_info('Created blob: id %s', id)
     else:
       id = req.blob_id
 
     self._blobs[id] = req.data
     resp = core.CreateResp(blob_id=id)
+    #util.log_info('W%d :: Created blob: id %s', self.id, id)
     handle.done(resp)
 
   def destroy(self, req, handle):

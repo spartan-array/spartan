@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import collections
 from spartan import util
 from spartan.util import Assert
@@ -18,7 +20,7 @@ class TileExtent(object):
   carry the shape of the array they are a part of; this is used to
   compute global position information.
   '''
-  
+
   @property
   def size(self):
     return np.prod(self.shape)
@@ -45,9 +47,9 @@ class TileExtent(object):
 
   
   def __getitem__(self, idx):
-    return create([self.ul[idx]], 
-                  [self.lr[idx]], 
-                  [self.array_shape[idx]])
+    return create((self.ul[idx],),
+                  (self.lr[idx],),
+                  (self.array_shape[idx],))
 
   def __hash__(self):
     return hash(self.ul)
@@ -55,16 +57,7 @@ class TileExtent(object):
     #return ravelled_pos(self.ul, self.array_shape)
     
   def __eq__(self, other):
-    for i in range(len(self.ul)):
-      if other.ul[i] != self.ul[i] or other.lr[i] != self.lr[i]:
-        return False
-    return True
-
-  def __lt__(self, other):
-    for a, b in zip(self.ul, other.ul):
-      if a < b: return True
-      if b < a: return False
-    return False
+    return self.ul == other.ul and self.lr == other.lr
 
   def ravelled_pos(self):
     return ravelled_pos(self.ul, self.array_shape)
@@ -190,8 +183,8 @@ def offset_from(base, other):
   '''
   assert np.all(other.ul >= base.ul), (other, base)
   assert np.all(other.lr <= base.lr), (other, base)
-  return create(np.array(other.ul) - np.array(base.ul), 
-                np.array(other.lr) - np.array(base.ul),
+  return create(tuple(np.array(other.ul) - np.array(base.ul)),
+                tuple(np.array(other.lr) - np.array(base.ul)),
                 other.array_shape)
 
 
@@ -238,7 +231,7 @@ def from_slice(idx, shape):
     ul.append(indices[0])
     lr.append(indices[1])
     
-  return create(ul, lr, shape)
+  return create(tuple(ul), tuple(lr), shape)
 
 
 def intersection(a, b):
@@ -255,8 +248,6 @@ def intersection(a, b):
   return create(np.maximum(b.ul, a.ul),
                 np.minimum(b.lr, a.lr),
                 a.array_shape)
-
-TileExtent.intersection = intersection
 
 
 def shape_for_reduction(input_shape, axis):

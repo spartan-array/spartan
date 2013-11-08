@@ -178,6 +178,7 @@ class DistArray(object):
     
     #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
     tgt = np.ndarray(region.shape, dtype=self.dtype)
+    util.log_info('Fetching %d tiles', len(splits))
     for ex, intersection in splits:
       dst_slice = extent.offset_slice(region, intersection)
       blob_id = self.tiles[ex]
@@ -206,7 +207,7 @@ class DistArray(object):
     
     splits = list(extent.find_overlapping(self.tiles, region))
     futures = []
-    util.log_info('Updating %s tiles', len(splits))
+    #util.log_info('Updating %s tiles', len(splits))
     for dst_key, intersection in splits:
       #util.log_info('%d %s %s %s', self.table.id(), region, dst_key, intersection)
       blob_id = self.tiles[dst_key]
