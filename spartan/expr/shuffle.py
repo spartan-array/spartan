@@ -1,8 +1,9 @@
 from spartan import util, core
 from spartan.dense import distarray, tile
-from spartan.util import Assert, iterable
+from spartan.node import Node
+from spartan.util import iterable
 
-from .base import Expr, NotShapeable, lazify
+from .base import Expr, lazify
 
 
 def shuffle(v, fn, tile_hint=None, target=None, kw=None):
@@ -23,17 +24,16 @@ def shuffle(v, fn, tile_hint=None, target=None, kw=None):
   assert not iterable(v)
   
   return ShuffleExpr(array=v,
-                        map_fn=fn, 
-                        tile_hint=tile_hint,
-                        target=target, 
-                        fn_kw=kw)
+                     map_fn=fn,
+                     tile_hint=tile_hint,
+                     target=target,
+                     fn_kw=kw)
 
 
 def _target_mapper(ex, data, map_fn=None, inputs=None, target=None, fn_kw=None):
   result = map_fn(inputs, ex, **fn_kw)
   if result is not None:
     for ex, v in result:
-      util.log_info('%s %s', ex, v)
       target.update(ex, v)
   return []
         
@@ -41,13 +41,16 @@ def _notarget_mapper(ex, data, array=None, map_fn=None, inputs=None, fn_kw=None)
   #util.log_info('MapExtents: %s', map_fn)
   ctx = core.get_ctx()
   result = []
-  for ex, v in map_fn(inputs, ex, **fn_kw):
-    v = tile.from_data(v)
-    blob_id = ctx.create(v).wait().id
-    result.append((ex, blob_id))
+  map_result = map_fn(inputs, ex, **fn_kw)
+  if map_result is not None:
+    for ex, v in map_result:
+      v = tile.from_data(v)
+      blob_id = ctx.create(v).wait().blob_id
+      result.append((ex, blob_id))
   return result
 
 class ShuffleExpr(Expr):
+  __metaclass__ = Node
   _members = ['array', 'map_fn', 'target', 'tile_hint', 'fn_kw']
 
     

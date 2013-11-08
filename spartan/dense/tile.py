@@ -27,11 +27,11 @@ class Tile(object):
   # BLOB INTERFACE
   def get(self, selector):
     self._initialize()
-    try:
+    if isinstance(self.data, np.ndarray):
       return self.data[selector]
-    except:
-      util.log_info('SELECT FAILED: %s, %s', self._data.shape, selector)
-      raise
+
+    # sparse, can't select
+    return self.data
 
   def update(self, update, reducer):
     return merge_tiles(self, update, reducer)
@@ -121,6 +121,11 @@ def merge_tiles(old_tile, new_tile, reducer):
   Assert.eq(old_tile.dtype, new_tile.dtype)
   Assert.eq(old_tile.shape, new_tile.shape)
 
+  if old_tile.data is None:
+    old_tile.data = new_tile.data
+    old_tile.valid = new_tile.valid
+    return
+
   old_tile._initialize()
   new_tile._initialize()
 
@@ -130,7 +135,7 @@ def merge_tiles(old_tile, new_tile, reducer):
   # zero-dimensional arrays; just use
   # data == None as a mask.
   if len(old_tile.shape) == 0:
-    if old_tile.data is None:
+    if old_tile.data is None or reducer is None:
       old_tile.data = new_tile.data
     else:
       old_tile.data = reducer(old_tile.data, new_tile.data)
@@ -144,6 +149,9 @@ def merge_tiles(old_tile, new_tile, reducer):
   old_tile.valid[replaced] = 1
 
   if np.any(updated):
-    old_tile.data[updated] = reducer(old_tile.data[updated], new_tile.data[updated])
+    if reducer is None:
+      old_tile.data[updated] = new_tile.data[updated]
+    else:
+      old_tile.data[updated] = reducer(old_tile.data[updated], new_tile.data[updated])
 
   return old_tile

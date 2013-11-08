@@ -5,6 +5,7 @@ import collections
 import numpy as np
 from spartan import util, core
 from spartan.dense import distarray, tile
+from spartan.node import Node
 from spartan.util import Assert
 from .base import Expr, lazify, LazyList
 
@@ -36,10 +37,11 @@ def tile_mapper(ex, data, children, map_fn, fn_kw):
   result = map_fn(local_values, **fn_kw)
   #util.log_info('Done.')
   #assert isinstance(result, np.ndarray), result
-  return [(ex, ctx.create(tile.from_data(result)).wait().id)]
+  return [(ex, ctx.create(tile.from_data(result)).wait().blob_id)]
     
 
 class MapExpr(Expr):
+  __metaclass__ = Node
   _members = ['children', 'map_fn', 'fn_kw', 'local_dag']
   
   def compute_shape(self):

@@ -4,7 +4,7 @@
 
 from spartan import core
 import cPickle
-from cloud.serialization import cloudpickle
+import cloudpickle
 import numpy as np
 
 
@@ -104,100 +104,4 @@ class Message(object):
 
   def __cmp__(self, other):
     return cmp(self.__dict__, other.__dict__)
-
-
-class Register(Message):
-  worker_host = None
-  worker_port = None
-
-class Initialize(Message):
-  workers = None
-  
-
-class DelTable(Message):
-  def __init__(self, name):
-    self.name = name
-
-
-class TableDescriptor(Message):
-  def __init__(self, name, num_shards, workers=None):
-    self.name = name
-    self.num_shards = num_shards
-    self.workers = workers
-
-
-class GetRequest(Message):
-  def __init__(self, table_id, shard_id, keys=None, whole_shard=None):
-    self.table_id = table_id
-    self.shard_id = shard_id
-    self.keys = keys
-    self.whole_shard = whole_shard
-
-
-class Update(Message):
-  def __init__(self, key, op, value):
-    self.key = key
-    self.op = op
-    self.value = value
-
-
-class Entry(Message):
-  def __init__(self, key, value):
-    self.key = key
-    self.value = value
-
-
-class GetResponse(Message):
-  def __init__(self, entries=None, shard_data=None):
-    if entries is None:
-      entries = []
-    self.entries = entries
-    self.shard_data = shard_data
-
-
-class UpdateRequest(Message):
-  def __init__(self, table_id, shard_id, updates=None, shard_data=None):
-    self.table_id = table_id
-    self.shard_id = shard_id
-    if updates is None: updates = []
-    self.updates = updates
-    self.shard_data = shard_data
-
-
-class Empty(Message):
-  pass
-
-EMPTY = Empty()
-
-class IteratorRequest(Message):
-  def __init__(self, table_id, shard_id, iter_id=None):
-    self.table_id = table_id
-    self.shard_id = shard_id
-    self.iter_id = iter_id
-
-
-class IteratorResponse(Message):
-  def __init__(self, iter_id, entries=None):
-    self.iter_id = iter_id
-    self.entries = entries
-
-
-class KernelRequest(Message):
-  def __init__(self, slices=None, kernel=None):
-    if slices is None: slices = []
-    self.slices = slices
-    self.kernel = kernel
-
-
-class KernelResponse(Message):
-  def __init__(self, results=None):
-    if results is None:
-      results = []
-    self.results = results
-
-
-
-class Exception(Message):
-  def __init__(self, py_exc):
-    self.py_exc = py_exc
 

@@ -51,8 +51,11 @@ def _find_cluster_mapper(inputs, ex, d_pts, old_centers,
   # update centroid positions
   new_centers.update(extent.from_shape(new_centers.shape), l_centers)
   new_counts.update(extent.from_shape(new_counts.shape), l_counts)
+  return []
   
 def run(num_pts, num_centers, num_dim):
+  ctx = spartan.core.get_ctx()
+
   pts = expr.rand(num_pts, num_dim,
                   tile_hint=(divup(num_pts, ctx.num_workers), num_dim)).force()
                              
@@ -65,11 +68,11 @@ def run(num_pts, num_centers, num_dim):
   
   for i in range(10):
     _ = expr.shuffle(pts, 
-                         _find_cluster_mapper,
-                         kw={'d_pts' : pts, 
-                             'old_centers' : centers,
-                             'new_centers' : new_centers, 
-                             'new_counts' : new_counts })
+                     _find_cluster_mapper,
+                     kw={'d_pts' : pts,
+                         'old_centers' : centers,
+                         'new_centers' : new_centers,
+                         'new_counts' : new_counts })
     _.force()
     
     new_centers = lazify(new_centers) / lazify(new_counts)

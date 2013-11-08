@@ -2,6 +2,8 @@ from .base import Expr
 from spartan import util
 from spartan.dense import extent, tile, distarray
 from spartan.expr.base import make_primitive
+from spartan.node import Node
+
 
 def _reduce_mapper(ex, tile, reducer, axis, output, fn_kw):
   #util.log_info('Reduce: %s %s %s %s %s', reducer, ex, tile, axis, fn_kw)
@@ -11,6 +13,7 @@ def _reduce_mapper(ex, tile, reducer, axis, output, fn_kw):
   output.update(dst_extent, reduced)
 
 class ReduceExpr(Expr):
+  __metaclass__ = Node
   _members = ['array', 'axis', 'dtype_fn', 'reduce_fn', 'combine_fn', 'fn_kw']
   
   def evaluate(self, ctx, deps):

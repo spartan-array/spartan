@@ -80,13 +80,14 @@ def sgd_netflix_mapper(inputs, ex, V=None, M=None, U=None, worklist=None):
   
   u = U.select(ex[0].to_slice()) # size: (ex.shape[0] * r)
   m = M.select(ex[1].to_slice()) # size: (ex.shape[1] * r)
-  
-  _sgd_inner(v.row.astype(np.int64), 
+
+  _sgd_inner(v.row.astype(np.int64),
              v.col.astype(np.int64), 
              v.data, u, m)
-  
+
   U.update_slice(ex[0].to_slice(), u)
   M.update_slice(ex[1].to_slice(), m)
+  return []
 
 def strata_overlap(extents, v):
   for ex in extents:
@@ -96,7 +97,7 @@ def strata_overlap(extents, v):
 
 def _compute_strata(V):
   strata = []
-  extents = V.extents.keys() 
+  extents = V.tiles.keys()
   random.shuffle(extents)
   
   while extents:
@@ -120,9 +121,9 @@ def _evaluate_netflix(ctx, V, M, U):
     
     worklist = set(stratum)
     expr.shuffle(V, sgd_netflix_mapper, 
-                     target=None,
-                     kw={'V' : lazify(V), 'M' : lazify(M), 'U' : lazify(U),
-                         'worklist' : worklist }).force()
+                 target=None,
+                 kw={'V' : lazify(V), 'M' : lazify(M), 'U' : lazify(U),
+                     'worklist' : worklist }).force()
   util.log_info('Eval done.')
 
 NetflixSGD = make_primitive('NetflixSGD',

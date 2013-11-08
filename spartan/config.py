@@ -22,10 +22,10 @@ HOSTS = [
 
 
 parser = argparse.ArgumentParser()
-_names = set()
+flag_names = set()
 
 def add_flag(name, *args, **kw):
-  _names.add(kw.get('dest', name))
+  flag_names.add(kw.get('dest', name))
   
   parser.add_argument('--' + name, *args, **kw)
   if 'default' in kw:
@@ -33,7 +33,7 @@ def add_flag(name, *args, **kw):
   return None
   
 def add_bool_flag(name, default, **kw):
-  _names.add(name)
+  flag_names.add(name)
   
   parser.add_argument('--' + name, default=default, type=int, dest=name, **kw)
   parser.add_argument('--enable_' + name, action='store_true', dest=name)
@@ -66,7 +66,7 @@ class Flags(object):
     help='When running locally, use threads instead of forking. (slow, for debugging)', 
     default=False)
   
-  assign_mode = AssignMode.BY_NODE
+  assign_mode = add_flag('assign_mode', default=AssignMode.BY_NODE)
   add_flag('bycore', dest='assign_mode', action='store_const', const=AssignMode.BY_CORE)
   add_flag('bynode', dest='assign_mode', action='store_const', const=AssignMode.BY_NODE)
   
@@ -92,15 +92,18 @@ def parse_args(argv):
   import spartan.expr.optimize
 
   parsed_flags, rest = parser.parse_known_args(argv)
-  for flagname in _names:
-    setattr(flags, flagname, getattr(parsed_flags, flagname))
- 
-  flags._parsed = True
+
+  for flagname in flag_names:
+   setattr(flags, flagname, getattr(parsed_flags, flagname))
 
   logging.basicConfig(format='%(filename)s:%(lineno)s [%(funcName)s] %(message)s',
                       level=getattr(logging, flags.log_level))
 
-
+  for f in rest:
+    if f.startswith('-'):
+      util.log_warn('Unknown flag: %s' % f)
+ 
+  flags._parsed = True
   if flags.config_file == '':
     try:
       import appdirs

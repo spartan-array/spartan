@@ -8,6 +8,7 @@ import numpy as np
 from spartan.config import flags, Flags, add_bool_flag, add_flag
 from spartan.dense import extent
 from spartan.expr.reduce import ReduceExpr
+from spartan.node import Node
 from spartan.util import Assert, iterable
 
 from .. import util
@@ -26,6 +27,7 @@ except:
 # These are used to build up fusion operations.
 
 class LocalOp(Expr):
+  __metaclass__ = Node
   _cached_value = None
   def evaluate(self, ctx):
     deps = {}

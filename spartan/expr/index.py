@@ -4,11 +4,13 @@ Indexing operations (slicing and filtering).
 from .base import Expr, LazyList
 from spartan import util
 from spartan.dense import extent, tile, distarray
+from spartan.node import Node
 from spartan.util import Assert, join_tuple
 import numpy as np
 
 
 class IndexExpr(Expr):
+  __metaclass__ = Node
   _members = ['src', 'idx']
 
   def node_init(self):

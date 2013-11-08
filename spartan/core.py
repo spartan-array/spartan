@@ -1,73 +1,84 @@
 #!/usr/bin/env python
 import threading
-import traceback
 from spartan import util, rpc
 from spartan.util import Assert
 from spartan.node import Node
 
-import cloudpickle
-import cPickle
-import numpy as np
-
-
 MASTER_ID = 65536
 
 
-class Message(Node):
+class Message(object):
   pass
 
-
 class RegisterReq(Message):
+  __metaclass__ = Node
   _members = ['host', 'port']
 
 
 class RegisterResp(Message):
+  __metaclass__ = Node
   pass
 
 class Initialize(Message):
+  __metaclass__ = Node
   _members = ['id', 'peers']
 
 
 class NewBlob(Message):
+  __metaclass__ = Node
   _members = ['id', 'data']
 
 
 class GetReq(Message):
+  __metaclass__ = Node
   _members = ['id', 'selector']
 
 
 class GetResp(Message):
+  __metaclass__ = Node
   _members = ['id', 'data']
 
 
 class DestroyReq(Message):
-  _members = ['id' ]
+  __metaclass__ = Node
+  _members = ['ids' ]
 
 class UpdateReq(Message):
+  __metaclass__ = Node
   _members = ['id', 'data', 'reducer']
 
 
 class KernelReq(Message):
+  __metaclass__ = Node
   _members = ['blobs', 'mapper_fn', 'reduce_fn', 'kw']
 
 
 class KernelResp(Message):
+  __metaclass__ = Node
   _members = ['result']
 
 
 class CreateReq(Message):
-  _members = ['id', 'data']
+  __metaclass__ = Node
+  _members = ['blob_id', 'data']
 
 
 class CreateResp(Message):
-  _members = ['id']
+  __metaclass__ = Node
+  _members = ['blob_id']
 
 
 class BlobId(Message):
-  _members = ['worker', 'id']
+  def __init__(self, worker, id):
+    self.worker = worker
+    self.id = id
 
+  def __hash__(self): return self.worker ^  self.id
+  def __eq__(self, other): return self.worker == other.worker and self.id == other.id
+  def __repr__(self): return 'B(%d.%d)' % (self.worker, self.id)
 
-class Blob(Node):
+class Blob(object):
+  __metaclass__ = Node
   _members = ['data', 'id']
 
   def get(self, selector):
@@ -83,6 +94,7 @@ class BlobCtx(object):
     assert isinstance(workers, dict)
     assert isinstance(worker_id, int)
 
+    self.num_workers = len(workers)
     self.worker_id = worker_id
     self.workers = workers
     self.id_map = {}
@@ -91,7 +103,7 @@ class BlobCtx(object):
 
   def _send(self, id, method, req, wait=True):
     if self.active == False:
-      util.log_info('Ctx disabled.')
+      util.log_debug('Ctx disabled.')
       return None
 
     #util.log_info('%s %s', id, method)
@@ -109,6 +121,16 @@ class BlobCtx(object):
 
     return pending_req
 
+  def _send_all(self, method, req, wait=True):
+    if self.active == False:
+      util.log_debug('Ctx disabled.')
+      return None
+
+    futures = rpc.forall(self.workers.itervalues(), method, req)
+    if wait:
+      return futures.wait()
+    return futures
+
   def _lookup(self, blob_id):
     worker_id = blob_id.worker
     return worker_id
@@ -119,11 +141,14 @@ class BlobCtx(object):
       #    self.id_map[blob_id] = idx
     #return self.id_map[blob_id]
 
-  def destroy(self, blob_id):
+  def destroy_all(self, blob_ids):
     if self.worker_id != MASTER_ID: return
-    #util.log_info('Destroy: %s', blob_id)
-    req = DestroyReq(id=blob_id)
-    self._send(blob_id, 'destroy', req)
+    #util.log_info('Destroy: %s', blob_ids)
+    req = DestroyReq(ids=blob_ids)
+    self._send_all('destroy', req)
+
+  def destroy(self, blob_id):
+    return self.destroy_all([blob_id])
 
   def get(self, blob_id, selector):
     Assert.isinstance(blob_id, BlobId)
@@ -134,11 +159,18 @@ class BlobCtx(object):
     req = UpdateReq(id=blob_id, data=data, reducer=reducer)
     return self._send(blob_id, 'update', req, wait=wait)
 
-  def create(self, data):
+  def create_local(self):
+    assert self.worker_id != MASTER_ID
+    return BlobId(worker=self.worker_id, id=id_counter.next())
+
+  def create(self, data, hint=None):
     assert self.worker_id >= 0, self.worker_id
 
     if self.worker_id >= MASTER_ID:
-      worker_id = id_counter.next() % len(self.workers)
+      if hint is None:
+        worker_id = id_counter.next() % len(self.workers)
+      else:
+        worker_id = hint % len(self.workers)
       id = -1
     else:
       worker_id = self.worker_id
@@ -148,7 +180,7 @@ class BlobCtx(object):
     blob_id = BlobId(worker=worker_id, id=id)
     #util.log_info('%s %s %s %s', new_id, worker_id, data.shape, ''.join(traceback.format_stack()))
 
-    req = CreateReq(id=blob_id, data=data)
+    req = CreateReq(blob_id=blob_id, data=data)
     return self._send(blob_id, 'create', req, wait=False)
 
   def map(self, blob_ids, mapper_fn, reduce_fn, kw):
@@ -159,10 +191,10 @@ class BlobCtx(object):
 
     #util.log_info('%s', req)
 
-    futures = [w.run_kernel(req) for w in self.workers.itervalues()]
+    futures = rpc.forall(self.workers.itervalues(), 'run_kernel', req).wait()
     result = {}
     for f in futures:
-      for blob_id, v in f.wait().iteritems():
+      for blob_id, v in f.iteritems():
         result[blob_id] = v
     return result
 

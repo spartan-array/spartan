@@ -117,6 +117,22 @@ class EZTimer(object):
   def __del__(self):
     print('%3.5f:: %s' % (time.time() - self.st, self.name))
 
+class Timer(object):
+  def __init__(self):
+    self.elapsed = 0
+
+  def start(self):
+    self.st = time.time()
+
+  def stop(self):
+    self.elapsed += time.time() - self.st
+
+  def __enter__(self):
+    self.start()
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    self.stop()
+
 def dump_stacks(out):
   '''Dump the stacks of all threads.'''
   id_to_name = dict([(th.ident, th.name) for th in threading.enumerate()])

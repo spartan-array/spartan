@@ -19,6 +19,8 @@ import numpy as np
 from spartan import util
 from spartan.dense import distarray
 from spartan.expr.base import Expr
+from spartan.node import Node
+
 
 def _loop_kernel(kernel):
   mapper = kernel.arg('_args')
@@ -26,6 +28,7 @@ def _loop_kernel(kernel):
   return mapper(*args)
 
 class LoopExpr(Expr):
+  __metaclass__ = Node
   _members = ['ranges', 'sources', 'arg_fn', 'mapper_fn', 'target']
   
   def evaluate(self, ctx, deps):

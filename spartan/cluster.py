@@ -40,7 +40,12 @@ def _start_remote_worker(worker, st, ed):
           '--count=%d' % (ed - st),
           '--port=%d' % (flags.port_base + 1)]
   
-  for name, value in config.flags:
+  for name in config.flag_names:
+    value = getattr(config.flags, name, None)
+    if value is None:
+      print 'Skipping unknown flag: %s' % value
+      continue
+
     if isinstance(value, bool):
       value = int(value)
     args.append('--%s=%s' % (name, value))

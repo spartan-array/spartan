@@ -4,6 +4,7 @@ from spartan.dense import tile, distarray
 import numpy as np
 
 class NdArrayExpr(Expr):
+  __metaclass__ = Node
   _members = ['_shape', 'dtype', 'tile_hint', 'combine_fn', 'reduce_fn']
   
   def visit(self, visitor):

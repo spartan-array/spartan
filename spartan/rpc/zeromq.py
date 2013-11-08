@@ -1,14 +1,9 @@
 '''ZeroMQ socket implementation.'''
-import atexit
+
 import cProfile
-
 import collections
-
 import os
 import threading
-import time
-import sys
-import traceback
 import socket
 import zmq
 
@@ -17,6 +12,7 @@ from spartan import util
 
 POLLER = None
 POLLER_LOCK = threading.Lock()
+PROFILER = None
 
 def poller():
   global POLLER
@@ -27,8 +23,10 @@ def poller():
       POLLER.start()
     return POLLER
 
+
 class Socket(SocketBase):
   __slots__ = ['_zmq', '_hostport', '_out', '_in', '_addr', '_closed', '_shutdown', '_lock']
+
   def __init__(self, ctx, sock_type, hostport):
     # util.log('New socket...')
     self._zmq = ctx.socket(sock_type)
@@ -144,6 +142,7 @@ class ServerSocket(Socket):
 
 class StubSocket(SocketBase):
   '''Handles a single read from a client'''
+
   def __init__(self, source, socket, data):
     self._out = collections.deque()
     self.source = source
@@ -255,6 +254,7 @@ class ZMQPoller(threading.Thread):
 
 def shutdown():
   poller().stop()
+
 
 import atexit
 atexit.register(shutdown)

@@ -6,6 +6,7 @@ sockets which should implement the :class:`.Socket` interface.
 '''
 from cPickle import PickleError
 import cProfile
+import collections
 import weakref
 import sys
 import threading
@@ -16,7 +17,7 @@ import cStringIO
 import cPickle
 
 from .. import util
-from spartan import cloudpickle
+from .. import cloudpickle
 from spartan.node import Node
 
 
@@ -32,14 +33,16 @@ def set_default_timeout(seconds):
   util.log_info('Set default timeout to %s seconds.', DEFAULT_TIMEOUT)
 
 
-class RPCException(Node):
+class RPCException(object):
+  __metaclass__ = Node
   _members = ['py_exc']
 
-class PickledData(Node):
+class PickledData(object):
   '''
   Helper class: indicates that this message has already been pickled,
   and should be sent as is, rather than being re-pickled.
   '''
+  __metaclass__ = Node
   _members = ['data']
 
 class SocketBase(object):
@@ -222,8 +225,14 @@ class Server(object):
     self._socket = socket
     self._socket.register_handler(self.handle_read)
     self._methods = {}
+    self._timers = collections.defaultdict(util.Timer)
     self._running = False
     self.register_method('diediedie', self._diediedie)
+
+
+  def timings(self):
+    return '\n'.join(['%s: %f' % (m, self._timers[m].get())
+                      for m in self._methods.keys()])
 
   def _diediedie(self, handle, req):
     handle.done(None)
@@ -261,23 +270,24 @@ class Server(object):
     reader = cStringIO.StringIO(data)
     header = cPickle.load(reader)
 
-    #util.log_info('Reading: %s %s', self._socket.addr, header['rpc_id'])
-    handle = PendingRequest(socket, header['rpc_id'])
-    name = header['method']
+    with self._timers[header['method']]:
+      #util.log_info('Reading: %s %s', self._socket.addr, header['rpc_id'])
+      handle = PendingRequest(socket, header['rpc_id'])
+      name = header['method']
 
-    try:
-      fn = self._methods[name]
-    except KeyError:
-      handle.done(capture_exception())
-      return
+      try:
+        fn = self._methods[name]
+      except KeyError:
+        handle.done(capture_exception())
+        return
 
-    try:
-      req = cPickle.load(reader)
-      result = fn(req, handle)
-      assert result is None, 'non-None result from RPC handler (use handle.done())'
-    except:
-      util.log_info('Caught exception in handler.', exc_info=1)
-      handle.done(capture_exception())
+      try:
+        req = cPickle.load(reader)
+        result = fn(req, handle)
+        assert result is None, 'non-None result from RPC handler (use handle.done())'
+      except:
+        util.log_info('Caught exception in handler.', exc_info=1)
+        handle.done(capture_exception())
 
   def shutdown(self):
     self._running = 0
@@ -326,12 +336,6 @@ class Client(object):
 
   def addr(self):
     return self._socket.addr
-
-  def __enter__(self):
-    return self
-
-  def __exit__(self, exc_type, exc_val, exc_tb):
-    self.close()
 
   def close(self):
     self._socket.close()

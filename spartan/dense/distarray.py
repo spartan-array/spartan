@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from . import tile, extent
+import traceback
 import spartan
 from spartan import util, core
 from spartan.util import Assert
@@ -80,11 +81,11 @@ def create(shape,
 
   extents = compute_splits(shape, tile_hint, -1).keys()
   tiles = {}
-  for ex in extents:
-    tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype))
+  for i, ex in enumerate(extents):
+    tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype), hint=i)
 
   for ex in extents:
-    tiles[ex] = tiles[ex].wait().id
+    tiles[ex] = tiles[ex].wait().blob_id
 
   return DistArray(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer)
 
@@ -113,10 +114,8 @@ class DistArray(object):
 
   def __del__(self):
     if core.get_ctx().worker_id == core.MASTER_ID:
-      util.log_info('Destroying table...')
-
-    for ex, id in self.tiles.iteritems():
-      core.get_ctx().destroy(id)
+      #util.log_info('Destroying table... %s', self.tiles.values())
+      core.get_ctx().destroy_all(self.tiles.values())
 
   def id(self):
     return self.table.id()
@@ -207,6 +206,7 @@ class DistArray(object):
     
     splits = list(extent.find_overlapping(self.tiles, region))
     futures = []
+    util.log_info('Updating %s tiles', len(splits))
     for dst_key, intersection in splits:
       #util.log_info('%d %s %s %s', self.table.id(), region, dst_key, intersection)
       blob_id = self.tiles[dst_key]

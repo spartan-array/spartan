@@ -4,6 +4,7 @@ import cProfile
 import pstats
 import threading
 import time
+from spartan.dense import extent
 
 
 try:
@@ -59,18 +60,22 @@ class Worker(object):
     
   def create(self, req, handle):
     assert self._initialized
-    if req.id == -1:
-      id = core.get_ctx().create(req.data)
+    core.set_ctx(self._ctx)
+
+    if req.blob_id.id == -1:
+      id = core.get_ctx().create_local()
+      #util.log_info('Created blob: id %s', id)
     else:
-      id = req.id
+      id = req.blob_id
 
     self._blobs[id] = req.data
-    resp = core.CreateResp(id=id)
+    resp = core.CreateResp(blob_id=id)
     handle.done(resp)
 
   def destroy(self, req, handle):
-    if req.id in self._blobs:
-      del self._blobs[req.id]
+    for id in req.ids:
+      if id in self._blobs:
+        del self._blobs[id]
 
     handle.done()
 
@@ -88,6 +93,7 @@ class Worker(object):
       handle.done(resp)
 
   def _run_kernel(self, req, handle):
+    self._server._timers['run_kernel'].start()
     if flags.profile_kernels:
       self._kernel_prof.enable()
 
@@ -102,6 +108,7 @@ class Worker(object):
         #util.log_info('W%d kernel finish', self.id)
     handle.done(results)
 
+    self._server._timers['run_kernel'].stop()
     self._kernel_prof.disable()
 
   def run_kernel(self, req, handle):
@@ -115,6 +122,8 @@ class Worker(object):
       stats.dump_stats('./_kernel-profiles/%d' % self.id)
 
     util.log_info('Shutdown worker %d (profile? %d)', self.id, flags.profile_kernels)
+    #print self._server.timings()
+
     handle.done()
     threading.Thread(target=self._shutdown).start()
 

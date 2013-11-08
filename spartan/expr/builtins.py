@@ -24,14 +24,14 @@ def rand(*shape, **kw):
   :param tile_hint: A tuple indicating the desired tile shape for this array.
   '''
   return map(ndarray(shape, 
-                           dtype=np.float, 
-                           tile_hint=kw.get('tile_hint', None)), 
+                     dtype=np.float,
+                     tile_hint=kw.get('tile_hint', None)),
                      fn = lambda inputs: np.random.rand(*inputs[0].shape))
   
 def randn(*shape, **kw):
   return map(ndarray(shape, 
-                           dtype=np.float, 
-                           tile_hint=kw.get('tile_hint', None)), 
+                           dtype=np.float,
+                           tile_hint=kw.get('tile_hint', None)),
                      fn = lambda inputs: np.random.randn(*inputs[0].shape))
 
 def zeros(shape, dtype=np.float, tile_hint=None):

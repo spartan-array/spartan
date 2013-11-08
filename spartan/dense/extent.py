@@ -1,3 +1,4 @@
+import collections
 from spartan import util
 from spartan.util import Assert
 import numpy as np
@@ -24,7 +25,7 @@ class TileExtent(object):
   
   @property
   def shape(self):
-    result = self.lr_array - self.ul_array
+    result = np.asarray(self.lr) - np.asarray(self.ul)
     result[result == 0] = 1
     #util.log_info('Shape: %s', result)
     return tuple(result)
@@ -74,7 +75,7 @@ class TileExtent(object):
       return idx + self.ul[axis]
 
     local_idx = unravelled_pos(idx, self.shape)
-    return ravelled_pos(self.ul_array + local_idx, self.array_shape)
+    return ravelled_pos(np.asarray(self.ul) + local_idx, self.array_shape)
 
   def add_dim(self):
     return create(self.ul + (0,), 
@@ -84,7 +85,9 @@ class TileExtent(object):
   def clone(self):
     return create(self.ul, self.lr, self.array_shape)
  
-  
+#import traceback
+counts = collections.defaultdict(int)
+
 def create(ul, lr, array_shape):
   '''
   Create a new extent with the given coordinates and array shape.
@@ -93,23 +96,22 @@ def create(ul, lr, array_shape):
   :param lr:
   :param array_shape:
   '''
+  #stack = ''.join(traceback.format_stack())
+  #counts[stack] += 1
   ex = TileExtent()
   ex.ul = tuple(ul)
   ex.lr = tuple(lr)
 
-  assert np.all(np.array(ex.lr) >= np.array(ex.ul)),\
-    'Negative extent size: (%s, %s)' % (ul, lr)
+  #assert np.all(np.array(ex.lr) >= np.array(ex.ul)),\
+  #  'Negative extent size: (%s, %s)' % (ul, lr)
   
   if array_shape is not None:
     ex.array_shape = tuple(array_shape)
-    assert np.all(np.array(ex.lr) <= np.array(array_shape)),\
-      'Extent lr (%s) falls outside of the array(%s)' % (lr, array_shape)
+    #assert np.all(np.array(ex.lr) <= np.array(array_shape)),\
+    #  'Extent lr (%s) falls outside of the array(%s)' % (lr, array_shape)
   else:
     ex.array_shape = None
   
-  # cache some values as numpy arrays for faster access
-  ex.ul_array = np.asarray(ex.ul, dtype=np.int)
-  ex.lr_array = np.asarray(ex.lr, dtype=np.int)
   return ex
 
 def from_shape(shp):
@@ -250,10 +252,8 @@ def intersection(a, b):
     
   Assert.eq(a.array_shape, b.array_shape)
   
-  # if np.any(b.lr_array <= a.ul_array): return None
-  # if np.any(a.lr_array <= b.ul_array): return None
-  return create(np.maximum(b.ul_array, a.ul_array),
-                np.minimum(b.lr_array, a.lr_array),
+  return create(np.maximum(b.ul, a.ul),
+                np.minimum(b.lr, a.lr),
                 a.array_shape)
 
 TileExtent.intersection = intersection

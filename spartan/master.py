@@ -19,9 +19,11 @@ class Master(object):
   def shutdown(self):
     self._ctx.active = False
 
+    futures = rpc.FutureGroup()
     for id, w in self._workers.iteritems():
       util.log_info('Shutting down worker %d', id)
-      w.shutdown().wait()
+      futures.append(w.shutdown())
+    futures.wait()
 
     self._server.shutdown()
 
@@ -38,10 +40,16 @@ class Master(object):
 
   def _initialize(self):
     util.log_info('Initializing...')
-    req = core.Initialize(peers=dict([(id, w.addr()) for id, w in self._workers.iteritems()]))
+
+
+    req = core.Initialize(peers=dict([(id, w.addr())
+                                      for id, w in self._workers.iteritems()]))
+
+    futures = rpc.FutureGroup()
     for id, w in self._workers.iteritems():
       req.id = id
-      w.initialize(req).wait()
+      futures.append(w.initialize(req))
+    futures.wait()
 
     self._ctx = core.BlobCtx(core.MASTER_ID, self._workers)
     self._initialized = True
