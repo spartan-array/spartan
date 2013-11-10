@@ -71,7 +71,7 @@ def _start_remote_worker(worker, st, ed):
   # add flags from config/user
   args += repr(FLAGS).split(' ')
 
-  logging.debug('Running worker %s', ' '.join(args))
+  util.log_debug('Running worker %s', ' '.join(args))
   time.sleep(0.1)
   if worker != 'localhost':
     p = subprocess.Popen(ssh_args + args, executable='ssh')
