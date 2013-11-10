@@ -21,9 +21,20 @@ class HostListFlag(config.Flag):
   def _str(self):
     return ','.join(['%s:%d' % (host, count) for host, count in self.val])
 
+class AssignMode(object):
+  BY_CORE = 1
+  BY_NODE = 2
+
+class AssignModeFlag(config.Flag):
+  def parse(self, str): return getattr(AssignMode, str)
+  def _str(self):
+    if self.val == AssignMode.BY_CORE: return 'BY_CORE'
+    return 'BY_NODE'
+
 FLAGS.add(HostListFlag('hosts', default=[('localhost', 8)]))
 FLAGS.add(BoolFlag('xterm', default=False, help='Run workers in xterm'))
 FLAGS.add(BoolFlag('oprofile', default=False, help='Run workers inside of operf'))
+FLAGS.add(AssignModeFlag('assign_mode', default=AssignMode.BY_CORE))
 
 def _start_remote_worker(worker, st, ed):
   util.log_info('Starting worker %d:%d on host %s', st, ed, worker)
@@ -60,6 +71,7 @@ def _start_remote_worker(worker, st, ed):
   # add flags from config/user
   args += repr(FLAGS).split(' ')
 
+  logging.debug('Running worker %s', ' '.join(args))
   time.sleep(0.1)
   if worker != 'localhost':
     p = subprocess.Popen(ssh_args + args, executable='ssh')
@@ -83,9 +95,9 @@ def start_cluster(num_workers, use_cluster_workers):
     _start_remote_worker('localhost', 0, num_workers)
   else:
     count = 0
-    num_hosts = len(config.HOSTS)
-    for worker, total_tasks in config.HOSTS:
-      if FLAGS.assign_mode == config.AssignMode.BY_CORE:
+    num_hosts = len(FLAGS.hosts)
+    for worker, total_tasks in FLAGS.hosts:
+      if FLAGS.assign_mode == AssignMode.BY_CORE:
         sz = total_tasks
       else:
         sz = util.divup(num_workers, num_hosts)

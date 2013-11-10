@@ -41,8 +41,12 @@ class StrFlag(Flag):
 class BoolFlag(Flag):
   def parse(self, str):
     str = str.lower()
-    if str == 'false' or str == 0: self.val = False
-    self.val = True
+    str = str.strip()
+
+    if str == 'false' or str == '0': val = False
+    else: val = True
+    #print 'Bool %s "%s" %s' % (self.name, str, val)
+    self.val = val
 
   def _str(self):
     return str(int(self.val))
@@ -62,10 +66,6 @@ class LogLevelFlag(Flag):
   def _str(self):
     return LOG_STR[self.val]
 
-
-class AssignMode(object):
-  BY_CORE = 1
-  BY_NODE = 2
 
 
 class Flags(object):
@@ -119,8 +119,11 @@ def initialize(argv):
   FLAGS._parsed = True
 
   config_file = appdirs.user_data_dir('Spartan', 'rjpower.org') + '/spartan.ini'
+  config_dir = os.path.dirname(config_file)
+  if not os.path.exists(config_dir):
+    os.makedirs(config_dir, mode=0755)
+
   if not os.path.exists(config_file):
-    os.makedirs(os.path.dirname(config_file), mode=0755)
     open(config_file, 'a').close()
 
   print 'Loading configuration from %s' % (config_file)

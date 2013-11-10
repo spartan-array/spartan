@@ -1,8 +1,9 @@
+import os
 from os.path import basename, splitext
 import signal
 from spartan import util, config
 from spartan.cluster import start_cluster
-from spartan.config import FLAGS
+from spartan.config import FLAGS, StrFlag
 import cProfile
 import imp
 import spartan
@@ -50,9 +51,11 @@ def run_benchmarks(module, benchmarks, master, timer):
     getattr(module, benchname)(master, timer)
   
 def run(filename):
-  signal.signal(signal.SIGINT, sig_handler)
+  signal.signal(signal.SIGQUIT, sig_handler)
+  os.system('rm ./_kernel-profiles/*')
 
-  config.add_flag('worker_list', type=str, default='4,8,16,32,64,80')
+  FLAGS.add(StrFlag('worker_list', default='4,8,16,32,64,80'))
+
   config.initialize(sys.argv)
   mod_name, _ = splitext(basename(filename))
   module = imp.load_source(mod_name, filename)
