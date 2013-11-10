@@ -5,7 +5,7 @@ Optimizations over an expression graph.
 '''
 
 import numpy as np
-from spartan.config import flags, Flags, add_bool_flag, add_flag
+from spartan.config import FLAGS, BoolFlag
 from spartan.dense import extent
 from spartan.expr.reduce import ReduceExpr
 from spartan.node import Node
@@ -273,7 +273,7 @@ class NumexprFusionPass(OptimizePass):
 
 
 def apply_pass(klass, dag):
-  if not getattr(flags, 'opt_' + klass.name):
+  if not getattr(FLAGS, 'opt_' + klass.name):
     util.log_debug('Pass %s disabled', klass.name)
     return dag
   
@@ -283,7 +283,7 @@ def apply_pass(klass, dag):
 passes = []
 
 def optimize(dag):
-  if not flags.optimization:
+  if not FLAGS.optimization:
     util.log_info('Optimizations disabled')
     return dag
   
@@ -297,9 +297,9 @@ def add_optimization(klass, default):
   
   flagname = 'opt_' + klass.name
   #setattr(Flags, flagname, add_bool_flag(flagname, default=default))
-  setattr(Flags, flagname, add_flag(flagname, default=default, type=bool))
-  
-Flags.optimization = add_bool_flag('optimization', default=True)
+  FLAGS.add(BoolFlag(flagname, default=default, help='Enable %s optimization' % klass.__name__))
+
+FLAGS.add(BoolFlag('optimization', default=True))
 
 add_optimization(MapMapFusion, True)
 add_optimization(ReduceMapFusion, True)

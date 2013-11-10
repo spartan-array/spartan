@@ -4,129 +4,155 @@
 Configuration options and flags.
 
 Options may be specified on the command line, or via a configuration
-file.  Configuration files should be placed in $HOME/.config/spartanrc.
+file.  Configuration files should be placed in $HOME/.config/spartan.ini
 
 """
-
+import ConfigParser
 import argparse
 import logging
-import time
 import os
 import sys
-import traceback
+
+import appdirs
+
 from spartan import util
 
-HOSTS = [
-  ('localhost', 8),
-  ]
+class Flag(object):
+  def __init__(self, name, default=None, help=''):
+    self.name = name
+    self.val = default
+    self.help = help
+
+  def __repr__(self):
+    return '--%s=%s' % (self.name, self._str())
+
+  def _str(self):
+    return str(self.val)
 
 
-parser = argparse.ArgumentParser()
-flag_names = set()
+class IntFlag(Flag):
+  def parse(self, str):
+    self.val = int(str)
 
-def add_flag(name, *args, **kw):
-  flag_names.add(kw.get('dest', name))
-  
-  parser.add_argument('--' + name, *args, **kw)
-  if 'default' in kw:
-    return kw['default']
-  return None
-  
-def add_bool_flag(name, default, **kw):
-  flag_names.add(name)
-  
-  parser.add_argument('--' + name, default=default, type=int, dest=name, **kw)
-  parser.add_argument('--enable_' + name, action='store_true', dest=name)
-  parser.add_argument('--disable_' + name, action='store_false', dest=name)
-  
-  return default
-  
+class StrFlag(Flag):
+  def parse(self, str):
+    self.val = str
+
+class BoolFlag(Flag):
+  def parse(self, str):
+    str = str.lower()
+    if str == 'false' or str == 0: self.val = False
+    self.val = True
+
+  def _str(self):
+    return str(int(self.val))
+
+
+LOG_STR = {logging.DEBUG: 'DEBUG',
+           logging.INFO: 'INFO',
+           logging.WARN: 'WARN',
+           logging.ERROR: 'ERROR',
+           logging.FATAL: 'FATAL'}
+
+
+class LogLevelFlag(Flag):
+  def parse(self, str):
+    self.val = getattr(logging, str)
+
+  def _str(self):
+    return LOG_STR[self.val]
+
 
 class AssignMode(object):
   BY_CORE = 1
   BY_NODE = 2
 
+
 class Flags(object):
-  _parsed = False
+  def __init__(self):
+    self._parsed = False
+    self._vals = {}
 
-  profile_kernels = add_bool_flag('profile_kernels', default=False)
-  profile_master = add_bool_flag('profile_master', default=False)
-  log_level = add_flag('log_level', default='INFO', type=str)
-  num_workers = add_flag('num_workers', default=3, type=int)
-  cluster = add_bool_flag('cluster', default=False)
-  oprofile = add_bool_flag('oprofile', default=False)
-  
-  config_file = add_flag('config_file', default='', type=str)
-  
-  port_base = add_flag('port_base', type=int, default=10000,
-    help='Port to listen on (master = port_base, workers=port_base + N)')
-  
-  use_threads = add_bool_flag(
-    'use_threads',
-    help='When running locally, use threads instead of forking. (slow, for debugging)', 
-    default=False)
-  
-  assign_mode = add_flag('assign_mode', default=AssignMode.BY_NODE)
-  add_flag('bycore', dest='assign_mode', action='store_const', const=AssignMode.BY_CORE)
-  add_flag('bynode', dest='assign_mode', action='store_const', const=AssignMode.BY_NODE)
-  
-  def __getattr__(self, name):
-    assert self.__dict__['_parsed'], 'Flags accessed before parse_args called.'
-    return self.__dict__[name]
-  
+  def add(self, flag):
+    self._vals[flag.name] = flag
+
+  def __getattr__(self, key):
+    if key.startswith('_'): return self.__dict__[key]
+
+    assert self.__dict__['_parsed'], 'Access to flags before config.initialize() called.'
+    return self.__dict__['_vals'][key].val
+
   def __repr__(self):
-    result = []
-    for k, v in iter(self):
-      result.append('%s : %s' % (k, v))
-    return '\n'.join(result)
-  
+    return ' '.join([repr(f) for f in self._vals.values()])
+
+  def __str__(self):
+    return repr(self)
+
   def __iter__(self):
-    return iter([(k, getattr(self, k)) for k in dir(self)
-                 if not k.startswith('_')])
+    return iter(self._vals.items())
 
-flags = Flags()
 
-def parse_args(argv):
-  # force configuration settings to load.
-  import spartan.expr
-  import spartan.expr.optimize
+FLAGS = Flags()
+
+FLAGS.add(BoolFlag('profile_kernels', default=False))
+FLAGS.add(BoolFlag('profile_master', default=False))
+FLAGS.add(BoolFlag('cluster', default=False))
+FLAGS.add(LogLevelFlag('log_level', logging.INFO))
+FLAGS.add(IntFlag('num_workers', default=3))
+FLAGS.add(IntFlag('port_base', default=10000,
+                  help='Port to listen on (master = port_base, workers=port_base + N)'))
+
+FLAGS.add(BoolFlag(
+  'use_threads',
+  help='When running locally, use threads instead of forking. (slow, for debugging)',
+  default=False))
+
+
+def initialize(argv):
+  '''Parse configuration from flags and/or configuration file.'''
+
+  # load flags from other packages (is there a better way to do this?)
+
+  if FLAGS._parsed:
+    return
+
+  FLAGS._parsed = True
+
+  config_file = appdirs.user_data_dir('Spartan', 'rjpower.org') + '/spartan.ini'
+  if not os.path.exists(config_file):
+    os.makedirs(os.path.dirname(config_file), mode=0755)
+    open(config_file, 'a').close()
+
+  print 'Loading configuration from %s' % (config_file)
+  try:
+    config = ConfigParser.ConfigParser()
+    config.read(config_file)
+
+    if config.has_section('flags'):
+      for name, value in config.items('flags'):
+        argv.append('--%s=%s' % (name, value))
+  except:
+    print 'Failed to parse config file: %s' % config_file
+    sys.exit(1)
+
+  parser = argparse.ArgumentParser()
+  for name, flag in FLAGS:
+    parser.add_argument('--' + name, type=str)
 
   parsed_flags, rest = parser.parse_known_args(argv)
-
-  for flagname in flag_names:
-   setattr(flags, flagname, getattr(parsed_flags, flagname))
+  for name, flag in FLAGS:
+    if getattr(parsed_flags, name) is not None:
+      flag.parse(getattr(parsed_flags, name))
 
   logging.basicConfig(format='%(filename)s:%(lineno)s [%(funcName)s] %(message)s',
-                      level=getattr(logging, flags.log_level))
+                      level=FLAGS.log_level,
+                      stream=sys.stderr)
 
   for f in rest:
     if f.startswith('-'):
-      util.log_warn('Unknown flag: %s' % f)
- 
-  flags._parsed = True
-  if flags.config_file == '':
-    try:
-      import appdirs
-      flags.config_file = appdirs.user_data_dir('Spartan', 'rjpower.org') + '/spartanrc'
+      util.log_warn('Unknown flag: %s (ignored)' % f)
 
-      if not os.path.exists(flags.config_file):
-        os.makedirs(os.path.dirname(flags.config_file), mode=0755)
-        open(flags.config_file, 'a').close()
-    except:
-      print 'Missing appdirs package; spartanrc will not be processed.'
-
-  if flags.config_file:
-    util.log_info('Loading configuration from %s' % (flags.config_file))
-    try:
-      eval(compile(open(flags.config_file).read(),
-                   flags.config_file,
-                   'exec'))
-    except:
-      util.log_fatal('Failed to parse config file: %s' % (flags.config_file),
-                     exc_info=1)
-      sys.exit(1)
-
-  util.log_info('Hostlist: %s', HOSTS)
+  util.log_info('Hostlist: %s', FLAGS.hosts)
 
   return rest
 

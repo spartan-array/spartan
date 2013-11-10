@@ -182,7 +182,7 @@ def astype(x, dtype):
 
 def _ravel_mapper(array, ex):
   ul = extent.ravelled_pos(ex.ul, ex.array_shape)
-  lr = 1 + extent.ravelled_pos(ex.lr_array - 1, ex.array_shape)
+  lr = 1 + extent.ravelled_pos([lr - 1 for lr in ex.lr], ex.array_shape)
   shape = (np.prod(ex.array_shape),)
   
   ravelled_ex = extent.create((ul,), (lr,), shape)
@@ -202,7 +202,7 @@ def _reshape_mapper(array, ex, _dest_shape):
   tile = array.fetch(ex)
   
   ravelled_ul = extent.ravelled_pos(ex.ul, ex.array_shape)
-  ravelled_lr = extent.ravelled_pos(ex.lr_array - 1, ex.array_shape)
+  ravelled_lr = extent.ravelled_pos([lr - 1 for lr in ex.lr], ex.array_shape)
   
   target_ul = extent.unravelled_pos(ravelled_ul, _dest_shape)
   target_lr = extent.unravelled_pos(ravelled_lr, _dest_shape)

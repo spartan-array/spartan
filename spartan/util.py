@@ -14,12 +14,6 @@ import traceback
 
 import cStringIO
 
-
-def log_info(msg, *args):
-  msg = msg % args
-  print >>sys.stderr, msg
-
-
 log_debug = logging.debug
 log_info = logging.info
 log_warn = logging.warn

@@ -19,7 +19,7 @@ import sys
 
 import resource
 from spartan import config, util, rpc, core
-from spartan.config import flags
+from spartan.config import FLAGS, StrFlag, IntFlag
 
 
 class Worker(object):
@@ -94,7 +94,7 @@ class Worker(object):
 
   def _run_kernel(self, req, handle):
     self._server._timers['run_kernel'].start()
-    if flags.profile_kernels:
+    if FLAGS.profile_kernels:
       self._kernel_prof.enable()
 
     core.set_ctx(self._ctx)
@@ -115,13 +115,13 @@ class Worker(object):
     threading.Thread(target=self._run_kernel, args=(req, handle)).start()
 
   def shutdown(self, req, handle):
-    if flags.profile_kernels:
+    if FLAGS.profile_kernels:
       os.system('mkdir -p ./_kernel-profiles/')
       stats = pstats.Stats(self._kernel_prof)
       stats.add(rpc.poller().profiler)
       stats.dump_stats('./_kernel-profiles/%d' % self.id)
 
-    util.log_info('Shutdown worker %d (profile? %d)', self.id, flags.profile_kernels)
+    util.log_info('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_kernels)
     #print self._server.timings()
 
     handle.done()
@@ -150,27 +150,27 @@ if __name__ == '__main__':
   sys.path.append('./tests')
   
   import spartan
-  config.add_flag('master', type=str)
-  config.add_flag('port', type=int)
-  config.add_flag('count', type=int)
-  
+  FLAGS.add(StrFlag('master'))
+  FLAGS.add(IntFlag('port'))
+  FLAGS.add(IntFlag('count'))
+
   resource.setrlimit(resource.RLIMIT_AS, (8 * 1000 * 1000 * 1000,
                                           8 * 1000 * 1000 * 1000))
-    
-  config.parse_args(sys.argv)
-  assert flags.master is not None
-  assert flags.port > 0
-  assert flags.count > 0
 
-  util.log_info('Starting %d workers on %s', flags.count, socket.gethostname()) 
+  config.initialize(sys.argv)
+  assert FLAGS.master is not None
+  assert FLAGS.port > 0
+  assert FLAGS.count > 0
 
-  m_host, m_port = flags.master.split(':')
+  util.log_info('Starting %d workers on %s', FLAGS.count, socket.gethostname())
+
+  m_host, m_port = FLAGS.master.split(':')
   master = (m_host, int(m_port))
 
   workers = []
-  for i in range(flags.count):
+  for i in range(FLAGS.count):
     p = multiprocessing.Process(target=_start_worker, 
-                                args=(master, flags.port + i, i))
+                                args=(master, FLAGS.port + i, i))
     p.start()
     workers.append(p)
     

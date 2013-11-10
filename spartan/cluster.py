@@ -5,54 +5,62 @@ import threading
 import time
 
 from spartan import config, util
-from spartan.config import flags
+from spartan.config import FLAGS, BoolFlag
 import spartan
 import spartan.worker
 import spartan.master
 
+class HostListFlag(config.Flag):
+  def parse(self, str):
+    hosts = []
+    for host in str.split(','):
+      hostname, count = host.split(':')
+      hosts.append((hostname, int(count)))
+    self.val = hosts
+
+  def _str(self):
+    return ','.join(['%s:%d' % (host, count) for host, count in self.val])
+
+FLAGS.add(HostListFlag('hosts', default=[('localhost', 8)]))
+FLAGS.add(BoolFlag('xterm', default=False, help='Run workers in xterm'))
+FLAGS.add(BoolFlag('oprofile', default=False, help='Run workers inside of operf'))
+
 def _start_remote_worker(worker, st, ed):
   util.log_info('Starting worker %d:%d on host %s', st, ed, worker)
-  if flags.use_threads and worker == 'localhost':
+  if FLAGS.use_threads and worker == 'localhost':
     util.log_info('Using threads.')
     for i in range(st, ed):
       p = threading.Thread(target=spartan.worker._start_worker,
-                           args=((socket.gethostname(), flags.port_base), flags.port_base + 1 + i, i))
+                           args=((socket.gethostname(), FLAGS.port_base), FLAGS.port_base + 1 + i, i))
       p.daemon = True
       p.start()
     time.sleep(0.1)
     return
   
-  if flags.oprofile:
+  if FLAGS.oprofile:
     os.system('mkdir operf.%s' % worker)
     
   ssh_args = ['ssh', '-oForwardX11=no', worker ]
  
   args = ['cd %s && ' % os.path.abspath(os.path.curdir)]
-   
-  if flags.oprofile:
+
+  if FLAGS.xterm:
+    args += ['xterm', '-e',]
+
+  if FLAGS.oprofile:
     args += ['operf -e CPU_CLK_UNHALTED:100000000', '-g', '-d', 'operf.%s' % worker]
-  
-  args += [          
-          #'xterm', '-e',
+
+  args += [
           #'gdb', '-ex', 'run', '--args',
           'python', '-m spartan.worker',
-          '--master=%s:%d' % (socket.gethostname(), flags.port_base),
+          '--master=%s:%d' % (socket.gethostname(), FLAGS.port_base),
           '--count=%d' % (ed - st),
-          '--port=%d' % (flags.port_base + 1)]
-  
-  for name in config.flag_names:
-    value = getattr(config.flags, name, None)
-    if value is None:
-      print 'Skipping unknown flag: %s' % value
-      continue
+          '--port=%d' % (FLAGS.port_base + 1)]
 
-    if isinstance(value, bool):
-      value = int(value)
-    args.append('--%s=%s' % (name, value))
-  
-  #print args
+  # add flags from config/user
+  args += repr(FLAGS).split(' ')
+
   time.sleep(0.1)
-
   if worker != 'localhost':
     p = subprocess.Popen(ssh_args + args, executable='ssh')
   else:
@@ -77,7 +85,7 @@ def start_cluster(num_workers, use_cluster_workers):
     count = 0
     num_hosts = len(config.HOSTS)
     for worker, total_tasks in config.HOSTS:
-      if flags.assign_mode == config.AssignMode.BY_CORE:
+      if FLAGS.assign_mode == config.AssignMode.BY_CORE:
         sz = total_tasks
       else:
         sz = util.divup(num_workers, num_hosts)
@@ -88,7 +96,7 @@ def start_cluster(num_workers, use_cluster_workers):
       if count == num_workers:
         break
 
-  master = spartan.master.Master(flags.port_base, num_workers)
+  master = spartan.master.Master(FLAGS.port_base, num_workers)
   time.sleep(0.1)
   master.wait_for_initialization()
   return master

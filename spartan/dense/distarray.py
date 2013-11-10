@@ -178,7 +178,7 @@ class DistArray(object):
     
     #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
     tgt = np.ndarray(region.shape, dtype=self.dtype)
-    util.log_info('Fetching %d tiles', len(splits))
+    #util.log_info('Fetching %d tiles', len(splits))
     for ex, intersection in splits:
       dst_slice = extent.offset_slice(region, intersection)
       blob_id = self.tiles[ex]

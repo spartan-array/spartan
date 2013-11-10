@@ -2,7 +2,7 @@ from os.path import basename, splitext
 import signal
 from spartan import util, config
 from spartan.cluster import start_cluster
-from spartan.config import flags
+from spartan.config import FLAGS
 import cProfile
 import imp
 import spartan
@@ -16,9 +16,9 @@ CTX = None
 def get_cluster_ctx():
   global CTX
   if CTX is None:
-    config.parse_args(sys.argv)
-    print flags.cluster
-    CTX = start_cluster(flags.num_workers, flags.cluster)
+    config.initialize(sys.argv)
+    print FLAGS.cluster
+    CTX = start_cluster(FLAGS.num_workers, FLAGS.cluster)
     
   return CTX
 
@@ -53,12 +53,12 @@ def run(filename):
   signal.signal(signal.SIGINT, sig_handler)
 
   config.add_flag('worker_list', type=str, default='4,8,16,32,64,80')
-  config.parse_args(sys.argv)
+  config.initialize(sys.argv)
   mod_name, _ = splitext(basename(filename))
   module = imp.load_source(mod_name, filename)
   util.log_info('Running benchmarks for module: %s (%s)', module, filename)
  
-  if flags.profile_master:
+  if FLAGS.profile_master:
     prof = cProfile.Profile()
     prof.enable()
   
@@ -70,20 +70,20 @@ def run(filename):
   if benchmarks:
     # csv header
     print 'num_workers,bench,time'
-    workers = [int(w) for w in flags.worker_list.split(',')]
+    workers = [int(w) for w in FLAGS.worker_list.split(',')]
     
     for i in workers:
       timer = BenchTimer(i)
       util.log_info('Running benchmarks on %d workers', i)
-      master = start_cluster(i, flags.cluster)
+      master = start_cluster(i, FLAGS.cluster)
       run_benchmarks(module, benchmarks, master, timer)
       master.shutdown()
 
-  if flags.profile_master:  
+  if FLAGS.profile_master:
     prof.disable()
     prof.dump_stats('master_prof.out')
   
-  if flags.profile_kernels:
+  if FLAGS.profile_kernels:
     join_profiles('./_kernel-profiles')
 
 
