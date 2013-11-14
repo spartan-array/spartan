@@ -31,7 +31,7 @@ setup(
   packages=['spartan', 
             'spartan.expr',
             'spartan.rpc',
-            'spartan.dense',
+            'spartan.array',
             'spartan.sparse'],
    # + ext_modules = cythonize('tests/netflix.pyx'),
 )

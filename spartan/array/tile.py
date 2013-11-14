@@ -93,11 +93,8 @@ class DenseTile(Tile):
   def __setitem__(self, idx, val):
     self._initialize()
 
-    if self._type == TYPE_SPARSE:
-      self.data[idx] = val
-    else:
-      self.mask[idx] = 1
-      self.data[idx] = val
+    self.mask[idx] = 1
+    self.data[idx] = val
 
   def __repr__(self):
     return 'dense(%s, %s)' % (self.shape, self.dtype)
@@ -110,6 +107,12 @@ class SparseTile(Tile):
   def _initialize(self):
     if self.data is None:
       self._data = dok_matrix(self.shape, self.dtype)
+
+  def __setitem__(self, idx, val):
+    self._initialize()
+
+    self.mask[idx] = 1
+    self.data[idx] = val
 
 def from_data(data):
   if isinstance(data, np.ndarray) or np.isscalar(data):
