@@ -5,7 +5,7 @@ import unittest
 import spartan
 import numpy as np
 from spartan import expr, util
-from spartan.dense import distarray, extent
+from spartan.array import distarray, extent
 from spartan.util import Assert
 import test_common
 

@@ -17,7 +17,7 @@ import itertools
 
 import numpy as np
 from spartan import util
-from spartan.dense import distarray
+from spartan.array import distarray
 from spartan.expr.base import Expr
 from spartan.node import Node
 

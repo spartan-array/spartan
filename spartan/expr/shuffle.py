@@ -1,5 +1,5 @@
-from spartan import util, core
-from spartan.dense import distarray, tile
+from spartan import blob_ctx
+from spartan.array import distarray, tile
 from spartan.node import Node
 from spartan.util import iterable
 
@@ -39,7 +39,7 @@ def _target_mapper(ex, data, map_fn=None, inputs=None, target=None, fn_kw=None):
         
 def _notarget_mapper(ex, data, array=None, map_fn=None, inputs=None, fn_kw=None):
   #util.log_info('MapExtents: %s', map_fn)
-  ctx = core.get_ctx()
+  ctx = blob_ctx.get()
   result = []
   map_result = map_fn(inputs, ex, **fn_kw)
   if map_result is not None:

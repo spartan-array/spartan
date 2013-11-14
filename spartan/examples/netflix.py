@@ -1,6 +1,6 @@
 from copy import copy
 from spartan import util, expr, node
-from spartan.dense import extent
+from spartan.array import extent
 from spartan.expr import NotShapeable, lazify, make_primitive
 import cPickle
 import numpy as np

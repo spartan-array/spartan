@@ -3,7 +3,7 @@ Indexing operations (slicing and filtering).
 '''
 from .base import Expr, LazyList
 from spartan import util
-from spartan.dense import extent, tile, distarray
+from spartan.array import extent, tile, distarray
 from spartan.node import Node
 from spartan.util import Assert, join_tuple
 import numpy as np
@@ -58,15 +58,15 @@ def eval_Index(ctx, prim, deps):
   idx = deps['idx']
   
   Assert.isinstance(idx, (np.ndarray, distarray.DistArray))
-  
+
+  # scan over output, compute running count of the size
+  # of the first dimension
   if idx.dtype == np.bool:
-    dst = distarray.map_to_array(src, bool_index_mapper)
-    # scan over output, compute running count of the size 
-    # of the first dimension
+    dst = distarray.map_to_table(src, bool_index_mapper)
+
     row_counts = src.map_to_table(lambda k, v: v.shape[0])
     for _, v in row_counts:
       pass
-    raise NotImplementedError
   else:
     # create destination of the appropriate size
     dst = distarray.create(join_tuple([idx.shape[0]], src.shape[1:]),

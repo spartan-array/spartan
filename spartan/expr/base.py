@@ -5,9 +5,10 @@ and built into a control flow graph, which is then compiled
 into a series of primitive array operations.
 '''
 
-from ..node import Node
 import numpy as np
-from .. import core
+
+from ..node import Node
+from .. import blob_ctx
 
 
 def _apply_binary_op(inputs, binary_op=None, numpy_expr=None):
@@ -250,7 +251,7 @@ def evaluate(node):
     return node
 
   from . import backend
-  result = backend.evaluate(core.get_ctx(), dag(node))
+  result = backend.evaluate(blob_ctx.get(), dag(node))
   node._cached_value = result
   return result
 

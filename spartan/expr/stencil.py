@@ -2,7 +2,7 @@ import math
 
 from ..node import Node
 from spartan import util
-from spartan.dense import extent
+from spartan.array import extent
 import numpy as np
 from spartan.util import divup, Assert
 

@@ -6,7 +6,7 @@ import test_common
 
   
 def benchmark_linear_regression(ctx, timer):
-  N_EXAMPLES = 500000 * ctx.num_workers
+  N_EXAMPLES = 2500000 * ctx.num_workers
   N_DIM = 10
   x = expr.rand(N_EXAMPLES, N_DIM, 
                 tile_hint=(N_EXAMPLES / ctx.num_workers, N_DIM))
@@ -28,8 +28,6 @@ def benchmark_linear_regression(ctx, timer):
     #w = w - grad * 1e-6
 
   for i in range(5):
-    print '*' * 100
-    print i
     timer.time_op('linear-regression', _step)
   
 if __name__ == '__main__':

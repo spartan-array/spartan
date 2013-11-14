@@ -24,8 +24,8 @@ from base import Expr, evaluate, dag, glom, eager, lazify, force, make_primitive
 import numpy as np
 from spartan import util
 
-from ..dense import extent
-from ..dense.extent import index_for_reduction, shapes_match
+from ..array import extent
+from ..array.extent import index_for_reduction, shapes_match
 from ..util import Assert
 from .builtins import *
 from .map import map

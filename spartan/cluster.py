@@ -94,6 +94,8 @@ def start_cluster(num_workers, use_cluster_workers):
   if not use_cluster_workers:
     _start_remote_worker('localhost', 0, num_workers)
   else:
+    available_workers = sum([cnt for _, cnt in FLAGS.hosts])
+    assert available_workers > num_workers, 'Insufficient slots to run all workers.'
     count = 0
     num_hosts = len(FLAGS.hosts)
     for worker, total_tasks in FLAGS.hosts:

@@ -292,3 +292,30 @@ def as_list(x):
   if iterable(x): return list(x)
   
   return [x]
+
+
+def get_core_mapping():
+  lines = open('/proc/cpuinfo').read().strip().split('\n')
+  package_id = core_id = None
+  id = 0
+  cpus = {}
+  for l in lines:
+    if l.startswith('physical id'):
+      package_id = int(l.split(':')[1].strip())
+
+    if l.startswith('core_id'):
+      core_id = int(l.split(':')[1].strip())
+
+    if package_id is not None and core_id is not None:
+      cpus[id] = (package_id, core_id)
+
+  return cpus
+
+def get_good_cores():
+  """
+  Return a list of processor ids that correspond to the primary thread on each core.
+  :return:
+  """
+  cpus = get_core_mapping()
+  unique = {}
+  m

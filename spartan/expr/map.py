@@ -2,12 +2,10 @@
 
 import collections
 
-import numpy as np
-from spartan import util, core
-from spartan.dense import distarray, tile
+from spartan import util, blob_ctx
+from spartan.array import distarray, tile
 from spartan.node import Node
-from spartan.util import Assert
-from .base import Expr, lazify, LazyList
+from .base import Expr, lazify
 
 
 def map(inputs, fn, **kw):
@@ -28,7 +26,7 @@ def map(inputs, fn, **kw):
 
 
 def tile_mapper(ex, data, children, map_fn, fn_kw):
-  ctx = core.get_ctx()
+  ctx = blob_ctx.get()
   #util.log_info('MapTiles: %s', map_fn)
   #util.log_info('Fetching %d inputs', len(children))
   #util.log_info('%s %s', inputs, ex)

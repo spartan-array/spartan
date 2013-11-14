@@ -296,3 +296,22 @@ def find_shape(extents):
   shape = np.max([ex.lr for ex in extents], axis=0)
   shape[shape == 0] = 1
   return tuple(shape)
+
+
+def is_complete(shape, slices):
+  '''
+  Returns true if ``slices`` is a complete covering of shape; that is:
+
+  ::
+
+    array[slices] == array
+
+  :param shape: tuple of int
+  :param slices: list/tuple of `slice` objects
+  :rtype: boolean
+  '''
+  Assert.eq(len(shape), len(slices))
+  for dim,slice in zip(shape, slices):
+    if slice.start > 0: return False
+    if slice.stop < dim: return False
+  return True

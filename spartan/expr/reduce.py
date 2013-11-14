@@ -1,6 +1,6 @@
 from .base import Expr
 from spartan import util
-from spartan.dense import extent, tile, distarray
+from spartan.array import extent, tile, distarray
 from spartan.expr.base import make_primitive
 from spartan.node import Node
 

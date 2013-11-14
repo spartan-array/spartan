@@ -1,6 +1,6 @@
 from .base import Expr
 from ..node import Node
-from spartan.dense import tile, distarray
+from spartan.array import tile, distarray
 import numpy as np
 
 class NdArrayExpr(Expr):

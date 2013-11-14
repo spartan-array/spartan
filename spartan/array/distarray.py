@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
-from . import tile, extent
-import traceback
-import spartan
-from spartan import util, core
-from spartan.util import Assert
-import numpy as np
 import itertools
 import collections
+
+import numpy as np
+
+from . import tile, extent
+from spartan import util, core, blob_ctx
+from spartan.util import Assert
+
 
 # number of elements per tile
 TILE_SIZE = 100000
@@ -75,7 +76,7 @@ def create(shape,
            combiner=None,
            reducer=None,
            tile_hint=None):
-  ctx = core.get_ctx()
+  ctx = blob_ctx.get()
   dtype = np.dtype(dtype)
   shape = tuple(shape)
 
@@ -113,9 +114,9 @@ class DistArray(object):
     self.tiles = tiles
 
   def __del__(self):
-    if core.get_ctx().worker_id == core.MASTER_ID:
+    if blob_ctx.get().worker_id == blob_ctx.MASTER_ID:
       #util.log_info('Destroying table... %s', self.tiles.values())
-      core.get_ctx().destroy_all(self.tiles.values())
+      blob_ctx.get().destroy_all(self.tiles.values())
 
   def id(self):
     return self.table.id()
@@ -131,7 +132,7 @@ class DistArray(object):
     return sorted(scounts.items(), key=lambda kv: kv[1])[-1][0]
 
   def map_to_table(self, mapper_fn, kw=None):
-    ctx = core.get_ctx()
+    ctx = blob_ctx.get()
 
     if kw is None: kw = {}
     kw['array'] = self
@@ -163,7 +164,7 @@ class DistArray(object):
 
     #util.log_info('FETCH: %s %s', self.shape, region)
 
-    ctx = core.get_ctx()
+    ctx = blob_ctx.get()
     Assert.isinstance(region, extent.TileExtent)
     assert np.all(region.lr <= self.shape), (region, self.shape)
     
@@ -192,7 +193,7 @@ class DistArray(object):
     return self.update(extent.from_slice(slc, self.shape), data)
      
   def update(self, region, data):
-    ctx = core.get_ctx()
+    ctx = blob_ctx.get()
     Assert.isinstance(region, extent.TileExtent)
     Assert.eq(region.shape, data.shape,
               'Size of extent does not match size of data')
@@ -261,7 +262,7 @@ def from_table(extents):
     # fetch a one element array in order to get the dtype
     key, blob_id = extents.iteritems().next()
     #util.log_info('%s :: %s', key, blob_id)
-    t = core.get_ctx().get(blob_id, None)
+    t = blob_ctx.get().get(blob_id, None)
     Assert.isinstance(t, tile.Tile)
     dtype = t.dtype
   else:
@@ -278,6 +279,9 @@ def map_to_array(array, mapper_fn, kw=None):
       extents[ex] = id
 
   return from_table(extents)
+
+def map_to_table(array, mapper_fn, kw=None):
+  return array.map_to_table(mapper_fn=mapper_fn, kw=kw)
 
   
 def best_locality(array, ex):

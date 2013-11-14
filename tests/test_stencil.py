@@ -1,5 +1,5 @@
 from spartan import expr, util
-from spartan.dense import distarray
+from spartan.array import distarray
 from spartan.expr import stencil
 from spartan.util import Assert, divup
 from test_common import with_ctx

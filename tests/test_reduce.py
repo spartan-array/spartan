@@ -1,5 +1,5 @@
 from spartan import expr
-from spartan.dense import distarray
+from spartan.array import distarray
 from spartan.util import Assert
 import numpy as np
 import spartan

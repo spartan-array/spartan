@@ -1,6 +1,6 @@
 import numpy as np
 from spartan import expr, util
-from spartan.dense import distarray, extent
+from spartan.array import distarray, extent
 from spartan.expr import lazify
 import spartan
 from spartan.util import divup
@@ -54,7 +54,7 @@ def _find_cluster_mapper(inputs, ex, d_pts, old_centers,
   return []
   
 def run(num_pts, num_centers, num_dim):
-  ctx = spartan.core.get_ctx()
+  ctx = spartan.blob_ctx.get()
 
   pts = expr.rand(num_pts, num_dim,
                   tile_hint=(divup(num_pts, ctx.num_workers), num_dim)).force()

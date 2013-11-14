@@ -9,8 +9,8 @@ These include --
 * Other: (`dot`).
 '''
 import numpy as np
-from ..dense import distarray, extent
-from ..dense.extent import index_for_reduction, shapes_match
+from ..array import distarray, extent
+from ..array.extent import index_for_reduction, shapes_match
 from .base import force
 from .shuffle import shuffle
 from .map import map
@@ -248,6 +248,7 @@ def _dot_mapper(inputs, ex, av, bv):
                        (ex_a.lr[1], bv.shape[1]),
                        bv.shape)
   b = bv.fetch(ex_b)
+
   result = np.dot(a, b)
   
   ul = np.asarray([ex_a.ul[0], 0])

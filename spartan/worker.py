@@ -4,8 +4,6 @@ import cProfile
 import pstats
 import threading
 import time
-from spartan.dense import extent
-
 
 try:
   import pyximport; pyximport.install()
@@ -18,7 +16,7 @@ import socket
 import sys
 
 import resource
-from spartan import config, util, rpc, core
+from spartan import config, util, rpc, core, blob_ctx
 from spartan.config import FLAGS, StrFlag, IntFlag
 
 
@@ -54,16 +52,16 @@ class Worker(object):
       self._peers[id] = rpc.connect(host, port)
 
     self.id = req.id
-    self._ctx = core.BlobCtx(self.id, self._peers, self)
+    self._ctx = blob_ctx.BlobCtx(self.id, self._peers, self)
     self._initialized = True
     handle.done()
     
   def create(self, req, handle):
     assert self._initialized
-    core.set_ctx(self._ctx)
+    blob_ctx.set(self._ctx)
 
     if req.blob_id.id == -1:
-      id = core.get_ctx().create_local()
+      id = blob_ctx.get().create_local()
     else:
       id = req.blob_id
 
@@ -80,7 +78,9 @@ class Worker(object):
     handle.done()
 
   def update(self, req, handle):
-    self._blobs[req.id].update(req.data, req.reducer)
+    blob =  self._blobs[req.id]
+    self._blobs[req.id] = blob.update(req.data, req.reducer)
+
     handle.done()
 
   def get(self, req, handle):
@@ -97,7 +97,7 @@ class Worker(object):
     if FLAGS.profile_kernels:
       self._kernel_prof.enable()
 
-    core.set_ctx(self._ctx)
+    blob_ctx.set(self._ctx)
     results = {}
     for blob_id in req.blobs:
       #util.log_info('%s %s', blob_id, blob_id in self._blobs)
@@ -148,8 +148,7 @@ def _start_worker(master, port, local_id):
 
 if __name__ == '__main__':
   sys.path.append('./tests')
-  
-  import spartan
+
   FLAGS.add(StrFlag('master'))
   FLAGS.add(IntFlag('port'))
   FLAGS.add(IntFlag('count'))

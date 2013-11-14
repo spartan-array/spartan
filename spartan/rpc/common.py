@@ -5,7 +5,6 @@ The :class:`.Client` and :class:`.Server` classes here work with
 sockets which should implement the :class:`.Socket` interface.
 '''
 from cPickle import PickleError
-import cProfile
 import collections
 import weakref
 import sys
@@ -16,9 +15,9 @@ import types
 import cStringIO
 import cPickle
 
-from .. import util
-from .. import cloudpickle
-from spartan.node import Node
+from .. import cloudpickle, util, core
+from ..node import Node
+from spartan.rpc import serialization
 
 
 RPC_ID = xrange(1000000000).__iter__()
@@ -72,7 +71,8 @@ def capture_exception(exc_info=None):
 class Group(tuple):
   pass
 
-def pickle_to(obj, writer):
+def serialize_to(obj, writer):
+  #serialization.write(obj, writer)
   try:
     pickled = cPickle.dumps(obj, -1)
     writer.write(pickled)
@@ -80,12 +80,17 @@ def pickle_to(obj, writer):
     #util.log_warn('CPICKLE failed: %s (%s)', sys.exc_info(), obj)
     writer.write(cloudpickle.dumps(obj, -1))
 
-def pickle(obj):
+def serialize(obj):
+  #x = cStringIO.StringIO()
+  #serialization.write(obj, x)
+  #return x.getvalue()
   try:
     return cPickle.dumps(obj, -1)
   except (PickleError, TypeError):
     return cloudpickle.dumps(obj, -1)
 
+def read(f):
+  return cPickle.load(f)
 
 NO_RESULT = object()
 
@@ -118,7 +123,7 @@ class PendingRequest(object):
       # util.log_info('Finished %s, %s', self.socket.addr, self.rpc_id)
       w = cStringIO.StringIO()
       cPickle.dump(header, w, -1)
-      pickle_to(result, w)
+      serialize_to(result, w)
       self.socket.send(w.getvalue())
 
   def __del__(self):
@@ -282,7 +287,7 @@ class Server(object):
         return
 
       try:
-        req = cPickle.load(reader)
+        req = read(reader)
         result = fn(req, handle)
         assert result is None, 'non-None result from RPC handler (use handle.done())'
       except:
@@ -315,7 +320,7 @@ class ProxyMethod(object):
     if isinstance(request, PickledData):
       w.write(request.data)
     else:
-      pickle_to(request, w)
+      serialize_to(request, w)
 
     #util.log_info('Sending %s', self.method)
 #    if len(serialized) > 800000:
@@ -347,7 +352,8 @@ class Client(object):
     data = socket.recv()
     reader = cStringIO.StringIO(data)
     header = cPickle.load(reader)
-    resp = cPickle.load(reader)
+    resp = read(reader)
+    #resp = cPickle.load(reader)
     rpc_id = header['rpc_id']
     f = self._futures[rpc_id]
     f._set_result(resp)
@@ -366,7 +372,7 @@ def forall(clients, method, request):
   Returns a future wrapping all of the requests.
   '''
   futures = []
-  pickled = PickledData(data=pickle(request))
+  pickled = PickledData(data=serialize(request))
   for c in clients:
     futures.append(getattr(c, method)(pickled))
 

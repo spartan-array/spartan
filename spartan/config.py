@@ -126,7 +126,7 @@ def initialize(argv):
   if not os.path.exists(config_file):
     open(config_file, 'a').close()
 
-  print 'Loading configuration from %s' % (config_file)
+  print >>sys.stderr, 'Loading configuration from %s' % (config_file)
   try:
     config = ConfigParser.ConfigParser()
     config.read(config_file)
@@ -135,7 +135,7 @@ def initialize(argv):
       for name, value in config.items('flags'):
         argv.append('--%s=%s' % (name, value))
   except:
-    print 'Failed to parse config file: %s' % config_file
+    print >>sys.stderr, 'Failed to parse config file: %s' % config_file
     sys.exit(1)
 
   parser = argparse.ArgumentParser()

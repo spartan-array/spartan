@@ -11,7 +11,7 @@ import sys
 import time
 import types
 import unittest
-from spartan.dense import distarray
+from spartan.array import distarray
 
 CTX = None
 def get_cluster_ctx():

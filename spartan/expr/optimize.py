@@ -6,7 +6,7 @@ Optimizations over an expression graph.
 
 import numpy as np
 from spartan.config import FLAGS, BoolFlag
-from spartan.dense import extent
+from spartan.array import extent
 from spartan.expr.reduce import ReduceExpr
 from spartan.node import Node
 from spartan.util import Assert, iterable
@@ -16,7 +16,7 @@ from .base import Expr, LazyVal, LazyList
 from .shuffle import ShuffleExpr
 from .map import MapExpr
 from .ndarray import NdArrayExpr
-from spartan.dense.distarray import broadcast
+from spartan.array.distarray import broadcast
 
 try:
   import numexpr

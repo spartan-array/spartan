@@ -87,7 +87,7 @@ class Socket(SocketBase):
     self.flush()
     self._closed = True
     self._zmq.close()
-    del self._zmq
+    #del self._zmq
 
   def handle_write(self):
     with self._lock:
@@ -185,32 +185,56 @@ class ZMQPoller(threading.Thread):
 
     self._closing = {}
     self._running = False
+
+    self._to_add = []
+    self._to_del = []
+    self._to_mod = []
     self.setDaemon(True)
 
   def _run(self):
     self._running = True
     _poll = self._poller.poll
+    _poll_time = 1
+    MAX_TIMEOUT = 100
 
     while self._running:
-      self.profiler.disable()
-      socks = dict(_poll(100))
+      socks = dict(_poll(_poll_time))
+
+      if len(socks) == 0:
+        _poll_time = min(_poll_time * 2, MAX_TIMEOUT)
+      else:
+        _poll_time = 1
+
       #util.log_info('%s', self._sockets)
-      self.profiler.enable()
+      for fd, event in socks.iteritems():
+        if fd == self._pipe[0]:
+          os.read(fd, 1)
+          continue
+
+        if not fd in self._sockets:
+          continue
+
+        socket = self._sockets[fd]
+        if event & zmq.POLLIN:
+          socket.handle_read(socket)
+        if event & zmq.POLLOUT:
+          socket.handle_write()
+
       with self._lock:
-        for fd, event in socks.iteritems():
-          if fd == self._pipe[0]:
-            os.read(fd, 1)
-            continue
+        for s, dir in self._to_add:
+          self._sockets[s.zmq()] = s
+          self._poller.register(s.zmq(), dir)
 
-          if not fd in self._sockets:
-            # util.log('Handler for %s disappeared...', fd)
-            continue
+        for s, dir in self._to_mod:
+          self._poller.register(s.zmq(), dir)
 
-          socket = self._sockets[fd]
-          if event & zmq.POLLIN:
-            socket.handle_read(socket)
-          if event & zmq.POLLOUT:
-            socket.handle_write()
+        for s in self._to_del:
+          del self._sockets[s.zmq()]
+          self._poller.unregister(s.zmq())
+
+        del self._to_mod[:]
+        del self._to_add[:]
+        del self._to_del[:]
 
         for socket in self._closing.keys():
           socket.handle_close()
@@ -237,20 +261,19 @@ class ZMQPoller(threading.Thread):
 
   def modify(self, socket, direction):
     with self._lock:
-      self._poller.modify(socket.zmq(), direction)
+      self._to_mod.append((socket, direction))
       self.wakeup()
 
   def add(self, socket, direction):
-    self._sockets[socket.zmq()] = socket
     with self._lock:
-      self._poller.register(socket.zmq(), direction)
+      self._to_add.append((socket, direction))
       self.wakeup()
 
   def remove(self, socket):
     with self._lock:
-      self._poller.unregister(socket.zmq())
-      del self._sockets[socket.zmq()]
-
+      assert socket.zmq() in self._sockets
+      self._to_del.append(socket)
+      self.wakeup()
 
 def shutdown():
   poller().stop()

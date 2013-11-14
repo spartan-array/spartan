@@ -1,6 +1,6 @@
 import numpy as np
 from spartan import util, expr
-from spartan.dense import distarray, extent
+from spartan.array import distarray, extent
 from spartan.expr import backend
 from spartan.util import Assert
 from test_common import with_ctx

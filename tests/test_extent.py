@@ -1,5 +1,5 @@
 from spartan import util
-from spartan.dense import extent
+from spartan.array import extent
 from spartan.util import Assert
 import random
 

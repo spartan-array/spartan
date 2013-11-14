@@ -1,5 +1,5 @@
 from spartan import util, config, expr
-from spartan.dense import distarray
+from spartan.array import distarray
 import test_common
 
 def benchmark_slice(ctx, timer):
