@@ -110,7 +110,7 @@ class PendingRequest(object):
 
   def wait(self):
     while self.result is NO_RESULT:
-      time.sleep(0.001)
+      time.sleep(0.1)
     return self.result
 
   def done(self, result=None):
@@ -143,21 +143,6 @@ class RemoteException(Exception):
   def __str__(self):
     return repr(self)
 
-class FnFuture(object):
-  '''Chain ``fn`` to the given future.
-
-  ``self.wait()`` return ``fn(future.wait())``.
-  '''
-  def __init__(self, future, fn):
-    self.future = future
-    self.fn = fn
-    self.result = None
-
-  def wait(self):
-    result = self.future.wait()
-    # util.log_info('Applying %s to %s', self.fn, result)
-    self.result = self.fn(result)
-    return self.result
 
 class Future(object):
   def __init__(self, addr, rpc_id):
@@ -172,7 +157,7 @@ class Future(object):
 
     CLIENT_PENDING[self] = 1
 
-  def _set_result(self, result):
+  def done(self, result=None):
     self._cv.acquire()
     self.have_result = True
 
@@ -191,7 +176,7 @@ class Future(object):
     self._cv.acquire()
     while not self.have_result and not self.timed_out():
       # use a timeout so that ctrl-c works.
-      self._cv.wait(timeout=0.1)
+      self._cv.wait(timeout=1)
     self._cv.release()
 
 #    util.log_info('Result from %s in %f seconds.', self.addr, time.time() - self._start)
@@ -206,6 +191,20 @@ class Future(object):
 
   def on_finished(self, fn):
     return FnFuture(self, fn)
+
+
+class FnFuture(object):
+  '''Chain ``fn`` to the given future.
+
+  ``self.wait()`` return ``fn(future.wait())``.
+  '''
+  def __init__(self, future, fn):
+    self.future = future
+    self.fn = fn
+    self.result = None
+
+  def wait(self):
+    return self.fn(self.future.wait())
 
 
 class DummyFuture(object):
@@ -251,7 +250,7 @@ class Server(object):
   def serve(self):
     self.serve_nonblock()
     while self._running:
-      time.sleep(0.1)
+      time.sleep(1)
 
   def serve_nonblock(self):
 #    util.log_info('Running.')
@@ -356,7 +355,7 @@ class Client(object):
     #resp = cPickle.load(reader)
     rpc_id = header['rpc_id']
     f = self._futures[rpc_id]
-    f._set_result(resp)
+    f.done(resp)
     del self._futures[rpc_id]
 
   def close(self):

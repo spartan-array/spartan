@@ -29,7 +29,7 @@ class BlobCtx(object):
 
     # short-circuit for requests to the local worker
     if worker_id == self.worker_id:
-      pending_req = rpc.PendingRequest(None, -1)
+      pending_req = rpc.Future(None, -1)
       getattr(self.local_worker, method)(req, pending_req)
     else:
       pending_req =  getattr(self.workers[worker_id], method)(req)
@@ -68,10 +68,15 @@ class BlobCtx(object):
   def destroy(self, blob_id):
     return self.destroy_all([blob_id])
 
-  def get(self, blob_id, selector):
+  def get(self, blob_id, selector, callback=None):
     Assert.isinstance(blob_id, core.BlobId)
     req = core.GetReq(id=blob_id, selector=selector)
-    return self._send(blob_id, 'get', req).data
+    if callback is None:
+      return self._send(blob_id, 'get', req).data
+    else:
+      future = self._send(blob_id, 'get', req, wait=False)
+      return future.on_finished(callback)
+
 
   def update(self, blob_id, data, reducer, wait=True):
     req = core.UpdateReq(id=blob_id, data=data, reducer=reducer)

@@ -6,7 +6,7 @@ import collections
 import numpy as np
 
 from . import tile, extent
-from spartan import util, core, blob_ctx
+from spartan import util, core, blob_ctx, rpc
 from spartan.util import Assert
 
 
@@ -180,12 +180,22 @@ class DistArray(object):
     #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
     tgt = np.ndarray(region.shape, dtype=self.dtype)
     #util.log_info('Fetching %d tiles', len(splits))
+
+    futures = []
     for ex, intersection in splits:
       dst_slice = extent.offset_slice(region, intersection)
       blob_id = self.tiles[ex]
-      src_slice = ctx.get(blob_id, extent.offset_slice(ex, intersection))
+
+      def _apply_data(r, slc=dst_slice):
+        tgt[slc] = r.data
+
+      futures.append(ctx.get(blob_id, extent.offset_slice(ex, intersection),
+                             callback=_apply_data))
+      #tgt[dst_slice] = ctx.get(blob_id, extent.offset_slice(ex, intersection))
+
       #util.log_info('%s %s', dst_slice, src_slice.shape)
-      tgt[dst_slice] = src_slice
+    rpc.wait_for_all(futures)
+
     return tgt
     #return tile.data[]
    
@@ -217,8 +227,8 @@ class DistArray(object):
       #util.log_info('%s %s %s %s', dst_key.shape, intersection.shape, blob_id, update_tile)
       futures.append(ctx.update(blob_id, update_tile, self.reducer_fn, wait=False))
 
-    for f in futures: f.wait()
-  
+    rpc.wait_for_all(futures)
+
   def select(self, idx):
     '''
     Effectively __getitem__.
