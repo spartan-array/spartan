@@ -5,6 +5,8 @@ import collections
 import os
 import threading
 import socket
+import traceback
+import sys
 import zmq
 
 from .common import Group, SocketBase
@@ -23,12 +25,17 @@ def poller():
       POLLER.start()
     return POLLER
 
+socket_count = collections.defaultdict(int)
 
 class Socket(SocketBase):
   __slots__ = ['_zmq', '_hostport', '_out', '_in', '_addr', '_closed', '_shutdown', '_lock']
 
   def __init__(self, ctx, sock_type, hostport):
-    # util.log('New socket...')
+    socket_count[os.getpid()] += 1
+    #util.log_info('New socket... %s.%s -> %s [%s]',
+    #              socket.gethostname(), os.getpid(),  hostport, socket_count[os.getpid()])
+    #s = ''.join(traceback.format_stack())
+    #print >>sys.stderr, s
     self._zmq = ctx.socket(sock_type)
     self.addr = hostport
     self._out = collections.deque()
@@ -46,6 +53,9 @@ class Socket(SocketBase):
     self.handle_write()
 
   def close(self, *args):
+    if self._closed:
+      return
+
     if self.in_poll_loop():
       poller().remove(self)
       self.handle_close()
@@ -87,7 +97,7 @@ class Socket(SocketBase):
     self.flush()
     self._closed = True
     self._zmq.close()
-    #del self._zmq
+    del self._zmq
 
   def handle_write(self):
     with self._lock:
@@ -127,7 +137,12 @@ class ServerSocket(Socket):
     if port == -1:
       self.addr = (host, self._zmq.bind_to_random_port('tcp://%s' % host))
     else:
-      self._zmq.bind('tcp://%s:%d' % (host, port))
+      try:
+        self._zmq.bind('tcp://%s:%d' % (host, port))
+      except zmq.ZMQError:
+        util.log_info('Failed to bind (%s, %d)' % (host, port))
+        raise
+
     poller().add(self, zmq.POLLIN)
 
   def handle_read(self, socket):

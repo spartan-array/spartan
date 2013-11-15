@@ -102,17 +102,13 @@ FLAGS.add(IntFlag('num_workers', default=3))
 FLAGS.add(IntFlag('port_base', default=10000,
                   help='Port to listen on (master = port_base, workers=port_base + N)'))
 
-FLAGS.add(BoolFlag(
-  'use_threads',
-  help='When running locally, use threads instead of forking. (slow, for debugging)',
-  default=False))
-
-
 def initialize(argv):
   '''Parse configuration from flags and/or configuration file.'''
 
-  # load flags from other packages (is there a better way to do this?)
+  import spartan.expr.optimize
+  import spartan.cluster
 
+  # load flags from other packages (is there a better way to do this?)
   if FLAGS._parsed:
     return
 
@@ -155,7 +151,6 @@ def initialize(argv):
     if f.startswith('-'):
       util.log_warn('Unknown flag: %s (ignored)' % f)
 
-  util.log_info('Hostlist: %s', FLAGS.hosts)
-
+  util.log_debug('Hostlist: %s', FLAGS.hosts)
   return rest
 

@@ -17,19 +17,22 @@ from .map import map
 from .ndarray import ndarray
 from .reduce import reduce
 from .loop import loop
+from spartan import util
 from ..util import Assert
 
 def rand(*shape, **kw):
   '''
   :param tile_hint: A tuple indicating the desired tile shape for this array.
   '''
+  for s in shape: assert isinstance(s, int)
   return map(ndarray(shape, 
                      dtype=np.float,
                      tile_hint=kw.get('tile_hint', None)),
                      fn = lambda inputs: np.random.rand(*inputs[0].shape))
   
 def randn(*shape, **kw):
-  return map(ndarray(shape, 
+  for s in shape: assert isinstance(s, int)
+  return map(ndarray(shape,
                            dtype=np.float,
                            tile_hint=kw.get('tile_hint', None)),
                      fn = lambda inputs: np.random.randn(*inputs[0].shape))
@@ -235,26 +238,28 @@ def reshape(array, new_shape, tile_hint=None):
                      kw = { '_dest_shape' : new_shape})
 
 def _dot_mapper(inputs, ex, av, bv):
-  ex_a = ex
   # read current tile of array 'a'
-  a = av.fetch(ex_a)
+  ex_a = ex
 
-  target_shape = (av.shape[0], bv.shape[1])
-  
   # fetch corresponding column tile of array 'b'
   # rows = ex_a.cols
   # cols = *
   ex_b = extent.create((ex_a.ul[1], 0),
                        (ex_a.lr[1], bv.shape[1]),
                        bv.shape)
+
+  util.log_info('%s %s', ex_a, ex_b)
+
+  a = av.fetch(ex_a)
   b = bv.fetch(ex_b)
 
   result = np.dot(a, b)
-  
+
   ul = np.asarray([ex_a.ul[0], 0])
   lr = ul + result.shape
   #util.log_info('%s %s %s', a.shape, b.shape, result.shape)
   #util.log_info('%s %s %s', ul, lr, target_shape)
+  target_shape = (av.shape[0], bv.shape[1])
   out = extent.create(ul, lr, target_shape)
   
   yield out, result

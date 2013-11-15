@@ -36,8 +36,13 @@ FLAGS.add(BoolFlag('xterm', default=False, help='Run workers in xterm'))
 FLAGS.add(BoolFlag('oprofile', default=False, help='Run workers inside of operf'))
 FLAGS.add(AssignModeFlag('assign_mode', default=AssignMode.BY_CORE))
 
+FLAGS.add(BoolFlag(
+  'use_threads',
+  help='When running locally, use threads instead of forking. (slow, for debugging)',
+  default=True))
+
+
 def _start_remote_worker(worker, st, ed):
-  util.log_info('Starting worker %d:%d on host %s', st, ed, worker)
   if FLAGS.use_threads and worker == 'localhost':
     util.log_info('Using threads.')
     for i in range(st, ed):
@@ -47,7 +52,8 @@ def _start_remote_worker(worker, st, ed):
       p.start()
     time.sleep(0.1)
     return
-  
+
+  util.log_info('Starting worker %d:%d on host %s', st, ed, worker)
   if FLAGS.oprofile:
     os.system('mkdir operf.%s' % worker)
     

@@ -5,7 +5,7 @@ import numpy as np
 import spartan
 import test_common
 
-TEST_SIZE = 10
+TEST_SIZE = 5
 
 class TestReduce(test_common.ClusterTest):
   TILE_SIZE = TEST_SIZE

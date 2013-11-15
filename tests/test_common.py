@@ -17,10 +17,9 @@ CTX = None
 def get_cluster_ctx():
   global CTX
   if CTX is None:
+    util.log_info('Starting cluster...')
     config.initialize(sys.argv)
-    print FLAGS.cluster
     CTX = start_cluster(FLAGS.num_workers, FLAGS.cluster)
-    
   return CTX
 
 def sig_handler(sig, frame):
@@ -98,18 +97,26 @@ class ClusterTest(unittest.TestCase):
   cases, and resets the TILE_SIZE for distarray between test runs.
   '''
   TILE_SIZE = None
+  flags = None
   
   @classmethod
   def setUpClass(cls):
     cls.ctx = get_cluster_ctx()
-    
-  def setUp(self):
-    self.old_tilesize = distarray.TILE_SIZE
-    if self.TILE_SIZE is not None:
-      distarray.TILE_SIZE = self.TILE_SIZE
-  
-  def tearDown(self):
-    distarray.TILE_SIZE = self.old_tilesize
+    cls.old_tilesize = distarray.TILE_SIZE
+    if cls.TILE_SIZE is not None:
+      distarray.TILE_SIZE = cls.TILE_SIZE
+
+    cls.old_flags = {}
+    if cls.flags is not None:
+      for k, v in cls.flags.iteritems():
+        cls.old_flags[k] = getattr(config.FLAGS, k)
+        setattr(config.FLAGS, k, v)
+
+  @classmethod
+  def tearDownClass(cls):
+    distarray.TILE_SIZE = cls.old_tilesize
+    for k, v in cls.old_flags.iteritems():
+      setattr(config.FLAGS, k, v)
 
 
 def with_ctx(fn):

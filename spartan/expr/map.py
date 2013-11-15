@@ -33,8 +33,7 @@ def tile_mapper(ex, data, children, map_fn, fn_kw):
   local_values = [c.fetch(ex) for c in children]
   #util.log_info('Mapping...')
   result = map_fn(local_values, **fn_kw)
-  #util.log_info('Done.')
-  #assert isinstance(result, np.ndarray), result
+  #util.log_info('Result: %s', result)
   return [(ex, ctx.create(tile.from_data(result)).wait().blob_id)]
     
 
