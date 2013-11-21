@@ -70,5 +70,5 @@ class SliceTest(test_common.ClusterTest):
     Assert.all_eq(val, nx[:, :, 0].sum())
 
 if __name__ == '__main__':
-  rest = spartan.config.parse_args(sys.argv)
+  rest = spartan.config.initialize(sys.argv)
   unittest.main(argv=rest) 

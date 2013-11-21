@@ -65,14 +65,6 @@ expr Package
     :undoc-members:
     :show-inheritance:
 
-:mod:`node` Module
-------------------
-
-.. automodule:: spartan.expr.node
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 :mod:`optimize` Module
 ----------------------
 

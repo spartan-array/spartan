@@ -3,8 +3,11 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to Spartan's documentation!
+Spartan Documentation
 ===================================
+
+Spartan provides a *distributed array language* with numpy-like
+syntax and behavior.
 
 Packages:
 
@@ -12,11 +15,6 @@ Packages:
    :maxdepth: 2
    
    spartan
-   spartan.dense
-   spartan.expr
-   spartan.sparse
-   spartan.wrap
-   
 
 
 Indices and tables

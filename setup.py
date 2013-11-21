@@ -1,8 +1,7 @@
 #!/usr/bin/python
 
 from setuptools import setup, Extension
-
-#from Cython.Build import cythonize
+from Cython.Build import cythonize
 
 setup(
   name='spartan',
@@ -13,6 +12,7 @@ setup(
   install_requires=[
     'appdirs',
     'numpy>=1.6',
+    'cython',
     'sphinx_bootstrap_theme',                
   ],
   classifiers=[
@@ -31,7 +31,8 @@ setup(
   packages=['spartan', 
             'spartan.expr',
             'spartan.rpc',
-            'spartan.array',
-            'spartan.sparse'],
-   # + ext_modules = cythonize('tests/netflix.pyx'),
+            'spartan.array' ],
+  ext_modules = cythonize(
+              'spartan/core.pyx', 
+              'spartan/examples/netflix_core.pyx')
 )

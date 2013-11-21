@@ -9,6 +9,7 @@ spartan Package
     :undoc-members:
     :show-inheritance:
 
+
 :mod:`cluster` Module
 ---------------------
 
@@ -21,6 +22,38 @@ spartan Package
 --------------------
 
 .. automodule:: spartan.config
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+:mod:`core` Module
+------------------
+
+.. automodule:: spartan.core
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+:mod:`master` Module
+--------------------
+
+.. automodule:: spartan.master
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+:mod:`msg` Module
+-----------------
+
+.. automodule:: spartan.msg
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+:mod:`node` Module
+------------------
+
+.. automodule:: spartan.node
     :members:
     :undoc-members:
     :show-inheritance:
@@ -40,4 +73,15 @@ spartan Package
     :members:
     :undoc-members:
     :show-inheritance:
+
+Subpackages
+-----------
+
+.. toctree::
+
+    spartan.dense
+    spartan.examples
+    spartan.expr
+    spartan.rpc
+    spartan.sparse
 

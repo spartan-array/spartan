@@ -31,6 +31,8 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.viewcode',
               ]
 
+
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
@@ -257,4 +259,10 @@ intersphinx_mapping = { 'http://docs.scipy.org/doc/numpy': None,
                         'http://docs.scipy.org/doc/scipy/reference': None,
                         'http://scikit-learn.org/stable': None,
                         'http://docs.python.org/3.2' : None }
-                       
+
+autodoc_default_flags = [
+  'members',
+  'undoc-members',
+  'show-inheritance'
+  ]
+
