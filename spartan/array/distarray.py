@@ -69,34 +69,67 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
   return result
     
 
-
-def create(shape,
-           dtype=np.float, 
-           sharder=None,
-           combiner=None,
-           reducer=None,
-           tile_hint=None):
-  ctx = blob_ctx.get()
-  dtype = np.dtype(dtype)
-  shape = tuple(shape)
-
-  extents = compute_splits(shape, tile_hint, -1).keys()
-  tiles = {}
-  for i, ex in enumerate(extents):
-    tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype), hint=i)
-
-  for ex in extents:
-    tiles[ex] = tiles[ex].wait().blob_id
-
-  return DistArray(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer)
-
-empty = create
-
 def _array_mapper(blob_id, blob, array=None, user_fn=None, **kw):
+  ctx = blob_ctx.get()
   ex = array.extent_for_blob(blob_id)
-  return user_fn(ex, blob, **kw)
+  results = []
+  user_results = user_fn(ex, blob, **kw)
+  assert user_results is not None, user_fn
+
+  for target_ex, target_data in user_results:
+    Assert.eq(target_ex.shape, target_data.shape,
+              'Bad extent for result: %s %s' % (user_fn, ex))
+    blob_id = ctx.create(tile.from_data(target_data)).wait().blob_id
+    results.append((target_ex, blob_id))
+  return results
 
 class DistArray(object):
+  '''The interface required for distributed arrays.'''
+
+  def fetch(self, ex):
+    raise NotImplementedError
+
+  def update(self, ex, data):
+    raise NotImplementedError
+
+  def __repr__(self):
+    return '%s(shape=%s, dtype=%s)' % (self.__class__.__name__, self.shape, self.dtype)
+
+  def select(self, idx):
+    '''
+    Effectively __getitem__.
+
+    Renamed to avoid the chance of accidentally using a slow, local operation on
+    a distributed array.
+    '''
+    if isinstance(idx, extent.TileExtent):
+      return self.fetch(idx)
+
+    if np.isscalar(idx):
+      return self[idx:idx+1][0]
+
+    ex = extent.from_slice(idx, self.shape)
+    #util.log_info('Select: %s + %s -> %s', idx, self.shape, ex)
+    return self.fetch(ex)
+
+  def glom(self):
+    #util.log_info('Glomming: %s', self.shape)
+    return self.select(np.index_exp[:])
+
+  def map_to_array(self, mapper_fn, kw=None):
+    results = self.map_to_table(mapper_fn=mapper_fn, kw=kw)
+    extents = {}
+    for blob_id, d in results.iteritems():
+      for ex, id in d:
+        extents[ex] = id
+
+    return from_table(extents)
+
+  def foreach(self, mapper_fn, kw):
+    return self.map_to_table(mapper_fn=mapper_fn, kw=kw)
+
+
+class DistArrayImpl(DistArray):
   def __init__(self, shape, dtype, tiles, reducer_fn):
     self.shape = shape
     self.dtype = dtype
@@ -142,16 +175,7 @@ class DistArray(object):
                    mapper_fn = _array_mapper,
                    reduce_fn=None,
                    kw=kw)
-  
-  def foreach(self, mapper_fn, kw):
-    return self.map_to_table(mapper_fn=mapper_fn, kw=kw)
 
-  def __repr__(self):
-    return 'DistArray(shape=%s, dtype=%s)' % (self.shape, self.dtype)
-  
-  def _get(self, extent):
-    return self.table.get(extent)
-  
   def fetch(self, region):
     '''
     Return a local numpy array for the given region.
@@ -229,26 +253,27 @@ class DistArray(object):
 
     rpc.wait_for_all(futures)
 
-  def select(self, idx):
-    '''
-    Effectively __getitem__.
-    
-    Renamed to avoid the chance of accidentally using a slow, local operation on
-    a distributed array.
-    '''
-    if isinstance(idx, extent.TileExtent):
-      return self.fetch(idx)
-    
-    if np.isscalar(idx):
-      return self[idx:idx+1][0]
-    
-    ex = extent.from_slice(idx, self.shape)
-    return self.fetch(ex)
-  
-  def glom(self):
-    #util.log_info('Glomming: %s', self.shape)
-    return self.select(np.index_exp[:])
 
+def create(shape,
+           dtype=np.float,
+           sharder=None,
+           combiner=None,
+           reducer=None,
+           tile_hint=None):
+  '''Make a new, empty DistArray'''
+  ctx = blob_ctx.get()
+  dtype = np.dtype(dtype)
+  shape = tuple(shape)
+
+  extents = compute_splits(shape, tile_hint, -1).keys()
+  tiles = {}
+  for i, ex in enumerate(extents):
+    tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype), hint=i)
+
+  for ex in extents:
+    tiles[ex] = tiles[ex].wait().blob_id
+
+  return DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer)
 
 def from_table(extents):
   '''
@@ -278,22 +303,50 @@ def from_table(extents):
   else:
     # empty table; default dtype.
     dtype = np.float
-  
-  return DistArray(shape=shape, dtype=dtype, tiles=extents, reducer_fn=None)
 
-def map_to_array(array, mapper_fn, kw=None):
-  results = array.map_to_table(mapper_fn=mapper_fn, kw=kw)
-  extents = {}
-  for blob_id, d in results.iteritems():
-    for ex, id in d:
-      extents[ex] = id
+  return DistArrayImpl(shape=shape, dtype=dtype, tiles=extents, reducer_fn=None)
 
-  return from_table(extents)
+class LocalWrapper(DistArray):
+  '''
+  Provide the `DistArray` interface for local data.
+  '''
+  def __init__(self, data):
+    self._data = np.asarray(data)
+    assert not isinstance(data, core.BlobId)
+    #print 'Wrapping: %s %s (%s)' % (data, type(data), np.isscalar(data))
+    #print 'DATA: %s' % type(self._data)
 
-def map_to_table(array, mapper_fn, kw=None):
-  return array.map_to_table(mapper_fn=mapper_fn, kw=kw)
+  @property
+  def dtype(self):
+    return self._data.dtype
 
-  
+  @property
+  def shape(self):
+    return self._data.shape
+
+  def fetch(self, ex):
+    return self._data[ex.to_slice()]
+
+  def map_to_array(self, mapper_fn, kw=None):
+    if kw is None: kw = {}
+    ex = extent.from_slice(np.index_exp[:], self.shape)
+    result = mapper_fn(ex, self._data, **kw)
+    assert len(result) == 1
+    result_ex, result_data = result[0]
+
+    return as_array(result_data)
+
+  def __getitem__(self, idx):
+    return self._data[idx]
+
+def as_array(data):
+  if isinstance(data, DistArray):
+    return data
+
+  # TODO(power) -- promote numpy arrays to distarrays?
+  return LocalWrapper(data)
+
+
 def best_locality(array, ex):
   '''
   Return the table shard with the best locality for extent `ex`.
@@ -323,6 +376,7 @@ def _slice_mapper(ex, tile, **kw):
   :param mapper_fn: User mapper function.
   :param slice: `TileExtent` representing the slice of the input array.
   '''
+
   mapper_fn = kw['_slice_fn']
   slice_extent = kw['_slice_extent']
 
@@ -332,19 +386,19 @@ def _slice_mapper(ex, tile, **kw):
   intersection = extent.intersection(slice_extent, ex)
   if intersection is None:
     return []
-  
+
   offset = extent.offset_from(slice_extent, intersection)
   offset.array_shape = slice_extent.shape
 
   subslice = extent.offset_slice(ex, intersection)
   subtile = tile[subslice]
-  
-  return mapper_fn(offset, subtile, **fn_kw)
 
+  result = mapper_fn(offset, subtile, **fn_kw)
+  #util.log_info('Slice mapper[%s] %s %s -> %s', mapper_fn, offset, subtile, result)
+  return result
 
-class Slice(object):
+class Slice(DistArray):
   def __init__(self, darray, idx):
-    util.log_info('New slice: %s', idx)
     if not isinstance(idx, extent.TileExtent):
       idx = extent.from_slice(idx, darray.shape)
     util.log_info('New slice: %s', idx)
@@ -359,10 +413,6 @@ class Slice(object):
     self.tiles = offsets
     self.dtype = darray.dtype
     
-  def foreach(self, mapper_fn, kw):
-    return self.darray.foreach(mapper_fn=_slice_mapper,
-                               kw={'_slice_extent' : self.slice, '_slice_fn' : mapper_fn, 'fn_kw' : kw })
-  
   def map_to_table(self, mapper_fn, kw):
     return self.darray.map_to_table(mapper_fn = _slice_mapper,
                                     kw={'fn_kw' : kw,
@@ -384,8 +434,7 @@ class Slice(object):
 def broadcast_mapper(ex, tile, mapper_fn=None, bcast_obj=None):
   pass
 
-
-class Broadcast(object):
+class Broadcast(DistArray):
   '''A broadcast object mimics the behavior of Numpy broadcasting.
   
   Takes an input of shape (x, y) and a desired output shape (x, y, z),
@@ -425,18 +474,12 @@ class Broadcast(object):
     
     _, bcast = np.broadcast_arrays(template, fetched)
     return bcast 
-  
-  def map_to_table(self, mapper_fn, combine_fn=None, reduce_fn=None, kw=None):
-    raise NotImplementedError
-  
-  def foreach(self, fn):
-    raise NotImplementedError
-  
+
 
 def broadcast(args):
   if len(args) == 1:
     return args
- 
+
   orig_shapes = [list(x.shape) for x in args]
   dims = [len(shape) for shape in orig_shapes]
   max_dim = max(dims)

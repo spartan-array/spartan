@@ -22,7 +22,7 @@ class IndexExpr(Expr):
   def evaluate(self, ctx, deps):
     idx = deps['idx']
     assert not isinstance(idx, list) 
-    util.log_info('%s', idx)
+    util.log_info('Indexing: %s', idx)
     if isinstance(idx, tuple) or\
        isinstance(idx, slice) or\
        np.isscalar(idx):
@@ -85,16 +85,4 @@ def eval_Slice(ctx, prim, deps):
   return distarray.Slice(src, idx)
   # return _eager_slice(src, idx)
 
-def _eager_slice(src, idx):  
-  slice_region = extent.from_slice(idx, src.shape)
-  matching_extents = dict(extent.find_overlapping(src.extents, slice_region))
-  
-  util.log_info('Taking slice: %s from %s', idx, src.shape)
-  # util.log_info('Matching: %s', matching_extents)
-  result = distarray.map_to_array(
-    src, lambda k, v: slice_mapper(k, v, slice_region, matching_extents))
-  
-  util.log_info('Done.')
-  return result
-  
- 
+

@@ -6,6 +6,9 @@ import numpy as np
 class NdArrayExpr(Expr):
   __metaclass__ = Node
   _members = ['_shape', 'dtype', 'tile_hint', 'combine_fn', 'reduce_fn']
+
+  def __str__(self):
+    return 'array(%s, %s)' % (self.shape, self.dtype)
   
   def visit(self, visitor):
     return NdArrayExpr(_shape=visitor.visit(self.shape),

@@ -11,6 +11,7 @@ def _reduce_mapper(ex, tile, reducer, axis, output, fn_kw):
   dst_extent = extent.index_for_reduction(ex, axis)
   #util.log_info('Update: %s %s', dst_extent, reduced)
   output.update(dst_extent, reduced)
+  return []
 
 class ReduceExpr(Expr):
   __metaclass__ = Node

@@ -12,7 +12,7 @@ from spartan.node import Node
 from spartan.util import Assert, iterable
 
 from .. import util
-from .base import Expr, LazyVal, LazyList
+from .base import Expr, LazyVal, LazyList, AsArray
 from .shuffle import ShuffleExpr
 from .map import MapExpr
 from .ndarray import NdArrayExpr
@@ -100,7 +100,7 @@ def _dag_eval(inputs, dag, kw_inputs):
   return dag.evaluate(ctx, {})
     
 
-def _fold_mapper(inputs, fns=None, map_fn=None, map_kw=None):
+def _fold_mapper(*inputs,  **kw):
   '''Helper mapper function for folding.
   
   Runs each callable in `fns` on a number of the input tiles.
@@ -110,24 +110,30 @@ def _fold_mapper(inputs, fns=None, map_fn=None, map_kw=None):
   :param map_fn:
   :param map_kw:
   '''
+  fns = kw['fns']
+  map_fn = kw['map_fn']
+  map_kw = kw['map_kw']
   results = []
   for fn_info in fns:
     st, ed = fn_info['range']
     fn = fn_info['fn']
     kw = fn_info['fn_kw']
-    result = fn(inputs[st:ed], **kw)
-    assert isinstance(result, np.ndarray), result
+    fn_inputs = inputs[st:ed]
+    result = fn(*fn_inputs, **kw)
+    assert isinstance(result, np.ndarray) or np.isscalar(result), (type(result), fn)
     results.append(result)
   
   # util.log_info('%s %s %s', map_fn, results, map_kw)
-  return map_fn(results, **map_kw)
+  if 'numpy_expr' in map_kw: del map_kw['numpy_expr']
+  return map_fn(*results, **map_kw)
     
 
-def _take_first(lst): 
+def _take_first(*lst):
+#  util.log_info('Take first: %s --> %s', lst, lst[0])
   return lst[0]
 
 def map_like(v):
-  return isinstance(v, (MapExpr, ShuffleExpr, NdArrayExpr, LazyVal))
+  return isinstance(v, (MapExpr, ShuffleExpr, NdArrayExpr, LazyVal, AsArray))
 
 
 class MapMapFusion(OptimizePass):
@@ -141,6 +147,8 @@ class MapMapFusion(OptimizePass):
   def visit_MapExpr(self, op):
     #util.log_info('Map tiles: %s', op.children)
     Assert.iterable(op.children)
+    #util.log_info('VISIT %d', id(op))
+    #util.log_info('VISIT %s', op.children)
     map_children = self.visit(op.children)
     all_maps = np.all([map_like(v) for v in map_children])
     
@@ -175,17 +183,17 @@ class MapMapFusion(OptimizePass):
     
     # util.log_info('Created fold mapper with %d children', len(children))
     return MapExpr(children=LazyList(vals=children),
-                        map_fn=_fold_mapper,
-                        fn_kw={ 'fns' : fns,
-                                'map_fn' : map_fn,
-                                'map_kw' : map_kw })
+                   map_fn=_fold_mapper,
+                   fn_kw={ 'fns' : fns,
+                           'map_fn' : map_fn,
+                           'map_kw' : map_kw })
 
 def _folded_reduce(ex, tile, axis,
                    map_inputs, map_fn, map_kw,
                    reduce_fn, reduce_kw,):
   map_inputs = broadcast(map_inputs)
   local_values = [v.fetch(ex) for v in map_inputs]
-  map_output = map_fn(local_values, **map_kw)
+  map_output = map_fn(*local_values, **map_kw)
   return reduce_fn(ex, map_output, axis, **reduce_kw)
 
 class ReduceMapFusion(OptimizePass):
@@ -198,15 +206,15 @@ class ReduceMapFusion(OptimizePass):
       children = array.children
       Assert.isinstance(children, LazyList)
       return ReduceExpr(array=children[0],
-                           axis=op.axis,
-                           dtype_fn=op.dtype_fn,
-                           reduce_fn=_folded_reduce,
-                           combine_fn=op.combine_fn,
-                           fn_kw={'map_kw' : array.fn_kw,
-                                  'map_fn' : array.map_fn,
-                                  'reduce_fn' : op.reduce_fn,
-                                  'reduce_kw' : op.fn_kw,
-                                  'map_inputs' : children })
+                        axis=op.axis,
+                        dtype_fn=op.dtype_fn,
+                        reduce_fn=_folded_reduce,
+                        combine_fn=op.combine_fn,
+                        fn_kw={'map_kw' : array.fn_kw,
+                               'map_fn' : array.map_fn,
+                               'reduce_fn' : op.reduce_fn,
+                               'reduce_kw' : op.fn_kw,
+                               'map_inputs' : children })
     else:
       return op.visit(self)
 
@@ -235,11 +243,11 @@ class NumexprFusionPass(OptimizePass):
     map_children = [self.visit(v) for v in op.children]
     all_maps = np.all([map_like(v) for v in map_children])
    
-    if not (all_maps and 'numpy_expr' in op.fn_kw):
+    if not (all_maps and op.numpy_expr is not None):
       return op.visit(self)
     
     a, b = map_children
-    operation = op.fn_kw['numpy_expr']
+    operation = op.numpy_expr
    
     # mapping from variable name to input index 
     var_map = {}
@@ -254,7 +262,7 @@ class NumexprFusionPass(OptimizePass):
         for k, v in child.fn_kw['var_map'].iteritems():
           var_map[k] = len(inputs)
           inputs.append(child.children[v])
-        expr.extend(['(' + child.fn_kw['numpy_expr'] + ')'])
+        expr.extend(['(' + child.numpy_expr + ')'])
       else:
         v = new_var()
         var_map[v] = len(inputs)
@@ -268,8 +276,9 @@ class NumexprFusionPass(OptimizePass):
     expr = ' '.join(expr)
     
     return MapExpr(children=inputs,
-                        map_fn=_numexpr_mapper,
-                        fn_kw={ 'numpy_expr' : expr, 'var_map' : var_map, })
+                   map_fn=_numexpr_mapper,
+                   numpy_expr = expr,
+                   fn_kw={ 'numpy_expr' : expr, 'var_map' : var_map, })
 
 
 def apply_pass(klass, dag):
@@ -299,8 +308,8 @@ def add_optimization(klass, default):
   #setattr(Flags, flagname, add_bool_flag(flagname, default=default))
   FLAGS.add(BoolFlag(flagname, default=default, help='Enable %s optimization' % klass.__name__))
 
-FLAGS.add(BoolFlag('optimization', default=True))
-
 add_optimization(MapMapFusion, True)
 add_optimization(ReduceMapFusion, True)
 add_optimization(NumexprFusionPass, False)
+
+FLAGS.add(BoolFlag('optimization', default=True))

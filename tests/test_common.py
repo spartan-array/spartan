@@ -17,7 +17,7 @@ CTX = None
 def get_cluster_ctx():
   global CTX
   if CTX is None:
-    util.log_info('Starting cluster...')
+    print 'Starting cluster...'
     config.initialize(sys.argv)
     CTX = start_cluster(FLAGS.num_workers, FLAGS.cluster)
   return CTX

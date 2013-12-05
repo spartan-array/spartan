@@ -13,11 +13,12 @@ import test_common
 TEST_SIZE = 10
 
 def add_one_extent(v, ex):
-  util.log_info('Mapping: %s', ex)
-  yield (ex, v.fetch(ex) + 1)
+  result = v.fetch(ex) + 1
+  util.log_info('AddOne: %s, %s', ex, result)
+  yield (ex, result)
 
-def add_one_tile(tiles):
-  return tiles[0] + 1
+def add_one_tile(tile):
+  return tile + 1
 
 class SliceTest(test_common.ClusterTest):
   TILE_SIZE = 10
@@ -32,11 +33,11 @@ class SliceTest(test_common.ClusterTest):
   def test_slice_map(self):
     x = expr.arange((TEST_SIZE, TEST_SIZE))
     z = x[5:8, 5:8]
-    z = expr.map(z, add_one_tile) 
-    val = expr.force(z)
+    z = expr.map(z, add_one_tile)
+    print z
     nx = np.arange(TEST_SIZE*TEST_SIZE).reshape(TEST_SIZE, TEST_SIZE)
     
-    Assert.all_eq(val.glom(), nx[5:8, 5:8] + 1)
+    Assert.all_eq(z.glom(), nx[5:8, 5:8] + 1)
   
   
   def test_slice_shuffle(self):
@@ -53,7 +54,7 @@ class SliceTest(test_common.ClusterTest):
     nx = np.arange(10 * 10 * 10, dtype=np.int).reshape((10, 10, 10))
     
     y = x[:, :, 0]
-    z = expr.map(y, lambda tiles: tiles[0] + 13)
+    z = expr.map(y, lambda tile: tile + 13)
     val = z.glom()
    
     Assert.all_eq(val.reshape(10, 10), nx[:, :, 0] + 13)

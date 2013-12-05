@@ -75,6 +75,7 @@ class Worker(object):
       if id in self._blobs:
         del self._blobs[id]
 
+    #util.log_info('Destroy...')
     handle.done()
 
   def update(self, req, handle):

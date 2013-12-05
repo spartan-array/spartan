@@ -204,7 +204,7 @@ class ZMQPoller(threading.Thread):
     self._to_add = []
     self._to_del = []
     self._to_mod = []
-    self.setDaemon(True)
+    self.daemon = True
 
   def _run(self):
     self._running = True
@@ -292,10 +292,6 @@ class ZMQPoller(threading.Thread):
 
 def shutdown():
   poller().stop()
-
-
-import atexit
-atexit.register(shutdown)
 
 def server_socket(addr):
   host, port = addr

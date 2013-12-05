@@ -28,22 +28,22 @@ def rand(*shape, **kw):
   return map(ndarray(shape, 
                      dtype=np.float,
                      tile_hint=kw.get('tile_hint', None)),
-                     fn = lambda inputs: np.random.rand(*inputs[0].shape))
+                     fn = lambda input: np.random.rand(*input.shape))
   
 def randn(*shape, **kw):
   for s in shape: assert isinstance(s, int)
   return map(ndarray(shape,
-                           dtype=np.float,
-                           tile_hint=kw.get('tile_hint', None)),
-                     fn = lambda inputs: np.random.randn(*inputs[0].shape))
+                     dtype=np.float,
+                     tile_hint=kw.get('tile_hint', None)),
+             fn = lambda input: np.random.randn(*input.shape))
 
 def zeros(shape, dtype=np.float, tile_hint=None):
-  return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), 
-                     fn = lambda inputs: np.zeros(inputs[0].shape))
+  return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
+             fn = lambda input: np.zeros(input.shape))
 
 def ones(shape, dtype=np.float, tile_hint=None):
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), 
-                   fn = lambda inputs: np.ones(inputs[0].shape, dtype))
+             fn = lambda input: np.ones(input.shape, dtype))
 
 def _arange_mapper(inputs, ex, dtype=None):
   pos = extent.ravelled_pos(ex.ul, ex.array_shape)
@@ -98,9 +98,9 @@ def _to_structured_array(*vals):
     out[k] = v
   return out
 
-def _take_idx_mapper(inputs):
-  return inputs[0]['idx']
- 
+def _take_idx_mapper(input):
+  return input['idx']
+
 
 def _dual_reducer(ex, tile, axis, idx_f=None, val_f=None):
   local_idx = idx_f(tile[:], axis)
@@ -181,7 +181,7 @@ def astype(x, dtype):
   :param dtype:
   '''
   assert x is not None
-  return map(x, lambda inputs: inputs[0].astype(dtype))
+  return map(x, lambda tile: tile.astype(dtype))
 
 def _ravel_mapper(array, ex):
   ul = extent.ravelled_pos(ex.ul, ex.array_shape)
@@ -297,3 +297,14 @@ def dot(a, b):
                      kw = dict(av=av, bv=bv))
             
 
+def ln(v): return map(v, fn=np.log)
+def log(v): return map(v, fn=np.log)
+def exp(v): return map(v, fn=np.exp)
+def sqrt(v): return map(v, fn=np.sqrt)
+
+try:
+  import scipy.stats
+  def norm_cdf(v):
+    return map(v, fn=scipy.stats.norm.cdf)
+except:
+  util.log_info('Missing scipy.stats (some functions will be unavailable.')

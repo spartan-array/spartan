@@ -44,9 +44,7 @@ def _notarget_mapper(ex, data, array=None, map_fn=None, inputs=None, fn_kw=None)
   map_result = map_fn(inputs, ex, **fn_kw)
   if map_result is not None:
     for ex, v in map_result:
-      v = tile.from_data(v)
-      blob_id = ctx.create(v).wait().blob_id
-      result.append((ex, blob_id))
+      result.append((ex, v))
   return result
 
 class ShuffleExpr(Expr):
@@ -66,6 +64,5 @@ class ShuffleExpr(Expr):
                 kw = dict(map_fn=map_fn, inputs=v, target=target, fn_kw=fn_kw))
       return target
     else:
-      return distarray.map_to_array(v, 
-                                    mapper_fn = _notarget_mapper,
-                                    kw = dict(inputs=v, map_fn=map_fn, fn_kw=fn_kw))
+      return v.map_to_array(mapper_fn = _notarget_mapper,
+                            kw = dict(inputs=v, map_fn=map_fn, fn_kw=fn_kw))

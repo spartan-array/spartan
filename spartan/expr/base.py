@@ -8,12 +8,8 @@ into a series of primitive array operations.
 import numpy as np
 
 from ..node import Node
-from .. import blob_ctx
-
-
-def _apply_binary_op(inputs, binary_op=None, numpy_expr=None):
-  assert len(inputs) == 2
-  return binary_op(*inputs)
+from .. import blob_ctx, util
+from ..array import distarray
 
 
 class NotShapeable(Exception):
@@ -21,9 +17,14 @@ class NotShapeable(Exception):
 
 unique_id = iter(xrange(10000000))
 
-def _map(*args, **kw):
+def _map(a, b, fn, numpy_expr=None):
+  '''
+  Indirection for handling builtin operators (+,-,/,*).
+
+  (Map is implemented in map.py)
+  '''
   from .map import map
-  return map(*args, **kw)
+  return map((a, b), fn, numpy_expr)
 
 class Expr(object):
   _cached_value = None
@@ -74,34 +75,34 @@ class Expr(object):
     return self.__class__.__name__
 
   def __add__(self, other):
-    return _map((self, other), _apply_binary_op, binary_op=np.add, numpy_expr='+')
+    return _map(self, other, np.add, numpy_expr='+')
 
   def __sub__(self, other):
-    return _map((self, other), _apply_binary_op, binary_op=np.subtract, numpy_expr='-')
+    return _map(self, other, np.subtract, numpy_expr='-')
 
   def __mul__(self, other):
-    return _map((self, other), _apply_binary_op, binary_op=np.multiply, numpy_expr='*')
+    return _map(self, other, np.multiply, numpy_expr='*')
 
   def __mod__(self, other):
-    return _map((self, other), _apply_binary_op, binary_op=np.mod, numpy_expr='%')
+    return _map(self, other, np.mod, numpy_expr='%')
 
   def __div__(self, other):
-    return _map((self, other), _apply_binary_op, binary_op=np.divide, numpy_expr='/')
+    return _map(self, other, np.divide, numpy_expr='/')
 
   def __eq__(self, other):
-    return _map((self, other), _apply_binary_op, binary_op=np.equal, numpy_expr='==')
+    return _map(self, other, np.equal, numpy_expr='==')
 
   def __ne__(self, other):
-    return _map((self, other), _apply_binary_op, binary_op=np.not_equal, numpy_expr='!=')
+    return _map(self, other, np.not_equal, numpy_expr='!=')
 
   def __lt__(self, other):
-    return _map((self, other), _apply_binary_op, binary_op=np.less, numpy_expr='<')
+    return _map(self, other, np.less, numpy_expr='<')
 
   def __gt__(self, other):
-    return _map((self, other), _apply_binary_op, binary_op=np.greater, numpy_expr='>')
+    return _map(self, other, np.greater, numpy_expr='>')
 
   def __pow__(self, other):
-    return _map((self, other), _apply_binary_op, binary_op=np.power, numpy_expr='**')
+    return _map(self, other, np.power, numpy_expr='**')
 
   def __getitem__(self, idx):
     from .index import IndexExpr
@@ -142,6 +143,29 @@ Expr.__rmul__ = Expr.__mul__
 Expr.__rdiv__ = Expr.__div__
 
 
+class AsArray(Expr):
+  '''Promote a value to be array-like.
+
+  This should be wrapped around most user-inputs that may be
+  used in an array context, e.g. (``1 + x => map((as_array(1), as_array(x)), +)``)
+  '''
+  __metaclass__ = Node
+  _members = ['val']
+
+  def visit(self, visitor):
+    return self
+
+  def compute_shape(self):
+    raise NotShapeable
+
+  def evaluate(self, ctx, deps):
+    util.log_info('Evaluate: %s', deps['val'])
+    return distarray.as_array(deps['val'])
+
+  def __str__(self):
+    return 'as_array(%s)' % self.val
+
+
 class LazyVal(Expr):
   __metaclass__ = Node
   _members = ['val']
@@ -158,6 +182,8 @@ class LazyVal(Expr):
   def evaluate(self, ctx, deps):
     return self.val
 
+  def __str__(self):
+    return 'lazy(%s)' % self.val
 
 class LazyCollection(Expr):
   '''
@@ -167,6 +193,9 @@ class LazyCollection(Expr):
   child elements as expected.
   '''
   _members = ['vals']
+
+  def __str__(self):
+    return 'lazy(%s)' % (self.vals,)
 
   def evaluate(self, ctx, deps):
     return deps['vals']
@@ -181,8 +210,7 @@ class LazyCollection(Expr):
 class LazyDict(LazyCollection):
   __metaclass__ = Node
   def visit(self, visitor):
-    return LazyDict(vals=dict([(k, visitor.visit(v))
-                               for (k, v) in self.vals.iteritems()]))
+    return LazyDict(vals=dict([(k, visitor.visit(v)) for (k, v) in self.vals.iteritems()]))
 
 
 class LazyList(LazyCollection):
@@ -289,4 +317,12 @@ def lazify(val):
 
   return LazyVal(val=val)
 
+def as_array(lst):
+  results = []
+  for v in lst:
+    if isinstance(v, Expr):
+      results.append(v)
+    else:
+      results.append(AsArray(v))
 
+  return lazify(results)

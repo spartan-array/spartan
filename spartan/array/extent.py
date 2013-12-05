@@ -310,7 +310,9 @@ def is_complete(shape, slices):
   :param slices: list/tuple of `slice` objects
   :rtype: boolean
   '''
-  Assert.eq(len(shape), len(slices))
+  if len(shape) != len(slices):
+    return False
+
   for dim,slice in zip(shape, slices):
     if slice.start > 0: return False
     if slice.stop < dim: return False

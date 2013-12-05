@@ -12,8 +12,8 @@ from test_common import with_ctx
 
 @with_ctx
 def test_netflix_sgd(ctx):
-  U = 1000
-  M = 1000*1000
+  U = 100
+  M = 100*100
   r = 20
   d = 8
   P_RATING = 1000.0 / (U * M)
@@ -36,9 +36,9 @@ def test_netflix_sgd(ctx):
     _ = netflix.sgd(V, Mfactor, Ufactor).force()
     
 def test_sgd_inner():
-  N_ENTRIES = 2 * 1000 * 1000
-  U = 10000
-  M = 1000*1000
+  N_ENTRIES = 2 * 100 * 100
+  U = 100
+  M = 100*10
   r = 20
   rows = np.random.randint(0, U, N_ENTRIES).astype(np.int64)
   cols = np.random.randint(0, M, N_ENTRIES).astype(np.int64)

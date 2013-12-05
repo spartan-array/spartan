@@ -191,8 +191,12 @@ class Assert(object):
   def ge(a, b): assert (a >= b), 'Failed: %s >= %s' % (a, b)
   
   @staticmethod
-  def le(a, b): assert (a <= b), 'Failed: %s <= %s' % (a, b)
-  
+  def le(a, b, msg=None):
+    if msg is None:
+      assert (a <= b), 'Failed: %s <= %s' % (a, b)
+    else:
+      assert (a <= b), 'Failed: %s <= %s [%s]' % (a, b, msg)
+
   @staticmethod
   def true(expr): assert expr, 'Failed: %s == True' % (expr)
  

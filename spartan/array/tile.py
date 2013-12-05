@@ -35,6 +35,9 @@ class Tile(object):
     self._initialize()
     if extent.is_complete(self.data.shape, selector):
       return self.data
+
+    Assert.le(len(selector), len(self.data.shape),
+              'Selector has more dimensions than data! %s %s' % (selector, self.data.shape))
     return self.data[selector]
 
   def __getitem__(self, idx):
