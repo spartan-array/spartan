@@ -49,37 +49,39 @@ class Socket(SocketBase):
   def __repr__(self):
     return 'Socket(%s)' % ((self.addr,))
 
-  def flush(self):
-    self.handle_write()
-
   def close(self, *args):
     if self._closed:
       return
 
-    self._shutdown = True
-    poller().close(self)
+    with self._lock:
+      self._closed = True
+      self._shutdown = True
+      poller().close(self)
 
   def send(self, msg):
     assert not self._closed
-    #util.log_info('SEND %s', len(msg))
-    self._out.append(msg)
-    poller().modify(self, zmq.POLLIN | zmq.POLLOUT)
+    with self._lock:
+      #util.log_info('SEND %s', len(msg))
+      self._out.append(msg)
+      poller().modify(self, zmq.POLLIN | zmq.POLLOUT)
 
   def zmq(self):
     return self._zmq
 
   def recv(self):
     assert not self._closed
-    frames = self._zmq.recv_multipart(copy=False, track=False)
-    assert len(frames) == 1
-    return frames[0]
+    with self._lock:
+      frames = self._zmq.recv_multipart(copy=False, track=False)
+      assert len(frames) == 1
+      return frames[0]
 
   def connect(self):
     assert self._closed
-    self._closed = False
-    #util.log_info('Connecting: %s:%d' % self.addr)
-    self._zmq.connect('tcp://%s:%s' % self.addr)
-    poller().add(self, zmq.POLLIN)
+    with self._lock:
+      #util.log_info('Connecting: %s:%d' % self.addr)
+      self._zmq.connect('tcp://%s:%s' % self.addr)
+      poller().add(self, zmq.POLLIN)
+      self._closed = False
 
   @property
   def port(self):
@@ -90,10 +92,7 @@ class Socket(SocketBase):
     return self.addr[0]
 
   def handle_close(self):
-    #self.flush()
-    self._closed = True
     self._zmq.close()
-
     self._zmq = None
 
   def handle_write(self):

@@ -17,10 +17,6 @@ import cPickle
 
 from .. import cloudpickle, util, core
 from ..node import Node
-from spartan.rpc import serialization
-
-
-RPC_ID = xrange(1000000000).__iter__()
 
 CLIENT_PENDING = weakref.WeakKeyDictionary()
 SERVER_PENDING = weakref.WeakKeyDictionary()
@@ -122,13 +118,13 @@ class PendingRequest(object):
     self.finished = True
     self.result = result
 
-    if self.socket is not None:
-      header = { 'rpc_id' : self.rpc_id }
-      #util.log_info('Finished %s, %s', self.socket.addr, self.rpc_id)
-      w = cStringIO.StringIO()
-      cPickle.dump(header, w, -1)
-      serialize_to(result, w)
-      self.socket.send(w.getvalue())
+    assert self.socket is not None
+    header = { 'rpc_id' : self.rpc_id }
+    #util.log_info('Finished %s, %s', self.socket.addr, self.rpc_id)
+    w = cStringIO.StringIO()
+    cPickle.dump(header, w, -1)
+    serialize_to(result, w)
+    self.socket.send(w.getvalue())
 
   def __del__(self):
     if not self.finished:
@@ -162,6 +158,7 @@ class Future(object):
     CLIENT_PENDING[self] = 1
 
   def done(self, result=None):
+    #util.log_info('Result... %s %s', self.addr, self.rpc_id)
     self._cv.acquire()
     self.have_result = True
 
@@ -181,6 +178,8 @@ class Future(object):
     while not self.have_result and not self.timed_out():
       # use a timeout so that ctrl-c works.
       self._cv.wait(timeout=1)
+      if time.time() - self._start > 2:
+        util.log_info('Waiting... %s %s', self.addr, self.rpc_id)
     self._cv.release()
 
 #    util.log_info('Result from %s in %f seconds.', self.addr, time.time() - self._start)
@@ -210,15 +209,6 @@ class FnFuture(object):
   def wait(self):
     return self.fn(self.future.wait())
 
-
-class DummyFuture(object):
-  def __init__(self, base=None):
-    self.v = base
-
-  def wait(self):
-    return self.v
-
-DUMMY_FUTURE = DummyFuture()
 
 class FutureGroup(list):
   def wait(self):
@@ -278,24 +268,23 @@ class Server(object):
     reader = cStringIO.StringIO(data)
     header = cPickle.load(reader)
 
-    with self._timers[header['method']]:
-      #util.log_info('Reading: %s %s', self._socket.addr, header['rpc_id'])
-      handle = PendingRequest(socket, header['rpc_id'])
-      name = header['method']
+    #util.log_info('Call[%s] %s %s', header['method'], self._socket.addr, header['rpc_id'])
+    handle = PendingRequest(socket, header['rpc_id'])
+    name = header['method']
 
-      try:
-        fn = self._methods[name]
-      except KeyError:
-        handle.exception()
-        return
+    try:
+      fn = self._methods[name]
+    except KeyError:
+      handle.exception()
+      return
 
-      try:
-        req = read(reader)
-        result = fn(req, handle)
-        assert result is None, 'non-None result from RPC handler (use handle.done())'
-      except:
-        util.log_info('Caught exception in handler.', exc_info=1)
-        handle.exception()
+    try:
+      req = read(reader)
+      result = fn(req, handle)
+      assert result is None, 'non-None result from RPC handler (use handle.done())'
+    except:
+      util.log_info('Caught exception in handler.', exc_info=1)
+      handle.exception()
 
   def shutdown(self):
     self._running = 0
@@ -309,21 +298,9 @@ class ProxyMethod(object):
     self.method = method
 
   def __call__(self, request=None):
-    rpc_id = RPC_ID.next()
-    w = cStringIO.StringIO()
-
-    header = { 'method' : self.method, 'rpc_id' : rpc_id }
-    cPickle.dump(header, w, -1)
-    if isinstance(request, PickledData):
-      w.write(request.data)
-    else:
-      serialize_to(request, w)
-
-    #util.log_info('Sending %s', self.method)
 #    if len(serialized) > 800000:
 #      util.log_info('%s::\n %s; \n\n\n %s', self.method, ''.join(traceback.format_stack()), request)
-
-    return self.client.send(rpc_id, w.getvalue())
+    return self.client.send(self.method, request)
 
 class Client(object):
   def __init__(self, socket):
@@ -332,14 +309,27 @@ class Client(object):
     self._socket.connect()
     self._futures = {}
     self._lock = threading.Lock()
+    self._rpc_id = xrange(10000000).__iter__()
 
   def __reduce__(self, *args, **kwargs):
     raise cPickle.PickleError('Not pickleable.')
 
-  def send(self, rpc_id, data):
+  def send(self, method, request):
     with self._lock:
-      f = Future(self.addr, rpc_id)
+      rpc_id = self._rpc_id.next()
+      header = { 'method' : method, 'rpc_id' : rpc_id }
+
+      w = cStringIO.StringIO()
+      cPickle.dump(header, w, -1)
+      if isinstance(request, PickledData):
+        w.write(request.data)
+      else:
+        serialize_to(request, w)
+
+      data = w.getvalue()
+      f = Future(self.addr(), rpc_id)
       self._futures[rpc_id] = f
+      #util.log_info('Send %s, %s', self.addr(), rpc_id)
       self._socket.send(data)
       return f
 

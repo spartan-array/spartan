@@ -75,7 +75,9 @@ class BlobCtx(object):
     if self.worker_id != MASTER_ID: return
     #util.log_info('Destroy: %s', blob_ids)
     req = core.DestroyReq(ids=blob_ids)
-    self._send_all('destroy', req)
+
+    # fire and forget...?
+    self._send_all('destroy', req, wait=False)
 
   def destroy(self, blob_id):
     return self.destroy_all([blob_id])
