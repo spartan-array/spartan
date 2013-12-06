@@ -11,6 +11,7 @@ except ImportError:
   pass
 
 import multiprocessing
+from multiprocessing.pool import ThreadPool
 import os
 import socket
 import sys
@@ -18,7 +19,6 @@ import sys
 import resource
 from spartan import config, util, rpc, core, blob_ctx
 from spartan.config import FLAGS, StrFlag, IntFlag
-
 
 class Worker(object):
   def __init__(self, port, master):
@@ -29,6 +29,7 @@ class Worker(object):
     self._master = master
     self._running = True
     self._ctx = None
+    self._kernel_threads = ThreadPool(processes=1)
     self._kernel_prof = cProfile.Profile()
 
     hostname = socket.gethostname()
@@ -98,22 +99,25 @@ class Worker(object):
     if FLAGS.profile_kernels:
       self._kernel_prof.enable()
 
-    blob_ctx.set(self._ctx)
-    results = {}
-    for blob_id in req.blobs:
-      #util.log_info('%s %s', blob_id, blob_id in self._blobs)
-      if blob_id in self._blobs:
-        #util.log_info('W%d kernel start', self.id)
-        blob = self._blobs[blob_id]
-        results[blob_id] = req.mapper_fn(blob_id, blob, **req.kw)
-        #util.log_info('W%d kernel finish', self.id)
-    handle.done(results)
+    try:
+      blob_ctx.set(self._ctx)
+      results = {}
+      for blob_id in req.blobs:
+        #util.log_info('%s %s', blob_id, blob_id in self._blobs)
+        if blob_id in self._blobs:
+          #util.log_info('W%d kernel start', self.id)
+          blob = self._blobs[blob_id]
+          results[blob_id] = req.mapper_fn(blob_id, blob, **req.kw)
+          #util.log_info('W%d kernel finish', self.id)
+      handle.done(results)
+    except:
+      handle.exception()
 
     self._server._timers['run_kernel'].stop()
     self._kernel_prof.disable()
 
   def run_kernel(self, req, handle):
-    threading.Thread(target=self._run_kernel, args=(req, handle)).start()
+    self._kernel_threads.apply_async(self._run_kernel, args=(req, handle))
 
   def shutdown(self, req, handle):
     if FLAGS.profile_kernels:
