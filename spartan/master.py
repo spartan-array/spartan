@@ -23,8 +23,6 @@ class Master(object):
     for id, w in self._workers.iteritems():
       util.log_info('Shutting down worker %d', id)
       futures.append(w.shutdown())
-    futures.wait()
-
     self._server.shutdown()
 
   def register(self, req, handle):

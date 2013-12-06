@@ -30,14 +30,14 @@ def shuffle(v, fn, tile_hint=None, target=None, kw=None):
                      fn_kw=kw)
 
 
-def _target_mapper(ex, data, map_fn=None, inputs=None, target=None, fn_kw=None):
+def _target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
   result = map_fn(inputs, ex, **fn_kw)
   if result is not None:
     for ex, v in result:
       target.update(ex, v)
   return []
         
-def _notarget_mapper(ex, data, array=None, map_fn=None, inputs=None, fn_kw=None):
+def _notarget_mapper(ex, array=None, map_fn=None, inputs=None, fn_kw=None):
   #util.log_info('MapExtents: %s', map_fn)
   ctx = blob_ctx.get()
   result = []
@@ -50,6 +50,9 @@ def _notarget_mapper(ex, data, array=None, map_fn=None, inputs=None, fn_kw=None)
 class ShuffleExpr(Expr):
   __metaclass__ = Node
   _members = ['array', 'map_fn', 'target', 'tile_hint', 'fn_kw']
+
+  def __str__(self):
+    return 'shuffle[%d](%s, %s)' % (id(self), self.map_fn, self.array)
 
     
   def evaluate(self, ctx, deps):

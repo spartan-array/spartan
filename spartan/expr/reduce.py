@@ -5,8 +5,9 @@ from spartan.expr.base import make_primitive
 from spartan.node import Node
 
 
-def _reduce_mapper(ex, tile, reducer, axis, output, fn_kw):
+def _reduce_mapper(ex, input, reducer, axis, output, fn_kw):
   #util.log_info('Reduce: %s %s %s %s %s', reducer, ex, tile, axis, fn_kw)
+  tile = input.fetch(ex)
   reduced = reducer(ex, tile, axis, **fn_kw)
   dst_extent = extent.index_for_reduction(ex, axis)
   #util.log_info('Update: %s %s', dst_extent, reduced)
@@ -35,10 +36,12 @@ class ReduceExpr(Expr):
     
     
     util.log_info('Reducing into array %s', output_array)
-    input_array.foreach(_reduce_mapper, kw={'reducer' : reducer,
-                                            'axis' : axis,
-                                            'output' : output_array,
-                                            'fn_kw' : fn_kw})
+    input_array.foreach(_reduce_mapper, kw={
+      'input' : input_array,
+      'reducer' : reducer,
+      'axis' : axis,
+      'output' : output_array,
+      'fn_kw' : fn_kw})
     
     return output_array
 

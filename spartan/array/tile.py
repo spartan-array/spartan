@@ -5,11 +5,12 @@ from spartan import util
 from spartan.util import Assert
 
 
-NONE_VALID = 0
-ALL_VALID = 1
+MASK_VALID = 1
+MASK_INVALID = 0
 
 TYPE_DENSE = 0
 TYPE_SPARSE = 1
+
 
 class Tile(object):
   '''
@@ -17,6 +18,7 @@ class Tile(object):
 
   Tiles implement the Blob protocol: see `Blob`.
   '''
+
   def __init__(self, shape, dtype):
     self.shape = shape
     self.dtype = dtype
@@ -29,52 +31,65 @@ class Tile(object):
   def data(self, val):
     if val is not None:
       Assert.eq(val.dtype, self.dtype)
+
     self._data = val
 
   def get(self, selector):
-    self._initialize()
-    if extent.is_complete(self.data.shape, selector):
-      return self.data
+    raise NotImplementedError
 
-    Assert.le(len(selector), len(self.data.shape),
-              'Selector has more dimensions than data! %s %s' % (selector, self.data.shape))
-    return self.data[selector]
-
-  def __getitem__(self, idx):
-    self._initialize()
-
-    if len(self.shape) == 0:
-      return self.data
-
-    #if not np.all(self.mask[idx]):
-    #  util.log_info('%s %s %s', idx, self.data[idx], self.mask[idx])
-    #  raise ValueError
-    return self.data[idx]
+  def update(self, update, reducer):
+    raise NotImplementedError
 
 
 class DenseTile(Tile):
+  '''Dense tiles use regular numpy arrays for storage.
+
+  They track updates using a mask to determine valid regions.
+  This masking is done manually, instead of using numpy.ma (MaskedArray),
+  as MaskedArrays do not seem to properly handle masking of
+  structured arrays.  Conversion to MaskedArrays is performed on
+  fetch.
+  '''
+
   def __init__(self, shape, dtype, data, mask=None):
     Tile.__init__(self, shape, dtype)
+
     if data is not None:
       Assert.eq(data.shape, shape)
-
-    self._data = data
-
-    if mask is None:
-      if data is None:
-        self.mask = NONE_VALID
-      else:
-        self.mask = ALL_VALID
+      if mask is None:
+        mask = MASK_VALID
     else:
-      Assert.eq(mask.shape, shape)
-      Assert.eq(mask.dtype, np.bool)
-      self.mask = mask
+      mask = MASK_INVALID
 
+    self.mask = mask
+    self.data = data
     self.shape = shape
     self.dtype = dtype
 
   def update(self, update, reducer):
     return merge_dense(self, update, reducer)
+
+  def get(self, selector=None):
+    self._initialize()
+
+    # scalars are just returned directly.
+    if len(self.data.shape) == 0:
+      return self.data
+
+    if selector is None or extent.is_complete(self.data.shape, selector):
+      data = self.data
+      mask = self.mask
+    else:
+      Assert.le(len(selector), len(self.data.shape),
+                'Selector has more dimensions than data! %s %s' % (selector, self.data.shape))
+
+      data = self.data[selector]
+      mask = self.mask[selector]
+
+    masked = np.ma.masked_all(data.shape, dtype=data.dtype)
+    #util.log_info("\nM:%s\nD%s\n", data, mask)
+    masked[mask] = data[mask]
+    return masked
 
   def _initialize(self):
     # if this is a scalar, then data is just the scalar value itself.
@@ -82,57 +97,54 @@ class DenseTile(Tile):
       return
 
     if self.data is None:
-      self._data = np.ndarray(self.shape, dtype=self.dtype)
+      self.data = np.ndarray(self.shape, dtype=self.dtype)
 
-    Assert.isinstance(self.data, np.ndarray)
-
-    if self.mask is NONE_VALID:
-      self.mask = np.zeros(self.shape, dtype=np.bool)
-    elif self.mask is ALL_VALID:
-      self.mask = np.ones(self.shape, dtype=np.bool)
-    else:
-      assert isinstance(self.mask, np.ndarray)
+    if not isinstance(self.mask, np.ndarray):
+      mask_val = self.mask
+      self.mask = np.ndarray(self.shape, dtype=np.bool)
+      self.mask[:] = mask_val
 
   def __setitem__(self, idx, val):
     self._initialize()
-
-    self.mask[idx] = 1
+    self.mask[idx] = MASK_VALID
     self.data[idx] = val
 
   def __repr__(self):
     return 'dense(%s, %s)' % (self.shape, self.dtype)
 
+
 class SparseTile(Tile):
   def __init__(self, shape, data, dtype):
     Tile.__init__(self, shape, dtype)
-    self._data = data
+    self.data = data
+
+  def get(self, selector=None):
+    self._initialize()
+    assert selector is None or extent.is_complete(self.shape, selector)
+    return self.data
 
   def _initialize(self):
     if self.data is None:
-      self._data = dok_matrix(self.shape, self.dtype)
+      self.data = dok_matrix(self.shape, self.dtype)
 
   def __setitem__(self, idx, val):
     self._initialize()
-
-    self.mask[idx] = 1
     self.data[idx] = val
+
 
 def from_data(data):
   if isinstance(data, np.ndarray) or np.isscalar(data):
     return DenseTile(
-                shape=data.shape,
-                data=data,
-                dtype=data.dtype)
+      shape=data.shape,
+      data=data,
+      dtype=data.dtype)
   else:
-    return SparseTile(
-                shape=data.shape,
-                data=data,
-                dtype=data.dtype)
+    return SparseTile(shape=data.shape, data=data, dtype=data.dtype)
 
 
 def from_shape(shape, dtype, tile_type=TYPE_DENSE):
   assert tile_type == TYPE_DENSE
-  return DenseTile(shape =shape, data = None, dtype = dtype)
+  return DenseTile(shape=shape, data=None, dtype=dtype)
 
 
 def from_intersection(src, overlap, data):
@@ -144,12 +156,12 @@ def from_intersection(src, overlap, data):
   :param data:
   '''
   slc = extent.offset_slice(src, overlap)
-  tdata = np.ndarray(src.shape, dtype=data.dtype)
-  tmask = np.zeros(src.shape, dtype=np.bool)
+  tdata = np.ndarray(src.shape, data.dtype)
+  tmask = np.ndarray(src.shape, np.bool)
+  tmask[:] = MASK_INVALID
+  tmask[slc] = MASK_VALID
   tdata[slc] = data
-  tmask[slc] = 1
-
-  return DenseTile(dtype=data.dtype, data=tdata, mask=tmask, shape=src.shape)
+  return DenseTile(dtype=data.dtype, data=tdata, shape=src.shape, mask=tmask)
 
 
 def merge_dense(old_tile, new_tile, reducer):
@@ -178,11 +190,12 @@ def merge_dense(old_tile, new_tile, reducer):
     return old_tile
 
   Assert.eq(old_tile.shape, new_tile.shape)
+
   replaced = ~old_tile.mask & new_tile.mask
   updated = old_tile.mask & new_tile.mask
 
   old_tile.data[replaced] = new_tile.data[replaced]
-  old_tile.mask[replaced] = 1
+  old_tile.mask[replaced] = MASK_VALID
 
   if np.any(updated):
     if reducer is None:

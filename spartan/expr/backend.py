@@ -45,8 +45,8 @@ def evaluate(ctx, prim):
   elif not isinstance(prim, Expr):
     return prim
   
-  #util.log_info('Evaluating: %s', prim)
   if prim._cached_value is None:
+    #util.log_info('Evaluating: %s', prim)
     prim._cached_value = _evaluate(ctx, prim)
   
   return prim._cached_value

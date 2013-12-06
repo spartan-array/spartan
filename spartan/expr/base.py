@@ -17,14 +17,17 @@ class NotShapeable(Exception):
 
 unique_id = iter(xrange(10000000))
 
-def _map(a, b, fn, numpy_expr=None):
+def _map(*args, **kw):
   '''
   Indirection for handling builtin operators (+,-,/,*).
 
   (Map is implemented in map.py)
   '''
+  fn = kw['fn']
+  numpy_expr = kw.get('numpy_expr', None)
+
   from .map import map
-  return map((a, b), fn, numpy_expr)
+  return map(args, fn, numpy_expr)
 
 class Expr(object):
   _cached_value = None
@@ -75,34 +78,37 @@ class Expr(object):
     return self.__class__.__name__
 
   def __add__(self, other):
-    return _map(self, other, np.add, numpy_expr='+')
+    return _map(self, other, fn=np.add, numpy_expr='+')
 
   def __sub__(self, other):
-    return _map(self, other, np.subtract, numpy_expr='-')
+    return _map(self, other, fn=np.subtract, numpy_expr='-')
 
   def __mul__(self, other):
-    return _map(self, other, np.multiply, numpy_expr='*')
+    return _map(self, other, fn=np.multiply, numpy_expr='*')
 
   def __mod__(self, other):
-    return _map(self, other, np.mod, numpy_expr='%')
+    return _map(self, other, fn=np.mod, numpy_expr='%')
 
   def __div__(self, other):
-    return _map(self, other, np.divide, numpy_expr='/')
+    return _map(self, other, fn=np.divide, numpy_expr='/')
 
   def __eq__(self, other):
-    return _map(self, other, np.equal, numpy_expr='==')
+    return _map(self, other, fn=np.equal, numpy_expr='==')
 
   def __ne__(self, other):
-    return _map(self, other, np.not_equal, numpy_expr='!=')
+    return _map(self, other, fn=np.not_equal, numpy_expr='!=')
 
   def __lt__(self, other):
-    return _map(self, other, np.less, numpy_expr='<')
+    return _map(self, other, fn=np.less, numpy_expr='<')
 
   def __gt__(self, other):
-    return _map(self, other, np.greater, numpy_expr='>')
+    return _map(self, other, fn=np.greater, numpy_expr='>')
 
   def __pow__(self, other):
-    return _map(self, other, np.power, numpy_expr='**')
+    return _map(self, other, fn=np.power, numpy_expr='**')
+
+  def __neg__(self):
+    return _map(self, fn=np.negative)
 
   def __getitem__(self, idx):
     from .index import IndexExpr
@@ -163,7 +169,7 @@ class AsArray(Expr):
     return distarray.as_array(deps['val'])
 
   def __str__(self):
-    return 'as_array(%s)' % self.val
+    return 'V(%s)' % self.val
 
 
 class LazyVal(Expr):

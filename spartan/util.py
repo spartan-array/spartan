@@ -11,8 +11,10 @@ import sys
 import threading
 import time
 import traceback
-
 import cStringIO
+
+import numpy as np
+
 
 log_debug = logging.debug
 log_info = logging.info
@@ -168,12 +170,21 @@ class Assert(object):
   '''
   @staticmethod
   def all_eq(a, b):
-    import numpy
-    if hasattr(a, 'shape') and hasattr(b, 'shape'):
+    if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
       assert a.shape == b.shape, 'Mismatched shapes: %s %s' % (a.shape, b.shape)
-      
-    assert numpy.all(a == b), 'Failed: \n%s\n ==\n%s' % (a, b)
-  
+      assert np.all(a == b), 'Failed: \n%s\n ==\n%s' % (a, b)
+      return
+
+    if np.isscalar(a) or np.isscalar(b):
+      assert a == b, 'Failed: \n%s\n ==\n%s' % (a, b)
+      return
+
+    assert iterable(a), (a, b)
+    assert iterable(b), (a, b)
+
+    for i, j in zip(a, b):
+      assert i == j, 'Failed: \n%s\n ==\n%s' % (a, b)
+
   @staticmethod
   def eq(a, b, msg=''): 
     assert (a == b), 'Failed: %s == %s (%s)' % (a, b, msg)

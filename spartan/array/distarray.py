@@ -73,7 +73,7 @@ def _array_mapper(blob_id, blob, array=None, user_fn=None, **kw):
   ctx = blob_ctx.get()
   ex = array.extent_for_blob(blob_id)
   results = []
-  user_results = user_fn(ex, blob, **kw)
+  user_results = user_fn(ex, **kw)
   assert user_results is not None, user_fn
 
   for target_ex, target_data in user_results:
@@ -134,6 +134,7 @@ class DistArrayImpl(DistArray):
     self.shape = shape
     self.dtype = dtype
     self.reducer_fn = reducer_fn
+    self.ctx = blob_ctx.get()
 
     #util.log_info('%s', extents)
     Assert.isinstance(tiles, dict)
@@ -146,10 +147,19 @@ class DistArrayImpl(DistArray):
 
     self.tiles = tiles
 
+  def __reduce__(self):
+    return (DistArrayImpl, (self.shape, self.dtype, self.tiles, self.reducer_fn))
+
   def __del__(self):
-    if blob_ctx.get().worker_id == blob_ctx.MASTER_ID:
+    '''Destroy this array.
+
+    NB: Destruction is actually deferred until the next usage of the
+    blob_ctx.  __del__ can be called at anytime, including the
+    invocation of a RPC call, which leads to odd/bad behavior.
+    '''
+    if self.ctx.worker_id == blob_ctx.MASTER_ID:
       #util.log_info('Destroying table... %s', self.tiles.values())
-      blob_ctx.get().destroy_all(self.tiles.values())
+      self.ctx.defer(lambda: self.ctx.destroy_all(self.tiles.values()))
 
   def id(self):
     return self.table.id()
@@ -183,13 +193,13 @@ class DistArrayImpl(DistArray):
     If necessary, data will be copied from remote hosts to fill the region.    
     :param region: `Extent` indicating the region to fetch.
     '''
+    Assert.isinstance(region, extent.TileExtent)
     Assert.eq(region.array_shape, self.shape)
     Assert.eq(len(region.ul), len(self.shape))
 
     #util.log_info('FETCH: %s %s', self.shape, region)
 
     ctx = blob_ctx.get()
-    Assert.isinstance(region, extent.TileExtent)
     assert np.all(region.lr <= self.shape), (region, self.shape)
     
     # special case exact match against a tile 
@@ -197,28 +207,34 @@ class DistArrayImpl(DistArray):
       #util.log_info('Exact match.')
       ex, intersection = region, region
       blob_id = self.tiles[region]
-      return ctx.get(blob_id, extent.offset_slice(ex, intersection))
+      tgt = ctx.get(blob_id, extent.offset_slice(ex, intersection))
+    else:
+      splits = list(extent.find_overlapping(self.tiles.iterkeys(), region))
 
-    splits = list(extent.find_overlapping(self.tiles.iterkeys(), region))
-    
-    #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
-    tgt = np.ndarray(region.shape, dtype=self.dtype)
-    #util.log_info('Fetching %d tiles', len(splits))
+      #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
+      tgt = np.ma.MaskedArray(np.ndarray(region.shape, dtype=self.dtype))
+      tgt.mask = tile.MASK_INVALID
+      #util.log_info('Fetching %d tiles', len(splits))
 
-    futures = []
-    for ex, intersection in splits:
-      dst_slice = extent.offset_slice(region, intersection)
-      blob_id = self.tiles[ex]
+      futures = []
+      for ex, intersection in splits:
+        dst_slice = extent.offset_slice(region, intersection)
+        blob_id = self.tiles[ex]
 
-      def _apply_data(r, slc=dst_slice):
-        tgt[slc] = r.data
+        def _apply_data(r, slc=dst_slice):
+          tgt[slc] = r.data
 
-      futures.append(ctx.get(blob_id, extent.offset_slice(ex, intersection),
-                             callback=_apply_data))
-      #tgt[dst_slice] = ctx.get(blob_id, extent.offset_slice(ex, intersection))
+        futures.append(ctx.get(blob_id, extent.offset_slice(ex, intersection),
+                               callback=_apply_data))
+        #tgt[dst_slice] = ctx.get(blob_id, extent.offset_slice(ex, intersection))
 
-      #util.log_info('%s %s', dst_slice, src_slice.shape)
-    rpc.wait_for_all(futures)
+        #util.log_info('%s %s', dst_slice, src_slice.shape)
+      rpc.wait_for_all(futures)
+
+    # attempt to remove mask on arrays when it is
+    # all valid.
+    if isinstance(tgt, np.ma.MaskedArray) and np.all(tgt.mask == np.ma.nomask):
+      return tgt.data
 
     return tgt
     #return tile.data[]
@@ -364,7 +380,7 @@ def best_locality(array, ex):
   
 
 
-def _slice_mapper(ex, tile, **kw):
+def _slice_mapper(ex, **kw):
   '''
   Run when mapping over a slice.
   Computes the intersection of the current tile and a global slice.
@@ -391,9 +407,8 @@ def _slice_mapper(ex, tile, **kw):
   offset.array_shape = slice_extent.shape
 
   subslice = extent.offset_slice(ex, intersection)
-  subtile = tile[subslice]
 
-  result = mapper_fn(offset, subtile, **fn_kw)
+  result = mapper_fn(offset, **fn_kw)
   #util.log_info('Slice mapper[%s] %s %s -> %s', mapper_fn, offset, subtile, result)
   return result
 
@@ -423,16 +438,10 @@ class Slice(DistArray):
     offset = extent.compute_slice(self.slice, idx.to_slice())
     return self.darray.fetch(offset)
 
-  def glom(self):
-    return self.darray.fetch(self.slice)
-
-  def __getitem__(self, idx):
-    ex = extent.compute_slice(self.slice, idx)
-    return self.darray.fetch(ex)
 
 
 def broadcast_mapper(ex, tile, mapper_fn=None, bcast_obj=None):
-  pass
+  raise NotImplementedError
 
 class Broadcast(DistArray):
   '''A broadcast object mimics the behavior of Numpy broadcasting.

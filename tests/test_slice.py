@@ -5,6 +5,7 @@ import unittest
 import spartan
 import numpy as np
 from spartan import expr, util
+from spartan.expr import optimize
 from spartan.array import distarray, extent
 from spartan.util import Assert
 import test_common
@@ -69,6 +70,17 @@ class SliceTest(test_common.ClusterTest):
     val = y.glom()
     
     Assert.all_eq(val, nx[:, :, 0].sum())
+
+  def test_slice_sub(self):
+    a = expr.arange((TEST_SIZE,), dtype=np.int)
+    v = (a[1:] - a[:-1])
+    print optimize.optimize(v)
+    v = v.glom()
+    print v
+
+    na = np.arange(TEST_SIZE, dtype=np.int)
+    nv = na[1:] - na[:-1]
+    Assert.all_eq(v, nv)
 
 if __name__ == '__main__':
   rest = spartan.config.initialize(sys.argv)

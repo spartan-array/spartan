@@ -134,4 +134,7 @@ def join_profiles(dir):
   return pstats.Stats(*glob.glob(dir + '/*')).dump_stats('./kernel-prof.out')
 
 if __name__ == '__main__':
-  raise Exception, 'Should not be run directly.'
+  if sys.argv[1] == 'join':
+    join_profiles(sys.argv[2])
+  else:
+    raise Exception, 'Should not be run directly.'

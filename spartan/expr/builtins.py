@@ -293,14 +293,14 @@ def dot(a, b):
                    combine_fn=np.add,
                    reduce_fn=np.add)
   
-  return shuffle(av, _dot_mapper, target=target,
-                     kw = dict(av=av, bv=bv))
+  return shuffle(av, _dot_mapper, target=target, kw = dict(av=av, bv=bv))
             
 
 def ln(v): return map(v, fn=np.log)
 def log(v): return map(v, fn=np.log)
 def exp(v): return map(v, fn=np.exp)
 def sqrt(v): return map(v, fn=np.sqrt)
+def abs(v): return map(v, fn=np.abs)
 
 try:
   import scipy.stats

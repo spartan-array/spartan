@@ -13,4 +13,12 @@ def black_scholes(current, strike, maturity, rate, volatility):
   call = expr.norm_cdf(d1) * current -\
          expr.norm_cdf(d2) * strike * expr.exp(-rate * maturity)
 
-  return call
+  put = expr.norm_cdf(-d2) * strike * expr.exp(-rate * maturity) -\
+        expr.norm_cdf(-d1) * current
+
+  return put, call
+
+def find_change(arr, threshold=0.5):
+  diff = expr.abs(arr[1:] - arr[:-1])
+  diff = expr.eager(diff)
+  return diff[diff > threshold]

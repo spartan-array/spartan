@@ -31,27 +31,23 @@ class IndexExpr(Expr):
     return eval_Index(ctx, self, deps)
      
 
-def slice_mapper(ex, val, region, matching_extents):
-  if ex in matching_extents:
-    intersection = matching_extents[ex]
-    local_slc = extent.offset_slice(ex, intersection)
-    output_ex = extent.offset_from(region, intersection)
-    return [(output_ex, tile.from_data(val[local_slc]))]
-
-def int_index_mapper(ex, tile, src, idx, dst):
+def int_index_mapper(ex, src, idx, dst):
   '''Map over the index array, fetching rows from the data array.'''
   idx_vals = idx.fetch(extent.drop_axis(ex, -1))
+  tile = src.fetch(ex)
   
   util.log_info('Dest shape: %s, idx: %s, %s', tile.shape, ex, idx_vals)
   for dst_idx, src_idx in enumerate(idx_vals):
     tile[dst_idx] = src.fetch(extent.from_slice(int(src_idx), src.shape))
+
   return [(ex, tile)]
 
-def bool_index_mapper(ex, tile, src, idx):
-  slc = ex.to_slice()
-  local_val = src[slc]
-  local_idx = idx[slc]
-  return [(ex, local_val[local_idx])]
+def bool_index_mapper(ex, src, idx):
+  val = src.fetch(ex)
+  mask = idx.fetch(ex)
+
+  #util.log_info('\nVal: %s\n Mask: %s', val, mask)
+  return [(ex, np.ma.masked_array(val, mask))]
 
 def eval_Index(ctx, prim, deps):
   src = deps['src']
@@ -59,24 +55,21 @@ def eval_Index(ctx, prim, deps):
   
   Assert.isinstance(idx, (np.ndarray, distarray.DistArray))
 
-  # scan over output, compute running count of the size
-  # of the first dimension
   if idx.dtype == np.bool:
-    dst = distarray.map_to_table(src, bool_index_mapper)
-
-    row_counts = src.map_to_table(lambda k, v: v.shape[0])
-    for _, v in row_counts:
-      pass
-  else:
-    # create destination of the appropriate size
-    dst = distarray.create(join_tuple([idx.shape[0]], src.shape[1:]),
-                           dtype=src.dtype)
-    
-    # map over it, replacing existing items.
-    dst.foreach(lambda k, v: int_index_mapper(k, v, src, idx, dst),
-                kw={})
+    # return a new array masked by `idx`
+    dst = src.map_to_array(bool_index_mapper, kw={ 'src' : src, 'idx' : idx})
     return dst
-  
+  else:
+    util.log_info('Integer indexing...')
+
+    Assert.eq(len(idx.shape), 1)
+
+    # create empty destination of same first dimension as the index array
+    dst = distarray.create(join_tuple([idx.shape[0]], src.shape[1:]), dtype=src.dtype)
+    
+    # map over it, fetching the appropriate values for each tile.
+    return dst.map_to_array(int_index_mapper, kw={ 'src' : src, 'idx' : idx, 'dst' : dst })
+
     
 def eval_Slice(ctx, prim, deps):
   src = deps['src']

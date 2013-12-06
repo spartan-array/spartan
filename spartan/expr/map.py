@@ -27,7 +27,7 @@ def map(inputs, fn, numpy_expr=None, **kw):
   return MapExpr(children=inputs, map_fn=fn, numpy_expr=None, fn_kw=kw)
 
 
-def tile_mapper(ex, data, children, map_fn, fn_kw):
+def tile_mapper(ex, children, map_fn, fn_kw):
   ctx = blob_ctx.get()
   #util.log_info('MapTiles: %s', map_fn)
   #util.log_info('Fetching %d inputs', len(children))
