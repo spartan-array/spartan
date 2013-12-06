@@ -56,12 +56,8 @@ class Socket(SocketBase):
     if self._closed:
       return
 
-    if self.in_poll_loop():
-      poller().remove(self)
-      self.handle_close()
-    else:
-      self._shutdown = True
-      poller().close(self)
+    self._shutdown = True
+    poller().close(self)
 
   def send(self, msg):
     assert not self._closed
@@ -94,13 +90,17 @@ class Socket(SocketBase):
     return self.addr[0]
 
   def handle_close(self):
-    self.flush()
+    #self.flush()
     self._closed = True
     self._zmq.close()
-    del self._zmq
+
+    self._zmq = None
 
   def handle_write(self):
     with self._lock:
+      if not self._out:
+        return
+
       while self._out:
         next = self._out.popleft()
         if isinstance(next, Group):
@@ -198,11 +198,10 @@ class ZMQPoller(threading.Thread):
     self._sockets = {}
     self.profiler = cProfile.Profile()
 
-    self._closing = {}
     self._running = False
 
     self._to_add = []
-    self._to_del = []
+    self._to_close = []
     self._to_mod = []
     self.daemon = True
 
@@ -243,24 +242,16 @@ class ZMQPoller(threading.Thread):
         for s, dir in self._to_mod:
           self._poller.register(s.zmq(), dir)
 
-        for s in self._to_del:
-          del self._sockets[s.zmq()]
+        for s in self._to_close:
           self._poller.unregister(s.zmq())
+          del self._sockets[s.zmq()]
+          socket.handle_close()
 
         del self._to_mod[:]
         del self._to_add[:]
-        del self._to_del[:]
+        del self._to_close[:]
 
-        for socket in self._closing.keys():
-          socket.handle_close()
-        self._closing.clear()
-
-  def close(self, socket):
-    'Execute socket.handle_close() from within the polling thread.'
-    with self._lock:
-      self._closing[socket] = 1
-      self.remove(socket)
-      self.wakeup()
+    util.log_info("ZMQ poller stopped.")
 
   def stop(self):
     if not self._running:
@@ -276,6 +267,7 @@ class ZMQPoller(threading.Thread):
 
   def modify(self, socket, direction):
     with self._lock:
+      assert socket.zmq() in self._sockets
       self._to_mod.append((socket, direction))
       self.wakeup()
 
@@ -284,10 +276,11 @@ class ZMQPoller(threading.Thread):
       self._to_add.append((socket, direction))
       self.wakeup()
 
-  def remove(self, socket):
+  def close(self, socket):
+    'Execute socket.handle_close() from within the polling thread.'
     with self._lock:
       assert socket.zmq() in self._sockets
-      self._to_del.append(socket)
+      self._to_close.append(socket)
       self.wakeup()
 
 def shutdown():

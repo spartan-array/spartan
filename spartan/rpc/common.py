@@ -25,7 +25,10 @@ RPC_ID = xrange(1000000000).__iter__()
 CLIENT_PENDING = weakref.WeakKeyDictionary()
 SERVER_PENDING = weakref.WeakKeyDictionary()
 
+NO_RESULT = object()
+
 DEFAULT_TIMEOUT = 100
+
 def set_default_timeout(seconds):
   global DEFAULT_TIMEOUT
   DEFAULT_TIMEOUT = seconds
@@ -45,20 +48,20 @@ class PickledData(object):
   _members = ['data']
 
 class SocketBase(object):
-  def send(self, blob): pass
-  def recv(self): pass
-  def flush(self): pass
-  def close(self): pass
+  def send(self, blob): assert False
+  def recv(self): assert False
+  def flush(self): assert False
+  def close(self): assert False
 
   def register_handler(self, handler):
     'A handler() is called in response to read requests.'
     self._handler = handler
 
   # client
-  def connect(self): pass
+  def connect(self): assert False
 
   # server
-  def bind(self): pass
+  def bind(self): assert False
 
 
 def capture_exception(exc_info=None):
@@ -92,12 +95,10 @@ def serialize(obj):
 def read(f):
   return cPickle.load(f)
 
-NO_RESULT = object()
-
 class PendingRequest(object):
-  '''An outstanding RPC request.
+  '''An outstanding RPC request on the server.
 
-  Call done(result) when a method is finished processing.
+  Call done(result) when finished to send result back to client.
   '''
   def __init__(self, socket, rpc_id):
     self.socket = socket
@@ -113,6 +114,9 @@ class PendingRequest(object):
       time.sleep(0.1)
     return self.result
 
+  def exception(self):
+    self.done(capture_exception())
+
   def done(self, result=None):
     # util.log_info('RPC finished in %.3f seconds' % (time.time() - self.created))
     self.finished = True
@@ -120,7 +124,7 @@ class PendingRequest(object):
 
     if self.socket is not None:
       header = { 'rpc_id' : self.rpc_id }
-      # util.log_info('Finished %s, %s', self.socket.addr, self.rpc_id)
+      #util.log_info('Finished %s, %s', self.socket.addr, self.rpc_id)
       w = cStringIO.StringIO()
       cPickle.dump(header, w, -1)
       serialize_to(result, w)
@@ -183,7 +187,7 @@ class Future(object):
 
     if not self.have_result and self.timed_out():
       util.log_info('timed out!')
-      raise Exception('Timed out on remote call (%s %s)', self.addr, self.rpc_id)
+      raise Exception('Timed out on remote call (%s %s)', self.addr(), self.rpc_id)
 
     if isinstance(self.result, RPCException):
       raise RemoteException(self.result.py_exc)
@@ -282,7 +286,7 @@ class Server(object):
       try:
         fn = self._methods[name]
       except KeyError:
-        handle.done(capture_exception())
+        handle.exception()
         return
 
       try:
@@ -291,7 +295,7 @@ class Server(object):
         assert result is None, 'non-None result from RPC handler (use handle.done())'
       except:
         util.log_info('Caught exception in handler.', exc_info=1)
-        handle.done(capture_exception())
+        handle.exception()
 
   def shutdown(self):
     self._running = 0
@@ -302,20 +306,14 @@ class Server(object):
 class ProxyMethod(object):
   def __init__(self, client, method):
     self.client = client
-    self.socket = client._socket
     self.method = method
 
   def __call__(self, request=None):
     rpc_id = RPC_ID.next()
+    w = cStringIO.StringIO()
 
     header = { 'method' : self.method, 'rpc_id' : rpc_id }
-
-    f = Future(self.socket.addr, rpc_id)
-    self.client._futures[rpc_id] = f
-
-    w = cStringIO.StringIO()
     cPickle.dump(header, w, -1)
-
     if isinstance(request, PickledData):
       w.write(request.data)
     else:
@@ -325,8 +323,7 @@ class ProxyMethod(object):
 #    if len(serialized) > 800000:
 #      util.log_info('%s::\n %s; \n\n\n %s', self.method, ''.join(traceback.format_stack()), request)
 
-    self.socket.send(w.getvalue())
-    return f
+    return self.client.send(rpc_id, w.getvalue())
 
 class Client(object):
   def __init__(self, socket):
@@ -334,9 +331,17 @@ class Client(object):
     self._socket.register_handler(self.handle_read)
     self._socket.connect()
     self._futures = {}
+    self._lock = threading.Lock()
 
   def __reduce__(self, *args, **kwargs):
     raise cPickle.PickleError('Not pickleable.')
+
+  def send(self, rpc_id, data):
+    with self._lock:
+      f = Future(self.addr, rpc_id)
+      self._futures[rpc_id] = f
+      self._socket.send(data)
+      return f
 
   def addr(self):
     return self._socket.addr
