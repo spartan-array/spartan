@@ -5,7 +5,7 @@ from Cython.Build import cythonize
 
 setup(
   name='spartan',
-  version='0.05',
+  version='0.06',
   maintainer='Russell Power',
   maintainer_email='russell.power@gmail.com',
   url='http://github.com/rjpower/spartan',

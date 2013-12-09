@@ -1,13 +1,24 @@
-## Spartan
+# Spartan
 
-Spartan is a distributed array engine, built on top of a Piccolo-style
-key-value store.
+Spartan is a library for distributed array programming.  Programmers
+build up array expressions (using Numpy-like operations).  These 
+expressions are then compiled and optimized and run on a distributed
+array backend across multiple machines.
 
-### Installation
+## Installation
 
-pip install [--user] spartan
+#### From PyPi (not necessarily up-to-date)
+    
+    pip install [--user] spartan
 
-### Usage
+#### From source
+
+    pip install --user cython
+    git clone http://github.com/rjpower/spartan.git
+    cd spartan
+    python setup.py develop --user
+
+## Usage
 
 Operations in Spartan look superficially like numpy array operations, but
 actually are composed into a deferred expression tree.  For example:
@@ -38,7 +49,13 @@ actually are composed into a deferred expression tree.  For example:
 Expressions are combined together lazily until they are *forced* -- this
 is caused by a call to the ``force`` method.
 
-### Running
+## Running
 
-python benchmarks/benchmark_lreg.py
+Tests can be run using nosetests `pip install --user nose`.
+
+    nosetests tests/
+
+There are a few benchmarks to test performance as well:
+
+    python benchmarks/benchmark_*.py
 
