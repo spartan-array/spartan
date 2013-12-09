@@ -7,7 +7,6 @@ import numpy as np
 import spartan
 import test_common
 
-import pyximport; pyximport.install()
 from test_common import with_ctx
 
 @with_ctx

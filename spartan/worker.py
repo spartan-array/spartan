@@ -5,11 +5,6 @@ import pstats
 import threading
 import time
 
-try:
-  import pyximport; pyximport.install()
-except ImportError:
-  pass
-
 import multiprocessing
 from multiprocessing.pool import ThreadPool
 import os
@@ -96,8 +91,6 @@ class Worker(object):
 
   def _run_kernel(self, req, handle):
     self._server._timers['run_kernel'].start()
-    if FLAGS.profile_kernels:
-      self._kernel_prof.enable()
 
     try:
       blob_ctx.set(self._ctx)

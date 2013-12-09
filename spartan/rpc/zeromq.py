@@ -199,7 +199,7 @@ class ZMQPoller(threading.Thread):
 
     self._poller.register(self._pipe[0], zmq.POLLIN)
     self._sockets = {}
-    self.profiler = cProfile.Profile()
+    #self.profiler = cProfile.Profile()
 
     self._running = False
 
@@ -215,7 +215,7 @@ class ZMQPoller(threading.Thread):
     MAX_TIMEOUT = 100
 
     while self._running:
-      self.profiler.disable()
+      #self.profiler.disable()
       socks = dict(_poll(_poll_time))
 
       if len(socks) == 0:
@@ -223,7 +223,7 @@ class ZMQPoller(threading.Thread):
       else:
         _poll_time = 1
 
-      self.profiler.enable()
+      #self.profiler.enable()
       #util.log_info('%s', self._sockets)
       for fd, event in socks.iteritems():
         if fd == self._pipe[0]:
