@@ -7,6 +7,7 @@ import threading
 import socket
 import traceback
 import sys
+import fcntl
 import zmq
 
 from .common import Group, SocketBase
@@ -193,6 +194,9 @@ class ZMQPoller(threading.Thread):
     self._lock = threading.RLock()
 
     self._pipe = os.pipe()
+    fcntl.fcntl(self._pipe[0], fcntl.F_SETFL, os.O_NONBLOCK)
+    fcntl.fcntl(self._pipe[1], fcntl.F_SETFL, os.O_NONBLOCK)
+
     self._poller.register(self._pipe[0], zmq.POLLIN)
     self._sockets = {}
     self.profiler = cProfile.Profile()
@@ -223,7 +227,7 @@ class ZMQPoller(threading.Thread):
       #util.log_info('%s', self._sockets)
       for fd, event in socks.iteritems():
         if fd == self._pipe[0]:
-          os.read(fd, 1)
+          os.read(fd, 10000)
           continue
 
         if not fd in self._sockets:

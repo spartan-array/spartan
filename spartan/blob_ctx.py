@@ -33,7 +33,7 @@ class BlobCtx(object):
       fns = self._deferred
       self._deferred = []
       for fn in fns:
-        util.log_info('Running deferred operation %s', fn)
+        #util.log_info('Running deferred operation %s', fn)
         fn()
 
     #util.log_info('%s %s', id, method)

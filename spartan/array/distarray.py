@@ -128,6 +128,7 @@ class DistArray(object):
   def foreach(self, mapper_fn, kw):
     return self.map_to_table(mapper_fn=mapper_fn, kw=kw)
 
+ID_COUNTER = iter(xrange(10000000))
 
 class DistArrayImpl(DistArray):
   def __init__(self, shape, dtype, tiles, reducer_fn):
@@ -146,6 +147,7 @@ class DistArrayImpl(DistArray):
       self.blob_to_ex[v] = k
 
     self.tiles = tiles
+    self.id = ID_COUNTER.next()
 
   def __reduce__(self):
     return (DistArrayImpl, (self.shape, self.dtype, self.tiles, self.reducer_fn))
@@ -158,8 +160,12 @@ class DistArrayImpl(DistArray):
     invocation of a RPC call, which leads to odd/bad behavior.
     '''
     if self.ctx.worker_id == blob_ctx.MASTER_ID:
-      #util.log_info('Destroying table... %s', self.tiles.values())
-      self.ctx.defer(lambda: self.ctx.destroy_all(self.tiles.values()))
+      #util.log_info('Destroying table... %s', self.id)
+      ctx = self.ctx
+      tiles = self.tiles.values()
+
+      # drop reference to self from lambda
+      self.ctx.defer(lambda: ctx.destroy_all(tiles))
 
   def id(self):
     return self.table.id()
