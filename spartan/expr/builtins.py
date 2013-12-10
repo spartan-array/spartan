@@ -26,21 +26,14 @@ def rand(*shape, **kw):
   :param tile_hint: A tuple indicating the desired tile shape for this array.
   '''
   for s in shape: assert isinstance(s, int)
-  return map(ndarray(shape,
-                     dtype=np.float,
-                     tile_hint=kw.get('tile_hint', None)),
-             fn=lambda input: np.random.rand(*input.shape),
-             numpy_expr='np.random.rand')
+  return shuffle(ndarray(shape, dtype=np.float, tile_hint=kw.get('tile_hint', None)),
+                 fn=lambda input, ex: [(ex, np.random.rand(*ex.shape))])
 
 
 def randn(*shape, **kw):
   for s in shape: assert isinstance(s, int)
-  return map(ndarray(shape,
-                     dtype=np.float,
-                     tile_hint=kw.get('tile_hint', None)),
-             fn=lambda input: np.random.randn(*input.shape),
-             numpy_expr='np.random.randn')
-
+  return shuffle(ndarray(shape, dtype=np.float, tile_hint=kw.get('tile_hint', None)),
+                 fn=lambda input, ex: [(ex, np.random.randn(*ex.shape))])
 
 def zeros(shape, dtype=np.float, tile_hint=None):
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),

@@ -6,13 +6,14 @@ Optimizations over an expression graph.
 
 import numpy as np
 from spartan.config import FLAGS, BoolFlag
-from spartan.expr.reduce import ReduceExpr, ReduceOp
+from spartan.expr.local import make_var, LocalInput
+from spartan.expr.reduce import ReduceExpr, LocalReduceExpr
 from spartan.util import Assert
 
 from .. import util
-from .base import Expr, Val, ListExpr, AsArray, Op, OpInput, make_var, DictExpr
+from .base import Expr, Val, ListExpr, AsArray, DictExpr
 from .shuffle import ShuffleExpr
-from .map import MapExpr, MapOp
+from .map import MapExpr, LocalMapExpr
 from .ndarray import NdArrayExpr
 from spartan.array.distarray import broadcast
 
@@ -85,7 +86,7 @@ class MapMapFusion(OptimizePass):
 
     #util.log_info('Original: %s', expr.op)
     children = {}
-    combined_op = MapOp(fn=expr.op.fn,
+    combined_op = LocalMapExpr(fn=expr.op.fn,
                      kw=expr.op.kw,
                      pretty_fn=expr.op.pretty_fn)
     for name, child_expr in map_children.iteritems():
@@ -97,7 +98,7 @@ class MapMapFusion(OptimizePass):
         combined_op.add_dep(child_expr.op)
       else:
         key = make_var()
-        combined_op.add_dep(OpInput(idx=key))
+        combined_op.add_dep(LocalInput(idx=key))
         children[key] = child_expr
 
     return MapExpr(children=DictExpr(children),
@@ -115,7 +116,7 @@ class ReduceMapFusion(OptimizePass):
       if not isinstance(v, MapExpr):
         return expr.visit(self)
 
-    combined_op = ReduceOp(fn=expr.op.fn,
+    combined_op = LocalReduceExpr(fn=expr.op.fn,
                            kw=expr.op.kw)
 
     new_children = {}

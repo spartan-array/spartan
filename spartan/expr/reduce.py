@@ -1,23 +1,15 @@
-from .base import Expr, Op, OpCtx, make_var, DictExpr, OpInput
+from .base import Expr, DictExpr
 from spartan import util
 from spartan.array import extent, tile, distarray
+from spartan.expr import local
+from spartan.expr.local import make_var, LocalReduceExpr, LocalInput, LocalCtx
 from spartan.node import Node
-
-class ReduceOp(Op):
-  __metaclass__ = Node
-  _members = ['fn', 'deps', 'kw']
-
-  def evaluate(self, ctx):
-    deps = [d.evaluate(ctx) for d in self.deps]
-    assert len(deps) == 1
-    if self.kw is None: self.kw = {}
-    return self.fn(ctx.extent, deps[0], axis=ctx.axis, **self.kw)
 
 def _reduce_mapper(ex, children, op, axis, output):
   #util.log_info('Reduce: %s %s %s %s %s', reducer, ex, tile, axis, fn_kw)
 
   local_values = dict([(k, v.fetch(ex)) for k, v in children.iteritems()])
-  ctx = OpCtx(inputs=local_values,
+  ctx = LocalCtx(inputs=local_values,
               axis=axis,
               extent=ex)
 
@@ -52,7 +44,8 @@ class ReduceExpr(Expr):
     output_array = distarray.create(shape, dtype,
                                     combiner=tile_accum, 
                                     reducer=tile_accum)
-    
+
+    print local.codegen(op)
     
     # util.log_info('Reducing into array %s', output_array)
     largest.foreach(_reduce_mapper, kw={
@@ -82,8 +75,8 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, combine_fn, fn_kw=None):
   if fn_kw is None: fn_kw = {}
   varname = make_var()
 
-  reduce_op = ReduceOp(fn=local_reduce_fn,
-                       deps=[OpInput(idx=varname)],
+  reduce_op = LocalReduceExpr(fn=local_reduce_fn,
+                       deps=[LocalInput(idx=varname)],
                        kw=fn_kw)
 
   return ReduceExpr(children=DictExpr({ varname : v}),

@@ -1,5 +1,5 @@
 import test_common
-from spartan import expr
+from spartan import expr, util
 from spartan.expr.optimize import optimize
 from spartan.examples import finance
 
@@ -16,16 +16,16 @@ class TestFinance(test_common.ClusterTest):
 
   def test_call(self):
     put, call = finance.black_scholes(self.current, self.strike, maturity, rate, volatility)
-    print optimize(call)
-    print call.glom()
+    util.log_info(optimize(call))
+    util.log_info(call.glom())
 
   def test_put(self):
     put, call = finance.black_scholes(self.current, self.strike, maturity, rate, volatility)
-    print optimize(put)
-    print put.glom()
+    util.log_info(optimize(put))
+    util.log_info(put.glom())
 
   def test_find_change(self):
     arr = expr.randn(100)
     movers = finance.find_change(arr)
-    print optimize(movers)
-    print movers.glom().compressed()
+    util.log_info(optimize(movers))
+    util.log_info(movers.glom().compressed())

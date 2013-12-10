@@ -17,49 +17,6 @@ class NotShapeable(Exception):
   pass
 
 unique_id = iter(xrange(10000000))
-var_id = iter(xrange(1000000))
-
-def make_var():
-  '''Return a new unique key for use as a variable name'''
-  return 'k%d' % var_id.next()
-
-class OpCtx(object):
-  __metaclass__ = Node
-  _members = ['inputs', 'axis', 'extent']
-
-class Op(object):
-  '''Represents an internal operation to be performed in the context of a tile.
-
-  Briefly: expressions are over arrays, and operations are over tiles.
-
-  Yes, this naming needs work.
-
-  `Op`s have dependencies and can be
-  chained together; this allows us to construct local DAG's when optimizing,
-  which can then be executed or converted to parakeet code.
-  '''
-  def add_dep(self, v):
-    if self.deps is None: self.deps = []
-    self.deps.append(v)
-
-class OpInput(Op):
-  '''An externally supplied input.'''
-  __metaclass__ = Node
-  _members = ['idx']
-
-  def __str__(self):
-    return 'V(%s)' % self.idx
-
-  def emit_code(self):
-    return self.idx
-
-  def node_init(self):
-    Assert.isinstance(self.idx, str)
-
-  def evaluate(self, ctx):
-    return ctx.inputs[self.idx]
-
-
 
 def _map(*args, **kw):
   '''

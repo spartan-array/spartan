@@ -1,23 +1,14 @@
 #!/usr/bin/env python
-import StringIO
 
 import collections
-import numpy as np
 
-from spartan import util, blob_ctx
-from spartan.array import distarray, tile
-from spartan.expr.base import OpCtx, DictExpr
-from spartan.node import Node
-from spartan.util import Assert
-from .base import Expr, lazify, as_array, Op, OpInput, make_var
-
-class MapOp(Op):
-  _members = ['deps', 'kw', 'fn', 'pretty_fn']
-  __metaclass__ = Node
-
-  def evaluate(self, ctx):
-    deps = [d.evaluate(ctx) for d in self.deps]
-    return self.fn(*deps)
+from .. import util, blob_ctx
+from ..array import distarray
+from .local import LocalCtx, make_var, LocalInput, LocalMapExpr
+from ..node import Node
+from spartan.expr import local
+from ..util import Assert
+from .base import DictExpr, Expr, as_array
 
 def tile_mapper(ex, children, op):
   ctx = blob_ctx.get()
@@ -26,7 +17,7 @@ def tile_mapper(ex, children, op):
   #util.log_info('%s %s', children, ex)
 
   local_values = dict([(k, v.fetch(ex)) for (k, v) in children.iteritems()])
-  op_ctx = OpCtx(inputs=local_values)
+  op_ctx = LocalCtx(inputs=local_values)
 
   #util.log_info('Inputs: %s', local_values)
   result = op.evaluate(op_ctx)
@@ -58,9 +49,7 @@ class MapExpr(Expr):
     #for c in children:
     #  util.log_info('Child: %s', c)
 
-    #print 'Code:'
-    #print 'def mapper(%s):' % ','.join([k for k in children.keys()])
-    #print op.emit_code()
+    print local.codegen(op)
 
     keys = children.keys()
     vals = children.values()
@@ -93,10 +82,10 @@ def map(inputs, fn, numpy_expr=None):
     v = as_array(v)
     varname = make_var()
     children[varname] = v
-    op_deps.append(OpInput(idx=varname))
+    op_deps.append(LocalInput(idx=varname))
 
   children = DictExpr(vals=children)
-  op = MapOp(fn=fn,
+  op = LocalMapExpr(fn=fn,
              pretty_fn=numpy_expr,
              deps=op_deps)
 
