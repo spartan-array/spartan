@@ -1,9 +1,12 @@
-from spartan import expr
-from spartan.array import distarray
-from spartan.util import Assert
+import unittest
+
 import numpy as np
-import spartan
+
+from spartan import expr
+from spartan.util import Assert
+from spartan import util
 import test_common
+
 
 TEST_SIZE = 5
 
@@ -79,5 +82,18 @@ class TestReduce(test_common.ClusterTest):
     for axis in [None, 0, 1, 2]:  
       y = x.argmax(axis)
       val = y.glom()
-      print val
       Assert.all_eq(val, nx.argmax(axis))
+
+  def test_simple_sum(self):
+    def _(axis):
+      util.log_info('Testing sum over axis %s', axis)
+      a = expr.ones((TEST_SIZE, TEST_SIZE))
+      b = a.sum(axis=axis)
+      Assert.all_eq(b.glom(), np.ones((TEST_SIZE, TEST_SIZE)).sum(axis))
+
+    _(axis=0)
+    _(axis=1)
+    _(axis=None)
+
+if __name__ == '__main__':
+  unittest.main()

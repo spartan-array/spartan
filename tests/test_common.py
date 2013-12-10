@@ -1,3 +1,4 @@
+import atexit
 import os
 from os.path import basename, splitext
 import signal
@@ -13,6 +14,10 @@ import types
 import unittest
 from spartan.array import distarray
 
+def _dump_profile():
+  import yappi
+  yappi.get_func_stats().save('master_prof.out', type='pstat')
+
 CTX = None
 def get_cluster_ctx():
   global CTX
@@ -20,6 +25,12 @@ def get_cluster_ctx():
     print 'Starting cluster...'
     config.initialize(sys.argv)
     CTX = start_cluster(FLAGS.num_workers, FLAGS.cluster)
+
+    if FLAGS.profile_master:
+      import yappi
+      yappi.start()
+      atexit.register(_dump_profile)
+
   return CTX
 
 def sig_handler(sig, frame):
@@ -59,11 +70,6 @@ def run(filename):
   mod_name, _ = splitext(basename(filename))
   module = imp.load_source(mod_name, filename)
   util.log_info('Running benchmarks for module: %s (%s)', module, filename)
- 
-  if FLAGS.profile_master:
-    import yappi
-    yappi.start()
-
   benchmarks = [k for k in dir(module) if (
              k.startswith('benchmark_') and 
              isinstance(getattr(module, k), types.FunctionType))
@@ -81,9 +87,6 @@ def run(filename):
       run_benchmarks(module, benchmarks, master, timer)
       master.shutdown()
 
-  if FLAGS.profile_master:
-    yappi.get_func_stats().save('master_prof.out', type='pstat')
-  
   if FLAGS.profile_worker:
     join_profiles('./_worker_profiles')
 
