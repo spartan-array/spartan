@@ -44,10 +44,8 @@ cdef class BlobId(object):
 
 
 cdef class Message(object):
-  pass
-
-
-
+  def __reduce__(Message self):
+    return (self.__class__, tuple(), self.__dict__)
 
 class RegisterReq(Message):
   __metaclass__ = Node

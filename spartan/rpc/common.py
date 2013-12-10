@@ -13,6 +13,7 @@ import time
 import traceback
 import types
 import cStringIO
+import pickle
 import cPickle
 
 from .. import cloudpickle, util, core
@@ -72,17 +73,13 @@ class Group(tuple):
 
 def serialize_to(obj, writer):
   #serialization.write(obj, writer)
-  try:
-    pickled = cPickle.dumps(obj, -1)
-    writer.write(pickled)
-  except (PickleError, TypeError):
-    #util.log_warn('CPICKLE failed: %s (%s)', sys.exc_info(), obj)
-    writer.write(cloudpickle.dumps(obj, -1))
+  writer.write(serialize(obj))
 
 def serialize(obj):
   #x = cStringIO.StringIO()
   #serialization.write(obj, x)
   #return x.getvalue()
+  #util.log_info('Pickling: %s', obj)
   try:
     return cPickle.dumps(obj, -1)
   except (PickleError, TypeError):
