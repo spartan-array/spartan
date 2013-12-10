@@ -8,7 +8,8 @@ into a series of primitive array operations.
 import numpy as np
 
 from ..node import Node
-from .. import blob_ctx, util
+from .. import blob_ctx, node, util
+from ..util import Assert
 from ..array import distarray
 
 
@@ -16,6 +17,49 @@ class NotShapeable(Exception):
   pass
 
 unique_id = iter(xrange(10000000))
+var_id = iter(xrange(1000000))
+
+def make_var():
+  '''Return a new unique key for use as a variable name'''
+  return 'k%d' % var_id.next()
+
+class OpCtx(object):
+  __metaclass__ = Node
+  _members = ['inputs', 'axis', 'extent']
+
+class Op(object):
+  '''Represents an internal operation to be performed in the context of a tile.
+
+  Briefly: expressions are over arrays, and operations are over tiles.
+
+  Yes, this naming needs work.
+
+  `Op`s have dependencies and can be
+  chained together; this allows us to construct local DAG's when optimizing,
+  which can then be executed or converted to parakeet code.
+  '''
+  def add_dep(self, v):
+    if self.deps is None: self.deps = []
+    self.deps.append(v)
+
+class OpInput(Op):
+  '''An externally supplied input.'''
+  __metaclass__ = Node
+  _members = ['idx']
+
+  def __str__(self):
+    return 'V(%s)' % self.idx
+
+  def emit_code(self):
+    return self.idx
+
+  def node_init(self):
+    Assert.isinstance(self.idx, str)
+
+  def evaluate(self, ctx):
+    return ctx.inputs[self.idx]
+
+
 
 def _map(*args, **kw):
   '''
@@ -28,6 +72,7 @@ def _map(*args, **kw):
 
   from .map import map
   return map(args, fn, numpy_expr)
+
 
 class Expr(object):
   _cached_value = None
@@ -78,34 +123,34 @@ class Expr(object):
     return self.__class__.__name__
 
   def __add__(self, other):
-    return _map(self, other, fn=np.add, numpy_expr='+')
+    return _map(self, other, fn=np.add)
 
   def __sub__(self, other):
-    return _map(self, other, fn=np.subtract, numpy_expr='-')
+    return _map(self, other, fn=np.subtract)
 
   def __mul__(self, other):
-    return _map(self, other, fn=np.multiply, numpy_expr='*')
+    return _map(self, other, fn=np.multiply)
 
   def __mod__(self, other):
-    return _map(self, other, fn=np.mod, numpy_expr='%')
+    return _map(self, other, fn=np.mod)
 
   def __div__(self, other):
-    return _map(self, other, fn=np.divide, numpy_expr='/')
+    return _map(self, other, fn=np.divide)
 
   def __eq__(self, other):
-    return _map(self, other, fn=np.equal, numpy_expr='==')
+    return _map(self, other, fn=np.equal)
 
   def __ne__(self, other):
-    return _map(self, other, fn=np.not_equal, numpy_expr='!=')
+    return _map(self, other, fn=np.not_equal)
 
   def __lt__(self, other):
-    return _map(self, other, fn=np.less, numpy_expr='<')
+    return _map(self, other, fn=np.less)
 
   def __gt__(self, other):
-    return _map(self, other, fn=np.greater, numpy_expr='>')
+    return _map(self, other, fn=np.greater)
 
   def __pow__(self, other):
-    return _map(self, other, fn=np.power, numpy_expr='**')
+    return _map(self, other, fn=np.power)
 
   def __neg__(self):
     return _map(self, fn=np.negative)
@@ -252,7 +297,7 @@ def glom(node):
 
 def dag(node):
   '''
-  Compile and return the DAG representing this expression.
+  Optimize and return the DAG representing this expression.
   
   :param node: The node to compute a DAG for.
   '''

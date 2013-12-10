@@ -1,15 +1,12 @@
-from copy import copy
-from spartan import util, expr, node
-from spartan.array import extent
-from spartan.expr import NotShapeable, lazify, make_primitive
 import cPickle
-import numpy as np
 import random
-import scipy.sparse
-import spartan
-import time
 import zipfile
 
+import numpy as np
+import scipy.sparse
+
+from spartan import util, expr, node
+from spartan.expr import lazify
 
 #import parakeet
 # EPSILON = 1e-5
@@ -111,24 +108,27 @@ def _compute_strata(V):
     strata.append(stratum)
   
   return strata
-  
-def _evaluate_netflix(ctx, V, M, U):
-  strata = _compute_strata(V)
-  util.log_info('Start eval')
-  for i, stratum in enumerate(strata):
-    util.log_info('Processing stratum: %d of %d (size = %d)', i, len(strata), len(stratum))
-    #for ex in stratum: print ex
-    
-    worklist = set(stratum)
-    expr.shuffle(V, sgd_netflix_mapper, 
-                 target=None,
-                 kw={'V' : lazify(V), 'M' : lazify(M), 'U' : lazify(U),
-                     'worklist' : worklist }).force()
-  util.log_info('Eval done.')
 
-NetflixSGD = make_primitive('NetflixSGD',
-                            ['V', 'M', 'U'],
-                            _evaluate_netflix)
-    
+class NetflixSGD(expr.Expr):
+  __metaclass__ = node.Node
+  _members = ['V', 'M', 'U']
+
+  def evaluate(self, ctx, deps):
+    V, M, U = deps['V'], deps['M'], deps['U']
+
+    strata = _compute_strata(V)
+    util.log_info('Start eval')
+    for i, stratum in enumerate(strata):
+      util.log_info('Processing stratum: %d of %d (size = %d)', i, len(strata), len(stratum))
+      #for ex in stratum: print ex
+
+      worklist = set(stratum)
+      expr.shuffle(V, sgd_netflix_mapper,
+                   target=None,
+                   kw={'V' : lazify(V), 'M' : lazify(M), 'U' : lazify(U),
+                       'worklist' : worklist }).force()
+    util.log_info('Eval done.')
+
+
 def sgd(V, M, U):
   return NetflixSGD(V=V, M=M, U=U)
