@@ -28,10 +28,10 @@ actually are composed into a deferred expression tree.  For example:
 
     MapExpr {
       local_dag = None,
-      fn_kw = LazyDict {
+      fn_kw = DictExpr {
         vals = {}
       },
-      children = LazyList {
+      children = ListExpr {
         vals = [
         [0] = NdArrayExpr {
           combine_fn = None,

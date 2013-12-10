@@ -1,7 +1,7 @@
 '''
 Indexing operations (slicing and filtering).
 '''
-from .base import Expr, LazyList
+from .base import Expr, ListExpr
 from spartan import util
 from spartan.array import extent, tile, distarray
 from spartan.node import Node
@@ -15,8 +15,8 @@ class IndexExpr(Expr):
 
   def node_init(self):
     Expr.node_init(self)
-    assert not isinstance(self.src, LazyList)
-    assert not isinstance(self.idx, LazyList)
+    assert not isinstance(self.src, ListExpr)
+    assert not isinstance(self.idx, ListExpr)
     assert not isinstance(self.idx, list)
 
   def evaluate(self, ctx, deps):

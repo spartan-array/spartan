@@ -172,7 +172,7 @@ class AsArray(Expr):
     return 'V(%s)' % self.val
 
 
-class LazyVal(Expr):
+class Val(Expr):
   __metaclass__ = Node
   _members = ['val']
 
@@ -191,9 +191,9 @@ class LazyVal(Expr):
   def __str__(self):
     return 'lazy(%s)' % self.val
 
-class LazyCollection(Expr):
+class CollectionExpr(Expr):
   '''
-  LazyCollections wrap normal tuples, lists and dicts with `Expr` semantics.
+  CollectionExpr subclasses wrap normal tuples, lists and dicts with `Expr` semantics.
   
   visit() and evaluate() are supported; these thread the visitor through
   child elements as expected.
@@ -213,35 +213,28 @@ class LazyCollection(Expr):
     return iter(self.vals)
 
 
-class LazyDict(LazyCollection):
+class DictExpr(CollectionExpr):
+  __metaclass__ = Node
+
+  def iteritems(self): return self.vals.iteritems()
+  def keys(self): return self.vals.keys()
+  def values(self): return self.vals.values()
+
+  def visit(self, visitor):
+    return DictExpr(vals=dict([(k, visitor.visit(v)) for (k, v) in self.vals.iteritems()]))
+
+
+class ListExpr(CollectionExpr):
   __metaclass__ = Node
   def visit(self, visitor):
-    return LazyDict(vals=dict([(k, visitor.visit(v)) for (k, v) in self.vals.iteritems()]))
+    return ListExpr(vals=[visitor.visit(v) for v in self.vals])
 
 
-class LazyList(LazyCollection):
+class TupleExpr(CollectionExpr):
   __metaclass__ = Node
   def visit(self, visitor):
-    return LazyList(vals=[visitor.visit(v) for v in self.vals])
+    return TupleExpr(vals=tuple([visitor.visit(v) for v in self.vals]))
 
-
-class LazyTuple(LazyCollection):
-  __metaclass__ = Node
-  def visit(self, visitor):
-    return LazyTuple(vals=tuple([visitor.visit(v) for v in self.vals]))
-
-
-def make_primitive(name, arg_names, evaluate_fn):
-  class NewPrimitive(Expr):
-    __metaclass__ = Node
-    _members = arg_names
-
-    def evaluate(self, ctx, deps):
-      return evaluate_fn(ctx, **deps)
-
-
-  NewPrimitive.__name__= name
-  return NewPrimitive
 
 
 def glom(node):
@@ -313,22 +306,19 @@ def lazify(val):
     return val
 
   if isinstance(val, dict):
-    return LazyDict(vals=val)
+    return DictExpr(vals=val)
 
   if isinstance(val, list):
-    return LazyList(vals=val)
+    return ListExpr(vals=val)
 
   if isinstance(val, tuple):
-    return LazyTuple(vals=val)
+    return TupleExpr(vals=val)
 
-  return LazyVal(val=val)
+  return Val(val=val)
 
-def as_array(lst):
-  results = []
-  for v in lst:
-    if isinstance(v, Expr):
-      results.append(v)
-    else:
-      results.append(AsArray(v))
 
-  return lazify(results)
+def as_array(v):
+  if isinstance(v, Expr):
+    return v
+  else:
+    return AsArray(v)
