@@ -94,7 +94,7 @@ class Flags(object):
 
 FLAGS = Flags()
 
-FLAGS.add(BoolFlag('profile_kernels', default=False))
+FLAGS.add(BoolFlag('profile_worker', default=False))
 FLAGS.add(BoolFlag('profile_master', default=False))
 FLAGS.add(BoolFlag('cluster', default=False))
 FLAGS.add(LogLevelFlag('log_level', logging.INFO))

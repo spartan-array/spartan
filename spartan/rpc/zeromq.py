@@ -270,12 +270,15 @@ class ZMQPoller(threading.Thread):
 
   def modify(self, socket, direction):
     with self._lock:
-      assert socket.zmq() in self._sockets
+      assert socket.zmq() in self._sockets, socket.zmq()
+      #util.log_info('Modifying... %s', socket.zmq())
       self._to_mod.append((socket, direction))
       self.wakeup()
 
   def add(self, socket, direction):
     with self._lock:
+      assert not socket.zmq() in self._sockets, socket.zmq()
+      #util.log_info('Adding... %s', socket.zmq())
       self._to_add.append((socket, direction))
       self.wakeup()
 
@@ -283,6 +286,7 @@ class ZMQPoller(threading.Thread):
     'Execute socket.handle_close() from within the polling thread.'
     with self._lock:
       assert socket.zmq() in self._sockets
+      #util.log_info('Removing... %s', socket.zmq())
       self._to_close.append(socket)
       self.wakeup()
 

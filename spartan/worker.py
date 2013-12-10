@@ -15,6 +15,11 @@ import resource
 from spartan import config, util, rpc, core, blob_ctx
 from spartan.config import FLAGS, StrFlag, IntFlag
 
+try:
+  import yappi
+except:
+  pass
+
 class Worker(object):
   def __init__(self, port, master):
     self.id = -1
@@ -25,7 +30,7 @@ class Worker(object):
     self._running = True
     self._ctx = None
     self._kernel_threads = ThreadPool(processes=1)
-    self._kernel_prof = cProfile.Profile()
+    #self._kernel_prof = cProfile.Profile()
 
     hostname = socket.gethostname()
     self._server = rpc.listen(hostname, port)
@@ -36,7 +41,6 @@ class Worker(object):
     req.host = hostname
     req.port = port
     master.register(req)
-
 
   def get_worker(self, worker_id):
     return self._peers[worker_id]
@@ -107,19 +111,17 @@ class Worker(object):
       handle.exception()
 
     self._server._timers['run_kernel'].stop()
-    self._kernel_prof.disable()
+    #self._kernel_prof.disable()
 
   def run_kernel(self, req, handle):
     self._kernel_threads.apply_async(self._run_kernel, args=(req, handle))
 
   def shutdown(self, req, handle):
-    if FLAGS.profile_kernels:
-      os.system('mkdir -p ./_kernel-profiles/')
-      stats = pstats.Stats(self._kernel_prof)
-      stats.add(rpc.poller().profiler)
-      stats.dump_stats('./_kernel-profiles/%d' % self.id)
+    if FLAGS.profile_worker:
+      os.system('mkdir -p ./_worker_profiles/')
+      yappi.get_func_stats().save('./_worker_profiles/%d' % self.id, type='pstat')
 
-    util.log_info('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_kernels)
+    util.log_info('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_worker)
     #print self._server.timings()
 
     handle.done()
@@ -138,6 +140,10 @@ class Worker(object):
 
 def _start_worker(master, port, local_id):
   util.log_info('Master: %s', master)
+
+  if FLAGS.profile_worker:
+    yappi.start()
+
   pid = os.getpid()
   os.system('taskset -pc %d %d > /dev/null' % (local_id, pid))
   master = rpc.connect(*master)

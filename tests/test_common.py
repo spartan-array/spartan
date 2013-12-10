@@ -51,7 +51,7 @@ def run_benchmarks(module, benchmarks, master, timer):
   
 def run(filename):
   signal.signal(signal.SIGQUIT, sig_handler)
-  os.system('rm ./_kernel-profiles/*')
+  os.system('rm ./_worker_profiles/*')
 
   FLAGS.add(StrFlag('worker_list', default='4,8,16,32,64,80'))
 
@@ -61,9 +61,9 @@ def run(filename):
   util.log_info('Running benchmarks for module: %s (%s)', module, filename)
  
   if FLAGS.profile_master:
-    prof = cProfile.Profile()
-    prof.enable()
-  
+    import yappi
+    yappi.start()
+
   benchmarks = [k for k in dir(module) if (
              k.startswith('benchmark_') and 
              isinstance(getattr(module, k), types.FunctionType))
@@ -82,11 +82,10 @@ def run(filename):
       master.shutdown()
 
   if FLAGS.profile_master:
-    prof.disable()
-    prof.dump_stats('master_prof.out')
+    yappi.get_func_stats().save('master_prof.out', type='pstat')
   
-  if FLAGS.profile_kernels:
-    join_profiles('./_kernel-profiles')
+  if FLAGS.profile_worker:
+    join_profiles('./_worker_profiles')
 
 
 class ClusterTest(unittest.TestCase):
@@ -131,7 +130,7 @@ def with_ctx(fn):
 def join_profiles(dir):
   import glob
   import pstats
-  return pstats.Stats(*glob.glob(dir + '/*')).dump_stats('./kernel-prof.out')
+  return pstats.Stats(*glob.glob(dir + '/*')).dump_stats('./worker_prof.out')
 
 if __name__ == '__main__':
   if sys.argv[1] == 'join':
