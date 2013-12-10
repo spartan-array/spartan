@@ -352,14 +352,12 @@ class LocalWrapper(DistArray):
   def map_to_array(self, mapper_fn, kw=None):
     if kw is None: kw = {}
     ex = extent.from_slice(np.index_exp[:], self.shape)
-    result = mapper_fn(ex, self._data, **kw)
+    result = mapper_fn(ex, **kw)
     assert len(result) == 1
     result_ex, result_data = result[0]
 
     return as_array(result_data)
 
-  def __getitem__(self, idx):
-    return self._data[idx]
 
 def as_array(data):
   if isinstance(data, DistArray):
@@ -461,7 +459,8 @@ class Broadcast(DistArray):
     Assert.isinstance(shape, tuple)
     self.base = base
     self.shape = shape
-  
+    self.dtype = base.dtype
+
   def __repr__(self):
     return 'Broadcast(%s -> %s)' % (self.base, self.shape)
   

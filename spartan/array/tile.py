@@ -177,8 +177,8 @@ def merge_dense(old_tile, new_tile, reducer):
   old_tile._initialize()
   new_tile._initialize()
 
-  #util.log_info('OLD: %s', old_tile.data)
-  #util.log_info('NEW: %s', new_tile.data)
+  # util.log_info('OLD: %s', old_tile.data)
+  # util.log_info('NEW: %s', new_tile.data)
 
   # zero-dimensional arrays; just use
   # data == None as a mask.
@@ -194,6 +194,9 @@ def merge_dense(old_tile, new_tile, reducer):
   replaced = ~old_tile.mask & new_tile.mask
   updated = old_tile.mask & new_tile.mask
 
+  # util.log_info('REPLACE: %s', replaced)
+  # util.log_info('UPDATE: %s', updated)
+
   old_tile.data[replaced] = new_tile.data[replaced]
   old_tile.mask[replaced] = MASK_VALID
 
@@ -201,6 +204,10 @@ def merge_dense(old_tile, new_tile, reducer):
     if reducer is None:
       old_tile.data[updated] = new_tile.data[updated]
     else:
+      # a = old_tile.data[updated]
+      # b = new_tile.data[updated]
+      # util.log_info('%s %s %s', reducer, a, b)
       old_tile.data[updated] = reducer(old_tile.data[updated], new_tile.data[updated])
+      #util.log_info('%s', old_tile.data)
 
   return old_tile
