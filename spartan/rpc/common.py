@@ -82,7 +82,7 @@ def serialize(obj):
   #util.log_info('Pickling: %s', obj)
   try:
     return cPickle.dumps(obj, -1)
-  except (PickleError, TypeError):
+  except (pickle.PicklingError, PickleError, TypeError):
     return cloudpickle.dumps(obj, -1)
 
 def read(f):
