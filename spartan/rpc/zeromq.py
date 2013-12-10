@@ -8,6 +8,7 @@ import socket
 import traceback
 import sys
 import fcntl
+import time
 import zmq
 
 from .common import Group, SocketBase
@@ -26,10 +27,17 @@ def poller():
       POLLER.start()
     return POLLER
 
+def in_poll_loop():
+  return threading.current_thread() == poller()
+
 socket_count = collections.defaultdict(int)
 
+CLOSED = 0
+CONNECTING = 1
+CONNECTED = 2
+
 class Socket(SocketBase):
-  __slots__ = ['_zmq', '_hostport', '_out', '_in', '_addr', '_closed', '_shutdown', '_lock']
+  __slots__ = ['_zmq', '_hostport', '_out', '_in', '_addr', '_status', '_shutdown', '_lock']
 
   def __init__(self, ctx, sock_type, hostport):
     socket_count[os.getpid()] += 1
@@ -40,27 +48,28 @@ class Socket(SocketBase):
     self._zmq = ctx.socket(sock_type)
     self.addr = hostport
     self._out = collections.deque()
-    self._closed = True
     self._shutdown = False
     self._lock = threading.RLock()
 
-  def in_poll_loop(self):
-    return threading.current_thread() == poller()
-
+    self._status = CLOSED
   def __repr__(self):
     return 'Socket(%s)' % ((self.addr,))
 
+  def closed(self):
+    return self._status == CLOSED
+
   def close(self, *args):
-    if self._closed:
+    if self.closed():
       return
 
     with self._lock:
-      self._closed = True
+      self._status = CLOSED
       self._shutdown = True
       poller().close(self)
 
   def send(self, msg):
-    assert not self._closed
+    assert not self.closed()
+
     with self._lock:
       #util.log_info('SEND %s', len(msg))
       self._out.append(msg)
@@ -70,19 +79,19 @@ class Socket(SocketBase):
     return self._zmq
 
   def recv(self):
-    assert not self._closed
+    assert not self.closed()
     with self._lock:
       frames = self._zmq.recv_multipart(copy=False, track=False)
       assert len(frames) == 1
       return frames[0]
 
   def connect(self):
-    assert self._closed
+    assert self.closed()
     with self._lock:
       #util.log_info('Connecting: %s:%d' % self.addr)
       self._zmq.connect('tcp://%s:%s' % self.addr)
       poller().add(self, zmq.POLLIN)
-      self._closed = False
+      self._status = CONNECTED
 
   @property
   def port(self):
@@ -129,8 +138,8 @@ class ServerSocket(Socket):
     Socket.send(self, msg)
 
   def bind(self):
-    assert self._closed
-    self._closed = False
+    assert self.closed()
+    self._status = CONNECTED
     host, port = self.addr
     host = socket.gethostbyname(host)
     util.log_info('Binding... %s', (host, port))
@@ -276,11 +285,20 @@ class ZMQPoller(threading.Thread):
       self.wakeup()
 
   def add(self, socket, direction):
+    if in_poll_loop():
+      self._sockets[socket.zmq()] = socket
+      self._poller.register(socket.zmq(), direction)
+      return
+
     with self._lock:
       assert not socket.zmq() in self._sockets, socket.zmq()
       #util.log_info('Adding... %s', socket.zmq())
       self._to_add.append((socket, direction))
       self.wakeup()
+
+    # wait until we get added
+    while not socket.zmq() in self._sockets:
+      time.sleep(0.01)
 
   def close(self, socket):
     'Execute socket.handle_close() from within the polling thread.'
