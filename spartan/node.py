@@ -8,6 +8,23 @@ import numpy as np
 from itertools import izip
 import copy
 
+def list_repr(lst, compact=False):
+  v_str = ['[']
+  for i, v in enumerate(lst):
+    if compact:
+      v_str.append(str(v))
+    else:
+      v_str.append('[%d] = %s' % (i, v))
+  v_str += [']']
+
+  if compact:
+    v_str = ','.join(v_str)
+  else:
+    v_str = '\n'.join(v_str)
+
+  return v_str
+
+
 class NodeTemplate(object):
   def __init__(self, *args, **kw):
     n_args = len(args)
@@ -83,12 +100,7 @@ class NodeTemplate(object):
     member_strings = []
     for (k,v) in self.iteritems():
       if isinstance(v, list):
-        v_str = ['[']
-        for i, v in enumerate(v):
-          v_str.append('[%d] = %s' % (i, v))
-        v_str += [']']
-
-        v_str = '\n'.join(v_str)
+        v_str = list_repr(v)
       else:
         v_str = str(v)
       member_strings.append("%s = %s" % (k, v_str))
