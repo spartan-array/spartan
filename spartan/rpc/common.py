@@ -175,8 +175,8 @@ class Future(object):
     while not self.have_result and not self.timed_out():
       # use a timeout so that ctrl-c works.
       self._cv.wait(timeout=1)
-      if time.time() - self._start > 2:
-        util.log_info('Waiting... %s %s', self.addr, self.rpc_id)
+      #if time.time() - self._start > 2:
+      #  util.log_info('Waiting... %s %s', self.addr, self.rpc_id)
     self._cv.release()
 
 #    util.log_info('Result from %s in %f seconds.', self.addr, time.time() - self._start)
