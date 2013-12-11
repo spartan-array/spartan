@@ -4,6 +4,8 @@ Expr operations are not performed immediately, but are set aside
 and built into a control flow graph, which is then compiled
 into a series of primitive array operations.
 '''
+import collections
+import weakref
 
 import numpy as np
 
@@ -30,11 +32,30 @@ def _map(*args, **kw):
   from .map import map
   return map(args, fn, numpy_expr)
 
+def expr_like(expr, **kw):
+  '''Construct a new expression like ``expr``.
+
+  The new expression has the same id, but is initialized using ``kw``
+  '''
+  kw['expr_id'] = expr.expr_id
+  new_expr = expr.__class__(**kw)
+  #util.log_info('Copied %s', new_expr)
+  return new_expr
+
+eval_cache = {}
+expr_references = collections.defaultdict(int)
 
 class Expr(object):
-  _cached_value = None
-  _optimized = None
-  _expr_id = None
+  _members = ['expr_id']
+
+  # should evaluation of this object be cached
+  needs_cache = True
+
+  @property
+  def cache(self):
+    #if self.expr_id in eval_cache:
+      #util.log_info('Cache hit %s', self.expr_id)
+    return eval_cache.get(self.expr_id, None)
 
   def dependencies(self):
     '''
@@ -62,19 +83,37 @@ class Expr(object):
     for k in self.members:
       deps[k] = visitor.visit(getattr(self, k))
 
-    return self.__class__(**deps)
+    return expr_like(self, **deps)
 
+  def __del__(self):
+    expr_references[self.expr_id] -= 1
+    if expr_references[self.expr_id] == 0:
+      if self.expr_id in eval_cache: del eval_cache[self.expr_id]
+      del expr_references[self.expr_id]
+
+    #util.log_info('Cache size: %s', len(eval_cache))
 
   def node_init(self):
     #assert self.expr_id is not None
-    if self._expr_id is None:
-      self._expr_id = unique_id.next()
+    if self.expr_id is None:
+      self.expr_id = unique_id.next()
+    else:
+      Assert.isinstance(self.expr_id, int)
 
-  def evaluate(self, ctx, deps):
+    expr_references[self.expr_id] += 1
+
+  def evaluate(self):
+    '''
+    Evaluate this expression.
+    '''
+    from . import backend
+    return backend.evaluate(blob_ctx.get(), self.dag())
+
+  def _evaluate(self, ctx, deps):
     raise NotImplementedError
 
   def __hash__(self):
-    return self._expr_id
+    return self.expr_id
 
   def typename(self):
     return self.__class__.__name__
@@ -125,8 +164,8 @@ class Expr(object):
     
     If the value has been computed already this always succeeds.
     '''
-    if self._cached_value is not None:
-      return self._cached_value.shape
+    if self.cache is not None:
+      return self.cache.shape
 
     try:
       return self.compute_shape()
@@ -134,7 +173,7 @@ class Expr(object):
       return evaluate(self).shape
 
   def force(self):
-    return force(self)
+    return self.evaluate()
 
   def dag(self):
     return dag(self)
@@ -149,7 +188,6 @@ Expr.__rsub__ = Expr.__sub__
 Expr.__radd__ = Expr.__add__
 Expr.__rmul__ = Expr.__mul__
 Expr.__rdiv__ = Expr.__div__
-
 
 class AsArray(Expr):
   '''Promote a value to be array-like.
@@ -166,7 +204,7 @@ class AsArray(Expr):
   def compute_shape(self):
     raise NotShapeable
 
-  def evaluate(self, ctx, deps):
+  def _evaluate(self, ctx, deps):
     util.log_info('Evaluate: %s', deps['val'])
     return distarray.as_array(deps['val'])
 
@@ -175,8 +213,12 @@ class AsArray(Expr):
 
 
 class Val(Expr):
+  '''Wrap an existing value into an expression.'''
   __metaclass__ = Node
   _members = ['val']
+
+  needs_cache = False
+
 
   def visit(self, visitor):
     return self
@@ -187,7 +229,7 @@ class Val(Expr):
   def compute_shape(self):
     return self.val.shape
 
-  def evaluate(self, ctx, deps):
+  def _evaluate(self, ctx, deps):
     return self.val
 
   def __str__(self):
@@ -200,12 +242,13 @@ class CollectionExpr(Expr):
   visit() and evaluate() are supported; these thread the visitor through
   child elements as expected.
   '''
+  needs_cache = False
   _members = ['vals']
 
   def __str__(self):
     return 'lazy(%s)' % (self.vals,)
 
-  def evaluate(self, ctx, deps):
+  def _evaluate(self, ctx, deps):
     return deps['vals']
 
   def __getitem__(self, idx):
@@ -244,12 +287,12 @@ def glom(node):
   Evaluate this expression and return the result as a `numpy.ndarray`. 
   '''
   if isinstance(node, Expr):
-    node = evaluate(node)
+    value = evaluate(node)
 
-  if isinstance(node, np.ndarray):
-    return node
+  if isinstance(value, np.ndarray):
+    return value
 
-  return node.glom()
+  return value.glom()
 
 
 def dag(node):
@@ -261,30 +304,17 @@ def dag(node):
   if not isinstance(node, Expr):
     raise TypeError
 
-  if node._optimized is not None:
-    return node._optimized
-
   from . import optimize
-  dag = optimize.optimize(node)
-  node._optimized = dag
-  return node._optimized
+  return optimize.optimize(node)
 
+
+def force(node):
+  return evaluate(node)
 
 def evaluate(node):
-  '''
-  Evaluate this expression.
-  
-  :param node: `Expr` to evaluate.
-  '''
-  if not isinstance(node, Expr):
-    return node
-
-  from . import backend
-  result = backend.evaluate(blob_ctx.get(), dag(node))
-  node._cached_value = result
-  return result
-
-force = evaluate
+  if isinstance(node, Expr):
+    return node.evaluate()
+  return node
 
 def eager(node):
   '''
@@ -323,4 +353,4 @@ def as_array(v):
   if isinstance(v, Expr):
     return v
   else:
-    return AsArray(v)
+    return AsArray(val=v)

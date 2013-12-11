@@ -19,7 +19,7 @@ class IndexExpr(Expr):
     assert not isinstance(self.idx, ListExpr)
     assert not isinstance(self.idx, list)
 
-  def evaluate(self, ctx, deps):
+  def _evaluate(self, ctx, deps):
     idx = deps['idx']
     assert not isinstance(idx, list) 
     util.log_info('Indexing: %s', idx)

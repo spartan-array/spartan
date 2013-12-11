@@ -1,7 +1,8 @@
-from spartan import blob_ctx
-from spartan.array import distarray, tile
-from spartan.node import Node
-from spartan.util import iterable
+from .. import blob_ctx
+from ..array import distarray, tile
+from ..node import Node
+from ..util import iterable
+from .. import util
 
 from .base import Expr, lazify
 
@@ -52,14 +53,15 @@ class ShuffleExpr(Expr):
   _members = ['array', 'map_fn', 'target', 'tile_hint', 'fn_kw']
 
   def __str__(self):
-    return 'shuffle[%d](%s, %s)' % (id(self), self.map_fn, self.array)
+    return 'shuffle[%d](%s, %s)' % (self.expr_id, self.map_fn, self.array)
 
-    
-  def evaluate(self, ctx, deps):
+  def _evaluate(self, ctx, deps):
     v = deps['array']
     fn_kw = deps['fn_kw']
     target = deps['target']
-    
+
+    util.log_info('Keywords: %s', fn_kw)
+
     map_fn = self.map_fn
 
     if target is not None:

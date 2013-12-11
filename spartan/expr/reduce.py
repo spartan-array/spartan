@@ -23,7 +23,7 @@ class ReduceExpr(Expr):
   __metaclass__ = Node
   _members = ['children', 'axis', 'dtype_fn', 'op', 'combine_fn']
   
-  def evaluate(self, ctx, deps):
+  def _evaluate(self, ctx, deps):
     children = deps['children']
     axis = deps['axis']
     op = deps['op']
@@ -79,7 +79,7 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, combine_fn, fn_kw=None):
                        deps=[LocalInput(idx=varname)],
                        kw=fn_kw)
 
-  return ReduceExpr(children=DictExpr({ varname : v}),
+  return ReduceExpr(children=DictExpr(vals={ varname : v}),
                     axis=axis,
                     dtype_fn=dtype_fn,
                     op=reduce_op,

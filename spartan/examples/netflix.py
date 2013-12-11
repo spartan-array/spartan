@@ -113,7 +113,7 @@ class NetflixSGD(expr.Expr):
   __metaclass__ = node.Node
   _members = ['V', 'M', 'U']
 
-  def evaluate(self, ctx, deps):
+  def _evaluate(self, ctx, deps):
     V, M, U = deps['V'], deps['M'], deps['U']
 
     strata = _compute_strata(V)

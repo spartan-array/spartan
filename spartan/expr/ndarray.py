@@ -23,7 +23,7 @@ class NdArrayExpr(Expr):
   def compute_shape(self):
     return self._shape
  
-  def evaluate(self, ctx, deps):
+  def _evaluate(self, ctx, deps):
     shape = self._shape
     dtype = self.dtype
     tile_hint = self.tile_hint

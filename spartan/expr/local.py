@@ -8,6 +8,8 @@ Briefly: global expressions are over arrays, and local expressions are over tile
 chained together; this allows us to construct local DAG's when optimizing,
 which can then be executed or converted to parakeet code.
 '''
+import numpy as np
+from spartan import util
 from spartan.util import Assert
 from spartan.node import Node
 

@@ -17,6 +17,10 @@ def tile_mapper(ex, children, op):
   #util.log_info('%s %s', children, ex)
 
   local_values = dict([(k, v.fetch(ex)) for (k, v) in children.iteritems()])
+  #util.log_info('Local %s', [type(v) for v in local_values.values()])
+  #util.log_info('Local %s', local_values.keys())
+  #util.log_info('Op %s', op)
+
   op_ctx = LocalCtx(inputs=local_values)
 
   #util.log_info('Inputs: %s', local_values)
@@ -42,14 +46,14 @@ class MapExpr(Expr):
         output_shape[i] = max(output_shape[i], v)
     return tuple([output_shape[i] for i in range(len(output_shape))])
 
-  def evaluate(self, ctx, deps):
+  def _evaluate(self, ctx, deps):
     children = deps['children']
     op = self.op
 
     #for c in children:
     #  util.log_info('Child: %s', c)
 
-    print local.codegen(op)
+    util.log_info('Codegen for expression: %s', local.codegen(op))
 
     keys = children.keys()
     vals = children.values()

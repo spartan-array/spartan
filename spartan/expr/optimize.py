@@ -11,7 +11,7 @@ from spartan.expr.reduce import ReduceExpr, LocalReduceExpr
 from spartan.util import Assert
 
 from .. import util
-from .base import Expr, Val, ListExpr, AsArray, DictExpr
+from .base import Expr, Val, ListExpr, AsArray, DictExpr, lazify, expr_like
 from .shuffle import ShuffleExpr
 from .map import MapExpr, LocalMapExpr
 from .ndarray import NdArrayExpr
@@ -43,7 +43,9 @@ class OptimizePass(object):
     #self.visited.add(op)
     
     #util.log_info('VISIT %s: %s', op.typename(), hash(op))
-    if hasattr(self, 'visit_%s' % op.typename()):
+    if hasattr(self, 'visit_default'):
+      self.visited[op] = self.visit_default(op)
+    elif hasattr(self, 'visit_%s' % op.typename()):
       self.visited[op] = getattr(self, 'visit_%s' % op.typename())(op)
     else:
       self.visited[op] = op.visit(self)
@@ -65,8 +67,8 @@ class MapMapFusion(OptimizePass):
   
   map(f, map(g, map(h, x))) -> map(f . g . h, x)
   '''
-  
   name = 'map_fusion'
+  before = []
 
   def visit_MapExpr(self, expr):
     #util.log_info('Map tiles: %s', expr)
@@ -101,13 +103,16 @@ class MapMapFusion(OptimizePass):
         combined_op.add_dep(LocalInput(idx=key))
         children[key] = child_expr
 
-    return MapExpr(children=DictExpr(children),
-                   op=combined_op)
+    return expr_like(expr,
+                     children=DictExpr(vals=children),
+                     op=combined_op)
 
 
 class ReduceMapFusion(OptimizePass):
+  '''Fuse reduce(f, map(g, X)) -> reduce(f . g, X)'''
   name = 'reduce_fusion'
-  
+  before = []
+
   def visit_ReduceExpr(self, expr):
     Assert.isinstance(expr.children, DictExpr)
     old_children = self.visit(expr.children)
@@ -116,8 +121,7 @@ class ReduceMapFusion(OptimizePass):
       if not isinstance(v, MapExpr):
         return expr.visit(self)
 
-    combined_op = LocalReduceExpr(fn=expr.op.fn,
-                           kw=expr.op.kw)
+    combined_op = LocalReduceExpr(fn=expr.op.fn, kw=expr.op.kw)
 
     new_children = {}
     for name, child_expr in old_children.iteritems():
@@ -125,71 +129,31 @@ class ReduceMapFusion(OptimizePass):
         merge_var(new_children, k, v)
       combined_op.add_dep(child_expr.op)
 
-    return ReduceExpr(children=new_children,
-                      axis=expr.axis,
-                      dtype_fn=expr.dtype_fn,
-                      combine_fn=expr.combine_fn,
-                      op=combined_op)
+    return expr_like(expr,
+                     children=new_children,
+                     axis=expr.axis,
+                     dtype_fn=expr.dtype_fn,
+                     combine_fn=expr.combine_fn,
+                     op=combined_op)
 
-def _numexpr_mapper(inputs, var_map=None, numpy_expr=None):
-  gdict = {}
-  for k, v in var_map.iteritems():
-    gdict[k] = inputs[v]
-    
-  numexpr.ncores = 1 
-  result = numexpr.evaluate(numpy_expr, global_dict=gdict)
-  return result
+class CollapsedCachedExpressions(OptimizePass):
+  '''Replace expressions which have already been evaluated
+  with a simple value expression.
 
+  This results in simpler local expressions when evaluating
+  iterative programs.
+  '''
 
-_COUNTER = iter(xrange(1000000))
-def new_var():
-  return 'input_%d' % _COUNTER.next()
-    
+  name = 'collapse_cached'
+  before = [MapMapFusion, ReduceMapFusion]
 
-class NumexprFusionPass(OptimizePass):
-  '''Fold binary operations compatible with numexpr into a single numexpr operator.'''
-  name = 'numexpr_fusion'
-  
-  def visit_MapExpr(self, op):
-    map_children = [self.visit(v) for v in op.children]
-    all_maps = np.all([map_like(v) for v in map_children])
-   
-    if not (all_maps and op.numpy_expr is not None):
-      return op.visit(self)
-    
-    a, b = map_children
-    operation = op.numpy_expr
-   
-    # mapping from variable name to input index 
-    var_map = {}
-    
-    # inputs to the expression
-    inputs = []
-    expr = []
-    
-    def _add_expr(child):
-      # fold expression from the a mapper into this one.
-      if isinstance(child, MapExpr) and child.map_fn == _numexpr_mapper:
-        for k, v in child.fn_kw['var_map'].iteritems():
-          var_map[k] = len(inputs)
-          inputs.append(child.children[v])
-        expr.extend(['(' + child.numpy_expr + ')'])
-      else:
-        v = new_var()
-        var_map[v] = len(inputs)
-        inputs.append(child)
-        expr.append(v)
-    
-    _add_expr(a)
-    expr.append(operation)
-    _add_expr(b)
-    
-    expr = ' '.join(expr)
-    
-    return MapExpr(children=inputs,
-                   map_fn=_numexpr_mapper,
-                   numpy_expr = expr,
-                   fn_kw={ 'numpy_expr' : expr, 'var_map' : var_map, })
+  def visit_default(self, expr):
+    #util.log_info('Visit: %s, %s', expr.expr_id, expr.cache)
+    if expr.cache is not None:
+      util.log_info('Collapsing %s', expr.typename())
+      return lazify(expr.cache)
+    else:
+      return expr.visit(self)
 
 
 def apply_pass(klass, dag):
@@ -213,14 +177,22 @@ def optimize(dag):
   return dag
 
 def add_optimization(klass, default):
-  passes.append(klass)
+  if klass.before:
+    for i, p in enumerate(passes):
+      if p in klass.before:
+        break
+    passes.insert(i, klass)
+  else:
+    passes.append(klass)
   
   flagname = 'opt_' + klass.name
   #setattr(Flags, flagname, add_bool_flag(flagname, default=default))
   FLAGS.add(BoolFlag(flagname, default=default, help='Enable %s optimization' % klass.__name__))
 
+  #util.log_info('Passes: %s', passes)
+
 add_optimization(MapMapFusion, True)
 add_optimization(ReduceMapFusion, True)
-add_optimization(NumexprFusionPass, False)
+add_optimization(CollapsedCachedExpressions, True)
 
 FLAGS.add(BoolFlag('optimization', default=True))

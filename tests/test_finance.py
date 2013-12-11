@@ -16,8 +16,9 @@ class TestFinance(test_common.ClusterTest):
 
   def test_call(self):
     put, call = finance.black_scholes(self.current, self.strike, maturity, rate, volatility)
-    util.log_info(optimize(call))
-    util.log_info(call.glom())
+    util.log_info(call)
+    #util.log_info(optimize(call))
+    #util.log_info(call.glom())
 
   def test_put(self):
     put, call = finance.black_scholes(self.current, self.strike, maturity, rate, volatility)

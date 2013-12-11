@@ -28,36 +28,20 @@ def list_repr(lst, compact=False):
 class NodeTemplate(object):
   def __init__(self, *args, **kw):
     n_args = len(args)
+    assert n_args == 0, 'Keyword initialization only.'
     members = self.members
-    n_members = len(members)
-    class_name = self.__class__.__name__
     self_dict = self.__dict__
-    if n_args == n_members:
-      assert len(kw) == 0
-      for (k,v) in zip(members,args):
-        self_dict[k] = v
-    elif n_args < n_members:
-      for field in members:
-        self_dict[field] = kw.get(field)
 
-      for field, value in izip(members, args):
-        self_dict[field] = value
+    for k in members:
+      self_dict[k] = kw.get(k)
 
-      for (k,v) in kw.iteritems():
-        assert k in members, \
-          "Keyword argument '%s' not recognized for %s: %s" % \
-          (k, self.node_type(), members)
-    else:
-      raise Exception('Too many arguments for %s, expected %s' % \
-                      (class_name, members))
+    for (k,v) in kw.iteritems():
+      assert k in members, \
+        "Keyword argument '%s' not recognized for %s: %s" % \
+        (k, self.node_type(), members)
 
-    # it's more common to not define a node initializer,
-    # so add an extra check to avoid having to always
-    # traverse the full class hierarchy
-    if hasattr(self, 'node_init'):
-      for C in self.__class__.mro():
-        if 'node_init' in C.__dict__:
-          C.node_init(self)
+    for init in self.initializers:
+      init(self)
 
   def __hash__(self):
     # print "Warning: __hash__ not implemented for %s" % self
@@ -73,7 +57,7 @@ class NodeTemplate(object):
     return hash_value
 
   def eq_members(self, other):
-    print 'EQ:', self.__class__.__name__
+    #print 'EQ:', self.__class__.__name__
     for (k,v) in self.iteritems():
       if not hasattr(other, k):
         return False
@@ -125,6 +109,8 @@ class NodeTemplate(object):
 
 
 class Node(object):
+  '''Metaclass for making treelike objects.'''
+
   @classmethod
   def members(cls):
     return cls.members
@@ -134,9 +120,10 @@ class Node(object):
     for m in attrs.get('_members', []):
       members.add(m)
 
-    for b in bases:
-      for m in getattr(b, '_members', []):
-        members.add(m)
+    for klass in bases:
+      for superklass in klass.mro():
+        for m in getattr(superklass, '_members', []):
+          members.add(m)
     members = list(members)
 
     attrs['members'] = members
@@ -148,6 +135,16 @@ class Node(object):
 
     bases += [NodeTemplate]
     bases = tuple(bases)
-    return type(name, bases, attrs)
+    new_class = type(name, bases, attrs)
+
+    # find node_init methods and build a list to invoke at init time.
+    initializers = []
+    for C in new_class.mro():
+      if 'node_init' in C.__dict__:
+        initializers.append(C.node_init)
+
+    new_class.initializers = initializers
+    #print name, initializers
+    return new_class
 
 

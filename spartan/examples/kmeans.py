@@ -1,7 +1,7 @@
 import numpy as np
 from spartan import expr, util
 from spartan.array import distarray, extent
-from spartan.expr import lazify
+from spartan.expr import lazify, eager
 import spartan
 from spartan.util import divup
 
@@ -29,16 +29,10 @@ def _find_closest(pts, centers):
 
 def _find_cluster_mapper(inputs, ex, d_pts, old_centers, 
                          new_centers, new_counts):
-  #util.log_info('Mapping...')
   centers = old_centers.glom()
   pts = d_pts.fetch(ex)
 
   closest = _find_closest(pts, centers)
-  
-  #dists = np.dot(pts, centers.T)
-  
-  # assign points to nearest centroid
-  #closest = np.argmin(dists, axis=1)
   
   l_counts = np.zeros((centers.shape[0], 1))
   l_centers = np.zeros_like(centers)
@@ -63,8 +57,8 @@ def run(num_pts, num_centers, num_dim):
   
   #util.log_info('%s', centers.glom())
 
-  new_centers = expr.ndarray((num_centers, num_dim)).force()
-  new_counts = expr.ndarray((num_centers,1)).force()
+  new_centers = expr.ndarray((num_centers, num_dim))
+  new_counts = expr.ndarray((num_centers,1))
   
   for i in range(10):
     _ = expr.shuffle(pts, 
@@ -74,6 +68,4 @@ def run(num_pts, num_centers, num_dim):
                          'new_centers' : new_centers,
                          'new_counts' : new_counts })
     _.force()
-    
-    new_centers = lazify(new_centers) / lazify(new_counts)
-    new_centers = new_centers.force()
+    new_centers = new_centers / new_counts

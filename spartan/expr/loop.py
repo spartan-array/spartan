@@ -31,7 +31,7 @@ class LoopExpr(Expr):
   __metaclass__ = Node
   _members = ['ranges', 'sources', 'arg_fn', 'mapper_fn', 'target']
   
-  def evaluate(self, ctx, deps):
+  def _evaluate(self, ctx, deps):
     fn = deps['arg_fn']
     sources = deps['sources']
     worklist = []

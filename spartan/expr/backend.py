@@ -6,9 +6,9 @@ Evalution for `Expr` nodes.
 `evaluate` evaluates a nodes dependencies, caching
 results, then evaluates nodes themselves.
 '''
-
+from . import base
 from spartan import util
-from spartan.util import Assert
+
 
 def _evaluate(ctx, prim):
   #util.log_info('Evaluting deps for %s', prim)
@@ -17,7 +17,7 @@ def _evaluate(ctx, prim):
     deps[k] = evaluate(ctx, vs)
       
   #util.log_info('Evaluting %s', prim.typename())
-  return prim.evaluate(ctx, deps)
+  return prim._evaluate(ctx, deps)
   #return util.timeit(lambda: prim.evaluate(ctx, deps), 'eval: %s' % prim)
 
 def evaluate(ctx, prim):
@@ -44,10 +44,14 @@ def evaluate(ctx, prim):
     return [evaluate(ctx, v) for v in prim]
   elif not isinstance(prim, Expr):
     return prim
-  
-  if prim._cached_value is None:
-    #util.log_info('Evaluating: %s', prim)
-    prim._cached_value = _evaluate(ctx, prim)
-  
-  return prim._cached_value
+
+  if prim.cache is not None:
+    return prim.cache
+
+  value = _evaluate(ctx, prim)
+  if prim.needs_cache:
+    #util.log_info('Caching %s -> %s', prim.expr_id, value)
+    base.eval_cache[prim.expr_id] = value
+
+  return value
 
