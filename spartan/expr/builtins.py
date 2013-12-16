@@ -35,16 +35,17 @@ def randn(*shape, **kw):
   return shuffle(ndarray(shape, dtype=np.float, tile_hint=kw.get('tile_hint', None)),
                  fn=lambda input, ex: [(ex, np.random.randn(*ex.shape))])
 
+
 def zeros(shape, dtype=np.float, tile_hint=None):
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
              fn=lambda input: np.zeros(input.shape),
-             numpy_expr='np.zeros')
+             numpy_expr='numpy.zeros')
 
 
 def ones(shape, dtype=np.float, tile_hint=None):
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
              fn=lambda input: np.ones(input.shape, dtype),
-             numpy_expr='np.ones')
+             numpy_expr='numpy.ones')
 
 
 def _arange_mapper(inputs, ex, dtype=None):
@@ -331,6 +332,6 @@ try:
   import scipy.stats
 
   def norm_cdf(v):
-    return map(v, fn=scipy.stats.norm.cdf)
+    return map(v, fn=scipy.stats.norm.cdf, numpy_expr='mathlib.norm_cdf')
 except:
   util.log_info('Missing scipy.stats (some functions will be unavailable.')

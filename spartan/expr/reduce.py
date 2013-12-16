@@ -1,6 +1,5 @@
 from .base import Expr, DictExpr
-from spartan import util
-from spartan.array import extent, tile, distarray
+from spartan.array import extent, distarray
 from spartan.expr import local
 from spartan.expr.local import make_var, LocalReduceExpr, LocalInput, LocalCtx
 from spartan.node import Node
@@ -76,11 +75,12 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, combine_fn, fn_kw=None):
   varname = make_var()
 
   reduce_op = LocalReduceExpr(fn=local_reduce_fn,
-                       deps=[LocalInput(idx=varname)],
-                       kw=fn_kw)
+                              deps=[LocalInput(idx=varname)],
+                              kw=fn_kw)
 
   return ReduceExpr(children=DictExpr(vals={ varname : v}),
                     axis=axis,
                     dtype_fn=dtype_fn,
                     op=reduce_op,
                     combine_fn=combine_fn)
+

@@ -53,9 +53,10 @@ is caused by a call to the ``force`` method.
 
 Tests can be run using nosetests `pip install --user nose`.
 
+    pip install --user nose
     nosetests tests/
 
-There are a few benchmarks to test performance as well:
+There are a few benchmarks for performance testing, see
 
-    python benchmarks/benchmark_*.py
+    tests/benchmark_*.py
 

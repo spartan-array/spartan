@@ -53,7 +53,7 @@ class MapExpr(Expr):
     #for c in children:
     #  util.log_info('Child: %s', c)
 
-    util.log_info('Codegen for expression: %s', local.codegen(op))
+    #util.log_info('Codegen for expression: %s', local.codegen(op))
 
     keys = children.keys()
     vals = children.values()
@@ -77,9 +77,6 @@ def map(inputs, fn, numpy_expr=None):
   if not util.iterable(inputs):
     inputs = [inputs]
 
-  if numpy_expr is None:
-    numpy_expr = fn.__name__
-
   op_deps = []
   children = {}
   for v in inputs:
@@ -90,8 +87,8 @@ def map(inputs, fn, numpy_expr=None):
 
   children = DictExpr(vals=children)
   op = LocalMapExpr(fn=fn,
-             pretty_fn=numpy_expr,
-             deps=op_deps)
+                    pretty_fn=numpy_expr,
+                    deps=op_deps)
 
   return MapExpr(children=children, op=op)
 

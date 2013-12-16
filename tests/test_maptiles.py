@@ -35,7 +35,12 @@ class TestMapTiles(test_common.ClusterTest):
   def test_compile_add_many(self):
     a = expr.ones((TEST_SIZE, TEST_SIZE))
     b = expr.ones((TEST_SIZE, TEST_SIZE))
-    Assert.all_eq((a + b + a + b + a + b + a + b + a + b).glom(), np.ones((TEST_SIZE, TEST_SIZE)) * 10)
+
+    add_many = (a + b + a + b + a + b + a + b + a + b)
+    print add_many
+    print add_many.dag()
+    Assert.all_eq(add_many.glom(),
+                  np.ones((TEST_SIZE, TEST_SIZE)) * 10)
 
   def test_compile_index(self):
     a = expr.arange((TEST_SIZE, TEST_SIZE))

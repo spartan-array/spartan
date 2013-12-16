@@ -93,7 +93,7 @@ class DistArray(object):
     raise NotImplementedError
 
   def __repr__(self):
-    return '%s(shape=%s, dtype=%s)' % (self.__class__.__name__, self.shape, self.dtype)
+    return '%s(id=%s, shape=%s, dtype=%s)' % (id(self), self.__class__.__name__, self.shape, self.dtype)
 
   def select(self, idx):
     '''
