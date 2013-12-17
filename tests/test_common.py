@@ -14,10 +14,6 @@ import types
 import unittest
 from spartan.array import distarray
 
-def _dump_profile():
-  import yappi
-  yappi.get_func_stats().save('master_prof.out', type='pstat')
-
 CTX = None
 def get_cluster_ctx():
   global CTX
@@ -25,11 +21,6 @@ def get_cluster_ctx():
     print 'Starting cluster...'
     config.initialize(sys.argv)
     CTX = start_cluster(FLAGS.num_workers, FLAGS.cluster)
-
-    if FLAGS.profile_master:
-      import yappi
-      yappi.start()
-      atexit.register(_dump_profile)
 
   return CTX
 
@@ -56,7 +47,6 @@ class BenchTimer(object):
     
 
 def run_benchmarks(module, benchmarks, master, timer):
-  time.sleep(0.1)
   for benchname in benchmarks:
     getattr(module, benchname)(master, timer)
   

@@ -1,8 +1,15 @@
+import atexit
 import socket
 import threading
 
 import time
 from spartan import util, rpc, core, blob_ctx
+from spartan.config import FLAGS
+
+
+def _dump_profile():
+  import yappi
+  yappi.get_func_stats().save('master_prof.out', type='pstat')
 
 
 class Master(object):
@@ -15,6 +22,12 @@ class Master(object):
     self._initialized = False
     self._server.serve_nonblock()
     self._ctx = None
+
+    if FLAGS.profile_master:
+      import yappi
+      yappi.start()
+      atexit.register(_dump_profile)
+
 
   def shutdown(self):
     self._ctx.active = False
