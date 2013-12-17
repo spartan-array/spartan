@@ -17,25 +17,13 @@ class BlobCtx(object):
     self.id_map = {}
     self.local_worker = local_worker
     self.active = True
-    self._deferred = []
 
     #util.log_info('New blob ctx.  Worker=%s', self.worker_id)
-
-  def defer(self, closure):
-    self._deferred.append(closure)
 
   def _send(self, id, method, req, wait=True):
     if self.active == False:
       util.log_debug('Ctx disabled.')
       return None
-
-    # process any deferred operations now:
-    if self._deferred:
-      fns = self._deferred
-      self._deferred = []
-      for fn in fns:
-        #util.log_info('Running deferred operation %s', fn)
-        fn()
 
     #util.log_info('%s %s', id, method)
     worker_id = self._lookup(id)

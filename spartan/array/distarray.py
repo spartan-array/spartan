@@ -130,6 +130,9 @@ class DistArray(object):
 
 ID_COUNTER = iter(xrange(10000000))
 
+# List of tiles to be destroyed at the next safe point.
+_pending_destructors = []
+
 class DistArrayImpl(DistArray):
   def __init__(self, shape, dtype, tiles, reducer_fn):
     self.shape = shape
@@ -149,6 +152,11 @@ class DistArrayImpl(DistArray):
     self.tiles = tiles
     self.id = ID_COUNTER.next()
 
+    if _pending_destructors:
+      self.ctx.destroy_all(_pending_destructors)
+      del _pending_destructors[:]
+
+
   def __reduce__(self):
     return (DistArrayImpl, (self.shape, self.dtype, self.tiles, self.reducer_fn))
 
@@ -161,11 +169,8 @@ class DistArrayImpl(DistArray):
     '''
     if self.ctx.worker_id == blob_ctx.MASTER_ID:
       #util.log_info('Destroying table... %s', self.id)
-      ctx = self.ctx
       tiles = self.tiles.values()
-
-      # drop reference to self from lambda
-      self.ctx.defer(lambda: ctx.destroy_all(tiles))
+      _pending_destructors.extend(tiles)
 
   def id(self):
     return self.table.id()
