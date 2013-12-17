@@ -16,9 +16,13 @@ from .shuffle import shuffle
 from .map import map
 from .ndarray import ndarray
 from .reduce import reduce
+from .optimize import disable_parakeet
 from .loop import loop
 from spartan import util
 from ..util import Assert
+
+def _make_ones(input): return np.ones(input.shape, input.dtype)
+def _make_zeros(input): return np.zeros(input.shape, input.dtype)
 
 
 def rand(*shape, **kw):
@@ -38,14 +42,12 @@ def randn(*shape, **kw):
 
 def zeros(shape, dtype=np.float, tile_hint=None):
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
-             fn=lambda input: np.zeros(input.shape),
-             numpy_expr='numpy.zeros')
+             fn=_make_zeros)
 
 
 def ones(shape, dtype=np.float, tile_hint=None):
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
-             fn=lambda input: np.ones(input.shape, dtype),
-             numpy_expr='numpy.ones')
+             fn=_make_ones)
 
 
 def _arange_mapper(inputs, ex, dtype=None):
@@ -73,7 +75,8 @@ def sum(x, axis=None):
   :param x: The array to sum.
   :param axis: Either an integer or ``None``.
   '''
-  return reduce(x, axis=axis,
+  return reduce(x,
+                axis=axis,
                 dtype_fn=lambda input: input.dtype,
                 local_reduce_fn=_sum_local,
                 combine_fn=np.add)
@@ -105,11 +108,13 @@ def _to_structured_array(*vals):
   return out
 
 
+@disable_parakeet
 def _take_idx_mapper(input):
   return input['idx']
 
 
 def _dual_reducer(ex, tile, axis, idx_f=None, val_f=None):
+  Assert.isinstance(ex, extent.TileExtent)
   local_idx = idx_f(tile[:], axis)
   local_val = val_f(tile[:], axis)
 

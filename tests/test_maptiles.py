@@ -18,7 +18,7 @@ class TestMapTiles(test_common.ClusterTest):
     a = 1.0 + expr.ones((100,), dtype=np.float32)
     b = 1.0 + np.ones(100).astype(np.float32)
 
-    Assert.all_eq(expr.ln(a).glom(), np.log(b))
+    Assert.all_close(expr.ln(a).glom(), np.log(b))
 
   def test_compile_add2(self):
     a = expr.ones((TEST_SIZE, TEST_SIZE))

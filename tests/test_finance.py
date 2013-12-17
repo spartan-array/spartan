@@ -1,3 +1,5 @@
+import unittest
+import sys
 import test_common
 from spartan import expr, util
 from spartan.expr import eager
@@ -31,3 +33,7 @@ class TestFinance(test_common.ClusterTest):
     movers = finance.find_change(arr)
     util.log_info(optimize(movers))
     util.log_info(movers.glom().compressed())
+
+
+if __name__ == '__main__':
+  unittest.main(argv=sys.argv[:1])

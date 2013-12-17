@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from spartan.expr import sqrt, exp, norm_cdf, eager, log
+from spartan.expr import sqrt, exp, norm_cdf, eager, log, abs
 
 def black_scholes(current, strike, maturity, rate, volatility):
   d1 = 1.0 / (volatility * sqrt(maturity)) * (

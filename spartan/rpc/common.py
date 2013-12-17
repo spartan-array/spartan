@@ -104,7 +104,7 @@ class PendingRequest(object):
 
   def wait(self):
     while self.result is NO_RESULT:
-      time.sleep(0.1)
+      time.sleep(0.01)
     return self.result
 
   def exception(self):
@@ -241,7 +241,7 @@ class Server(object):
   def serve(self):
     self.serve_nonblock()
     while self._running:
-      time.sleep(1)
+      time.sleep(0.1)
 
   def serve_nonblock(self):
 #    util.log_info('Running.')

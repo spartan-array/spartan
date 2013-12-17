@@ -196,11 +196,19 @@ class Assert(object):
       assert a == b, 'Failed: \n%s\n ==\n%s' % (a, b)
       return
 
-    assert iterable(a), (a, b)
-    assert iterable(b), (a, b)
+    assert is_iterable(a), (a, b)
+    assert is_iterable(b), (a, b)
 
     for i, j in zip(a, b):
       assert i == j, 'Failed: \n%s\n ==\n%s' % (a, b)
+
+  @staticmethod
+  def all_close(a, b):
+    assert isinstance(a, np.ndarray) and isinstance(b, np.ndarray)
+    assert a.shape == b.shape, 'Mismatched shapes: %s %s' % (a.shape, b.shape)
+    assert np.allclose(a, b), 'Failed: \n%s close to \n%s' % (a, b)
+    return
+
 
   @staticmethod
   def eq(a, b, msg=''):
@@ -235,7 +243,7 @@ class Assert(object):
 
   @staticmethod
   def iterable(expr):
-    assert iterable(expr), 'Not iterable: %s' % expr
+    assert is_iterable(expr), 'Not iterable: %s' % expr
 
   @staticmethod
   def isinstance(expr, klass):
@@ -333,13 +341,19 @@ def divup(a, b):
   return int(ceil(float(a) / b))
 
 
-def iterable(x):
+def is_iterable(x):
   return hasattr(x, '__iter__')
 
+def is_lambda(fn):
+  """Return True if ``fn`` is a lambda expression.
+
+  For some reason testing against LambdaType does not work correctly.
+  """
+  return fn.__name__ == '<lambda>'
 
 def as_list(x):
   if isinstance(x, list): return x
-  if iterable(x): return list(x)
+  if is_iterable(x): return list(x)
 
   return [x]
 

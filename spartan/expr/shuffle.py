@@ -1,7 +1,7 @@
 from .. import blob_ctx
 from ..array import distarray, tile
 from ..node import Node
-from ..util import iterable
+from ..util import is_iterable
 from .. import util
 
 from .base import Expr, lazify
@@ -22,7 +22,7 @@ def shuffle(v, fn, tile_hint=None, target=None, kw=None):
   v = lazify(v)
   #util.log_info('%s', kw)
   
-  assert not iterable(v)
+  assert not is_iterable(v)
   
   return ShuffleExpr(array=v,
                      map_fn=fn,

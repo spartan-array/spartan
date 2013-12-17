@@ -3,11 +3,12 @@
 '''
 Optimizations over an expression graph.
 '''
+import tempfile
 
 import numpy as np
 from spartan.config import FLAGS, BoolFlag
 from spartan.expr import local
-from spartan.expr.local import make_var, LocalInput
+from spartan.expr.local import make_var, LocalInput, ParakeetExpr
 from spartan.expr.reduce import ReduceExpr, LocalReduceExpr
 from spartan.util import Assert
 
@@ -27,6 +28,14 @@ try:
   import parakeet
 except:
   parakeet = None
+
+
+_parakeet_blacklist = set()
+
+def disable_parakeet(fn):
+  "Disables parakeet optimization for this function."
+  _parakeet_blacklist.add(fn)
+  return fn
 
 
 class OptimizePass(object):
@@ -132,7 +141,9 @@ class ReduceMapFusion(OptimizePass):
       if not isinstance(v, MapExpr):
         return expr.visit(self)
 
-    combined_op = LocalReduceExpr(fn=expr.op.fn, kw=expr.op.kw)
+    combined_op = LocalReduceExpr(fn=expr.op.fn,
+                                  kw=expr.op.kw,
+                                  deps=[expr.op.deps[0]])
 
     new_children = {}
     for name, child_expr in old_children.iteritems():
@@ -167,6 +178,52 @@ class CollapsedCachedExpressions(OptimizePass):
     else:
       return expr.visit(self)
 
+def _codegen(op):
+  if isinstance(op, local.FnCallExpr):
+    if util.is_lambda(op.fn) and not op.pretty_fn:
+      raise local.CodegenException('Cannot codegen through a lambda expression: %s' % op.fn)
+
+    if op.fn in _parakeet_blacklist:
+      raise local.CodegenException('Blacklisted %s', op.fn)
+
+    name = op.fn_name()
+
+    arg_str = ','.join([_codegen(v) for v in op.deps])
+    kw_str = ','.join(['%s=%s' % (k, v) for k, v in op.kw.iteritems()])
+    if arg_str:
+      kw = ',' + kw_str
+
+    return '%s(%s %s)' % (name, arg_str, kw_str)
+  elif isinstance(op, local.LocalInput):
+    return op.idx
+  else:
+    raise local.CodegenException('Cannot codegen for %s' % type(op))
+
+
+def codegen(op):
+  '''Given a local operation, generate an equivalent parakeet function definition.'''
+  if isinstance(op, ParakeetExpr):
+    return op.source
+
+  op_code =  _codegen(op)
+
+  prelude = '\n'.join([
+    'import parakeet',
+    'import spartan.expr',
+    'import numpy',
+    'from spartan import mathlib',
+    'from spartan import util',
+    '@util.synchronized',
+    '@parakeet.jit',
+  ])
+
+  fn = prelude + 'def _jit_fn'
+  fn = fn + '(%s):\n  ' % ','.join(op.input_names())
+  fn = fn + 'return ' + op_code
+
+  # verify we can compile before proceeding
+  local.compile_parakeet_source(fn)
+  return fn
 
 class ParakeetGeneration(OptimizePass):
   '''Currently disabled.
@@ -179,13 +236,18 @@ class ParakeetGeneration(OptimizePass):
   after = [MapMapFusion, ReduceMapFusion]
 
   def visit_MapExpr(self, expr):
+    # if we've already converted this to parakeet, stop now
     if isinstance(expr.op, local.ParakeetExpr):
       return expr.visit(self)
 
-    source = local.codegen(expr.op)
-    return expr_like(expr,
-                     op=local.ParakeetExpr(source=source,  deps=expr.op.deps),
-                     children=expr.children)
+    try:
+      source = codegen(expr.op)
+      return expr_like(expr,
+                       op=local.ParakeetExpr(source=source,  deps=expr.op.deps),
+                       children=expr.children)
+    except local.CodegenException:
+      util.log_info('Failed to convert to parakeet.', exc_info=1)
+      return expr.visit(self)
 
 
 def apply_pass(klass, dag):
@@ -228,6 +290,8 @@ def add_optimization(klass, default):
 add_optimization(MapMapFusion, True)
 add_optimization(ReduceMapFusion, True)
 add_optimization(CollapsedCachedExpressions, True)
-add_optimization(ParakeetGeneration, True)
+
+if parakeet is not None:
+  add_optimization(ParakeetGeneration, True)
 
 FLAGS.add(BoolFlag('optimization', default=True))

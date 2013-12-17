@@ -5,6 +5,7 @@ from .util import Assert
 MASTER_ID = 65536
 ID_COUNTER = iter(xrange(10000000))
 
+
 class BlobCtx(object):
   def __init__(self, worker_id, workers, local_worker=None):
     assert isinstance(workers, dict)
@@ -44,7 +45,7 @@ class BlobCtx(object):
       pending_req = rpc.Future(None, -1)
       getattr(self.local_worker, method)(req, pending_req)
     else:
-      pending_req =  getattr(self.workers[worker_id], method)(req)
+      pending_req = getattr(self.workers[worker_id], method)(req)
 
     if wait:
       return pending_req.wait()
@@ -126,9 +127,9 @@ class BlobCtx(object):
       return None
 
     req = core.KernelReq(blobs=blob_ids,
-                    mapper_fn=mapper_fn,
-                    reduce_fn=reduce_fn,
-                    kw=kw)
+                         mapper_fn=mapper_fn,
+                         reduce_fn=reduce_fn,
+                         kw=kw)
 
     #util.log_info('%s', req)
 
@@ -142,8 +143,10 @@ class BlobCtx(object):
 
 _ctx = threading.local()
 
+
 def get():
   return _ctx.val
+
 
 def set(ctx):
   _ctx.val = ctx

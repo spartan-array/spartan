@@ -16,7 +16,14 @@ def tile_mapper(ex, children, op):
   #util.log_info('Fetching %d inputs', len(children))
   #util.log_info('%s %s', children, ex)
 
-  local_values = dict([(k, v.fetch(ex)) for (k, v) in children.iteritems()])
+  local_values = {}
+  for k, gv in children.iteritems():
+    lv = gv.fetch(ex)
+    if hasattr(lv, 'mask'):
+      lv = lv.data
+    local_values[k] = lv
+
+  #local_values = dict([(k, v.fetch(ex)) for (k, v) in children.iteritems()])
   #util.log_info('Local %s', [type(v) for v in local_values.values()])
   #util.log_info('Local %s', local_values.keys())
   #util.log_info('Op %s', op)
@@ -74,7 +81,7 @@ def map(inputs, fn, numpy_expr=None):
   :param v: `Expr`
   :param fn: callable taking arguments ``*inputs``
   '''
-  if not util.iterable(inputs):
+  if not util.is_iterable(inputs):
     inputs = [inputs]
 
   op_deps = []

@@ -205,7 +205,7 @@ class AsArray(Expr):
     raise NotShapeable
 
   def _evaluate(self, ctx, deps):
-    util.log_info('Evaluate: %s', deps['val'])
+    util.log_info('%s: Array promotion: value=%s', self.expr_id, deps['val'])
     return distarray.as_array(deps['val'])
 
   def __str__(self):

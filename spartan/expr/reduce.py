@@ -8,9 +8,10 @@ def _reduce_mapper(ex, children, op, axis, output):
   #util.log_info('Reduce: %s %s %s %s %s', reducer, ex, tile, axis, fn_kw)
 
   local_values = dict([(k, v.fetch(ex)) for k, v in children.iteritems()])
-  ctx = LocalCtx(inputs=local_values,
-              axis=axis,
-              extent=ex)
+  local_values['extent'] = ex
+  local_values['axis'] = axis
+
+  ctx = LocalCtx(inputs=local_values, axis=axis, extent=ex)
 
   reduced = op.evaluate(ctx)
   dst_extent = extent.index_for_reduction(ex, axis)
@@ -44,7 +45,7 @@ class ReduceExpr(Expr):
                                     combiner=tile_accum, 
                                     reducer=tile_accum)
 
-    print local.codegen(op)
+    #print local.codegen(op)
     
     # util.log_info('Reducing into array %s', output_array)
     largest.foreach(_reduce_mapper, kw={
@@ -62,7 +63,9 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, combine_fn, fn_kw=None):
   
   The resulting array should have a datatype given by ``dtype_fn(input).``
   
-  For each tile of the input ``local_reduce_fn`` is called.
+  For each tile of the input ``local_reduce_fn`` is called with
+  arguments: (tiledata, axis, extent).
+
   The output is combined using ``combine_fn``.
    
   :param v: `Expr`
@@ -74,8 +77,14 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, combine_fn, fn_kw=None):
   if fn_kw is None: fn_kw = {}
   varname = make_var()
 
+  assert not 'axis' in fn_kw, '"axis" argument is reserved.'
+  fn_kw['axis'] = axis
+
   reduce_op = LocalReduceExpr(fn=local_reduce_fn,
-                              deps=[LocalInput(idx=varname)],
+                              deps=[
+                                    LocalInput(idx='extent'),
+                                    LocalInput(idx=varname),
+                              ],
                               kw=fn_kw)
 
   return ReduceExpr(children=DictExpr(vals={ varname : v}),
