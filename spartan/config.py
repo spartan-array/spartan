@@ -6,6 +6,15 @@ Configuration options and flags.
 Options may be specified on the command line, or via a configuration
 file.  Configuration files should be placed in $HOME/.config/spartan.ini
 
+To facilitate changing options when running with nosetests, flag values
+are also parsed out from the SPARTAN_OPTS environment variable.
+
+::
+
+    SPARTAN_OPTS='--profile_master=1 ...' nosetests
+
+
+
 """
 import ConfigParser
 import argparse
@@ -94,6 +103,7 @@ class Flags(object):
 
 FLAGS = Flags()
 
+FLAGS.add(BoolFlag('print_options', default=False))
 FLAGS.add(BoolFlag('profile_worker', default=False))
 FLAGS.add(BoolFlag('profile_master', default=False))
 FLAGS.add(BoolFlag('cluster', default=False))
@@ -138,6 +148,9 @@ def initialize(argv):
   for name, flag in FLAGS:
     parser.add_argument('--' + name, type=str)
 
+  if os.getenv('SPARTAN_OPTS'):
+    argv += os.getenv('SPARTAN_OPTS').split(' ')
+
   parsed_flags, rest = parser.parse_known_args(argv)
   for name, flag in FLAGS:
     if getattr(parsed_flags, name) is not None:
@@ -150,6 +163,12 @@ def initialize(argv):
   for f in rest:
     if f.startswith('-'):
       util.log_warn('Unknown flag: %s (ignored)' % f)
+
+  if FLAGS.print_options:
+    print 'Configuration status:'
+    for name, flag in sorted(FLAGS):
+      print '  >> ', name, '\t', flag.val
+
 
   util.log_debug('Hostlist: %s', FLAGS.hosts)
   return rest
