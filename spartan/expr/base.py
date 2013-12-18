@@ -312,8 +312,10 @@ def force(node):
   return evaluate(node)
 
 def evaluate(node):
-  Assert.isinstance(node, Expr)
-  return node.evaluate()
+  if isinstance(node, Expr):
+    return node.evaluate()
+  Assert.isinstance(node, np.ndarray)
+  return node
 
 def eager(node):
   '''

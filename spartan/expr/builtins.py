@@ -41,12 +41,12 @@ def randn(*shape, **kw):
 
 
 def zeros(shape, dtype=np.float, tile_hint=None):
-  return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
+  return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
              fn=_make_zeros)
 
 
 def ones(shape, dtype=np.float, tile_hint=None):
-  return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
+  return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
              fn=_make_ones)
 
 

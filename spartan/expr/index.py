@@ -34,13 +34,19 @@ class IndexExpr(Expr):
 def int_index_mapper(ex, src, idx, dst):
   '''Map over the index array, fetching rows from the data array.'''
   idx_vals = idx.fetch(extent.drop_axis(ex, -1))
-  tile = src.fetch(ex)
-  
-  util.log_info('Dest shape: %s, idx: %s, %s', tile.shape, ex, idx_vals)
-  for dst_idx, src_idx in enumerate(idx_vals):
-    tile[dst_idx] = src.fetch(extent.from_slice(int(src_idx), src.shape))
 
-  return [(ex, tile)]
+  output = []
+  for dst_idx, src_idx in enumerate(idx_vals):
+    output.append(src.select(src_idx))
+
+  output_ex = extent.create(
+    ([ex.ul[0]] + [0] * (len(dst.shape) - 1)),
+    ([ex.lr[0]] + list(output[0].shape)),
+    (dst.shape))
+
+  #util.log_info('%s %s', output_ex.shape, np.array(output).shape)
+  output = np.array(output)
+  return [(output_ex, output)]
 
 def bool_index_mapper(ex, src, idx):
   val = src.fetch(ex)
