@@ -216,7 +216,7 @@ class Assert(object):
 
   @staticmethod
   def ne(a, b):
-    assert (a == b), 'Failed: %s != %s' % (a, b)
+    assert (a != b), 'Failed: %s != %s' % (a, b)
 
   @staticmethod
   def gt(a, b):

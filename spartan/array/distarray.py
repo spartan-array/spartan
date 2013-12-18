@@ -27,8 +27,10 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
   :rtype: list of `Extent`
   '''
 
+  util.log_info('Splitting %s %s %s', shape, tile_hint, num_shards)
+
   if num_shards != -1:
-    tile_size = np.prod(shape) / (num_shards * 4)
+    tile_size = np.prod(shape) / num_shards
   else:
     tile_size = DEFAULT_TILE_SIZE
   
@@ -76,6 +78,7 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
     
 
 def _array_mapper(blob_id, blob, array=None, user_fn=None, **kw):
+  '''Invoke ``user_fn`` on ``blob``, and construct tiles from the results.'''
   ctx = blob_ctx.get()
   ex = array.extent_for_blob(blob_id)
   results = []
@@ -269,7 +272,6 @@ class DistArrayImpl(DistArray):
     Assert.eq(region.shape, data.shape,
               'Size of extent does not match size of data')
 
-    #util.log_info('%s %s', self.table.id(), self.tiles)
     # exact match
     if region in self.tiles:
       #util.log_info('EXACT: %d %s ', self.table.id(), region)
@@ -279,7 +281,7 @@ class DistArrayImpl(DistArray):
     
     splits = list(extent.find_overlapping(self.tiles, region))
     futures = []
-    #util.log_info('Updating %s tiles', len(splits))
+    util.log_info('%s: Updating %s tiles', region, len(splits))
     for dst_key, intersection in splits:
       #util.log_info('%d %s %s %s', self.table.id(), region, dst_key, intersection)
       blob_id = self.tiles[dst_key]
@@ -302,7 +304,7 @@ def create(shape,
   dtype = np.dtype(dtype)
   shape = tuple(shape)
 
-  extents = compute_splits(shape, tile_hint, ctx.num_workers * 5).keys()
+  extents = compute_splits(shape, tile_hint, ctx.num_workers * 4).keys()
   tiles = {}
   for i, ex in enumerate(extents):
     tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype), hint=i)

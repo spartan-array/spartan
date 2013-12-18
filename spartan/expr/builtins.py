@@ -29,14 +29,25 @@ def rand(*shape, **kw):
   '''
   :param tile_hint: A tuple indicating the desired tile shape for this array.
   '''
+  tile_hint = None
+  if 'tile_hint' in kw:
+    tile_hint = kw['tile_hint']
+    del kw['tile_hint']
+
+  assert len(kw) == 0, 'Unknown keywords %s' % kw
+
   for s in shape: assert isinstance(s, int)
-  return shuffle(ndarray(shape, dtype=np.float, tile_hint=kw.get('tile_hint', None)),
+  return shuffle(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
                  fn=lambda input, ex: [(ex, np.random.rand(*ex.shape))])
 
 
 def randn(*shape, **kw):
+  tile_hint = None
+  if 'tile_hint' in kw:
+    tile_hint = kw['tile_hint']
+    del kw['tile_hint']
   for s in shape: assert isinstance(s, int)
-  return shuffle(ndarray(shape, dtype=np.float, tile_hint=kw.get('tile_hint', None)),
+  return shuffle(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
                  fn=lambda input, ex: [(ex, np.random.randn(*ex.shape))])
 
 
@@ -48,6 +59,7 @@ def zeros(shape, dtype=np.float, tile_hint=None):
 def ones(shape, dtype=np.float, tile_hint=None):
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
              fn=_make_ones)
+
 
 
 def _arange_mapper(inputs, ex, dtype=None):
@@ -186,6 +198,8 @@ def size(x, axis=None):
     return np.prod(x.shape)
   return x.shape[axis]
 
+def _astype_mapper(t, dtype):
+  return t.astype(dtype)
 
 def astype(x, dtype):
   '''
@@ -197,7 +211,7 @@ def astype(x, dtype):
   :param dtype:
   '''
   assert x is not None
-  return map(x, lambda tile: tile.astype(dtype))
+  return map(x, _astype_mapper, fn_kw={'dtype': np.dtype(dtype).str })
 
 
 def _ravel_mapper(array, ex):
@@ -229,8 +243,9 @@ def _reshape_mapper(array, ex, _dest_shape):
   target_ul = extent.unravelled_pos(ravelled_ul, _dest_shape)
   target_lr = extent.unravelled_pos(ravelled_lr, _dest_shape)
 
-  #util.log_info('%s + %s -> %s', ravelled_ul, _dest_shape, target_ul)
-  #util.log_info('%s + %s -> %s', ravelled_lr, _dest_shape, target_lr)
+  util.log_info('\n%s + %s -> %s\n%s + %s -> %s',
+                ravelled_ul, _dest_shape, target_ul,
+                ravelled_lr, _dest_shape, target_lr)
 
   target_ex = extent.create(target_ul, np.array(target_lr) + 1, _dest_shape)
   yield target_ex, tile.reshape(target_ex.shape)
@@ -273,17 +288,23 @@ def _dot_mapper(inputs, ex, av, bv):
 
   a = av.fetch(ex_a)
   b = bv.fetch(ex_b)
-
-  result = np.dot(a, b)
+  util.log_info('%s %s %s', type(a), a.shape, a.dtype)
+  util.log_info('%s %s %s', type(b), b.shape, b.dtype)
+  result = a.dot(b)
 
   ul = np.asarray([ex_a.ul[0], 0])
   lr = ul + result.shape
+  target_shape = (av.shape[0], bv.shape[1])
+  target_ex = extent.create(ul, lr, target_shape)
+
+  util.log_info('A: %s', a.dtype)
+  util.log_info('B: %s', b.dtype)
+  util.log_info('R: %s', result.dtype)
+  util.log_info('T: %s', target_ex)
+
   #util.log_info('%s %s %s', a.shape, b.shape, result.shape)
   #util.log_info('%s %s %s', ul, lr, target_shape)
-  target_shape = (av.shape[0], bv.shape[1])
-  out = extent.create(ul, lr, target_shape)
-
-  yield out, result
+  yield target_ex, result
 
 
 def _dot_numpy(array, ex, numpy_data=None):

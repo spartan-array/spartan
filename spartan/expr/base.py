@@ -314,7 +314,8 @@ def force(node):
 def evaluate(node):
   if isinstance(node, Expr):
     return node.evaluate()
-  Assert.isinstance(node, np.ndarray)
+
+  Assert.isinstance(node, (np.ndarray, distarray.DistArray))
   return node
 
 def eager(node):

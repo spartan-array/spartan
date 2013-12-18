@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-import cProfile
-import pstats
 import threading
 import time
 
@@ -11,7 +9,6 @@ import os
 import socket
 import sys
 
-import resource
 from spartan import config, util, rpc, core, blob_ctx
 from spartan.util import Assert
 from spartan.config import FLAGS, StrFlag, IntFlag

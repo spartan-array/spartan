@@ -1,5 +1,6 @@
 import traceback
 import numpy as np
+import scipy
 from scipy.sparse import dok_matrix
 from . import extent
 from spartan import util
@@ -25,6 +26,7 @@ class Tile(object):
   '''
 
   def __init__(self, shape, dtype, data, mask, tile_type):
+    Assert.ne(dtype, object)
     self.id = ID.next()
     self.shape = shape
     self.dtype = dtype
@@ -52,11 +54,12 @@ class Tile(object):
     self._data = val
 
   def update(self, update, reducer):
+    #util.log_info('Update: %s %s', update.data, reducer)
     return merge(self, update, reducer)
 
   def get(self, selector=None):
     if self.data is None:
-      util.log_info('EMPTY %s %s', self.id, self.shape)
+      #util.log_info('EMPTY %s %s', self.id, self.shape)
       return np.ndarray(self.shape, self.dtype)[selector]
 
     # scalars are just returned directly.
@@ -65,20 +68,18 @@ class Tile(object):
 
     self._initialize_mask()
     if self.type == TYPE_SPARSE:
-      result = self.data[selector]
+      if selector is None or extent.is_complete(self.data.shape, selector):
+        result = self.data
+      else:
+        result = self.data[selector]
     elif self.mask is None:
       result = self.data[selector]
     else:
-      if selector is None or extent.is_complete(self.data.shape, selector):
-        data = self.data
-        mask = self.mask
-      else:
-        Assert.le(len(selector), len(self.data.shape),
-                  'Selector has more dimensions than data! %s %s' % (selector, self.data.shape))
+      Assert.le(len(selector), len(self.data.shape),
+                'Selector has more dimensions than data! %s %s' % (selector, self.data.shape))
 
-        data = self.data[selector]
-        mask = self.mask[selector]
-
+      data = self.data[selector]
+      mask = self.mask[selector]
       result = np.ma.masked_all(data.shape, dtype=data.dtype)
       result[mask] = data[mask]
 
@@ -109,12 +110,20 @@ class Tile(object):
 
 
 def from_data(data):
-  return Tile(
-    shape=data.shape,
-    data=data,
-    dtype=data.dtype,
-    mask=MASK_ALL_SET,
-    tile_type=TYPE_DENSE)
+  if isinstance(data, scipy.sparse.spmatrix):
+    return Tile(
+      shape=data.shape,
+      data=data,
+      dtype=data.dtype,
+      mask=MASK_ALL_SET,
+      tile_type=TYPE_SPARSE)
+  else:
+    return Tile(
+      shape=data.shape,
+      data=data,
+      dtype=data.dtype,
+      mask=MASK_ALL_SET,
+      tile_type=TYPE_DENSE)
 
 
 def from_shape(shape, dtype, tile_type=TYPE_DENSE):
@@ -134,6 +143,7 @@ def from_intersection(src, overlap, data):
   :param overlap: `TileExtent`
   :param data:
   '''
+  util.log_info('%s %s %s', src, overlap, data.dtype)
   slc = extent.offset_slice(src, overlap)
   tdata = np.ndarray(src.shape, data.dtype)
   tmask = np.zeros(src.shape, np.bool)
@@ -158,9 +168,6 @@ def merge(old_tile, new_tile, reducer):
     #util.log_info('REPL %s %s', new_tile.id, new_tile.data)
     return new_tile
 
-  old_tile._initialize()
-  new_tile._initialize()
-
   #util.log_info('OLD: %s %s', old_tile.id, old_tile.data)
   #util.log_info('NEW: %s %s', new_tile.id, new_tile.data)
 
@@ -172,12 +179,15 @@ def merge(old_tile, new_tile, reducer):
       old_tile.data = reducer(old_tile.data, new_tile.data)
     return old_tile
 
+  old_tile._initialize()
+  new_tile._initialize()
+
   Assert.eq(old_tile.shape, new_tile.shape)
   if old_tile.type == TYPE_DENSE:
     replaced = ~old_tile.mask & new_tile.mask
     updated = old_tile.mask & new_tile.mask
 
-    util.log_info('%s %s', old_tile.mask, new_tile.mask)
+    #util.log_info('%s %s', old_tile.mask, new_tile.mask)
     #util.log_info('REPLACE: %s', replaced)
     #util.log_info('UPDATE: %s', updated)
 
@@ -190,7 +200,7 @@ def merge(old_tile, new_tile, reducer):
       else:
         old_tile.data[updated] = reducer(old_tile.data[updated], new_tile.data[updated])
   else:
-    # sparse update, no mask
+    # sparse update, no mask, just iterate over data items.
     for k, v in new_tile.iteritems():
       if old_tile.has_key(k):
         old_tile[k] = reducer(old_tile[k], v)

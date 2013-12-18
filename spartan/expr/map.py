@@ -75,7 +75,7 @@ class MapExpr(Expr):
                                          'op' : op })
     return result
 
-def map(inputs, fn, numpy_expr=None):
+def map(inputs, fn, numpy_expr=None, fn_kw=None):
   '''
   Evaluate ``fn`` over each tile of the input.
   :param v: `Expr`
@@ -94,6 +94,7 @@ def map(inputs, fn, numpy_expr=None):
 
   children = DictExpr(vals=children)
   op = LocalMapExpr(fn=fn,
+                    kw=fn_kw,
                     pretty_fn=numpy_expr,
                     deps=op_deps)
 

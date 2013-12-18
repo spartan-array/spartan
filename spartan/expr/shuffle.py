@@ -1,7 +1,7 @@
 from .. import blob_ctx
 from ..array import distarray, tile
 from ..node import Node
-from ..util import is_iterable
+from ..util import is_iterable, Assert
 from .. import util
 
 from .base import Expr, lazify
@@ -45,6 +45,7 @@ def _notarget_mapper(ex, array=None, map_fn=None, inputs=None, fn_kw=None):
   map_result = map_fn(inputs, ex, **fn_kw)
   if map_result is not None:
     for ex, v in map_result:
+      Assert.eq(ex.shape, v.shape, 'Bad shape from %s' % map_fn)
       result.append((ex, v))
   return result
 
