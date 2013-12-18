@@ -13,6 +13,7 @@ import sys
 
 import resource
 from spartan import config, util, rpc, core, blob_ctx
+from spartan.util import Assert
 from spartan.config import FLAGS, StrFlag, IntFlag
 
 try:
@@ -59,26 +60,29 @@ class Worker(object):
     
   def create(self, req, handle):
     assert self._initialized
+    #util.log_info('Creating: %s', req.blob_id)
+    Assert.eq(req.blob_id.worker, self.id)
 
     if req.blob_id.id == -1:
-      id = blob_ctx.get().create_local()
+      id = self._ctx.create_local()
     else:
       id = req.blob_id
 
     self._blobs[id] = req.data
     resp = core.CreateResp(blob_id=id)
-    #util.log_info('W%d :: Created blob: id %s', self.id, id)
     handle.done(resp)
 
   def destroy(self, req, handle):
     for id in req.ids:
       if id in self._blobs:
         del self._blobs[id]
+        #util.log_info('Destroyed blob %s', id)
 
     #util.log_info('Destroy...')
     handle.done()
 
   def update(self, req, handle):
+    #util.log_info('W%d Update: %s', self.id, req.id)
     blob =  self._blobs[req.id]
     self._blobs[req.id] = blob.update(req.data, req.reducer)
 

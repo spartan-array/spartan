@@ -389,9 +389,9 @@ def memoize(f):
   '''Cache outputs of ``f``'''
   _cache = {}
   def wrapped(*args):
-    if args in _cache:
-      return _cache[args]
-    _cache[args] = f(*args)
+    if not args in _cache:
+      _cache[args] = f(*args)
+    return _cache[args]
 
   wrapped.__name__ = f.__name__
   wrapped.__doc__ = f.__doc__

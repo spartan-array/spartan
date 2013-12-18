@@ -36,6 +36,9 @@ class Master(object):
     for id, w in self._workers.iteritems():
       util.log_info('Shutting down worker %d', id)
       futures.append(w.shutdown())
+
+    # Wait a second to let our shutdown request go out.
+    time.sleep(1)
     self._server.shutdown()
 
   def register(self, req, handle):

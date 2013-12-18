@@ -6,7 +6,7 @@ import numpy as np
 #signal.signal(signal.SIGQUIT, test_common.sig_handler)
 
 import spartan.array.distarray
-spartan.array.distarray.TILE_SIZE = 500
+spartan.array.distarray.DEFAULT_TILE_SIZE = 500
 
 def make_weights(tile, ex):
   uids = np.random.randint(0, ex.shape[0], n_ratings)

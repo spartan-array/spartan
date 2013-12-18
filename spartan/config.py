@@ -115,10 +115,11 @@ FLAGS.add(IntFlag('port_base', default=10000,
 def initialize(argv):
   '''Parse configuration from flags and/or configuration file.'''
 
+  # load flags defined in other modules (is there a better way to do this?)
+  import spartan.expr.local
   import spartan.expr.optimize
   import spartan.cluster
 
-  # load flags from other packages (is there a better way to do this?)
   if FLAGS._parsed:
     return
 
@@ -133,13 +134,16 @@ def initialize(argv):
     open(config_file, 'a').close()
 
   print >>sys.stderr, 'Loading configuration from %s' % (config_file)
+
+  # Prepend configuration options to the flags array so that they
+  # are overridden by user flags.
   try:
     config = ConfigParser.ConfigParser()
     config.read(config_file)
 
     if config.has_section('flags'):
       for name, value in config.items('flags'):
-        argv.append('--%s=%s' % (name, value))
+        argv.insert(0, '--%s=%s' % (name, value))
   except:
     print >>sys.stderr, 'Failed to parse config file: %s' % config_file
     sys.exit(1)
@@ -162,7 +166,7 @@ def initialize(argv):
 
   for f in rest:
     if f.startswith('-'):
-      util.log_warn('Unknown flag: %s (ignored)' % f)
+      print >>sys.stderr, '>>> Unknown flag: %s (ignored)' % f
 
   if FLAGS.print_options:
     print 'Configuration status:'

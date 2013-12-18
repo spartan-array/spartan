@@ -20,19 +20,19 @@ class TestMapTiles(test_common.ClusterTest):
 
     Assert.all_close(expr.ln(a).glom(), np.log(b))
 
-  def test_compile_add2(self):
+  def test_add2(self):
     a = expr.ones((TEST_SIZE, TEST_SIZE))
     b = expr.ones((TEST_SIZE, TEST_SIZE))
     Assert.all_eq((a + b).glom(), np.ones((TEST_SIZE, TEST_SIZE)) * 2)
 
-  def test_compile_add3(self):
+  def test_add3(self):
     a = expr.ones((TEST_SIZE, TEST_SIZE))
     b = expr.ones((TEST_SIZE, TEST_SIZE))
     c = expr.ones((TEST_SIZE, TEST_SIZE))
     Assert.all_eq((a + b + c).glom(), np.ones((TEST_SIZE, TEST_SIZE)) * 3)
 
 
-  def test_compile_add_many(self):
+  def test_add_many(self):
     a = expr.ones((TEST_SIZE, TEST_SIZE))
     b = expr.ones((TEST_SIZE, TEST_SIZE))
 
@@ -42,9 +42,9 @@ class TestMapTiles(test_common.ClusterTest):
     Assert.all_eq(add_many.glom(),
                   np.ones((TEST_SIZE, TEST_SIZE)) * 10)
 
-  def test_compile_index(self):
+  def test_index(self):
     a = expr.arange((TEST_SIZE, TEST_SIZE))
-    b = expr.ones((10,))
+    b = expr.ones((10,), dtype=np.int)
     z = a[b]
     val = expr.evaluate(z)
 
