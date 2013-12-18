@@ -78,6 +78,7 @@ def run(filename):
       master.shutdown()
 
   if FLAGS.profile_worker:
+    util.log_info('Writing worker profiles...')
     join_profiles('./_worker_profiles')
 
 
@@ -94,9 +95,9 @@ class ClusterTest(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     cls.ctx = get_cluster_ctx()
-    cls.old_tilesize = distarray.TILE_SIZE
+    cls.old_tilesize = distarray.DEFAULT_TILE_SIZE
     if cls.TILE_SIZE is not None:
-      distarray.TILE_SIZE = cls.TILE_SIZE
+      distarray.DEFAULT_TILE_SIZE = cls.TILE_SIZE
 
     cls.old_flags = {}
     if cls.flags is not None:
@@ -106,7 +107,7 @@ class ClusterTest(unittest.TestCase):
 
   @classmethod
   def tearDownClass(cls):
-    distarray.TILE_SIZE = cls.old_tilesize
+    distarray.DEFAULT_TILE_SIZE = cls.old_tilesize
     for k, v in cls.old_flags.iteritems():
       setattr(config.FLAGS, k, v)
 

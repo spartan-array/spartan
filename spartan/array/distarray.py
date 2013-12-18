@@ -11,7 +11,7 @@ from spartan.util import Assert
 
 
 # number of elements per tile
-TILE_SIZE = 100000
+DEFAULT_TILE_SIZE = 100000
 
 
 def take_first(a,b):
@@ -25,6 +25,11 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
   :param tile_hint: tuple indicating the desired tile shape 
   :rtype: list of `Extent`
   '''
+
+  if num_shards != -1:
+    tile_size = np.prod(shape) / (num_shards * 4)
+  else:
+    tile_size = DEFAULT_TILE_SIZE
   
   splits = [None] * len(shape)
   if tile_hint is None:
@@ -37,7 +42,7 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
     # split each dimension into tiles.  the first dimension
     # is kept contiguous if possible.
     for dim in reversed(range(len(shape))):
-      step = max(1, TILE_SIZE / weight)
+      step = max(1, tile_size / weight)
       dim_splits = []
       for i in range(0, shape[dim], step):
         dim_splits.append((i, min(shape[dim], i + step)))
@@ -135,6 +140,7 @@ _pending_destructors = []
 
 class DistArrayImpl(DistArray):
   def __init__(self, shape, dtype, tiles, reducer_fn):
+    #util.log_info('Creating array with %s tiles', len(tiles))
     self.shape = shape
     self.dtype = dtype
     self.reducer_fn = reducer_fn
@@ -224,7 +230,7 @@ class DistArrayImpl(DistArray):
 
       #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
       tgt = np.ma.MaskedArray(np.ndarray(region.shape, dtype=self.dtype))
-      tgt.mask = tile.MASK_INVALID
+      tgt.mask = 0
       #util.log_info('Fetching %d tiles', len(splits))
 
       futures = []
@@ -292,7 +298,7 @@ def create(shape,
   dtype = np.dtype(dtype)
   shape = tuple(shape)
 
-  extents = compute_splits(shape, tile_hint, -1).keys()
+  extents = compute_splits(shape, tile_hint, ctx.num_workers * 5).keys()
   tiles = {}
   for i, ex in enumerate(extents):
     tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype), hint=i)
