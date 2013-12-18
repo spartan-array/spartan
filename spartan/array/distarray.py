@@ -2,6 +2,7 @@
 
 import itertools
 import collections
+import traceback
 
 import numpy as np
 
@@ -98,7 +99,7 @@ class DistArray(object):
     raise NotImplementedError
 
   def __repr__(self):
-    return '%s(id=%s, shape=%s, dtype=%s)' % (id(self), self.__class__.__name__, self.shape, self.dtype)
+    return '%s(id=%s, shape=%s, dtype=%s)' % (self.__class__.__name__, id(self), self.shape, self.dtype)
 
   def select(self, idx):
     '''
@@ -111,7 +112,8 @@ class DistArray(object):
       return self.fetch(idx)
 
     if np.isscalar(idx):
-      return self[idx:idx+1][0]
+      result = self.select(slice(idx, idx + 1))
+      return result[0]
 
     ex = extent.from_slice(idx, self.shape)
     #util.log_info('Select: %s + %s -> %s', idx, self.shape, ex)
@@ -140,7 +142,8 @@ _pending_destructors = []
 
 class DistArrayImpl(DistArray):
   def __init__(self, shape, dtype, tiles, reducer_fn):
-    #util.log_info('Creating array with %s tiles', len(tiles))
+    util.log_info('Creating array with %s tiles', len(tiles))
+    #traceback.print_stack()
     self.shape = shape
     self.dtype = dtype
     self.reducer_fn = reducer_fn
@@ -154,6 +157,7 @@ class DistArrayImpl(DistArray):
       Assert.isinstance(k, extent.TileExtent)
       Assert.isinstance(v, core.BlobId)
       self.blob_to_ex[v] = k
+      #util.log_info('Blob: %s', v)
 
     self.tiles = tiles
     self.id = ID_COUNTER.next()
