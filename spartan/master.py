@@ -17,7 +17,7 @@ class Master(object):
     self._workers = {}
     self.num_workers = num_workers
     self._port = port
-    self._server = rpc.listen(socket.gethostname(), port)
+    self._server = rpc.listen('0.0.0.0', port)
     self._server.register_object(self)
     self._initialized = False
     self._server.serve_nonblock()

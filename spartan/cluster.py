@@ -97,6 +97,8 @@ def start_cluster(num_workers, use_cluster_workers):
   :param num_workers:
   :param use_cluster_workers:
   '''
+  master = spartan.master.Master(FLAGS.port_base, num_workers)
+
   if not use_cluster_workers:
     _start_remote_worker('localhost', 0, num_workers)
   else:
@@ -116,8 +118,6 @@ def start_cluster(num_workers, use_cluster_workers):
       if count == num_workers:
         break
 
-  master = spartan.master.Master(FLAGS.port_base, num_workers)
-  time.sleep(0.1)
   master.wait_for_initialization()
   return master
 
