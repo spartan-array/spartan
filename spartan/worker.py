@@ -53,12 +53,12 @@ class Worker(object):
 
     self.id = req.id
     self._ctx = blob_ctx.BlobCtx(self.id, self._peers, self)
+    blob_ctx.set(self._ctx)
     self._initialized = True
     handle.done()
     
   def create(self, req, handle):
     assert self._initialized
-    blob_ctx.set(self._ctx)
 
     if req.blob_id.id == -1:
       id = blob_ctx.get().create_local()
@@ -117,19 +117,19 @@ class Worker(object):
     self._kernel_threads.apply_async(self._run_kernel, args=(req, handle))
 
   def shutdown(self, req, handle):
+    util.log_info('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_worker)
     if FLAGS.profile_worker:
       os.system('mkdir -p ./_worker_profiles/')
       yappi.get_func_stats().save('./_worker_profiles/%d' % self.id, type='pstat')
 
-    util.log_info('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_worker)
     #print self._server.timings()
 
     handle.done()
     threading.Thread(target=self._shutdown).start()
 
   def _shutdown(self):
-    time.sleep(0.1)
     util.log_info('Closing server...')
+    time.sleep(0.1)
     self._running = False
     self._server.shutdown()
 
@@ -157,8 +157,8 @@ if __name__ == '__main__':
   FLAGS.add(IntFlag('port'))
   FLAGS.add(IntFlag('count'))
 
-  resource.setrlimit(resource.RLIMIT_AS, (8 * 1000 * 1000 * 1000,
-                                          8 * 1000 * 1000 * 1000))
+  #resource.setrlimit(resource.RLIMIT_AS, (8 * 1000 * 1000 * 1000,
+  #                                        8 * 1000 * 1000 * 1000))
 
   config.initialize(sys.argv)
   assert FLAGS.master is not None
