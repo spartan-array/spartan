@@ -282,12 +282,12 @@ class TupleExpr(CollectionExpr):
 
 
 
-def glom(node):
+def glom(value):
   '''
   Evaluate this expression and return the result as a `numpy.ndarray`. 
   '''
-  if isinstance(node, Expr):
-    value = evaluate(node)
+  if isinstance(value, Expr):
+    value = evaluate(value)
 
   if isinstance(value, np.ndarray):
     return value
@@ -312,9 +312,8 @@ def force(node):
   return evaluate(node)
 
 def evaluate(node):
-  if isinstance(node, Expr):
-    return node.evaluate()
-  return node
+  Assert.isinstance(node, Expr)
+  return node.evaluate()
 
 def eager(node):
   '''

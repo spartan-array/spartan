@@ -199,6 +199,20 @@ def _codegen(op):
   else:
     raise local.CodegenException('Cannot codegen for %s' % type(op))
 
+def find_modules(op):
+  modules = set()
+  if isinstance(op, local.FnCallExpr):
+    if hasattr(op.fn, '__module__'):
+      modules.add(op.fn.__module__)
+    elif hasattr(op.fn, '__class__'):
+      modules.add(op.fn.__class__.__module__)
+
+
+  for d in op.deps:
+    modules.union(find_modules(d))
+
+  return modules
+
 
 def codegen(op):
   '''Given a local operation, generate an equivalent parakeet function definition.'''
@@ -207,19 +221,28 @@ def codegen(op):
 
   op_code =  _codegen(op)
 
-  prelude = '\n'.join([
+  module_prelude = [
     'import parakeet',
     'import spartan.expr',
     'import numpy',
     'from spartan import mathlib',
     'from spartan import util',
-    '@util.synchronized',
-    '@parakeet.jit',
-  ])
+  ]
 
-  fn = prelude + 'def _jit_fn'
+  for mod in find_modules(op):
+    module_prelude.append('import %s' % mod)
+
+  fn_prelude = '''
+@util.synchronized
+@parakeet.jit
+'''
+
+  fn = '\n'.join(module_prelude)
+  fn = fn + fn_prelude
+  fn = fn + 'def _jit_fn'
   fn = fn + '(%s):\n  ' % ','.join(op.input_names())
   fn = fn + 'return ' + op_code
+  fn = fn + '\n\n'
 
   # verify we can compile before proceeding
   local.compile_parakeet_source(fn)

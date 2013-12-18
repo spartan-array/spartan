@@ -11,7 +11,7 @@ def _reduce_mapper(ex, children, op, axis, output):
   local_values['extent'] = ex
   local_values['axis'] = axis
 
-  ctx = LocalCtx(inputs=local_values, axis=axis, extent=ex)
+  ctx = LocalCtx(inputs=local_values)
 
   reduced = op.evaluate(ctx)
   dst_extent = extent.index_for_reduction(ex, axis)

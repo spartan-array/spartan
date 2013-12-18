@@ -10,7 +10,6 @@ which can then be executed or converted to parakeet code.
 '''
 import tempfile
 import imp
-import types
 
 from spartan import util
 from spartan.util import Assert
@@ -27,14 +26,17 @@ def make_var():
 
 class LocalCtx(object):
   __metaclass__ = Node
-  _members = ['inputs', 'axis', 'extent']
+  _members = ['inputs']
 
 
 class LocalExpr(object):
   '''Represents an internal operation to be performed in the context of a tile.'''
+  _members = ['deps']
+
+  def node_init(self):
+    if self.deps is None: self.deps = []
 
   def add_dep(self, v):
-    if self.deps is None: self.deps = []
     self.deps.append(v)
 
   def input_names(self):
@@ -61,7 +63,7 @@ class LocalInput(LocalExpr):
 
 class FnCallExpr(LocalExpr):
   __metaclass__ = Node
-  _members = ['deps', 'kw', 'fn', 'pretty_fn']
+  _members = ['kw', 'fn', 'pretty_fn']
 
   def node_init(self):
     if self.kw is None: self.kw = {}
@@ -98,21 +100,29 @@ class LocalReduceExpr(FnCallExpr):
 @util.memoize
 def compile_parakeet_source(src):
   '''Compile source code defining a parakeet function.'''
-  namespace = {}
-  util.log_info('Eval::\n\n%s\n\n', src)
-  tf = tempfile.NamedTemporaryFile(suffix='.py', delete=False)
-  tf.write(src)
-  tf.close()
-
-  import atexit
   import os
-  atexit.register(lambda: os.remove(tf.name))
+  import hashlib
+  #util.log_info('Hash: %s', hash(src))
+  srcdir = os.path.join(tempfile.gettempdir(), 'spartan')
+  srcfile = os.path.join(srcdir, hashlib.md5(src).hexdigest()) + '.py'
+
+  if not os.path.exists(srcdir):
+    os.makedirs(srcdir)
+
+  tmpfile = tempfile.NamedTemporaryFile(delete=False)
+  tmpfile.write(src)
+  tmpfile.close()
+
+  os.rename(tmpfile.name, srcfile)
+
+  #atexit.register(lambda: os.remove(srcfile))
 
   try:
-    module = imp.load_source('parakeet_temp', tf.name)
+    module = imp.load_source('parakeet_temp', srcfile)
   except Exception, ex:
     util.log_info('Failed to build parakeet wrapper.  Source was: %s', src)
     raise CodegenException(ex.message, ex.args)
+
   return module._jit_fn
 
 
@@ -123,11 +133,17 @@ class ParakeetExpr(LocalExpr):
   def evaluate(self, ctx):
     names = self.input_names()
     fn = compile_parakeet_source(self.source)
+    #util.log_info('Parakeet: %s', fn)
     kw_args = {}
     for var in names:
       value = ctx.inputs[var]
       kw_args[var] = value
 
-    util.log_info('%s', kw_args)
-    return fn(**kw_args)
+    if FLAGS.use_cuda:
+      return fn(_backend='cuda', **kw_args)
+    else:
+      return fn(**kw_args)
+
+from spartan.config import FLAGS, BoolFlag
+FLAGS.add(BoolFlag('use_cuda', default=False))
 
