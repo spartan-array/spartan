@@ -284,6 +284,7 @@ class Server(object):
       handle.exception()
 
   def shutdown(self):
+    util.log_info('Server going down...')
     self._running = 0
     self._socket.close()
     del self._socket
