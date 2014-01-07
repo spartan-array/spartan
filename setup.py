@@ -20,6 +20,7 @@ def build_cython():
     print '#' * 10, 'Cythonizing %s' % f
     assert os.system('cython "%s"' % f) == 0
 
+build_cython()
 from distutils.command.sdist import sdist
 class cython_sdist(sdist):
   '''Build Cython .c files for source distribution.'''
@@ -40,6 +41,7 @@ setup(
     'yappi',
     'numpy',
     'cython',
+	'pyzmq',
     #'sphinx_bootstrap_theme',
   ],
   classifiers=[

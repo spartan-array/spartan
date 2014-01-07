@@ -313,7 +313,6 @@ def add_optimization(klass, default):
 add_optimization(MapMapFusion, True)
 add_optimization(ReduceMapFusion, True)
 add_optimization(CollapsedCachedExpressions, True)
-
 if parakeet is not None:
   add_optimization(ParakeetGeneration, True)
 
