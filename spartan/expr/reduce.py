@@ -45,8 +45,6 @@ class ReduceExpr(Expr):
                                     combiner=tile_accum, 
                                     reducer=tile_accum)
 
-    #print local.codegen(op)
-    
     # util.log_info('Reducing into array %s', output_array)
     largest.foreach(_reduce_mapper, kw={
       'children' : children,

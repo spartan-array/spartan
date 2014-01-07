@@ -277,14 +277,14 @@ def _dot_mapper(inputs, ex, av, bv):
   # read current tile of array 'a'
   ex_a = ex
 
-  # fetch corresponding column tile of array 'b'
-  # rows = ex_a.cols
+  # fetch all column tiles of b that correspond to tile a's rows, i.e.
+  # rows = ex_a.cols (should be ex_a.rows?)
   # cols = *
   ex_b = extent.create((ex_a.ul[1], 0),
                        (ex_a.lr[1], bv.shape[1]),
                        bv.shape)
 
-  util.log_info('%s %s', ex_a, ex_b)
+  util.log_info('%s %s ex_a=%s ex_b=%s', type(av), type(bv), ex_a, ex_b)
 
   a = av.fetch(ex_a)
   b = bv.fetch(ex_b)
