@@ -8,7 +8,8 @@ from spartan.util import Assert
 
 TYPE_EMPTY = 0
 TYPE_DENSE = 1
-TYPE_SPARSE = 2
+TYPE_MASKED = 2
+TYPE_SPARSE = 3
 
 MASK_ALL_CLEAR = 0
 MASK_ALL_SET = 1
@@ -36,6 +37,7 @@ class Tile(object):
 
     if data is not None:
       Assert.eq(data.shape, shape)
+      Assert.eq(data.dtype, dtype)
 
     if isinstance(mask, np.ndarray):
       Assert.eq(mask.shape, shape)
@@ -58,6 +60,7 @@ class Tile(object):
     return merge(self, update, reducer)
 
   def get(self, selector=None):
+    # no data, return an empty array
     if self.data is None:
       #util.log_info('EMPTY %s %s', self.id, self.shape)
       return np.ndarray(self.shape, self.dtype)[selector]
@@ -66,22 +69,28 @@ class Tile(object):
     if len(self.data.shape) == 0:
       return self.data
 
-    self._initialize_mask()
+    Assert.le(len(selector), len(self.data.shape),
+              'Selector has more dimensions than data! %s %s' % (selector, self.data.shape))
+
+    # otherwise if sparse, return a sparse subset
     if self.type == TYPE_SPARSE:
       if selector is None or extent.is_complete(self.data.shape, selector):
         result = self.data
       else:
         result = self.data[selector]
-    elif self.mask is None:
-      result = self.data[selector]
-    else:
-      Assert.le(len(selector), len(self.data.shape),
-                'Selector has more dimensions than data! %s %s' % (selector, self.data.shape))
-
-      data = self.data[selector]
-      mask = self.mask[selector]
-      result = np.ma.masked_all(data.shape, dtype=data.dtype)
-      result[mask] = data[mask]
+      return result
+    
+    # dense, check our mask and return a masked segment or unmasked if
+    # the mask is all filled for the selected region.
+    self._initialize_mask()
+    if self.mask is None or np.all(self.mask[selector]):
+      #util.log_info('%s %s %s', self.data, self.mask, selector)
+      return self.data[selector]
+      
+    data = self.data[selector]
+    mask = self.mask[selector]
+    result = np.ma.masked_all(data.shape, dtype=data.dtype)
+    result[mask] = data[mask]
 
     #util.log_info('%s %s', self.id, result)
     return result
@@ -143,7 +152,7 @@ def from_intersection(src, overlap, data):
   :param overlap: `TileExtent`
   :param data:
   '''
-  util.log_info('%s %s %s', src, overlap, data.dtype)
+  util.log_debug('%s %s %s', src, overlap, data.dtype)
   slc = extent.offset_slice(src, overlap)
   tdata = np.ndarray(src.shape, data.dtype)
   tmask = np.zeros(src.shape, np.bool)
@@ -200,7 +209,8 @@ def merge(old_tile, new_tile, reducer):
       else:
         old_tile.data[updated] = reducer(old_tile.data[updated], new_tile.data[updated])
   else:
-    # sparse update, no mask, just iterate over data items.
+    # sparse update, no mask, just iterate over data items
+    # TODO(POWER) -- this is SLOW!
     for k, v in new_tile.iteritems():
       if old_tile.has_key(k):
         old_tile[k] = reducer(old_tile[k], v)
