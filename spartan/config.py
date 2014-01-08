@@ -40,15 +40,15 @@ class Flag(object):
 
 
 class IntFlag(Flag):
-  def parse(self, str):
+  def set(self, str):
     self.val = int(str)
 
 class StrFlag(Flag):
-  def parse(self, str):
+  def set(self, str):
     self.val = str
 
 class BoolFlag(Flag):
-  def parse(self, str):
+  def set(self, str):
     str = str.lower()
     str = str.strip()
 
@@ -69,7 +69,7 @@ LOG_STR = {logging.DEBUG: 'DEBUG',
 
 
 class LogLevelFlag(Flag):
-  def parse(self, str):
+  def set(self, str):
     self.val = getattr(logging, str)
 
   def _str(self):
@@ -128,25 +128,26 @@ def initialize(argv):
   config_file = appdirs.user_data_dir('Spartan', 'rjpower.org') + '/spartan.ini'
   config_dir = os.path.dirname(config_file)
   if not os.path.exists(config_dir):
-    os.makedirs(config_dir, mode=0755)
+    try:
+      os.makedirs(config_dir, mode=0755)
+    except:
+      print >>sys.stderr, 'Failed to create config directory.'
 
-  if not os.path.exists(config_file):
-    open(config_file, 'a').close()
+  if os.path.exists(config_file):
+    print >>sys.stderr, 'Loading configuration from %s' % (config_file)
 
-  print >>sys.stderr, 'Loading configuration from %s' % (config_file)
+    # Prepend configuration options to the flags array so that they
+    # are overridden by user flags.
+    try:
+      config = ConfigParser.ConfigParser()
+      config.read(config_file)
 
-  # Prepend configuration options to the flags array so that they
-  # are overridden by user flags.
-  try:
-    config = ConfigParser.ConfigParser()
-    config.read(config_file)
-
-    if config.has_section('flags'):
-      for name, value in config.items('flags'):
-        argv.insert(0, '--%s=%s' % (name, value))
-  except:
-    print >>sys.stderr, 'Failed to parse config file: %s' % config_file
-    sys.exit(1)
+      if config.has_section('flags'):
+        for name, value in config.items('flags'):
+          argv.insert(0, '--%s=%s' % (name, value))
+    except:
+      print >>sys.stderr, 'Failed to parse config file: %s' % config_file
+      sys.exit(1)
 
   parser = argparse.ArgumentParser()
   for name, flag in FLAGS:
@@ -158,9 +159,10 @@ def initialize(argv):
   parsed_flags, rest = parser.parse_known_args(argv)
   for name, flag in FLAGS:
     if getattr(parsed_flags, name) is not None:
-      flag.parse(getattr(parsed_flags, name))
+      #print >>sys.stderr, 'Parsing: %s : %s' % (name, getattr(parsed_flags, name))
+      flag.set(getattr(parsed_flags, name))
 
-  logging.basicConfig(format='%(filename)s:%(lineno)s [%(funcName)s] %(message)s',
+  logging.basicConfig(format='%(created)f %(filename)s:%(lineno)s [%(funcName)s] %(message)s',
                       level=FLAGS.log_level,
                       stream=sys.stderr)
 
