@@ -92,12 +92,12 @@ class Worker(object):
     handle.done()
 
   def get(self, req, handle):
-    if req.selector is None:
+    if req.subslice is None:
       #util.log_info('GET: %s', type(self._blobs[req.id]))
       resp = core.GetResp(data=self._blobs[req.id])
       handle.done(resp)
     else:
-      resp = core.GetResp(data=self._blobs[req.id].get(req.selector))
+      resp = core.GetResp(data=self._blobs[req.id].get(req.subslice))
       handle.done(resp)
 
   def _run_kernel(self, req, handle):

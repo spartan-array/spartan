@@ -5,15 +5,16 @@ import numpy as np
 
 class NdArrayExpr(Expr):
   __metaclass__ = Node
-  _members = ['_shape', 'dtype', 'tile_hint', 'combine_fn', 'reduce_fn']
+  _members = ['_shape', 'sparse', 'dtype', 'tile_hint', 'combine_fn', 'reduce_fn']
 
   def __str__(self):
-    return 'array(%s, %s)' % (self.shape, self.dtype)
+    return 'dist_array(%s, %s)' % (self.shape, self.dtype)
   
   def visit(self, visitor):
     return NdArrayExpr(_shape=visitor.visit(self.shape),
                        dtype=visitor.visit(self.dtype),
                        tile_hint=self.tile_hint,
+                       sparse=self.sparse,
                        combine_fn=self.combine_fn,
                        reduce_fn=self.reduce_fn)
   
@@ -31,14 +32,16 @@ class NdArrayExpr(Expr):
     return distarray.create(shape, dtype,
                             combiner=self.combine_fn,
                             reducer=self.reduce_fn,
-                            tile_hint=tile_hint)
+                            tile_hint=tile_hint,
+                            sparse=self.sparse)
 
 
 def ndarray(shape, 
             dtype=np.float, 
             tile_hint=None,
             combine_fn=None, 
-            reduce_fn=None):
+            reduce_fn=None,
+            sparse=False):
   '''
   Lazily create a new distributed array.
   :param shape:
@@ -49,4 +52,5 @@ def ndarray(shape,
                      dtype = dtype,
                      tile_hint = tile_hint,
                      combine_fn = combine_fn,
-                     reduce_fn = reduce_fn) 
+                     reduce_fn = reduce_fn,
+                     sparse = sparse)

@@ -16,7 +16,7 @@ class Blob(object):
   def update(self, new_val, reducer):
     pass
 
-  def get(self, selector):
+  def get(self, subslice):
     pass
 
 cdef class BlobId(object):
@@ -68,7 +68,7 @@ class NewBlob(Message):
 
 class GetReq(Message):
   __metaclass__ = Node
-  _members = ['id', 'selector']
+  _members = ['id', 'subslice']
 
 
 class GetResp(Message):

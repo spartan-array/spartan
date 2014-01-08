@@ -4,6 +4,7 @@ import itertools
 import collections
 import traceback
 
+import scipy.sparse
 import numpy as np
 
 from . import tile, extent
@@ -104,6 +105,19 @@ class DistArray(object):
 
   def __repr__(self):
     return '%s(id=%s, shape=%s, dtype=%s)' % (self.__class__.__name__, id(self), self.shape, self.dtype)
+  
+  def __setitem__(self, idx, value):
+    if np.isscalar(idx):
+      result = self.select(slice(idx, idx + 1))
+      return result[0]
+
+    ex = extent.from_slice(idx, self.shape)
+    if not isinstance(value, np.ndarray):
+      a_value = np.ndarray(ex.shape, dtype=self.dtype)
+      a_value[:] = value
+      value = a_value
+    
+    self.update(ex, value)
 
   def select(self, idx):
     '''
@@ -224,11 +238,11 @@ class DistArrayImpl(DistArray):
     Assert.isinstance(region, extent.TileExtent)
     Assert.eq(region.array_shape, self.shape)
     Assert.eq(len(region.ul), len(self.shape))
-
+    assert np.all(region.lr <= self.shape), (region, self.shape)
     #util.log_info('FETCH: %s %s', self.shape, region)
 
     ctx = blob_ctx.get()
-    assert np.all(region.lr <= self.shape), (region, self.shape)
+   
     
     # special case exact match against a tile 
     if region in self.tiles:
@@ -252,14 +266,23 @@ class DistArrayImpl(DistArray):
     # if we have any masked tiles, then we need to create a masked array.
     # otherwise, create a dense array.
     results = [r.data for r in rpc.wait_for_all(futures)]
-    
-    need_mask = False
-    for r in results:
-      if isinstance(r, np.ma.MaskedArray): need_mask = True
    
-    if need_mask: 
+    DENSE = 0
+    MASKED = 1
+    SPARSE = 2
+    
+    output_type = DENSE
+    for r in results:
+      if isinstance(r, np.ma.MaskedArray) and output_type == DENSE: 
+        output_type = MASKED
+      if scipy.sparse.issparse(r):
+        output_type = SPARSE
+   
+    if output_type == MASKED:
       tgt = np.ma.MaskedArray(np.ndarray(region.shape, dtype=self.dtype))
       tgt.mask = 0
+    elif output_type == SPARSE:
+      tgt = scipy.sparse.lil_matrix(region.shape, dtype=self.dtype)
     else:
       tgt = np.ndarray(region.shape, dtype=self.dtype)
     
@@ -306,7 +329,8 @@ def create(shape,
            sharder=None,
            combiner=None,
            reducer=None,
-           tile_hint=None):
+           tile_hint=None,
+           sparse=False):
   '''Make a new, empty DistArray'''
   ctx = blob_ctx.get()
   dtype = np.dtype(dtype)
@@ -314,8 +338,12 @@ def create(shape,
 
   extents = compute_splits(shape, tile_hint, ctx.num_workers * 4).keys()
   tiles = {}
+  tile_type = tile.TYPE_SPARSE if sparse else tile.TYPE_DENSE
+  
   for i, ex in enumerate(extents):
-    tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype), hint=i)
+    tiles[ex] = ctx.create(
+                  tile.from_shape(ex.shape, dtype, tile_type=tile_type), 
+                  hint=i)
 
   for ex in extents:
     tiles[ex] = tiles[ex].wait().blob_id

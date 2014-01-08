@@ -111,7 +111,7 @@ def compile_parakeet_source(src):
   tmpfile.write(src)
   tmpfile.flush()
   
-  util.log_info('File: %s, Source: \n %s \n', tmpfile.name, src)
+  #util.log_info('File: %s, Source: \n %s \n', tmpfile.name, src)
 
   #os.rename(tmpfile.name, srcfile)
   #atexit.register(lambda: os.remove(srcfile))
@@ -119,7 +119,8 @@ def compile_parakeet_source(src):
   try:
     module = imp.load_source('parakeet_temp', tmpfile.name)
   except Exception, ex:
-    util.log_info('Failed to build parakeet wrapper.  Source was: %s', src)
+    util.log_info('Failed to build parakeet wrapper')
+    util.log_debug('Source was: %s', src)
     raise CodegenException(ex.message, ex.args)
   
   source_files.append(src)

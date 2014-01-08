@@ -17,6 +17,7 @@ from .map import map
 from .ndarray import ndarray
 from .reduce import reduce
 from .optimize import disable_parakeet
+from .optimize import not_idempotent
 from .loop import loop
 from spartan import util
 from ..util import Assert
@@ -24,6 +25,23 @@ from ..util import Assert
 def _make_ones(input): return np.ones(input.shape, input.dtype)
 def _make_zeros(input): return np.zeros(input.shape, input.dtype)
 
+@not_idempotent
+def _make_rand(input):
+  return np.random.rand(*input.shape)
+
+@not_idempotent
+def _make_randn(input):
+  return np.random.randn(*input.shape)
+
+@not_idempotent
+def _make_sparse_rand(input, density=None, dtype=None):
+  Assert.eq(len(input.shape), 2)
+  
+  return scipy.sparse.rand(input.shape[0],
+                           input.shape[1],
+                           density=density,
+                           format='coo',
+                           dtype=dtype)
 
 def rand(*shape, **kw):
   '''
@@ -37,8 +55,8 @@ def rand(*shape, **kw):
   assert len(kw) == 0, 'Unknown keywords %s' % kw
 
   for s in shape: assert isinstance(s, int)
-  return shuffle(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
-                 fn=lambda input, ex: [(ex, np.random.rand(*ex.shape))])
+  return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
+             fn=_make_rand)
 
 
 def randn(*shape, **kw):
@@ -46,10 +64,20 @@ def randn(*shape, **kw):
   if 'tile_hint' in kw:
     tile_hint = kw['tile_hint']
     del kw['tile_hint']
+  
   for s in shape: assert isinstance(s, int)
-  return shuffle(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
-                 fn=lambda input, ex: [(ex, np.random.randn(*ex.shape))])
+  return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randn) 
 
+
+def sparse_rand(shape, 
+                density=0.001,
+                dtype=np.float32, 
+                tile_hint=None):
+  for s in shape: assert isinstance(s, int)
+  return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True),
+             fn=_make_sparse_rand,
+             fn_kw = { 'dtype' : dtype, 
+                       'density' : density })
 
 def zeros(shape, dtype=np.float, tile_hint=None):
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
@@ -64,7 +92,7 @@ def ones(shape, dtype=np.float, tile_hint=None):
 
 def _arange_mapper(inputs, ex, dtype=None):
   pos = extent.ravelled_pos(ex.ul, ex.array_shape)
-  #util.log_info('Extent: %s, pos: %s', ex, pos)
+  # util.log_info('Extent: %s, pos: %s', ex, pos)
   sz = np.prod(ex.shape)
   yield (ex, np.arange(pos, pos + sz, dtype=dtype).reshape(ex.shape))
 
@@ -292,7 +320,7 @@ def _dot_mapper(inputs, ex, av, bv):
 
   util.log_info('%s %s %s', type(a), a.shape, a.dtype)
   util.log_info('%s %s %s', type(b), b.shape, b.dtype)
-  #util.log_info('%s %s', bv.shape, len(bv.tiles))
+  # util.log_info('%s %s', bv.shape, len(bv.tiles))
   result = a.dot(b)
 
   ul = np.asarray([ex_a.ul[0], 0])
@@ -300,13 +328,13 @@ def _dot_mapper(inputs, ex, av, bv):
   target_shape = (av.shape[0], bv.shape[1])
   target_ex = extent.create(ul, lr, target_shape)
 
-  #util.log_info('A: %s', a.dtype)
-  #util.log_info('B: %s', b.dtype)
-  #util.log_info('R: %s', result.dtype)
-  #util.log_info('T: %s', target_ex)
+  # util.log_info('A: %s', a.dtype)
+  # util.log_info('B: %s', b.dtype)
+  # util.log_info('R: %s', result.dtype)
+  # util.log_info('T: %s', target_ex)
 
-  #util.log_info('%s %s %s', a.shape, b.shape, result.shape)
-  #util.log_info('%s %s %s', ul, lr, target_shape)
+  # util.log_info('%s %s %s', a.shape, b.shape, result.shape)
+  # util.log_info('%s %s %s', ul, lr, target_shape)
   yield target_ex, result
 
 
@@ -331,7 +359,7 @@ def dot(a, b):
   if isinstance(bv, np.ndarray):
     return shuffle(av, _dot_numpy, kw={'numpy_data': bv})
 
-  #av, bv = distarray.broadcast([av, bv])
+  # av, bv = distarray.broadcast([av, bv])
   Assert.eq(a.shape[1], b.shape[0])
   target = ndarray((a.shape[0], b.shape[1]),
                    dtype=av.dtype,

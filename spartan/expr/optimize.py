@@ -37,6 +37,13 @@ def disable_parakeet(fn):
   _parakeet_blacklist.add(fn)
   return fn
 
+_not_idempotent = set()
+
+def not_idempotent(fn):
+  "Disable map fusion for ``fn``."
+  _not_idempotent.add(fn)
+  return fn
+
 
 class OptimizePass(object):
   # These are used to ensure passes are ordered correctly.
@@ -103,7 +110,7 @@ class MapMapFusion(OptimizePass):
         all_maps = False
         break
 
-    if not all_maps:
+    if not all_maps or expr.op.fn in _not_idempotent:
       return expr.visit(self)
 
     #util.log_info('Original: %s', expr.op)
@@ -268,7 +275,7 @@ class ParakeetGeneration(OptimizePass):
                        op=local.ParakeetExpr(source=source,  deps=expr.op.deps),
                        children=expr.children)
     except local.CodegenException:
-      util.log_info('Failed to convert to parakeet.', exc_info=1)
+      util.log_info('Failed to convert to parakeet.')
       return expr.visit(self)
 
 

@@ -1,7 +1,7 @@
 import traceback
 import numpy as np
-import scipy
-from scipy.sparse import dok_matrix
+import scipy.sparse
+from scipy.sparse import dok_matrix, coo_matrix
 from . import extent
 from spartan import util
 from spartan.util import Assert
@@ -59,36 +59,38 @@ class Tile(object):
     #util.log_info('Update: %s %s', update.data, reducer)
     return merge(self, update, reducer)
 
-  def get(self, selector=None):
+  def get(self, subslice=None):
     # no data, return an empty array
     if self.data is None:
       #util.log_info('EMPTY %s %s', self.id, self.shape)
-      return np.ndarray(self.shape, self.dtype)[selector]
+      return np.ndarray(self.shape, self.dtype)[subslice]
 
     # scalars are just returned directly.
     if len(self.data.shape) == 0:
       return self.data
 
-    Assert.le(len(selector), len(self.data.shape),
-              'Selector has more dimensions than data! %s %s' % (selector, self.data.shape))
+    Assert.le(len(subslice), len(self.data.shape),
+              'Selector has more dimensions than data! %s %s' % (subslice, self.data.shape))
 
     # otherwise if sparse, return a sparse subset
     if self.type == TYPE_SPARSE:
-      if selector is None or extent.is_complete(self.data.shape, selector):
+      if subslice is None or extent.is_complete(self.data.shape, subslice):
         result = self.data
       else:
-        result = self.data[selector]
+        # TODO -- slicing doesn't really work for sparse arrays!
+        util.log_warn('Trying to slice a sparse tile  -- this will likely fail!')
+        result = self.data[subslice]
       return result
     
     # dense, check our mask and return a masked segment or unmasked if
     # the mask is all filled for the selected region.
     self._initialize_mask()
-    if self.mask is None or np.all(self.mask[selector]):
-      #util.log_info('%s %s %s', self.data, self.mask, selector)
-      return self.data[selector]
+    if self.mask is None or np.all(self.mask[subslice]):
+      #util.log_info('%s %s %s', self.data, self.mask, subslice)
+      return self.data[subslice]
       
-    data = self.data[selector]
-    mask = self.mask[selector]
+    data = self.data[subslice]
+    mask = self.mask[subslice]
     result = np.ma.masked_all(data.shape, dtype=data.dtype)
     result[mask] = data[mask]
 
@@ -119,7 +121,7 @@ class Tile(object):
 
 
 def from_data(data):
-  if isinstance(data, scipy.sparse.spmatrix):
+  if scipy.sparse.issparse(data):
     return Tile(
       shape=data.shape,
       data=data,
@@ -135,13 +137,21 @@ def from_data(data):
       tile_type=TYPE_DENSE)
 
 
-def from_shape(shape, dtype, tile_type=TYPE_DENSE):
-  assert tile_type == TYPE_DENSE
-  return Tile(shape=shape,
-              data=None,
-              dtype=dtype,
-              tile_type=tile_type,
-              mask=MASK_ALL_CLEAR)
+def from_shape(shape, dtype, tile_type):
+  if tile_type == TYPE_SPARSE:
+    return Tile(shape=shape,
+                data=dok_matrix(shape, dtype=dtype),
+                dtype=dtype,
+                tile_type=TYPE_SPARSE,
+                mask=MASK_ALL_CLEAR)
+  elif tile_type == TYPE_DENSE: 
+    return Tile(shape=shape,
+                data=None,
+                dtype=dtype,
+                tile_type=tile_type,
+                mask=MASK_ALL_CLEAR)
+  else:
+    assert False, 'Unknown tile type %s' % tile_type
 
 
 def from_intersection(src, overlap, data):

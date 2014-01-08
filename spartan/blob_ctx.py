@@ -74,9 +74,9 @@ class BlobCtx(object):
   def destroy(self, blob_id):
     return self.destroy_all([blob_id])
 
-  def get(self, blob_id, selector, callback=None, wait=True):
+  def get(self, blob_id, subslice, callback=None, wait=True):
     Assert.isinstance(blob_id, core.BlobId)
-    req = core.GetReq(id=blob_id, selector=selector)
+    req = core.GetReq(id=blob_id, subslice=subslice)
     if callback is None:
       if wait:
         return self._send(blob_id, 'get', req).data
