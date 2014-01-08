@@ -47,7 +47,7 @@ def test_sgd_inner():
   m = np.random.randn(M, r).astype(np.float32)
   
   for i in range(5):
-    util.timeit(lambda: netflix._sgd_inner(rows, cols, vals, u, m), 'sgd')
+    netflix._sgd_inner(rows, cols, vals, u, m)
   
 if __name__ == '__main__':
   test_common.run(__file__)

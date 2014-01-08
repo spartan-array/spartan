@@ -4,10 +4,10 @@ import test_common
 from math import sqrt
 
 N_COLORS = 3
-IMG_SIZE = 512
-FILTER_SIZE = (9, 9)
-N_IMGS = 32
-N_FILTERS = 16
+IMG_SIZE = 1024
+FILTER_SIZE = (5, 5)
+N_IMGS = 1
+N_FILTERS = 32
 ONE_TILE = (10000, 10000, 10000, 10000)
 
 def benchmark_convnet(ctx, timer):
@@ -25,7 +25,6 @@ def benchmark_convnet(ctx, timer):
                             tile_hint=ONE_TILE))
   w3 = expr.eager(expr.ones((N_FILTERS, N_FILTERS) + FILTER_SIZE,
                             tile_hint=ONE_TILE))
-  w4 = expr.eager(expr.ones((8 * 8 * 8, N_IMGS)))
   
   def _():
     conv1 = stencil.stencil(images, w1, 2)
@@ -37,15 +36,12 @@ def benchmark_convnet(ctx, timer):
     conv3 = stencil.stencil(pool2, w3, 2)
     pool3 = stencil.maxpool(conv3)
     
-    util.log_info(pool3.shape)
-    
-    #raveled3 = expr.reshape(pool3, (N_IMGS, 8 * 8 * 8))
-    #expr.ravel(pool3)
-    #fc4 = expr.dot(w4, raveled3)
-    #fc4.force()
+    expr.force(pool3)
  
   # force parakeet functions to compile before timing. 
   _()  
+  timer.time_op('convnet', _)
+  timer.time_op('convnet', _)
   timer.time_op('convnet', _)
   
 if __name__ == '__main__':

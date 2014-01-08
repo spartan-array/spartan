@@ -35,7 +35,6 @@ def sig_handler(sig, frame):
 
 class BenchTimer(object):
   def __init__(self, num_workers):
-    self.times = []
     self.num_workers = num_workers
      
   def time_op(self, key, fn):
@@ -76,6 +75,7 @@ def run(filename):
       master = start_cluster(i, FLAGS.cluster)
       run_benchmarks(module, benchmarks, master, timer)
       master.shutdown()
+      time.sleep(1)
 
   if FLAGS.profile_worker:
     util.log_info('Writing worker profiles...')

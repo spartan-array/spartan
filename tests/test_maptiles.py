@@ -37,8 +37,8 @@ class TestMapTiles(test_common.ClusterTest):
     b = expr.ones((TEST_SIZE, TEST_SIZE))
 
     add_many = (a + b + a + b + a + b + a + b + a + b)
-    print add_many
-    print add_many.dag()
+    #print add_many
+    #print add_many.dag()
     Assert.all_eq(add_many.glom(),
                   np.ones((TEST_SIZE, TEST_SIZE)) * 10)
 

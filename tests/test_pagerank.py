@@ -27,9 +27,9 @@ def test_pr(ctx):
 
   p = expr.rand(num_pages, 1).astype(np.float32)
 
-  for i in range(20):
+  for i in range(5):
     p = expr.dot(wts, p).force()
-    print p.glom()
+    #print p.glom()
 
 if __name__ == '__main__':
   test_common.run(__file__)

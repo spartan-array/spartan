@@ -24,14 +24,14 @@ class TestFinance(test_common.ClusterTest):
 
   def test_put(self):
     put, call = finance.black_scholes(self.current, self.strike, maturity, rate, volatility)
-    util.log_info(put)
-    util.log_info(optimize(put))
+    #util.log_info(put)
+    #util.log_info(optimize(put))
     util.log_info(put.glom())
 
   def test_find_change(self):
     arr = expr.randn(100)
     movers = finance.find_change(arr)
-    util.log_info(optimize(movers))
+    #util.log_info(optimize(movers))
     util.log_info(movers.glom().compressed())
 
 
