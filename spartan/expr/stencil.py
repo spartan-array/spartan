@@ -89,6 +89,8 @@ def stencil_mapper(array, ex, filters=None, images=None, target_shape=None):
       target_shape)
 
   result = convolve(local_image, local_filters)
+
+  util.log_info('...convolve done.')
   
   util.log_info('Updating: %s', target_ex)
   yield (target_ex, result)

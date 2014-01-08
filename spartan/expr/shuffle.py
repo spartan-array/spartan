@@ -32,10 +32,12 @@ def shuffle(v, fn, tile_hint=None, target=None, kw=None):
 
 
 def _target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
-  result = map_fn(inputs, ex, **fn_kw)
+  result = list(map_fn(inputs, ex, **fn_kw))
   if result is not None:
     for ex, v in result:
-      target.update(ex, v)
+      update_time, _ = util.timeit(lambda: target.update(ex, v))
+      util.log_info('Update took %s seconds.' % update_time)
+
   return []
         
 def _notarget_mapper(ex, array=None, map_fn=None, inputs=None, fn_kw=None):
@@ -46,8 +48,7 @@ def _notarget_mapper(ex, array=None, map_fn=None, inputs=None, fn_kw=None):
   if map_result is not None:
     for ex, v in map_result:
       Assert.eq(ex.shape, v.shape, 'Bad shape from %s' % map_fn)
-      result.append((ex, v))
-  return result
+      yield ex, v
 
 class ShuffleExpr(Expr):
   __metaclass__ = Node

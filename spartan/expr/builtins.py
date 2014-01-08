@@ -198,6 +198,7 @@ def size(x, axis=None):
     return np.prod(x.shape)
   return x.shape[axis]
 
+@disable_parakeet
 def _astype_mapper(t, dtype):
   return t.astype(dtype)
 
@@ -284,12 +285,14 @@ def _dot_mapper(inputs, ex, av, bv):
                        (ex_a.lr[1], bv.shape[1]),
                        bv.shape)
 
-  util.log_info('%s %s ex_a=%s ex_b=%s', type(av), type(bv), ex_a, ex_b)
+  time_a, a = util.timeit(lambda: av.fetch(ex_a))
+  util.log_info('Fetched...%s in %s', ex_a, time_a)
+  time_b, b = util.timeit(lambda: bv.fetch(ex_b))
+  util.log_info('Fetched...%s in %s', ex_b, time_b)
 
-  a = av.fetch(ex_a)
-  b = bv.fetch(ex_b)
   util.log_info('%s %s %s', type(a), a.shape, a.dtype)
   util.log_info('%s %s %s', type(b), b.shape, b.dtype)
+  #util.log_info('%s %s', bv.shape, len(bv.tiles))
   result = a.dot(b)
 
   ul = np.asarray([ex_a.ul[0], 0])
@@ -297,10 +300,10 @@ def _dot_mapper(inputs, ex, av, bv):
   target_shape = (av.shape[0], bv.shape[1])
   target_ex = extent.create(ul, lr, target_shape)
 
-  util.log_info('A: %s', a.dtype)
-  util.log_info('B: %s', b.dtype)
-  util.log_info('R: %s', result.dtype)
-  util.log_info('T: %s', target_ex)
+  #util.log_info('A: %s', a.dtype)
+  #util.log_info('B: %s', b.dtype)
+  #util.log_info('R: %s', result.dtype)
+  #util.log_info('T: %s', target_ex)
 
   #util.log_info('%s %s %s', a.shape, b.shape, result.shape)
   #util.log_info('%s %s %s', ul, lr, target_shape)
@@ -332,7 +335,7 @@ def dot(a, b):
   Assert.eq(a.shape[1], b.shape[0])
   target = ndarray((a.shape[0], b.shape[1]),
                    dtype=av.dtype,
-                   tile_hint=av.tile_shape(),
+                   tile_hint=bv.tile_shape(),
                    combine_fn=np.add,
                    reduce_fn=np.add)
 

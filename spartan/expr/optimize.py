@@ -189,9 +189,9 @@ def _codegen(op):
     name = op.fn_name()
 
     arg_str = ','.join([_codegen(v) for v in op.deps])
-    kw_str = ','.join(['%s=%s' % (k, v) for k, v in op.kw.iteritems()])
+    kw_str = ','.join(['%s=%s' % (k, repr(v)) for k, v in op.kw.iteritems()])
     if arg_str:
-      kw = ',' + kw_str
+      kw_str = ',' + kw_str
 
     return '%s(%s %s)' % (name, arg_str, kw_str)
   elif isinstance(op, local.LocalInput):
@@ -249,8 +249,7 @@ def codegen(op):
   return fn
 
 class ParakeetGeneration(OptimizePass):
-  '''Currently disabled.
-
+  '''
   Replace local map/reduce operations with an equivalent
   parakeet function definition.
   '''

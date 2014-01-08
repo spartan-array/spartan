@@ -96,33 +96,33 @@ class LocalMapExpr(FnCallExpr):
 class LocalReduceExpr(FnCallExpr):
   _op_type = 'reduce'
 
+# track source that we have already compiled via parakeet.
+# parakeet requires the source file remain available in
+# order to compile.
+source_files = []
 
+# memoize generated modules to avoid recompiling parakeet
+# functions for the same source.
 @util.memoize
 def compile_parakeet_source(src):
   '''Compile source code defining a parakeet function.'''
-  import os
-  import hashlib
-  #util.log_info('Hash: %s', hash(src))
-  srcdir = os.path.join(tempfile.gettempdir(), 'spartan')
-  srcfile = os.path.join(srcdir, hashlib.md5(src).hexdigest()) + '.py'
-
-  if not os.path.exists(srcdir):
-    os.makedirs(srcdir)
-
-  tmpfile = tempfile.NamedTemporaryFile(delete=False)
+  util.log_info('Compiling parakeet source.')
+  tmpfile = tempfile.NamedTemporaryFile(delete=False, prefix='spartan-local-', suffix='.py')
   tmpfile.write(src)
-  tmpfile.close()
+  tmpfile.flush()
+  
+  util.log_info('File: %s, Source: \n %s \n', tmpfile.name, src)
 
-  os.rename(tmpfile.name, srcfile)
-
+  #os.rename(tmpfile.name, srcfile)
   #atexit.register(lambda: os.remove(srcfile))
 
   try:
-    module = imp.load_source('parakeet_temp', srcfile)
+    module = imp.load_source('parakeet_temp', tmpfile.name)
   except Exception, ex:
     util.log_info('Failed to build parakeet wrapper.  Source was: %s', src)
     raise CodegenException(ex.message, ex.args)
-
+  
+  source_files.append(src)
   return module._jit_fn
 
 

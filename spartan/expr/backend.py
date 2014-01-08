@@ -18,7 +18,6 @@ def _evaluate(ctx, prim):
       
   #util.log_info('Evaluting %s', prim.typename())
   return prim._evaluate(ctx, deps)
-  #return util.timeit(lambda: prim.evaluate(ctx, deps), 'eval: %s' % prim)
 
 def evaluate(ctx, prim):
   '''
