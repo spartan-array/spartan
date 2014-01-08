@@ -19,6 +19,9 @@ class BlobCtx(object):
     self.active = True
 
     #util.log_info('New blob ctx.  Worker=%s', self.worker_id)
+    
+  def is_master(self):
+    return self.worker_id == MASTER_ID
 
   def _send(self, id, method, req, wait=True):
     if self.active == False:
@@ -71,11 +74,14 @@ class BlobCtx(object):
   def destroy(self, blob_id):
     return self.destroy_all([blob_id])
 
-  def get(self, blob_id, selector, callback=None):
+  def get(self, blob_id, selector, callback=None, wait=True):
     Assert.isinstance(blob_id, core.BlobId)
     req = core.GetReq(id=blob_id, selector=selector)
     if callback is None:
-      return self._send(blob_id, 'get', req).data
+      if wait:
+        return self._send(blob_id, 'get', req).data
+      else:
+        return self._send(blob_id, 'get', req, wait=False)
     else:
       future = self._send(blob_id, 'get', req, wait=False)
       return future.on_finished(callback)

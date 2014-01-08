@@ -1,17 +1,19 @@
 import os.path
 import socket
 import subprocess
+import sys
 import threading
 import time
 
 from spartan import config, util
-from spartan.config import FLAGS, BoolFlag
 import spartan
-import spartan.worker
+from spartan.config import FLAGS, BoolFlag
 import spartan.master
+import spartan.worker
+
 
 class HostListFlag(config.Flag):
-  def parse(self, str):
+  def set(self, str):
     hosts = []
     for host in str.split(','):
       hostname, count = host.split(':')
@@ -26,7 +28,9 @@ class AssignMode(object):
   BY_NODE = 2
 
 class AssignModeFlag(config.Flag):
-  def parse(self, str): return getattr(AssignMode, str)
+  def set(self, option_str):
+    self.val = getattr(AssignMode, option_str)
+
   def _str(self):
     if self.val == AssignMode.BY_CORE: return 'BY_CORE'
     return 'BY_NODE'
@@ -75,8 +79,11 @@ def _start_remote_worker(worker, st, ed):
           '--port=%d' % (FLAGS.port_base + 1)]
 
   # add flags from config/user
-  args += repr(FLAGS).split(' ')
-
+  for (name, value) in FLAGS:
+    if name in ['worker_list', 'print_options']: continue
+    args += [repr(value)]
+ 
+  #print >>sys.stderr, args 
   util.log_debug('Running worker %s', ' '.join(args))
   time.sleep(0.1)
   if worker != 'localhost':

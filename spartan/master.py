@@ -39,6 +39,7 @@ class Master(object):
 
     # Wait a second to let our shutdown request go out.
     time.sleep(1)
+
     self._server.shutdown()
 
   def register(self, req, handle):

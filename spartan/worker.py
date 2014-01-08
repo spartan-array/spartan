@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import pstats
+import cProfile
 import threading
 import time
 
@@ -12,11 +14,7 @@ import sys
 from spartan import config, util, rpc, core, blob_ctx
 from spartan.util import Assert
 from spartan.config import FLAGS, StrFlag, IntFlag
-
-try:
-  import yappi
-except:
-  pass
+from spartan.rpc import zeromq
 
 class Worker(object):
   def __init__(self, port, master):
@@ -28,7 +26,13 @@ class Worker(object):
     self._running = True
     self._ctx = None
     self._kernel_threads = ThreadPool(processes=1)
-    #self._kernel_prof = cProfile.Profile()
+    
+    if FLAGS.profile_worker:
+      self._kernel_prof = cProfile.Profile()
+      self._kernel_prof.disable()
+      zeromq.poller().enable_profiling()
+    else:
+      self._kernel_prof = None
 
     hostname = socket.gethostname()
     self._server = rpc.listen(hostname, port)
@@ -39,6 +43,8 @@ class Worker(object):
     req.host = hostname
     req.port = port
     master.register(req)
+
+
 
   def get_worker(self, worker_id):
     return self._peers[worker_id]
@@ -95,7 +101,8 @@ class Worker(object):
       handle.done(resp)
 
   def _run_kernel(self, req, handle):
-    self._server._timers['run_kernel'].start()
+    if FLAGS.profile_worker:
+      self._kernel_prof.enable()
 
     try:
       blob_ctx.set(self._ctx)
@@ -111,8 +118,8 @@ class Worker(object):
     except:
       handle.exception()
 
-    self._server._timers['run_kernel'].stop()
-    #self._kernel_prof.disable()
+    if FLAGS.profile_worker:
+      self._kernel_prof.disable()
 
   def run_kernel(self, req, handle):
     self._kernel_threads.apply_async(self._run_kernel, args=(req, handle))
@@ -121,15 +128,14 @@ class Worker(object):
     util.log_info('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_worker)
     if FLAGS.profile_worker:
       os.system('mkdir -p ./_worker_profiles/')
-      yappi.get_func_stats().save('./_worker_profiles/%d' % self.id, type='pstat')
-
-    #print self._server.timings()
+      stats = pstats.Stats(zeromq.poller().profiler, self._kernel_prof)
+      stats.dump_stats('./_worker_profiles/%d' % self.id)
 
     handle.done()
     threading.Thread(target=self._shutdown).start()
 
   def _shutdown(self):
-    util.log_info('Closing server...')
+    util.log_debug('Closing server...')
     time.sleep(0.1)
     self._running = False
     self._server.shutdown()
@@ -140,10 +146,7 @@ class Worker(object):
 
 
 def _start_worker(master, port, local_id):
-  util.log_info('Master: %s', master)
-
-  if FLAGS.profile_worker:
-    yappi.start()
+  util.log_info('Worker starting up... Master: %s Profile: %s', master, FLAGS.profile_worker)
 
   pid = os.getpid()
   os.system('taskset -pc %d %d > /dev/null' % (local_id, pid))

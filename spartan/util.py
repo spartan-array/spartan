@@ -82,7 +82,7 @@ def flatten(lst, depth=1, unique=False):
 
 def timeit(f, name=None):
   '''
-  Run ``f`` and log the amount of time taken.
+  Run ``f`` and return (time_taken, result).
    
   :param f:
   :param name:
@@ -90,10 +90,8 @@ def timeit(f, name=None):
   st = time.time()
   res = f()
   ed = time.time()
-  if name is None:
-    name = f
-  log_info('Operation %s completed in %.3f seconds', name, ed - st)
-  return res
+
+  return ed - st, res
 
 
 @contextmanager
