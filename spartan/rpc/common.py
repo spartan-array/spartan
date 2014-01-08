@@ -24,7 +24,7 @@ SERVER_PENDING = weakref.WeakKeyDictionary()
 
 NO_RESULT = object()
 
-DEFAULT_TIMEOUT = 100
+DEFAULT_TIMEOUT = 30
 
 def set_default_timeout(seconds):
   global DEFAULT_TIMEOUT
@@ -183,7 +183,7 @@ class Future(object):
 
     if not self.have_result and self.timed_out():
       util.log_info('timed out!')
-      raise Exception('Timed out on remote call (%s %s)', self.addr(), self.rpc_id)
+      raise Exception('Timed out on remote call (%s %s)', self.addr, self.rpc_id)
 
     if isinstance(self.result, RPCException):
       raise RemoteException(self.result.py_exc)
@@ -284,7 +284,7 @@ class Server(object):
       handle.exception()
 
   def shutdown(self):
-    util.log_info('Server going down...')
+    util.log_debug('Server going down...')
     self._running = 0
     self._socket.close()
     del self._socket

@@ -22,7 +22,7 @@ def poller():
   global POLLER
   with POLLER_LOCK:
     if POLLER is None:
-      #util.log_info('Started poller.. %s %s', os.getpid(), __file__)
+      util.log_info('Started poller.. %s %s', os.getpid(), __file__)
       POLLER = ZMQPoller()
       POLLER.start()
     return POLLER
@@ -58,7 +58,7 @@ class Socket(SocketBase):
     return self._status == CLOSED
 
   def close(self, *args):
-    util.log_info('Closing socket: %s (%s)', self.addr, self.closed())
+    util.log_debug('Closing socket: %s (%s)', self.addr, self.closed())
     if self.closed():
       return
 
@@ -105,7 +105,7 @@ class Socket(SocketBase):
     self._status = CLOSED
     self._zmq.close()
     self._zmq = None
-    util.log_info('Socket closed: %s', self.addr)
+    util.log_debug('Socket closed: %s', self.addr)
 
   def handle_write(self):
     with self._lock:
@@ -210,7 +210,7 @@ class ZMQPoller(threading.Thread):
 
     self._poller.register(self._pipe[0], zmq.POLLIN)
     self._sockets = {}
-    #self.profiler = cProfile.Profile()
+    self.profiler = None
 
     self._running = False
 
@@ -219,6 +219,12 @@ class ZMQPoller(threading.Thread):
     self._to_mod = []
     self.daemon = True
 
+  def enable_profiling(self):
+    self.profiler = cProfile.Profile()
+
+  def disable_profiling(self):
+    self.profiler = None
+
   def _run(self):
     self._running = True
     _poll = self._poller.poll
@@ -226,7 +232,7 @@ class ZMQPoller(threading.Thread):
     MAX_TIMEOUT = 100
 
     while self._running:
-      #self.profiler.disable()
+      if self.profiler: self.profiler.disable()
       socks = dict(_poll(_poll_time))
 
       if len(socks) == 0:
@@ -234,7 +240,7 @@ class ZMQPoller(threading.Thread):
       else:
         _poll_time = 1
 
-      #self.profiler.enable()
+      if self.profiler: self.profiler.enable()
       #util.log_info('%s', self._sockets)
       for fd, event in socks.iteritems():
         if fd == self._pipe[0]:
@@ -257,7 +263,7 @@ class ZMQPoller(threading.Thread):
           self._poller.register(s.zmq(), dir)
 
         for s in self._to_close:
-          util.log_info('Removing... %s (%s)', id(s), s.addr)
+          #util.log_info('Removing... %s (%s)', id(s), s.addr)
           self._poller.unregister(s.zmq())
           del self._sockets[s.zmq()]
           s.handle_close()
