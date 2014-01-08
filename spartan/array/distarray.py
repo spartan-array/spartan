@@ -29,13 +29,13 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
 
   util.log_info('Splitting %s %s %s', shape, tile_hint, num_shards)
 
-  if num_shards != -1:
-    tile_size = np.prod(shape) / num_shards
-  else:
-    tile_size = DEFAULT_TILE_SIZE
-  
   splits = [None] * len(shape)
   if tile_hint is None:
+    if num_shards != -1:
+      tile_size = np.prod(shape) / num_shards
+    else:
+      tile_size = DEFAULT_TILE_SIZE
+  
     # try to make reasonable tiles
     if len(shape) == 0:
       return { extent.create([], [], ()) :  0 }
@@ -62,7 +62,7 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
       for i in range(0, shape[dim], step):
         dim_splits.append((i, min(shape[dim],  i + step)))
       splits[dim] = dim_splits
- 
+
   result = {}
   idx = 0
   for slc in itertools.product(*splits):
@@ -91,6 +91,7 @@ def _array_mapper(blob_id, blob, array=None, user_fn=None, **kw):
     blob_id = ctx.create(tile.from_data(target_data)).wait().blob_id
     results.append((target_ex, blob_id))
   return results
+
 
 class DistArray(object):
   '''The interface required for distributed arrays.'''
@@ -143,14 +144,17 @@ ID_COUNTER = iter(xrange(10000000))
 # List of tiles to be destroyed at the next safe point.
 _pending_destructors = []
 
+
 class DistArrayImpl(DistArray):
   def __init__(self, shape, dtype, tiles, reducer_fn):
-    util.log_info('Creating array with %s tiles', len(tiles))
     #traceback.print_stack()
     self.shape = shape
     self.dtype = dtype
     self.reducer_fn = reducer_fn
     self.ctx = blob_ctx.get()
+
+    if self.ctx.is_master():
+      util.log_info('New array: %s, %s, %s tiles', shape, dtype, len(tiles))
 
     #util.log_info('%s', extents)
     Assert.isinstance(tiles, dict)
@@ -232,33 +236,37 @@ class DistArrayImpl(DistArray):
       ex, intersection = region, region
       blob_id = self.tiles[region]
       tgt = ctx.get(blob_id, extent.offset_slice(ex, intersection))
-    else:
-      splits = list(extent.find_overlapping(self.tiles.iterkeys(), region))
+      return tgt
+    
+    splits = list(extent.find_overlapping(self.tiles.iterkeys(), region))
 
-      #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
+    #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
+    #util.log_info('Fetching %d tiles', len(splits))
+
+    futures = []
+    for ex, intersection in splits:
+      blob_id = self.tiles[ex]
+      futures.append(ctx.get(blob_id, extent.offset_slice(ex, intersection), wait=False))
+    
+    # stitch results back together
+    # if we have any masked tiles, then we need to create a masked array.
+    # otherwise, create a dense array.
+    results = [r.data for r in rpc.wait_for_all(futures)]
+    
+    need_mask = False
+    for r in results:
+      if isinstance(r, np.ma.MaskedArray): need_mask = True
+   
+    if need_mask: 
       tgt = np.ma.MaskedArray(np.ndarray(region.shape, dtype=self.dtype))
       tgt.mask = 0
-      #util.log_info('Fetching %d tiles', len(splits))
-
-      futures = []
-      for ex, intersection in splits:
-        dst_slice = extent.offset_slice(region, intersection)
-        blob_id = self.tiles[ex]
-
-        def _apply_data(r, slc=dst_slice):
-          tgt[slc] = r.data
-
-        futures.append(ctx.get(blob_id, extent.offset_slice(ex, intersection),
-                               callback=_apply_data))
-        #tgt[dst_slice] = ctx.get(blob_id, extent.offset_slice(ex, intersection))
-
-        #util.log_info('%s %s', dst_slice, src_slice.shape)
-      rpc.wait_for_all(futures)
-
-    # attempt to remove mask on arrays when it is
-    # all valid.
-    if isinstance(tgt, np.ma.MaskedArray) and np.all(tgt.mask == np.ma.nomask):
-      return tgt.data
+    else:
+      tgt = np.ndarray(region.shape, dtype=self.dtype)
+    
+    for (ex, intersection), result in zip(splits, results):
+      dst_slice = extent.offset_slice(region, intersection)
+      #util.log_info('%s %s %s %s', ex, intersection, dst_slice, result)
+      tgt[dst_slice] = result
 
     return tgt
     #return tile.data[]
