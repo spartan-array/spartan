@@ -1,30 +1,46 @@
 #!/usr/bin/env python
 
+import cStringIO
+import collections
 from contextlib import contextmanager
 import logging
 from math import ceil
-from os.path import basename
-import collections
 import os
+from os.path import basename
 import select
+import socket
 import sys
 import threading
 import time
 import traceback
-import cStringIO
 
 import numpy as np
 
 
-log_debug = logging.debug
-log_info = logging.info
-log_warn = logging.warn
-log_error = logging.error
-log_fatal = logging.fatal
+HOSTNAME = socket.gethostname()
 
+def log_debug(*args, **kw):
+  kw['extra'] = { 'hostname' : HOSTNAME }
+  logging.debug(*args, **kw) 
+
+def log_info(*args, **kw):
+  kw['extra'] = { 'hostname' : HOSTNAME }
+  logging.info(*args, **kw) 
+
+def log_warn(*args, **kw):
+  kw['extra'] = { 'hostname' : HOSTNAME }
+  logging.warn(*args, **kw) 
+
+def log_error(*args, **kw):
+  kw['extra'] = { 'hostname' : HOSTNAME }
+  logging.error(*args, **kw) 
+  
+def log_fatal(*args, **kw):
+  kw['extra'] = { 'hostname' : HOSTNAME }
+  logging.fatal(*args, **kw) 
 
 def findCaller(obj):
-  f = sys._getframe(4)
+  f = sys._getframe(5)
   co = f.f_code
   filename = os.path.normcase(co.co_filename)
   return co.co_filename, f.f_lineno, co.co_name
