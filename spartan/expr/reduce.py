@@ -5,9 +5,15 @@ from spartan.expr.local import make_var, LocalReduceExpr, LocalInput, LocalCtx
 from spartan.node import Node
 
 def _reduce_mapper(ex, children, op, axis, output):
+  '''Run a local reducer for a tile, and update the appropiate 
+  portion of the output array.
+  '''
+  
   #util.log_info('Reduce: %s %s %s %s %s', reducer, ex, tile, axis, fn_kw)
 
   local_values = dict([(k, v.fetch(ex)) for k, v in children.iteritems()])
+  
+  # Set extent and axis information for user functions
   local_values['extent'] = ex
   local_values['axis'] = axis
 
@@ -46,7 +52,7 @@ class ReduceExpr(Expr):
                                     reducer=tile_accum)
 
     # util.log_info('Reducing into array %s', output_array)
-    largest.foreach(_reduce_mapper, kw={
+    largest.foreach_tile(_reduce_mapper, kw={
       'children' : children,
       'op' : op,
       'axis' : axis,

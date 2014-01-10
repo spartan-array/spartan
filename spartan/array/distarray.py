@@ -78,20 +78,10 @@ def compute_splits(shape, tile_hint=None, num_shards=-1):
   return result
     
 
-def _array_mapper(blob_id, blob, array=None, user_fn=None, **kw):
+def _tile_mapper(blob_id, blob, array=None, user_fn=None, **kw):
   '''Invoke ``user_fn`` on ``blob``, and construct tiles from the results.'''
-  ctx = blob_ctx.get()
   ex = array.extent_for_blob(blob_id)
-  results = []
-  user_results = user_fn(ex, **kw)
-  assert user_results is not None, user_fn
-
-  for target_ex, target_data in user_results:
-    Assert.eq(target_ex.shape, target_data.shape,
-              'Bad extent for result: %s %s' % (user_fn, ex))
-    blob_id = ctx.create(tile.from_data(target_data)).wait().blob_id
-    results.append((target_ex, blob_id))
-  return results
+  return user_fn(ex, **kw)
 
 
 class DistArray(object):
@@ -141,18 +131,15 @@ class DistArray(object):
     #util.log_info('Glomming: %s', self.shape)
     return self.select(np.index_exp[:])
 
-  def map_to_array(self, mapper_fn, kw=None):
-    results = self.map_to_table(mapper_fn=mapper_fn, kw=kw)
-    extents = {}
-    for blob_id, d in results.iteritems():
-      for ex, id in d:
-        extents[ex] = id
 
-    return from_table(extents)
-
-  def foreach(self, mapper_fn, kw):
-    return self.map_to_table(mapper_fn=mapper_fn, kw=kw)
-
+def map_to_array(distarray, mapper_fn, kw=None):
+  results = distarray.foreach_tile(mapper_fn=mapper_fn, kw=kw)
+  extents = {}
+  for blob_id, d in results.iteritems():
+    for ex, id in d:
+      extents[ex] = id
+  return from_table(extents)
+  
 ID_COUNTER = iter(xrange(10000000))
 
 # List of tiles to be destroyed at the next safe point.
@@ -166,6 +153,8 @@ class DistArrayImpl(DistArray):
     self.dtype = dtype
     self.reducer_fn = reducer_fn
     self.ctx = blob_ctx.get()
+    
+    Assert.not_null(dtype)
 
     if self.ctx.is_master():
       util.log_info('New array: %s, %s, %s tiles', shape, dtype, len(tiles))
@@ -216,7 +205,7 @@ class DistArrayImpl(DistArray):
     
     return sorted(scounts.items(), key=lambda kv: kv[1])[-1][0]
 
-  def map_to_table(self, mapper_fn, kw=None):
+  def foreach_tile(self, mapper_fn, kw=None):
     ctx = blob_ctx.get()
 
     if kw is None: kw = {}
@@ -224,8 +213,8 @@ class DistArrayImpl(DistArray):
     kw['user_fn'] = mapper_fn
 
     return ctx.map(self.tiles.values(),
-                   mapper_fn = _array_mapper,
-                   reduce_fn=None,
+                   mapper_fn = _tile_mapper,
+                   reduce_fn = None,
                    kw=kw)
 
   def fetch(self, region):
@@ -312,7 +301,7 @@ class DistArrayImpl(DistArray):
     
     splits = list(extent.find_overlapping(self.tiles, region))
     futures = []
-    util.log_info('%s: Updating %s tiles', region, len(splits))
+    util.log_debug('%s: Updating %s tiles', region, len(splits))
     for dst_key, intersection in splits:
       #util.log_info('%d %s %s %s', self.table.id(), region, dst_key, intersection)
       blob_id = self.tiles[dst_key]
@@ -371,10 +360,11 @@ def from_table(extents):
   if len(extents) > 0:
     # fetch a one element array in order to get the dtype
     key, blob_id = extents.iteritems().next()
-    #util.log_info('%s :: %s', key, blob_id)
+    util.log_info('%s :: %s', key, blob_id)
     t = blob_ctx.get().get(blob_id, None)
     Assert.isinstance(t, tile.Tile)
     dtype = t.dtype
+    #dtype = None
   else:
     # empty table; default dtype.
     dtype = np.float
@@ -402,7 +392,7 @@ class LocalWrapper(DistArray):
   def fetch(self, ex):
     return self._data[ex.to_slice()]
 
-  def map_to_array(self, mapper_fn, kw=None):
+  def foreach_tile(self, mapper_fn, kw=None):
     if kw is None: kw = {}
     ex = extent.from_slice(np.index_exp[:], self.shape)
     result = mapper_fn(ex, **kw)
@@ -485,8 +475,8 @@ class Slice(DistArray):
     self.tiles = offsets
     self.dtype = darray.dtype
     
-  def map_to_table(self, mapper_fn, kw):
-    return self.darray.map_to_table(mapper_fn = _slice_mapper,
+  def foreach_tile(self, mapper_fn, kw):
+    return self.darray.foreach_tile(mapper_fn = _slice_mapper,
                                     kw={'fn_kw' : kw,
                                         '_slice_extent' : self.slice,
                                         '_slice_fn' : mapper_fn })

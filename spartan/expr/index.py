@@ -1,12 +1,13 @@
 '''
 Indexing operations (slicing and filtering).
 '''
-from .base import Expr, ListExpr
-from spartan import util
+import numpy as np
+from spartan import util, blob_ctx
 from spartan.array import extent, tile, distarray
 from spartan.node import Node
 from spartan.util import Assert, join_tuple
-import numpy as np
+
+from .base import Expr, ListExpr
 
 
 class IndexExpr(Expr):
@@ -45,15 +46,19 @@ def int_index_mapper(ex, src, idx, dst):
     (dst.shape))
 
   #util.log_info('%s %s', output_ex.shape, np.array(output).shape)
-  output = np.array(output)
-  return [(output_ex, output)]
+  output_tile = tile.from_data(np.array(output))
+  tile_id = blob_ctx.get().create(output_tile).wait().blob_id
+  return [(output_ex, tile_id)]
 
 def bool_index_mapper(ex, src, idx):
   val = src.fetch(ex)
   mask = idx.fetch(ex)
 
   #util.log_info('\nVal: %s\n Mask: %s', val, mask)
-  return [(ex, np.ma.masked_array(val, mask))]
+  masked_val = np.ma.masked_array(val, mask)
+  output_tile = tile.from_data(masked_val)
+  tile_id = blob_ctx.get().create(output_tile).wait().blob_id
+  return [(ex, tile_id)]
 
 def eval_Index(ctx, prim, deps):
   src = deps['src']
@@ -63,7 +68,7 @@ def eval_Index(ctx, prim, deps):
 
   if idx.dtype == np.bool:
     # return a new array masked by `idx`
-    dst = src.map_to_array(bool_index_mapper, kw={ 'src' : src, 'idx' : idx})
+    dst = distarray.map_to_array(src, bool_index_mapper, kw={ 'src' : src, 'idx' : idx})
     return dst
   else:
     util.log_info('Integer indexing...')
@@ -74,7 +79,8 @@ def eval_Index(ctx, prim, deps):
     dst = distarray.create(join_tuple([idx.shape[0]], src.shape[1:]), dtype=src.dtype)
     
     # map over it, fetching the appropriate values for each tile.
-    return dst.map_to_array(int_index_mapper, kw={ 'src' : src, 'idx' : idx, 'dst' : dst })
+    return distarray.map_to_array(dst,
+                                  int_index_mapper, kw={ 'src' : src, 'idx' : idx, 'dst' : dst })
 
     
 def eval_Slice(ctx, prim, deps):

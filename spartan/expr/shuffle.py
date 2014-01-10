@@ -36,19 +36,26 @@ def _target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
   if result is not None:
     for ex, v in result:
       update_time, _ = util.timeit(lambda: target.update(ex, v))
-      util.log_info('Update took %s seconds.' % update_time)
+      #util.log_info('Update took %s seconds.' % update_time)
 
   return []
+
         
 def _notarget_mapper(ex, array=None, map_fn=None, inputs=None, fn_kw=None):
   #util.log_info('MapExtents: %s', map_fn)
   ctx = blob_ctx.get()
-  result = []
-  map_result = map_fn(inputs, ex, **fn_kw)
-  if map_result is not None:
-    for ex, v in map_result:
+  results = []
+  
+  user_result = map_fn(inputs, ex, **fn_kw)
+  if user_result is not None:
+    for ex, v in user_result:
       Assert.eq(ex.shape, v.shape, 'Bad shape from %s' % map_fn)
-      yield ex, v
+      result_tile = tile.from_data(v)
+      tile_id = blob_ctx.get().create(result_tile).wait().blob_id
+      results.append((ex, tile_id))
+  
+  return results  
+
 
 class ShuffleExpr(Expr):
   __metaclass__ = Node
@@ -67,9 +74,10 @@ class ShuffleExpr(Expr):
     map_fn = self.map_fn
 
     if target is not None:
-      v.foreach(_target_mapper,
-                kw = dict(map_fn=map_fn, inputs=v, target=target, fn_kw=fn_kw))
+      v.foreach_tile(mapper_fn = _target_mapper,
+                     kw = dict(map_fn=map_fn, inputs=v, target=target, fn_kw=fn_kw))
       return target
     else:
-      return v.map_to_array(mapper_fn = _notarget_mapper,
-                            kw = dict(inputs=v, map_fn=map_fn, fn_kw=fn_kw))
+      return distarray.map_to_array(v,
+                                    mapper_fn = _notarget_mapper,
+                                    kw = dict(inputs=v, map_fn=map_fn, fn_kw=fn_kw))

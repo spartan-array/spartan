@@ -3,12 +3,12 @@
 import collections
 
 from .. import util, blob_ctx
-from ..array import distarray
-from .local import LocalCtx, make_var, LocalInput, LocalMapExpr
+from ..array import distarray, tile
 from ..node import Node
-from spartan.expr import local
 from ..util import Assert
 from .base import DictExpr, Expr, as_array
+from .local import LocalCtx, make_var, LocalInput, LocalMapExpr
+
 
 def tile_mapper(ex, children, op):
   ctx = blob_ctx.get()
@@ -32,7 +32,12 @@ def tile_mapper(ex, children, op):
   result = op.evaluate(op_ctx)
   #util.log_info('Result: %s', result)
   Assert.eq(ex.shape, result.shape, 'Bad shape: (%s)' % op)
-  return [(ex, result)]
+  
+  # make a new tile and return it
+  result_tile = tile.from_data(result)
+  tile_id = blob_ctx.get().create(result_tile).wait().blob_id
+  
+  return [(ex, tile_id)]
 
 
 class MapExpr(Expr):
@@ -68,9 +73,9 @@ class MapExpr(Expr):
     children = dict(zip(keys, vals))
     #util.log_info('Mapping %s over %d inputs; largest = %s', op, len(children), largest.shape)
 
-    result = largest.map_to_array(tile_mapper,
-                                  kw = { 'children' : children,
-                                         'op' : op })
+    result = distarray.map_to_array(largest,
+                                    tile_mapper,
+                                    kw = { 'children' : children, 'op' : op })
     return result
 
 def map(inputs, fn, numpy_expr=None, fn_kw=None):
