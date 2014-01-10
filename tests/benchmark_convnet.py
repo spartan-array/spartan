@@ -4,19 +4,21 @@ import test_common
 from math import sqrt
 
 N_COLORS = 3
-IMG_SIZE = 1024
-FILTER_SIZE = (5, 5)
-N_IMGS = 1
-N_FILTERS = 32
+BASE_IMG_SIZE = 512
+FILTER_SIZE = (4, 4)
+N_FILTERS = 64
 ONE_TILE = (10000, 10000, 10000, 10000)
 
 def benchmark_convnet(ctx, timer):
-  hint = util.divup(IMG_SIZE, sqrt(ctx.num_workers))
-  tile_hint = (N_IMGS, N_COLORS, hint, hint)
-  #tile_hint = (util.divup(N_IMGS, ctx.num_workers), N_COLORS, IMG_SIZE, IMG_SIZE)
+  #image_size = BASE_IMG_SIZE * int(sqrt(ctx.num_workers))
+  image_size = BASE_IMG_SIZE
+  minibatch = ctx.num_workers
+  hint = util.divup(image_size, sqrt(ctx.num_workers))
+  tile_hint = (minibatch, N_COLORS, hint, hint)
+  #tile_hint = (util.divup(minibatch, ctx.num_workers), N_COLORS, image_size, image_size)
   util.log_info('Hint: %s', tile_hint)
     
-  images = expr.eager(expr.ones((N_IMGS, N_COLORS, IMG_SIZE, IMG_SIZE),
+  images = expr.eager(expr.ones((minibatch, N_COLORS, image_size, image_size),
                                 tile_hint=tile_hint))
   
   w1 = expr.eager(expr.ones((N_FILTERS, N_COLORS) + FILTER_SIZE,
@@ -40,9 +42,8 @@ def benchmark_convnet(ctx, timer):
  
   # force parakeet functions to compile before timing. 
   _()  
-  timer.time_op('convnet', _)
-  timer.time_op('convnet', _)
-  timer.time_op('convnet', _)
+  for i in range(2):
+    timer.time_op('convnet', _)
   
 if __name__ == '__main__':
   test_common.run(__file__)

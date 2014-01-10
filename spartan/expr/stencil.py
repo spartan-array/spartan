@@ -1,14 +1,14 @@
 import math
 
-from ..node import Node
-from spartan import util
-from spartan.array import extent
 import numpy as np
-from spartan.util import divup, Assert
+from .. import util
+from ..array import extent
+from ..util import divup, Assert
 
 
 try:
-  import parakeet
+  import parakeet 
+  parakeet.config.backend = 'c'
   jit = parakeet.jit
 except:
   def jit(fn):
@@ -24,7 +24,7 @@ def tiles_like(array, target_shape):
   return new_tile
 
 @util.synchronized
-def convolve(local_image, local_filters):
+def _convolve(local_image, local_filters):
   num_images, n_color, w, h = local_image.shape
   num_filts, f_col, fw, fh = local_filters.shape
 
@@ -60,6 +60,7 @@ def _maxpool(array, pool_size, stride):
           for i in xrange(0, pool_size):
             for j in xrange(0, pool_size):
               if x + i < w and y + j < h:
+                # TODO(power) -- replace this when parakeet bug is fixed
                 target[0, 0, 0, 0] = 0
                 # target[img, color, (x + i) / stride, (y + j) / stride] = \
                 #  max(array[img, color, x + i, y + j],
@@ -78,21 +79,19 @@ def stencil_mapper(array, ex, filters=None, images=None, target_shape=None):
   
   Assert.eq(n_col, f_col)
   
-  util.log_info('Stencil(%s), image: %s, filter: %s (%s, %s)',
-            ex,
-            local_image.shape, local_filters.shape,
-            images.shape, filters.shape)
+#   util.log_info('Stencil(%s), image: %s, filter: %s (%s, %s)', ex,
+#             local_image.shape, local_filters.shape,
+#             images.shape, filters.shape)
   
   target_ex = extent.create(
       (ex.ul[0], 0, ex.ul[2], ex.ul[3]),
       (ex.lr[0], num_filt, ex.lr[2], ex.lr[3]),
       target_shape)
 
-  result = convolve(local_image, local_filters)
+  result = _convolve(local_image, local_filters)
 
-  util.log_info('...convolve done.')
-  
-  util.log_info('Updating: %s', target_ex)
+  #util.log_info('..._convolve done.')
+  #util.log_info('Updating: %s', target_ex)
   yield (target_ex, result)
 
 
@@ -109,9 +108,9 @@ def stencil(images, filters, stride=1):
   n_filt, f_col, fw, fh = filters.shape
   
   tile_hint = tiles_like(images, (n_img, n_filt, w, h))
-#     util.log_info('Stencil: %s %s %s',
-#                   images.shape, (n_img, n_filt, w, h),
-#                   tile_hint)
+  util.log_info('Stencil: %s %s %s',
+                images.shape, (n_img, n_filt, w, h),
+                tile_hint)
    
   target = ndarray((n_img, n_filt, w, h),
                    dtype=images.dtype,
@@ -120,11 +119,11 @@ def stencil(images, filters, stride=1):
                    tile_hint=tile_hint)
   
   return shuffle(images,
-                     stencil_mapper,
-                     target=target,
-                     kw=dict(images=images,
-                             filters=filters,
-                             target_shape=target.shape))
+                 stencil_mapper,
+                 target=target,
+                 kw=dict(images=images,
+                         filters=filters,
+                         target_shape=target.shape))
 
 
 def _maxpool_mapper(array, ex, pool_size, stride, target_shape):
