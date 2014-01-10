@@ -1,20 +1,22 @@
 #!/usr/bin/env python
 
-import pstats
 import cProfile
-import threading
-import time
-
 import multiprocessing
 from multiprocessing.pool import ThreadPool
 import os
+import pstats
 import socket
 import sys
+import threading
+import time
 
-from spartan import config, util, rpc, core, blob_ctx
-from spartan.util import Assert
-from spartan.config import FLAGS, StrFlag, IntFlag
-from spartan.rpc import zeromq
+from . import config, util, rpc, core, blob_ctx
+from .config import FLAGS, StrFlag, IntFlag, BoolFlag
+from .rpc import zeromq
+from .util import Assert
+
+
+FLAGS.add(BoolFlag('use_single_core', default=True))
 
 class Worker(object):
   def __init__(self, port, master):
@@ -148,8 +150,10 @@ class Worker(object):
 def _start_worker(master, port, local_id):
   util.log_info('Worker starting up... Master: %s Profile: %s', master, FLAGS.profile_worker)
 
-  pid = os.getpid()
-  os.system('taskset -pc %d %d > /dev/null' % (local_id, pid))
+  if FLAGS.use_single_core:
+    pid = os.getpid()
+    os.system('taskset -pc %d %d > /dev/null' % (local_id, pid))
+    
   master = rpc.connect(*master)
   worker = Worker(port, master)
   worker.wait_for_shutdown()
