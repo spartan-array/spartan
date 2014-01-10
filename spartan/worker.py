@@ -89,8 +89,7 @@ class Worker(object):
   def update(self, req, handle):
     #util.log_info('W%d Update: %s', self.id, req.id)
     blob =  self._blobs[req.id]
-    self._blobs[req.id] = blob.update(req.data, req.reducer)
-
+    self._blobs[req.id] = blob.update(req.region, req.data, req.reducer)
     handle.done()
 
   def get(self, req, handle):

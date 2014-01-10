@@ -1,12 +1,27 @@
-from .base import Expr, DictExpr
+import numpy as np
+
+from spartan import util
 from spartan.array import extent, distarray
 from spartan.expr import local
 from spartan.expr.local import make_var, LocalReduceExpr, LocalInput, LocalCtx
 from spartan.node import Node
+from spartan.util import Assert
+
+from .base import Expr, DictExpr
+
 
 def _reduce_mapper(ex, children, op, axis, output):
   '''Run a local reducer for a tile, and update the appropiate 
   portion of the output array.
+  
+  N.B. Scipy sparse matrices DO NOT support dimensions != 2.
+  As a result, naive reductions over these matrices will fail
+  as the local reduction value will not have the correct
+  dimensionality.
+  
+  To deal with this, we assume that all outputs of a reduction
+  will be dense: we convert sparse reduction outputs to dense
+  and fix the dimensions before updating the target array.
   '''
   
   #util.log_info('Reduce: %s %s %s %s %s', reducer, ex, tile, axis, fn_kw)
@@ -19,21 +34,33 @@ def _reduce_mapper(ex, children, op, axis, output):
 
   ctx = LocalCtx(inputs=local_values)
 
-  reduced = op.evaluate(ctx)
+  local_reduction = op.evaluate(ctx)
   dst_extent = extent.index_for_reduction(ex, axis)
-  #util.log_info('Update: %s %s', dst_extent, reduced)
-  output.update(dst_extent, reduced)
+  
+  # HACK -- scipy.sparse matrices output DENSE values
+  # with the WRONG shape.  Fix shapes here that have
+  # the right SIZE but wrong number of dimensions.
+  # ARGH.
+  #if scipy.sparse.issparse(local_reduction):
+  #  local_reduction = local_reduction.todense()
+  Assert.eq(local_reduction.size, dst_extent.size)
+  
+  # fix shape
+  local_reduction = np.asarray(local_reduction).reshape(dst_extent.shape)
+    
+  util.log_info('Update: %s %s', dst_extent, local_reduction)
+  output.update(dst_extent, local_reduction)
   return []
 
 class ReduceExpr(Expr):
   __metaclass__ = Node
-  _members = ['children', 'axis', 'dtype_fn', 'op', 'combine_fn']
+  _members = ['children', 'axis', 'dtype_fn', 'op', 'accumulate_fn']
   
   def _evaluate(self, ctx, deps):
     children = deps['children']
     axis = deps['axis']
     op = deps['op']
-    tile_accum = deps['combine_fn']
+    tile_accum = deps['accumulate_fn']
 
     keys = children.keys()
     vals = children.values()
@@ -48,7 +75,6 @@ class ReduceExpr(Expr):
 
     shape = extent.shape_for_reduction(vals[0].shape, axis)
     output_array = distarray.create(shape, dtype,
-                                    combiner=tile_accum, 
                                     reducer=tile_accum)
 
     # util.log_info('Reducing into array %s', output_array)
@@ -61,7 +87,7 @@ class ReduceExpr(Expr):
     return output_array
 
  
-def reduce(v, axis, dtype_fn, local_reduce_fn, combine_fn, fn_kw=None):
+def reduce(v, axis, dtype_fn, local_reduce_fn, accumulate_fn, fn_kw=None):
   '''
   Reduce ``v`` over axis ``axis``.
   
@@ -70,13 +96,13 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, combine_fn, fn_kw=None):
   For each tile of the input ``local_reduce_fn`` is called with
   arguments: (tiledata, axis, extent).
 
-  The output is combined using ``combine_fn``.
+  The output is combined using ``accumulate_fn``.
    
   :param v: `Expr`
   :param axis: int or None
   :param dtype_fn: Callable: fn(array) -> `numpy.dtype`
   :param local_reduce_fn: Callable: fn(extent, data, axis)
-  :param combine_fn: Callable: fn(old_v, update_v) -> new_v 
+  :param accumulate_fn: Callable: fn(old_v, update_v) -> new_v 
   '''
   if fn_kw is None: fn_kw = {}
   varname = make_var()
@@ -95,5 +121,5 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, combine_fn, fn_kw=None):
                     axis=axis,
                     dtype_fn=dtype_fn,
                     op=reduce_op,
-                    combine_fn=combine_fn)
+                    accumulate_fn=accumulate_fn)
 

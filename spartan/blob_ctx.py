@@ -87,10 +87,14 @@ class BlobCtx(object):
       return future.on_finished(callback)
 
 
-  def update(self, blob_id, data, reducer, wait=True):
-    req = core.UpdateReq(id=blob_id, data=data, reducer=reducer)
-    return self._send(blob_id, 'update', req, wait=wait)
+#   def update(self, blob_id, data, reducer, wait=True):
+#     req = core.UpdateReq(id=blob_id, data=data, reducer=reducer)
+#     return self._send(blob_id, 'update', req, wait=wait)
 
+  def update(self, blob_id, region, data, reducer, wait=True):
+    req = core.UpdateReq(id=blob_id, region=region, data=data, reducer=reducer)
+    return self._send(blob_id, 'update', req, wait=wait)
+  
   def create_local(self):
     assert self.worker_id != MASTER_ID
     return core.BlobId(worker=self.worker_id, id=ID_COUNTER.next())

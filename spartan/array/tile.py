@@ -1,7 +1,7 @@
 import traceback
 import numpy as np
 import scipy.sparse
-from scipy.sparse import dok_matrix, coo_matrix
+from scipy.sparse import lil_matrix
 from . import extent
 from spartan import util
 from spartan.util import Assert
@@ -13,6 +13,11 @@ TYPE_SPARSE = 3
 
 MASK_ALL_CLEAR = 0
 MASK_ALL_SET = 1
+
+# get: slice -> ndarray or sparse or masked
+# update: right now -- takes a Tile
+#   change to update: takes a (slice, data, reducer) 
+#   where data is dense, masked, or sparse.
 
 ID = iter(xrange(100000000))
 
@@ -55,14 +60,16 @@ class Tile(object):
 
     self._data = val
 
-  def update(self, update, reducer):
-    #util.log_info('Update: %s %s', update.data, reducer)
-    return merge(self, update, reducer)
+  def update(self, subslice, data, reducer):
+    util.log_info('Update: %s %s %s', subslice, data, reducer)
+    return merge(self, subslice, data, reducer)
 
   def get(self, subslice=None):
     # no data, return an empty array
     if self.data is None:
       #util.log_info('EMPTY %s %s', self.id, self.shape)
+      if self.type == TYPE_SPARSE:
+          return lil_matrix(self.shape, self.dtype)[subslice]
       return np.ndarray(self.shape, self.dtype)[subslice]
 
     # scalars are just returned directly.
@@ -104,7 +111,7 @@ class Tile(object):
 
     if self.type == TYPE_SPARSE:
       if self.data is None:
-        self.data = dok_matrix(self.shape, self.dtype)
+        self.data = lil_matrix(self.shape, self.dtype)
     else:
       self._initialize_mask()
 
@@ -140,10 +147,10 @@ def from_data(data):
 def from_shape(shape, dtype, tile_type):
   if tile_type == TYPE_SPARSE:
     return Tile(shape=shape,
-                data=dok_matrix(shape, dtype=dtype),
+                data=lil_matrix(shape, dtype=dtype),
                 dtype=dtype,
                 tile_type=TYPE_SPARSE,
-                mask=MASK_ALL_CLEAR)
+                mask=None)
   elif tile_type == TYPE_DENSE: 
     return Tile(shape=shape,
                 data=None,
@@ -175,17 +182,13 @@ def from_intersection(src, overlap, data):
               tile_type=TYPE_DENSE)
 
 
-def merge(old_tile, new_tile, reducer):
+def merge(old_tile, subslice, update, reducer):
   Assert.isinstance(old_tile, Tile)
-  Assert.isinstance(new_tile, Tile)
 
-  Assert.eq(old_tile.dtype, new_tile.dtype)
-  Assert.eq(old_tile.shape, new_tile.shape)
-
-  # fast path -- replace an empty tile with the new data
+  # TODO(Qi) -- see if we can still do the fast path.
   if old_tile.data is None:
-    #util.log_info('REPL %s %s', new_tile.id, new_tile.data)
-    return new_tile
+    # return tile.from_data_and_shape(???)
+    old_tile._initialize()
 
   #util.log_info('OLD: %s %s', old_tile.id, old_tile.data)
   #util.log_info('NEW: %s %s', new_tile.id, new_tile.data)
@@ -193,38 +196,50 @@ def merge(old_tile, new_tile, reducer):
   # zero-dimensional arrays; just use data == None as a mask.
   if len(old_tile.shape) == 0:
     if old_tile.data is None or reducer is None:
-      old_tile.data = new_tile.data
+      old_tile.data = update
     else:
-      old_tile.data = reducer(old_tile.data, new_tile.data)
+      old_tile.data = reducer(old_tile.data, update)
     return old_tile
 
-  old_tile._initialize()
-  new_tile._initialize()
-
-  Assert.eq(old_tile.shape, new_tile.shape)
+  assert not isinstance(update, np.ma.MaskedArray)
+  
   if old_tile.type == TYPE_DENSE:
-    replaced = ~old_tile.mask & new_tile.mask
-    updated = old_tile.mask & new_tile.mask
+    # initialize:
+    # old_data[subslice] = data
+    #
+    # accumulate:
+    # old_data[subslice] = reduce(old_data[subslice], data) 
 
     #util.log_info('%s %s', old_tile.mask, new_tile.mask)
     #util.log_info('REPLACE: %s', replaced)
     #util.log_info('UPDATE: %s', updated)
-
-    old_tile.data[replaced] = new_tile.data[replaced]
-    old_tile.mask[replaced] = 1
-
-    if np.any(updated):
-      if reducer is None:
-        old_tile.data[updated] = new_tile.data[updated]
+    if old_tile.data is None:
+      util.log_info('old.shape:%s subslice:%s', old_tile.shape, subslice)
+      if old_tile.shape == subslice:
+        old_tile.data = update
+        old_tile.mask[subslice] = 1
+        return old_tile
       else:
-        old_tile.data[updated] = reducer(old_tile.data[updated], new_tile.data[updated])
+        old_tile.data = np.ndarray(old_tile.shape, dtype=old_tile.dtype)
+    
+    replaced = ~old_tile.mask[subslice]
+    updated = old_tile.mask[subslice]
+    
+
+    old_region = old_tile.data[subslice]
+    old_region[replaced] = update[replaced]
+    old_region[updated] = reducer(old_region[updated], update[updated]) 
+    
+    old_tile.mask[subslice] = 1
+#     if np.any(updated):
+#       if reducer is None:
+#         old_tile.data[updated] = new_tile.data[updated]
+#       else:
+#         old_tile.data[updated] = reducer(old_tile.data[updated], new_tile.data[updated])
   else:
+    # TODO (SPARSE UPDATE)!!!
     # sparse update, no mask, just iterate over data items
     # TODO(POWER) -- this is SLOW!
-    for k, v in new_tile.iteritems():
-      if old_tile.has_key(k):
-        old_tile[k] = reducer(old_tile[k], v)
-      else:
-        old_tile[k] = v
+    old_tile.data[subslice] = update
 
   return old_tile

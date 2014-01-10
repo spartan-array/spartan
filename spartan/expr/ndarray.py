@@ -5,7 +5,7 @@ import numpy as np
 
 class NdArrayExpr(Expr):
   __metaclass__ = Node
-  _members = ['_shape', 'sparse', 'dtype', 'tile_hint', 'combine_fn', 'reduce_fn']
+  _members = ['_shape', 'sparse', 'dtype', 'tile_hint', 'reduce_fn']
 
   def __str__(self):
     return 'dist_array(%s, %s)' % (self.shape, self.dtype)
@@ -15,7 +15,6 @@ class NdArrayExpr(Expr):
                        dtype=visitor.visit(self.dtype),
                        tile_hint=self.tile_hint,
                        sparse=self.sparse,
-                       combine_fn=self.combine_fn,
                        reduce_fn=self.reduce_fn)
   
   def dependencies(self):
@@ -30,7 +29,6 @@ class NdArrayExpr(Expr):
     tile_hint = self.tile_hint
     
     return distarray.create(shape, dtype,
-                            combiner=self.combine_fn,
                             reducer=self.reduce_fn,
                             tile_hint=tile_hint,
                             sparse=self.sparse)
@@ -39,7 +37,6 @@ class NdArrayExpr(Expr):
 def ndarray(shape, 
             dtype=np.float, 
             tile_hint=None,
-            combine_fn=None, 
             reduce_fn=None,
             sparse=False):
   '''
@@ -51,6 +48,5 @@ def ndarray(shape,
   return NdArrayExpr(_shape = shape,
                      dtype = dtype,
                      tile_hint = tile_hint,
-                     combine_fn = combine_fn,
                      reduce_fn = reduce_fn,
                      sparse = sparse)

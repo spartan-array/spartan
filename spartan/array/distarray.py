@@ -106,7 +106,6 @@ class DistArray(object):
       a_value = np.ndarray(ex.shape, dtype=self.dtype)
       a_value[:] = value
       value = a_value
-    
     self.update(ex, value)
 
   def select(self, idx):
@@ -294,21 +293,31 @@ class DistArrayImpl(DistArray):
 
     # exact match
     if region in self.tiles:
-      #util.log_info('EXACT: %d %s ', self.table.id(), region)
+      util.log_info('EXACT: %s %s ', region, extent.offset_slice(region, region))
       blob_id = self.tiles[region]
-      ctx.update(blob_id, tile.from_data(data), self.reducer_fn)
+      dst_slice = extent.offset_slice(region, region)
+      ctx.update(blob_id, dst_slice, data, self.reducer_fn)
       return
     
     splits = list(extent.find_overlapping(self.tiles, region))
     futures = []
-    util.log_debug('%s: Updating %s tiles', region, len(splits))
-    for dst_key, intersection in splits:
-      #util.log_info('%d %s %s %s', self.table.id(), region, dst_key, intersection)
-      blob_id = self.tiles[dst_key]
+    util.log_info('%s: Updating %s tiles', region, len(splits))
+    for dst_extent, intersection in splits:
+      #util.log_info('%s %s %s', region, dst_key, intersection)
+      blob_id = self.tiles[dst_extent]
+
       src_slice = extent.offset_slice(region, intersection)
-      update_tile = tile.from_intersection(dst_key, intersection, data[src_slice])
+      dst_slice = extent.offset_slice(dst_extent, intersection)
+      
+      #util.log_info('Update src:%s dst:%s data:%s', src_slice, dst_slice, data[src_slice])
+      #update_tile = tile.from_intersection(dst_key, intersection, data[src_slice])
       #util.log_info('%s %s %s %s', dst_key.shape, intersection.shape, blob_id, update_tile)
-      futures.append(ctx.update(blob_id, update_tile, self.reducer_fn, wait=False))
+      
+      futures.append(ctx.update(blob_id, 
+                                dst_slice, 
+                                data[src_slice], 
+                                self.reducer_fn, 
+                                wait=False))
 
     rpc.wait_for_all(futures)
 
@@ -316,7 +325,6 @@ class DistArrayImpl(DistArray):
 def create(shape,
            dtype=np.float,
            sharder=None,
-           combiner=None,
            reducer=None,
            tile_hint=None,
            sparse=False):

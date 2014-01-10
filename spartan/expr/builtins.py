@@ -8,19 +8,23 @@ These include --
 * Shape/type casting: (`reshape`, `ravel`, `astype`, `shape`, `size`)
 * Other: (`dot`).
 '''
+import sys
+
 import numpy as np
+import scipy.sparse as sp
+
+from .. import util
 from ..array import distarray, extent
 from ..array.extent import index_for_reduction, shapes_match
+from ..util import Assert
 from .base import force
-from .shuffle import shuffle
+from .loop import loop
 from .map import map
 from .ndarray import ndarray
+from .optimize import disable_parakeet, not_idempotent
 from .reduce import reduce
-from .optimize import disable_parakeet
-from .optimize import not_idempotent
-from .loop import loop
-from spartan import util
-from ..util import Assert
+from .shuffle import shuffle
+
 
 def _make_ones(input): return np.ones(input.shape, input.dtype)
 def _make_zeros(input): return np.zeros(input.shape, input.dtype)
@@ -37,11 +41,11 @@ def _make_randn(input):
 def _make_sparse_rand(input, density=None, dtype=None):
   Assert.eq(len(input.shape), 2)
   
-  return scipy.sparse.rand(input.shape[0],
-                           input.shape[1],
-                           density=density,
-                           format='coo',
-                           dtype=dtype)
+  return sp.rand(input.shape[0],
+                 input.shape[1],
+                 density=density,
+                 format='coo',
+                 dtype=dtype)
 
 def rand(*shape, **kw):
   '''
@@ -79,6 +83,16 @@ def sparse_rand(shape,
              fn_kw = { 'dtype' : dtype, 
                        'density' : density })
 
+def sparse_empty(shape,
+                 dtype=np.float32,
+                 tile_hint=None):
+    return ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True)
+
+def sparse_diagonal(shape,
+                    dypte=np.float32,
+                    tile_hint=None):
+    pass
+
 def zeros(shape, dtype=np.float, tile_hint=None):
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
              fn=_make_zeros)
@@ -103,8 +117,11 @@ def arange(shape, dtype=np.float):
                  kw={'dtype': dtype})
 
 
-def _sum_local(ex, tile, axis):
-  return np.sum(tile[:], axis)
+def _sum_local(ex, data, axis):
+  util.log_info('Summing: %s %s', ex, axis)
+  util.log_info('Summing: %s', data.shape)
+  util.log_info('Result: %s', data.sum(axis).shape)
+  return data.sum(axis)
 
 
 def sum(x, axis=None):
@@ -119,7 +136,7 @@ def sum(x, axis=None):
                 axis=axis,
                 dtype_fn=lambda input: input.dtype,
                 local_reduce_fn=_sum_local,
-                combine_fn=np.add)
+                accumulate_fn=np.add)
 
 
 def mean(x, axis=None):
@@ -188,7 +205,7 @@ def argmin(x, axis=None):
   compute_min = reduce(x, axis,
                        dtype_fn=_dual_dtype,
                        local_reduce_fn=_dual_reducer,
-                       combine_fn=lambda a, b: _dual_combiner(a, b, np.less),
+                       accumulate_fn=lambda a, b: _dual_combiner(a, b, np.less),
                        fn_kw={'idx_f': np.argmin, 'val_f': np.min})
 
   take_indices = map(compute_min, _take_idx_mapper)
@@ -207,7 +224,7 @@ def argmax(x, axis=None):
   compute_max = reduce(x, axis,
                        dtype_fn=_dual_dtype,
                        local_reduce_fn=_dual_reducer,
-                       combine_fn=lambda a, b: _dual_combiner(a, b, np.greater),
+                       accumulate_fn=lambda a, b: _dual_combiner(a, b, np.greater),
                        fn_kw={'idx_f': np.argmax, 'val_f': np.max})
 
   take_indices = map(compute_max, _take_idx_mapper)
@@ -364,7 +381,6 @@ def dot(a, b):
   target = ndarray((a.shape[0], b.shape[1]),
                    dtype=av.dtype,
                    tile_hint=bv.tile_shape(),
-                   combine_fn=np.add,
                    reduce_fn=np.add)
 
   return shuffle(av, _dot_mapper, target=target, kw=dict(av=av, bv=bv))
@@ -391,4 +407,4 @@ try:
   def norm_cdf(v):
     return map(v, fn=scipy.stats.norm.cdf, numpy_expr='mathlib.norm_cdf')
 except:
-  util.log_info('Missing scipy.stats (some functions will be unavailable.')
+  print >>sys.stderr, 'Missing scipy.stats (some functions will be unavailable.'

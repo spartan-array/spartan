@@ -115,7 +115,6 @@ def stencil(images, filters, stride=1):
   target = ndarray((n_img, n_filt, w, h),
                    dtype=images.dtype,
                    reduce_fn=np.sum,
-                   combine_fn=np.sum,
                    tile_hint=tile_hint)
   
   return shuffle(images,
@@ -157,7 +156,6 @@ def maxpool(images, pool_size=2, stride=2):
   target = ndarray((n_img, n_col) + tgt_shape,
                    dtype=images.dtype,
                    tile_hint=tile_hint,
-                   combine_fn=np.maximum,
                    reduce_fn=np.maximum)
    
   return shuffle(images,

@@ -82,9 +82,8 @@ class DestroyReq(Message):
 
 class UpdateReq(Message):
   __metaclass__ = Node
-  _members = ['id', 'data', 'reducer']
-
-
+  _members = ['id', 'region', 'data', 'reducer']
+  
 class KernelReq(Message):
   __metaclass__ = Node
   _members = ['blobs', 'mapper_fn', 'reduce_fn', 'kw']

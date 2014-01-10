@@ -162,7 +162,7 @@ class ReduceMapFusion(OptimizePass):
                      children=new_children,
                      axis=expr.axis,
                      dtype_fn=expr.dtype_fn,
-                     combine_fn=expr.combine_fn,
+                     accumulate_fn=expr.accumulate_fn,
                      op=combined_op)
 
 
