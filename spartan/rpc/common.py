@@ -24,7 +24,8 @@ SERVER_PENDING = weakref.WeakKeyDictionary()
 
 NO_RESULT = object()
 
-DEFAULT_TIMEOUT = 30
+DEFAULT_TIMEOUT = 1200
+WARN_THRESHOLD = 60
 
 def set_default_timeout(seconds):
   global DEFAULT_TIMEOUT
@@ -56,9 +57,6 @@ class SocketBase(object):
 
   # client
   def connect(self): assert False
-
-  # server
-  def bind(self): assert False
 
 
 def capture_exception(exc_info=None):
@@ -170,13 +168,17 @@ class Future(object):
   def timed_out(self):
     return self._deadline < time.time()
 
+  def elapsed_time(self):
+    return time.time() - self._start
+  
   def wait(self):
     self._cv.acquire()
     while not self.have_result and not self.timed_out():
       # use a timeout so that ctrl-c works.
       self._cv.wait(timeout=1)
-      #if time.time() - self._start > 2:
-      #  util.log_info('Waiting... %s %s', self.addr, self.rpc_id)
+      
+      if self.elapsed_time() > WARN_THRESHOLD:
+        util.log_info('Waiting for result from %s RPC: %s', self.addr, self.rpc_id)
     self._cv.release()
 
 #    util.log_info('Result from %s in %f seconds.', self.addr, time.time() - self._start)
@@ -246,7 +248,6 @@ class Server(object):
   def serve_nonblock(self):
 #    util.log_info('Running.')
     self._running = True
-    self._socket.bind()
 
   def register_object(self, obj):
     for name in dir(obj):
