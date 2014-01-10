@@ -16,26 +16,39 @@ import traceback
 
 import numpy as np
 
-
 HOSTNAME = socket.gethostname()
+LOGGING_CONFIGURED = False
+
+def _setup_logger():
+  global LOGGING_CONFIGURED
+  if logging.root is None:
+    raise Exception, 'Log attempt before logging was configured.'
+  
+  logging.RootLogger.findCaller = findCaller
+  LOGGING_CONFIGURED = True   
 
 def log_debug(*args, **kw):
+  if not LOGGING_CONFIGURED: _setup_logger()
   kw['extra'] = { 'hostname' : HOSTNAME }
   logging.debug(*args, **kw) 
 
 def log_info(*args, **kw):
+  if not LOGGING_CONFIGURED: _setup_logger()
   kw['extra'] = { 'hostname' : HOSTNAME }
   logging.info(*args, **kw) 
 
 def log_warn(*args, **kw):
+  if not LOGGING_CONFIGURED: _setup_logger()
   kw['extra'] = { 'hostname' : HOSTNAME }
   logging.warn(*args, **kw) 
 
 def log_error(*args, **kw):
+  if not LOGGING_CONFIGURED: _setup_logger()
   kw['extra'] = { 'hostname' : HOSTNAME }
   logging.error(*args, **kw) 
   
 def log_fatal(*args, **kw):
+  if not LOGGING_CONFIGURED: _setup_logger()
   kw['extra'] = { 'hostname' : HOSTNAME }
   logging.fatal(*args, **kw) 
 
@@ -45,9 +58,6 @@ def findCaller(obj):
   filename = os.path.normcase(co.co_filename)
   return co.co_filename, f.f_lineno, co.co_name
 
-
-root = logging.getLogger()
-logging.RootLogger.findCaller = findCaller
 
 
 class FileWatchdog(threading.Thread):
