@@ -61,7 +61,7 @@ class Tile(object):
     self._data = val
 
   def update(self, subslice, data, reducer):
-    util.log_info('Update: %s %s %s', subslice, data, reducer)
+    #util.log_info('Update: %s %s %s', subslice, data, reducer)
     return merge(self, subslice, data, reducer)
 
   def get(self, subslice=None):
@@ -217,7 +217,7 @@ def merge(old_tile, subslice, update, reducer):
       util.log_info('old.shape:%s subslice:%s', old_tile.shape, subslice)
       if old_tile.shape == subslice:
         old_tile.data = update
-        old_tile.mask[subslice] = 1
+        old_tile.mask[subslice] = True
         return old_tile
       else:
         old_tile.data = np.ndarray(old_tile.shape, dtype=old_tile.dtype)
@@ -225,17 +225,16 @@ def merge(old_tile, subslice, update, reducer):
     replaced = ~old_tile.mask[subslice]
     updated = old_tile.mask[subslice]
     
-
     old_region = old_tile.data[subslice]
     old_region[replaced] = update[replaced]
-    old_region[updated] = reducer(old_region[updated], update[updated]) 
     
-    old_tile.mask[subslice] = 1
-#     if np.any(updated):
-#       if reducer is None:
-#         old_tile.data[updated] = new_tile.data[updated]
-#       else:
-#         old_tile.data[updated] = reducer(old_tile.data[updated], new_tile.data[updated])
+    if np.any(updated):
+      if reducer is not None:
+        old_region[updated] = reducer(old_region[updated], update[updated]) 
+      else:
+        old_region[updated] = update[updated] 
+    
+    old_tile.mask[subslice] = True
   else:
     # TODO (SPARSE UPDATE)!!!
     # sparse update, no mask, just iterate over data items
