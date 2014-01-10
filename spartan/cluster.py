@@ -51,7 +51,7 @@ def _start_remote_worker(worker, st, ed):
     util.log_info('Using threads.')
     for i in range(st, ed):
       p = threading.Thread(target=spartan.worker._start_worker,
-                           args=((socket.gethostname(), FLAGS.port_base), FLAGS.port_base + 1 + i, i))
+                           args=((socket.gethostname(), FLAGS.port_base), i))
       p.daemon = True
       p.start()
     time.sleep(0.1)
@@ -75,8 +75,8 @@ def _start_remote_worker(worker, st, ed):
           #'gdb', '-ex', 'run', '--args',
           'python', '-m spartan.worker',
           '--master=%s:%d' % (socket.gethostname(), FLAGS.port_base),
-          '--count=%d' % (ed - st),
-          '--port=%d' % (FLAGS.port_base + 1)]
+          '--count=%d' % (ed - st)
+          ]
 
   # add flags from config/user
   for (name, value) in FLAGS:

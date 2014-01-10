@@ -6,6 +6,11 @@ def listen(host, port):
   server = Server(socket)
   return server
 
+def listen_on_random_port(host):
+  socket = server_socket((host, -1))
+  server = Server(socket)
+  return server
+
 def connect(host, port):
   socket = client_socket((host, port))
   return Client(socket)  

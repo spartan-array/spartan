@@ -19,7 +19,7 @@ from .util import Assert
 FLAGS.add(BoolFlag('use_single_core', default=True))
 
 class Worker(object):
-  def __init__(self, port, master):
+  def __init__(self, master):
     self.id = -1
     self._initialized = False
     self._peers = {}
@@ -37,13 +37,13 @@ class Worker(object):
       self._kernel_prof = None
 
     hostname = socket.gethostname()
-    self._server = rpc.listen(hostname, port)
+    self._server = rpc.listen_on_random_port(hostname)
     self._server.register_object(self)
     self._server.serve_nonblock()
 
     req = core.RegisterReq()
     req.host = hostname
-    req.port = port
+    req.port = self._server.addr[1]
     master.register(req)
 
 
@@ -147,7 +147,7 @@ class Worker(object):
       time.sleep(0.1)
 
 
-def _start_worker(master, port, local_id):
+def _start_worker(master, local_id):
   util.log_info('Worker starting up... Master: %s Profile: %s', master, FLAGS.profile_worker)
 
   if FLAGS.use_single_core:
@@ -155,14 +155,13 @@ def _start_worker(master, port, local_id):
     os.system('taskset -pc %d %d > /dev/null' % (local_id, pid))
     
   master = rpc.connect(*master)
-  worker = Worker(port, master)
+  worker = Worker(master)
   worker.wait_for_shutdown()
 
 if __name__ == '__main__':
   sys.path.append('./tests')
 
   FLAGS.add(StrFlag('master'))
-  FLAGS.add(IntFlag('port'))
   FLAGS.add(IntFlag('count'))
 
   #resource.setrlimit(resource.RLIMIT_AS, (8 * 1000 * 1000 * 1000,
@@ -170,7 +169,6 @@ if __name__ == '__main__':
 
   config.initialize(sys.argv)
   assert FLAGS.master is not None
-  assert FLAGS.port > 0
   assert FLAGS.count > 0
 
   util.log_info('Starting %d workers on %s', FLAGS.count, socket.gethostname())
@@ -181,7 +179,7 @@ if __name__ == '__main__':
   workers = []
   for i in range(FLAGS.count):
     p = multiprocessing.Process(target=_start_worker, 
-                                args=(master, FLAGS.port + i, i))
+                                args=(master, i))
     p.start()
     workers.append(p)
     

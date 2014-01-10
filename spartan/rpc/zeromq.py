@@ -131,6 +131,7 @@ class ServerSocket(Socket):
   def __init__(self, ctx, sock_type, hostport):
     Socket.__init__(self, ctx, sock_type, hostport)
     self.addr = hostport
+    self.bind()
 
   def send(self, msg):
     '''Send ``msg`` to a remote client.
@@ -145,6 +146,7 @@ class ServerSocket(Socket):
     host, port = self.addr
     host = socket.gethostbyname(host)
     util.log_info('Binding... %s', (host, port))
+    
     if port == -1:
       self.addr = (host, self._zmq.bind_to_random_port('tcp://%s' % host))
     else:
@@ -323,6 +325,10 @@ def server_socket(addr):
   host, port = addr
   return ServerSocket(zmq.Context.instance(), zmq.ROUTER, (host, port))
 
+def server_socket_random_port(host):
+  return ServerSocket(zmq.Context.instance(), 
+                      zmq.ROUTER, 
+                      (host, -1))
 
 def client_socket(addr):
   host, port = addr
