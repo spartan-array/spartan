@@ -271,6 +271,10 @@ class Assert(object):
 
     bad = [(k, v) for k, v in d.iteritems() if v > 1]
     assert len(bad) == 0, 'Duplicates found: %s' % bad
+    
+  @staticmethod
+  def not_null(expr):
+    assert expr is not None, expr
 
 
 def trace_fn(fn):
