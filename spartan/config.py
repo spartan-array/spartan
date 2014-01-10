@@ -119,6 +119,7 @@ def initialize(argv):
   import spartan.expr.local
   import spartan.expr.optimize
   import spartan.cluster
+  import spartan.worker
 
   if FLAGS._parsed:
     return
@@ -162,9 +163,10 @@ def initialize(argv):
       #print >>sys.stderr, 'Parsing: %s : %s' % (name, getattr(parsed_flags, name))
       flag.set(getattr(parsed_flags, name))
 
-  logging.basicConfig(format='%(created)f %(filename)s:%(lineno)s [%(funcName)s] %(message)s',
-                      level=FLAGS.log_level,
-                      stream=sys.stderr)
+  logging.basicConfig(
+    format='%(created)f %(hostname)s %(filename)s:%(lineno)s [%(funcName)s] %(message)s',
+    level=FLAGS.log_level,
+    stream=sys.stderr)
 
   for f in rest:
     if f.startswith('-'):
