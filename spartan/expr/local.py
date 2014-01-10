@@ -62,6 +62,14 @@ class LocalInput(LocalExpr):
 
 
 class FnCallExpr(LocalExpr):
+  '''Evaluate a function call.
+  
+  Dependencies that are variable should be specified via the ``deps`` attribute,
+  and will be evaluated and supplied to the function when called.
+  
+  Constants (axis of a reduction, datatype, etc), can be supplied via the ``kw``
+  argument.
+  '''
   __metaclass__ = Node
   _members = ['kw', 'fn', 'pretty_fn']
 
@@ -106,8 +114,8 @@ source_files = []
 @util.memoize
 def compile_parakeet_source(src):
   '''Compile source code defining a parakeet function.'''
-  util.log_info('Compiling parakeet source.')
-  tmpfile = tempfile.NamedTemporaryFile(delete=False, prefix='spartan-local-', suffix='.py')
+  util.log_debug('Compiling parakeet source.')
+  tmpfile = tempfile.NamedTemporaryFile(delete=True, prefix='spartan-local-', suffix='.py')
   tmpfile.write(src)
   tmpfile.flush()
   
@@ -123,7 +131,7 @@ def compile_parakeet_source(src):
     util.log_debug('Source was: %s', src)
     raise CodegenException(ex.message, ex.args)
   
-  source_files.append(src)
+  source_files.append(tmpfile)
   return module._jit_fn
 
 
