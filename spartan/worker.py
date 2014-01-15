@@ -16,8 +16,6 @@ from .rpc import zeromq
 from .util import Assert
 
 
-FLAGS.add(BoolFlag('use_single_core', default=True))
-
 class Worker(object):
   def __init__(self, master):
     self.id = -1
@@ -27,6 +25,9 @@ class Worker(object):
     self._master = master
     self._running = True
     self._ctx = None
+    
+    self._lock = threading.Lock()
+    
     self._kernel_threads = ThreadPool(processes=1)
     
     if FLAGS.profile_worker:
@@ -52,8 +53,7 @@ class Worker(object):
     return self._peers[worker_id]
 
   def initialize(self, req, handle):
-    util.log_info('Worker %d initializing...', req.id)
-
+    util.log_debug('Worker %d initializing...', req.id)
     for id, (host, port) in req.peers.iteritems():
       self._peers[id] = rpc.connect(host, port)
 
@@ -64,32 +64,36 @@ class Worker(object):
     handle.done()
     
   def create(self, req, handle):
-    assert self._initialized
-    #util.log_info('Creating: %s', req.blob_id)
-    Assert.eq(req.blob_id.worker, self.id)
-
-    if req.blob_id.id == -1:
-      id = self._ctx.create_local()
-    else:
-      id = req.blob_id
-
-    self._blobs[id] = req.data
-    resp = core.CreateResp(blob_id=id)
+    with self._lock:
+      assert self._initialized
+      #util.log_info('Creating: %s', req.blob_id)
+      Assert.eq(req.blob_id.worker, self.id)
+  
+      if req.blob_id.id == -1:
+        id = self._ctx.create_local()
+      else:
+        id = req.blob_id
+  
+      self._blobs[id] = req.data
+      resp = core.CreateResp(blob_id=id)
     handle.done(resp)
 
   def destroy(self, req, handle):
-    for id in req.ids:
-      if id in self._blobs:
-        del self._blobs[id]
-        #util.log_info('Destroyed blob %s', id)
+    with self._lock:
+      for id in req.ids:
+        if id in self._blobs:
+          del self._blobs[id]
+          #util.log_info('Destroyed blob %s', id)
 
     #util.log_info('Destroy...')
     handle.done()
 
   def update(self, req, handle):
     #util.log_info('W%d Update: %s', self.id, req.id)
-    blob =  self._blobs[req.id]
-    self._blobs[req.id] = blob.update(req.region, req.data, req.reducer)
+    with self._lock:
+      blob =  self._blobs[req.id]
+      self._blobs[req.id] = blob.update(req.region, req.data, req.reducer)
+    
     handle.done()
 
   def get(self, req, handle):
@@ -104,7 +108,7 @@ class Worker(object):
   def _run_kernel(self, req, handle):
     if FLAGS.profile_worker:
       self._kernel_prof.enable()
-
+      
     try:
       blob_ctx.set(self._ctx)
       results = {}
@@ -117,8 +121,9 @@ class Worker(object):
           #util.log_info('W%d kernel finish', self.id)
       handle.done(results)
     except:
+      util.log_warn('Exception occurred during kernel call', exc_info=1)
       handle.exception()
-
+    
     if FLAGS.profile_worker:
       self._kernel_prof.disable()
 
@@ -126,7 +131,7 @@ class Worker(object):
     self._kernel_threads.apply_async(self._run_kernel, args=(req, handle))
 
   def shutdown(self, req, handle):
-    util.log_info('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_worker)
+    util.log_debug('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_worker)
     if FLAGS.profile_worker:
       os.system('mkdir -p ./_worker_profiles/')
       stats = pstats.Stats(zeromq.poller().profiler, self._kernel_prof)
@@ -147,11 +152,11 @@ class Worker(object):
 
 
 def _start_worker(master, local_id):
-  util.log_info('Worker starting up... Master: %s Profile: %s', master, FLAGS.profile_worker)
+  util.log_debug('Worker starting up... Master: %s Profile: %s', master, FLAGS.profile_worker)
 
   if FLAGS.use_single_core:
     pid = os.getpid()
-    os.system('taskset -pc %d %d > /dev/null' % (local_id, pid))
+    os.system('taskset -pc %d %d > /dev/null' % (local_id * 2, pid))
     
   master = rpc.connect(*master)
   worker = Worker(master)
@@ -166,7 +171,7 @@ if __name__ == '__main__':
   #resource.setrlimit(resource.RLIMIT_AS, (8 * 1000 * 1000 * 1000,
   #                                        8 * 1000 * 1000 * 1000))
 
-  config.initialize(sys.argv)
+  config.parse(sys.argv)
   assert FLAGS.master is not None
   assert FLAGS.count > 0
 
