@@ -516,6 +516,9 @@ class Broadcast(DistArray):
     return 'Broadcast(%s -> %s)' % (self.base, self.shape)
   
   def fetch(self, ex):
+    # make a template to pass to numpy broadcasting
+    template = np.ndarray(ex.shape, dtype=self.base.dtype)
+    
     # drop extra dimensions
     while len(ex.shape) > len(self.base.shape):
       ex = extent.drop_axis(ex, -1)
@@ -534,14 +537,21 @@ class Broadcast(DistArray):
     
     ex = extent.create(ul, lr, self.base.shape) 
 
-    template = np.ndarray(ex.shape, dtype=self.base.dtype)
     fetched = self.base.fetch(ex)
     
     _, bcast = np.broadcast_arrays(template, fetched)
+    
+    util.log_debug('bcast: %s %s', fetched.shape, template.shape)
     return bcast 
 
 
 def broadcast(args):
+  '''Convert the list of arrays in ``args`` to have the same shape.
+  
+  Extra dimensions are added as necessary, and dimensions of size
+  1 are repeated to match the size of other arrays.
+  '''
+  
   if len(args) == 1:
     return args
 
@@ -559,7 +569,7 @@ def broadcast(args):
   # for each axis, all arrays should either share the 
   # same size, or have size == 1
   for axis in range(max_dim):
-    axis_shape = set(s[axis] for s in new_shapes)
+    axis_shape = set(shp[axis] for shp in new_shapes)
    
     assert len(axis_shape) <= 2, 'Mismatched shapes for broadcast: %s' % orig_shapes
     if len(axis_shape) == 2:
@@ -567,9 +577,9 @@ def broadcast(args):
   
     # now lift the inputs with size(axis) == 1 
     # to have the maximum size for the axis 
-    max_size = max(s[axis] for s in new_shapes)
-    for s in new_shapes:
-      s[axis] = max_size
+    max_size = max(shp[axis] for shp in new_shapes)
+    for shp in new_shapes:
+      shp[axis] = max_size
     
   # wrap arguments with missing dims in a Broadcast object.
   results = []
