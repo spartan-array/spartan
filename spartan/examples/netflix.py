@@ -74,7 +74,8 @@ def sgd_netflix_mapper(inputs, ex, V=None, M=None, U=None, worklist=None):
     return
   
   v = V.fetch(ex)
-  
+  #v = v.tocoo()
+    
   u = U.select(ex[0].to_slice()) # size: (ex.shape[0] * r)
   m = M.select(ex[1].to_slice()) # size: (ex.shape[1] * r)
 
@@ -82,8 +83,11 @@ def sgd_netflix_mapper(inputs, ex, V=None, M=None, U=None, worklist=None):
              v.col.astype(np.int64), 
              v.data, u, m)
 
+  #U.update(ex[0], u)
+  #M.update(ex[1], m)
   U.update_slice(ex[0].to_slice(), u)
   M.update_slice(ex[1].to_slice(), m)
+  
   return []
 
 def strata_overlap(extents, v):

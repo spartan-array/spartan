@@ -17,19 +17,21 @@ def test_netflix_sgd(ctx):
   d = 8
   P_RATING = 1000.0 / (U * M)
   
-  V = spartan.ndarray((U, M),
-                      tile_hint=(divup(U, d), divup(M, d)),
-                      dtype=np.float32)
-  
+  # create random factor and value matrices
   Mfactor = spartan.eager(spartan.rand(M, r).astype(np.float32))
   Ufactor = spartan.eager(spartan.rand(U, r).astype(np.float32))
+    
+  V = spartan.sparse_empty((U, M),
+                           tile_hint=(divup(U, d), divup(M, d)),
+                           dtype=np.float32)
   
 #   V = spartan.shuffle(V, netflix.load_netflix_mapper,
 #                           kw={ 'load_file' : '/big1/netflix.zip' })  
   
   V = spartan.eager(
-        spartan.shuffle(V, netflix.fake_netflix_mapper, 
-                          target=V, kw = { 'p_rating' : P_RATING }))
+        spartan.tocoo(
+          spartan.shuffle(V, netflix.fake_netflix_mapper, 
+                        target=V, kw = { 'p_rating' : P_RATING })))
   
   for i in range(2):
     _ = netflix.sgd(V, Mfactor, Ufactor).force()

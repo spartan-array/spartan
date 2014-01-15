@@ -23,8 +23,9 @@ def benchmark_netflix_sgd(ctx, timer):
                       dtype=np.float32)
 
   V = timer.time_op('prep', lambda: spartan.eager(
-        spartan.shuffle(V, netflix.fake_netflix_mapper, 
-                        target=V, kw = { 'p_rating' : P_RATING })))
+        spartan.tocoo(
+          spartan.shuffle(V, netflix.fake_netflix_mapper, 
+                        target=V, kw = { 'p_rating' : P_RATING }))))
  
 #   V = spartan.shuffle(V, netflix.load_netflix_mapper,
 #                           kw={ 'load_file' : '/big1/netflix.zip' })  
