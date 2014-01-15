@@ -30,10 +30,12 @@ def _make_ones(input): return np.ones(input.shape, input.dtype)
 def _make_zeros(input): return np.zeros(input.shape, input.dtype)
 
 @not_idempotent
+@disable_parakeet
 def _make_rand(input):
   return np.random.rand(*input.shape)
 
 @not_idempotent
+@disable_parakeet
 def _make_randn(input):
   return np.random.randn(*input.shape)
 
@@ -92,6 +94,14 @@ def sparse_diagonal(shape,
                     dypte=np.float32,
                     tile_hint=None):
     pass
+ 
+
+@disable_parakeet 
+def _tocoo(data):
+  return data.tocoo()
+
+def tocoo(array):
+  return map(array, fn=_tocoo)
 
 def zeros(shape, dtype=np.float, tile_hint=None):
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
@@ -118,9 +128,9 @@ def arange(shape, dtype=np.float):
 
 
 def _sum_local(ex, data, axis):
-  util.log_info('Summing: %s %s', ex, axis)
-  util.log_info('Summing: %s', data.shape)
-  util.log_info('Result: %s', data.sum(axis).shape)
+  #util.log_info('Summing: %s %s', ex, axis)
+  #util.log_info('Summing: %s', data.shape)
+  #util.log_info('Result: %s', data.sum(axis).shape)
   return data.sum(axis)
 
 
@@ -228,8 +238,19 @@ def argmax(x, axis=None):
                        fn_kw={'idx_f': np.argmax, 'val_f': np.max})
 
   take_indices = map(compute_max, _take_idx_mapper)
+
+  
   return take_indices
 
+def _countnonzero_local(ex, data, axis):
+  return np.asarray(np.count_nonzero(data))
+
+def count_nonzero(array):
+  return reduce(array, None,
+                dtype_fn=lambda input: np.int64,
+                local_reduce_fn=_countnonzero_local,
+                accumulate_fn = np.add)
+  
 
 def size(x, axis=None):
   '''
