@@ -6,7 +6,8 @@ import test_common
 import math
 
 def benchmark_matmul(ctx, timer):
-  N = int(1000 * math.pow(ctx.num_workers, 1.0 / 3.0))
+  #N = int(1000 * math.pow(ctx.num_workers, 1.0 / 3.0))
+  N = 4000
   T = util.divup(N, math.sqrt(ctx.num_workers))
 
   util.log_info('Testing with %d workers, N = %d, tile_size=%s', 
@@ -21,8 +22,7 @@ def benchmark_matmul(ctx, timer):
   def _step():
     expr.evaluate(expr.dot(x, y))
      
-  for i in range(3):
-    timer.time_op('matmul', _step)
+  timer.time_op('matmul', _step)
   
 if __name__ == '__main__':
   test_common.run(__file__)

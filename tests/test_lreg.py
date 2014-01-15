@@ -21,10 +21,5 @@ def test_linear_regression(ctx):
     diff = x * (yp - y)
     grad = expr.sum(diff, axis=0)
     grad = grad.glom().reshape((N_DIM, 1))
-#     util.log_info('Loop: %d', i)
-#     util.log_info('Weights: %s', w)
-#     util.log_info('Yp: %s', yp.glom())
     w = w - (grad * 1e-6)
-#     util.log_info('Grad: %s', grad)
-#     util.log_info('wprime: %s', w)
     

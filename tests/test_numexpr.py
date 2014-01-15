@@ -14,6 +14,6 @@ def test_numexpr_opt(ctx):
   e = expr.ones((10, 10))
   
   f = a + b + c + d + e
-  
-  print f.dag()
-  print f.force()
+  f.force()
+  #print f.dag()
+  #print f.force()

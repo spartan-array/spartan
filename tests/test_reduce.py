@@ -8,10 +8,10 @@ from spartan import util
 import test_common
 
 
-TEST_SIZE = 5
+TEST_SIZE = 50
 
 class TestReduce(test_common.ClusterTest):
-  TILE_SIZE = TEST_SIZE
+  TILE_SIZE = TEST_SIZE / 10
   def test_sum_3d(self):
     x = expr.arange((TEST_SIZE, TEST_SIZE, TEST_SIZE), dtype=np.int64)
     nx = np.arange(TEST_SIZE * TEST_SIZE * TEST_SIZE, dtype=np.int64).reshape((TEST_SIZE, TEST_SIZE, TEST_SIZE))
@@ -96,4 +96,9 @@ class TestReduce(test_common.ClusterTest):
     _(axis=None)
 
 if __name__ == '__main__':
+#   x = TestReduce(methodName='test_simple_sum')
+#   x.setUpClass()
+#   for i in range(100):
+#     x.setUp()
+#     x.test_simple_sum()
   unittest.main()

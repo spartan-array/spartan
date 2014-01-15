@@ -33,6 +33,10 @@ class TestFinance(test_common.ClusterTest):
     movers = finance.find_change(arr)
     #util.log_info(optimize(movers))
     util.log_info(movers.glom().compressed())
+  
+  def test_print_graph(self):
+    put, call = finance.black_scholes(self.current, self.strike, maturity, rate, volatility)
+    print put.dot()
 
 
 if __name__ == '__main__':

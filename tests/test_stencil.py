@@ -40,5 +40,5 @@ def test_local_convolve(ctx):
   for N in [1, 4, 16]:
     images = np.ones((N, 3, 128, 128))
     st = time.time()
-    stencil.convolve(images, filters)
+    stencil._convolve(images, filters)
     print N, F, time.time() - st

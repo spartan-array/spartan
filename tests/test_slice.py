@@ -26,8 +26,7 @@ class SliceTest(test_common.ClusterTest):
   def test_slice_get(self):
     x = expr.arange((TEST_SIZE, TEST_SIZE))
     z = x[5:8, 5:8]
-    zc = expr.dag(z)
-    val = expr.force(zc)
+    val = expr.force(z)
     nx = np.arange(TEST_SIZE*TEST_SIZE).reshape(TEST_SIZE, TEST_SIZE)
     Assert.all_eq(val.glom(), nx[5:8, 5:8])
   
