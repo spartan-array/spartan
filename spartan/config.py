@@ -88,8 +88,16 @@ class Flags(object):
   def __getattr__(self, key):
     if key.startswith('_'): return self.__dict__[key]
 
-    assert self.__dict__['_parsed'], 'Access to flags before config.initialize() called.'
+    assert self.__dict__['_parsed'], 'Access to flags before config.parse() called.'
     return self.__dict__['_vals'][key].val
+  
+  def __setattr__(self, key, value):
+    if key.startswith('_'): 
+      self.__dict__[key] = value
+      return
+    
+    assert self.__dict__['_parsed'], 'Access to flags before config.parse() called.'
+    self.__dict__['_vals'][key].val = value
 
   def __repr__(self):
     return ' '.join([repr(f) for f in self._vals.values()])
@@ -112,7 +120,7 @@ FLAGS.add(IntFlag('num_workers', default=3))
 FLAGS.add(IntFlag('port_base', default=10000,
                   help='Port to listen on (master = port_base, workers=port_base + N)'))
 
-def initialize(argv):
+def parse(argv):
   '''Parse configuration from flags and/or configuration file.'''
 
   # load flags defined in other modules (is there a better way to do this?)
@@ -163,6 +171,8 @@ def initialize(argv):
       #print >>sys.stderr, 'Parsing: %s : %s' % (name, getattr(parsed_flags, name))
       flag.set(getattr(parsed_flags, name))
 
+  # reset loggers so that basic config works
+  #logging.root = logging.RootLogger(logging.WARNING)
   logging.basicConfig(
     format='%(created)f %(hostname)s %(filename)s:%(lineno)s [%(funcName)s] %(message)s',
     level=FLAGS.log_level,

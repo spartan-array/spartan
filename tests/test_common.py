@@ -14,15 +14,6 @@ import types
 import unittest
 from spartan.array import distarray
 
-CTX = None
-def get_cluster_ctx():
-  global CTX
-  if CTX is None:
-    print 'Starting cluster...'
-    config.initialize(sys.argv)
-    CTX = start_cluster(FLAGS.num_workers, FLAGS.cluster)
-
-  return CTX
 
 def sig_handler(sig, frame):
   import threading
@@ -55,7 +46,6 @@ def run(filename):
 
   FLAGS.add(StrFlag('worker_list', default='4,8,16,32,64,80'))
 
-  config.initialize(sys.argv)
   mod_name, _ = splitext(basename(filename))
   module = imp.load_source(mod_name, filename)
   util.log_info('Running benchmarks for module: %s (%s)', module, filename)
@@ -63,19 +53,23 @@ def run(filename):
              k.startswith('benchmark_') and 
              isinstance(getattr(module, k), types.FunctionType))
           ]
- 
+
+  spartan.initialize(sys.argv)
   if benchmarks:
     # csv header
     print 'num_workers,bench,time'
     workers = [int(w) for w in FLAGS.worker_list.split(',')]
     
     for i in workers:
+      # restart the cluster
+      spartan.shutdown()
+      time.sleep(1)
+      FLAGS.num_workers = i
+      ctx = spartan.initialize()
+      
       timer = BenchTimer(i)
       util.log_info('Running benchmarks on %d workers', i)
-      master = start_cluster(i, FLAGS.cluster)
-      run_benchmarks(module, benchmarks, master, timer)
-      master.shutdown()
-      time.sleep(1)
+      run_benchmarks(module, benchmarks, ctx, timer)
 
   if FLAGS.profile_worker:
     util.log_info('Writing worker profiles...')
@@ -94,7 +88,7 @@ class ClusterTest(unittest.TestCase):
   
   @classmethod
   def setUpClass(cls):
-    cls.ctx = get_cluster_ctx()
+    cls.ctx = spartan.initialize()
     cls.old_tilesize = distarray.DEFAULT_TILE_SIZE
     if cls.TILE_SIZE is not None:
       distarray.DEFAULT_TILE_SIZE = cls.TILE_SIZE
@@ -114,7 +108,7 @@ class ClusterTest(unittest.TestCase):
 
 def with_ctx(fn):
   def test_fn():
-      ctx = get_cluster_ctx()
+      ctx = spartan.initialize()
       fn(ctx)
       
   test_fn.__name__ = fn.__name__
