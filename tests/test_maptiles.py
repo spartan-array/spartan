@@ -1,12 +1,14 @@
-from spartan import expr
+import unittest
+
+import numpy as np
+from spartan import expr, util
 from spartan.util import Assert
 from test_common import with_ctx
 import test_common
-import numpy as np
+
 
 TEST_SIZE = 10
 class TestMapTiles(test_common.ClusterTest):
-  TILE_SIZE = TEST_SIZE ** 3 / 16
   def test_map_1(self):
     a = expr.ones((20, 20))
     b = expr.ones((20, 20))
@@ -52,7 +54,12 @@ class TestMapTiles(test_common.ClusterTest):
     ny = np.ones((10,), dtype=np.int)
 
     Assert.all_eq(val.glom(), nx[ny])
+    
+  def test_broadcast(self):
+    a = expr.ones((2, 1))
+    b = expr.ones((2, 5))
+    Assert.all_eq((a / b).glom(), np.ones((2, 5)))
+    Assert.all_eq((b / a).glom(), np.ones((2, 5)))
 
 if __name__ == '__main__':
-  test_map_1()
-  test_ln()
+  unittest.main()
