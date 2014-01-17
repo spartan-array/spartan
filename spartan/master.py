@@ -55,8 +55,6 @@ class Master(object):
 
   def _initialize(self):
     util.log_info('Initializing...')
-
-
     req = core.Initialize(peers=dict([(id, w.addr())
                                       for id, w in self._workers.iteritems()]))
 

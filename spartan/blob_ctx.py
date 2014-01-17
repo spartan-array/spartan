@@ -77,6 +77,10 @@ class BlobCtx(object):
   def get(self, blob_id, subslice, callback=None, wait=True):
     Assert.isinstance(blob_id, core.BlobId)
     req = core.GetReq(id=blob_id, subslice=subslice)
+#     if self._lookup(blob_id) == self.worker_id:
+#       util.log_warn('fake get!')
+#     else:
+#       util.log_warn('real get!')
     if callback is None:
       if wait:
         return self._send(blob_id, 'get', req).data
@@ -93,6 +97,15 @@ class BlobCtx(object):
 
   def update(self, blob_id, region, data, reducer, wait=True):
     req = core.UpdateReq(id=blob_id, region=region, data=data, reducer=reducer)
+    
+#     import scipy.sparse
+#     if self._lookup(blob_id) == self.worker_id:
+#       util.log_warn('fake update!')
+#     elif scipy.sparse.issparse(data) and data.getnnz() == 0:
+#       util.log_warn('none update to remote!')
+#     else:
+#       util.log_warn('update to remote!')
+      
     return self._send(blob_id, 'update', req, wait=wait)
   
   def create_local(self):

@@ -119,6 +119,7 @@ FLAGS.add(LogLevelFlag('log_level', logging.INFO))
 FLAGS.add(IntFlag('num_workers', default=3))
 FLAGS.add(IntFlag('port_base', default=10000,
                   help='Port to listen on (master = port_base, workers=port_base + N)'))
+FLAGS.add(StrFlag('worker_list', default='4,8,16,32,64,80'))
 
 def parse(argv):
   '''Parse configuration from flags and/or configuration file.'''
@@ -172,7 +173,7 @@ def parse(argv):
       flag.set(getattr(parsed_flags, name))
 
   # reset loggers so that basic config works
-  #logging.root = logging.RootLogger(logging.WARNING)
+  logging.root = logging.RootLogger(logging.WARNING)
   logging.basicConfig(
     format='%(created)f %(hostname)s %(filename)s:%(lineno)s [%(funcName)s] %(message)s',
     level=FLAGS.log_level,

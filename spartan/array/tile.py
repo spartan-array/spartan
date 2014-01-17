@@ -1,9 +1,10 @@
 import traceback
 import numpy as np
 import scipy.sparse
-from scipy.sparse import lil_matrix
+import itertools
 from . import extent
 from spartan import util
+from .. import sparse_update
 from spartan.util import Assert
 
 TYPE_EMPTY = 0
@@ -61,16 +62,18 @@ class Tile(object):
     self._data = val
 
   def update(self, subslice, data, reducer):
-    #util.log_info('Update: %s %s %s', subslice, data, reducer)
+    #util.log_info('Update: %s %s', subslice, data)
     return merge(self, subslice, data, reducer)
 
   def get(self, subslice=None):
     # no data, return an empty array
     if self.data is None:
+      self._initialize()
       #util.log_info('EMPTY %s %s', self.id, self.shape)
-      if self.type == TYPE_SPARSE:
-          return lil_matrix(self.shape, self.dtype)[subslice]
-      return np.ndarray(self.shape, self.dtype)[subslice]
+#       if self.type == TYPE_SPARSE:
+#           return scipy.sparse.lil_matrix(self.shape, self.dtype)[subslice]
+#       
+#       return np.ndarray(self.shape, self.dtype)[subslice]
 
     # scalars are just returned directly.
     if len(self.data.shape) == 0:
@@ -111,8 +114,11 @@ class Tile(object):
 
     if self.type == TYPE_SPARSE:
       if self.data is None:
-        self.data = lil_matrix(self.shape, self.dtype)
+        #util.log_info('New sparse: %s', self.shape)
+        self.data = scipy.sparse.coo_matrix(self.shape, dtype=self.dtype)
     else:
+      if self.data is None:
+        self.data = np.ndarray(self.shape, dtype=self.dtype)
       self._initialize_mask()
 
   def _initialize_mask(self):
@@ -124,7 +130,7 @@ class Tile(object):
 
 
   def __repr__(self):
-    return 'tile(%s, %s)' % (self.shape, self.dtype)
+    return 'tile(%s, %s) [%s, %s]' % (self.shape, self.dtype, type(self.data), self.mask)
 
 
 def from_data(data):
@@ -140,14 +146,14 @@ def from_data(data):
       shape=data.shape,
       data=data,
       dtype=data.dtype,
-      mask=MASK_ALL_SET,
+      mask=np.ones(data.shape, dtype=np.bool),
       tile_type=TYPE_DENSE)
 
 
 def from_shape(shape, dtype, tile_type):
   if tile_type == TYPE_SPARSE:
     return Tile(shape=shape,
-                data=lil_matrix(shape, dtype=dtype),
+                data=None,
                 dtype=dtype,
                 tile_type=TYPE_SPARSE,
                 mask=None)
@@ -203,7 +209,35 @@ def merge(old_tile, subslice, update, reducer):
 
   assert not isinstance(update, np.ma.MaskedArray)
   
+  if scipy.sparse.issparse(update):
+    if old_tile.type == TYPE_DENSE:
+      #util.log_debug('Update sparse to dense')
+      update_coo = update.tocoo()
+      sparse_update.sparse_dense_update(old_tile.data, old_tile.mask, update_coo.row, update_coo.col, update_coo.data, 
+                                        sparse_update.REDUCE_ADD)
+      #util.log_info('Update %s', update)
+      #util.log_info('Update COO %s', update_coo) 
+      #util.log_info('New mask: %s', old_tile.mask)
+      #if reducer is not None:
+      #  old_tile.data[subslice] = reducer(old_tile.data[subslice], update)
+      #else:
+      #  old_tile.data[subslice] = update.todense()
+      old_tile.mask[subslice] = True
+    else:
+      if old_tile.shape == update.shape:
+        if reducer is not None:
+          old_tile.data = reducer(old_tile.data, update)
+        else:
+          old_tile.data = update
+      else:
+        if reducer is not None:  
+          old_tile.data[subslice] = reducer(old_tile.data[subslice], update)
+        else:
+          old_tile.data[subslice] = update
+    return old_tile
+    
   if old_tile.type == TYPE_DENSE:
+    #util.log_debug('Update dense to dense')
     # initialize:
     # old_data[subslice] = data
     #
@@ -212,33 +246,35 @@ def merge(old_tile, subslice, update, reducer):
 
     #util.log_info('%s %s', old_tile.mask, new_tile.mask)
     #util.log_info('REPLACE: %s', replaced)
-    #util.log_info('UPDATE: %s', updated)
-    if old_tile.data is None:
-      util.log_info('old.shape:%s subslice:%s', old_tile.shape, subslice)
-      if old_tile.shape == subslice:
-        old_tile.data = update
-        old_tile.mask[subslice] = True
-        return old_tile
-      else:
-        old_tile.data = np.ndarray(old_tile.shape, dtype=old_tile.dtype)
-    
-    replaced = ~old_tile.mask[subslice]
-    updated = old_tile.mask[subslice]
-    
-    old_region = old_tile.data[subslice]
-    old_region[replaced] = update[replaced]
-    
-    if np.any(updated):
+    #util.log_info('UPDATE: %s', updated) 
+    if old_tile.shape == update.shape:
       if reducer is not None:
-        old_region[updated] = reducer(old_region[updated], update[updated]) 
+        old_tile.data = reducer(old_tile.data, update)
       else:
-        old_region[updated] = update[updated] 
+        old_tile.data = update
+    else:
+      replaced = ~old_tile.mask[subslice]
+      updated = old_tile.mask[subslice]
+    
+      old_region = old_tile.data[subslice]  
+      if np.any(replaced):  
+        old_region[replaced] = update[replaced]
+    
+      if np.any(updated):
+        if reducer is not None:
+          old_region[updated] = reducer(old_region[updated], update[updated]) 
+        else:
+          old_region[updated] = update[updated] 
     
     old_tile.mask[subslice] = True
   else:
+    #util.log_info('Update dense to sparse')
     # TODO (SPARSE UPDATE)!!!
     # sparse update, no mask, just iterate over data items
     # TODO(POWER) -- this is SLOW!
-    old_tile.data[subslice] = update
+    if reducer is not None:
+      old_tile.data[subslice] = reducer(old_tile.data[subslice], update)
+    else:
+      old_tile.data[subslice] = update
 
   return old_tile

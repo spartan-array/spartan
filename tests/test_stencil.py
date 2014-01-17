@@ -42,3 +42,4 @@ def test_local_convolve(ctx):
     st = time.time()
     stencil._convolve(images, filters)
     print N, F, time.time() - st
+

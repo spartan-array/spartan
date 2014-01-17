@@ -109,6 +109,7 @@ class Worker(object):
     if FLAGS.profile_worker:
       self._kernel_prof.enable()
       
+    futures = []
     try:
       blob_ctx.set(self._ctx)
       results = {}
@@ -117,8 +118,17 @@ class Worker(object):
         if blob_id in self._blobs:
           #util.log_info('W%d kernel start', self.id)
           blob = self._blobs[blob_id]
-          results[blob_id] = req.mapper_fn(blob_id, blob, **req.kw)
+          result, future = req.mapper_fn(blob_id, blob, **req.kw)
+          results[blob_id] = result
+          
+          if future is not None:
+            futures.append(future)
+          
           #util.log_info('W%d kernel finish', self.id)
+      
+      # wait for all kernel update operations to finish
+#       util.log_warn('Waiting for %s futures', len(futures))
+      rpc.wait_for_all(futures) 
       handle.done(results)
     except:
       util.log_warn('Exception occurred during kernel call', exc_info=1)
@@ -133,9 +143,12 @@ class Worker(object):
   def shutdown(self, req, handle):
     util.log_debug('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_worker)
     if FLAGS.profile_worker:
-      os.system('mkdir -p ./_worker_profiles/')
-      stats = pstats.Stats(zeromq.poller().profiler, self._kernel_prof)
-      stats.dump_stats('./_worker_profiles/%d' % self.id)
+      try:
+        os.system('mkdir -p ./_worker_profiles/')
+        stats = pstats.Stats(zeromq.poller().profiler, self._kernel_prof)
+        stats.dump_stats('./_worker_profiles/%d' % self.id)
+      except Exception, ex:
+        print 'Failed to write profile.', ex
 
     handle.done()
     threading.Thread(target=self._shutdown).start()
@@ -194,4 +207,8 @@ if __name__ == '__main__':
       
   watchdog = util.FileWatchdog(on_closed=kill_workers)
   watchdog.start()
-  watchdog.join()
+  
+  for w in workers:
+    w.join()
+    
+  #print >>sys.stderr, 'All workers exited!'

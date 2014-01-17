@@ -24,6 +24,7 @@ from .ndarray import ndarray
 from .optimize import disable_parakeet, not_idempotent
 from .reduce import reduce
 from .shuffle import shuffle
+from .. import sparse_update
 
 
 def _make_ones(input): return np.ones(input.shape, input.dtype)
@@ -40,15 +41,32 @@ def _make_randn(input):
   return np.random.randn(*input.shape)
 
 @not_idempotent
-def _make_sparse_rand(input, density=None, dtype=None):
+@disable_parakeet
+def _make_sparse_rand(input, 
+                      density=None, 
+                      dtype=None, 
+                      format='csr'):
   Assert.eq(len(input.shape), 2)
   
   return sp.rand(input.shape[0],
                  input.shape[1],
                  density=density,
-                 format='coo',
+                 format=format,
                  dtype=dtype)
 
+@not_idempotent
+def _make_sparse_diagonal(tile, ex):
+  data = sp.lil_matrix(ex.shape)
+
+  if ex.ul[0] >= ex.ul[1] and ex.ul[0] < ex.lr[1]:
+    for i in range(ex.ul[0], min(ex.lr[0], ex.lr[1])):
+      data[i - ex.ul[0], i - ex.ul[1]] = 1
+  elif ex.ul[1] >= ex.ul[0] and ex.ul[1] < ex.lr[0]:
+    for j in range(ex.ul[1], min(ex.lr[1], ex.lr[0])):
+      data[j - ex.ul[0], j - ex.ul[1]] = 1
+
+  return [(ex, data)]
+  
 def rand(*shape, **kw):
   '''
   :param tile_hint: A tuple indicating the desired tile shape for this array.
@@ -77,13 +95,15 @@ def randn(*shape, **kw):
 
 def sparse_rand(shape, 
                 density=0.001,
+                format='lil',
                 dtype=np.float32, 
                 tile_hint=None):
   for s in shape: assert isinstance(s, int)
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True),
              fn=_make_sparse_rand,
              fn_kw = { 'dtype' : dtype, 
-                       'density' : density })
+                       'density' : density,
+                       'format' : format })
 
 def sparse_empty(shape,
                  dtype=np.float32,
@@ -91,9 +111,9 @@ def sparse_empty(shape,
     return ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True)
 
 def sparse_diagonal(shape,
-                    dypte=np.float32,
+                    dtype=np.float32,
                     tile_hint=None):
-    pass
+  return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True), _make_sparse_diagonal)
  
 
 @disable_parakeet 
@@ -352,15 +372,23 @@ def _dot_mapper(inputs, ex, av, bv):
                        bv.shape)
 
   time_a, a = util.timeit(lambda: av.fetch(ex_a))
-  util.log_info('Fetched...%s in %s', ex_a, time_a)
+  #util.log_info('Fetched...%s in %s', ex_a, time_a)
   time_b, b = util.timeit(lambda: bv.fetch(ex_b))
-  util.log_info('Fetched...%s in %s', ex_b, time_b)
+  util.log_info('Fetched...ax:%s in %s, bx:%s in %s', ex_a, time_a, ex_b, time_b)
 
-  util.log_info('%s %s %s', type(a), a.shape, a.dtype)
-  util.log_info('%s %s %s', type(b), b.shape, b.dtype)
+  #util.log_info('%s %s %s', type(a), a.shape, a.dtype)
+  #util.log_info('%s %s %s', type(b), b.shape, b.dtype)
   # util.log_info('%s %s', bv.shape, len(bv.tiles))
+  
+  #util.log_info('%s %s', type(a), type(b))
+  
+  if not sp.issparse(a):
+    a = sp.csr_matrix(a)
+  if not sp.issparse(b):
+    b = sp.csr_matrix(b)
+    
   result = a.dot(b)
-
+  
   ul = np.asarray([ex_a.ul[0], 0])
   lr = ul + result.shape
   target_shape = (av.shape[0], bv.shape[1])
@@ -382,7 +410,6 @@ def _dot_numpy(array, ex, numpy_data=None):
 
   yield (ex[0].add_dim(), np.dot(l, r))
 
-
 def dot(a, b):
   '''
   Compute the dot product (matrix multiplication) of 2 arrays.
@@ -399,14 +426,25 @@ def dot(a, b):
 
   # av, bv = distarray.broadcast([av, bv])
   Assert.eq(a.shape[1], b.shape[0])
+  sparse = av.sparse and bv.sparse
   target = ndarray((a.shape[0], b.shape[1]),
                    dtype=av.dtype,
                    tile_hint=bv.tile_shape(),
-                   reduce_fn=np.add)
-
+                   reduce_fn=np.add,
+                   sparse=sparse)
+  
   return shuffle(av, _dot_mapper, target=target, kw=dict(av=av, bv=bv))
+ 
+def op_map(*args, **kw):
+  fn = kw['fn']
+  return map(args, fn)
+ 
+def add(a, b):
+  return op_map(a, b, fn=lambda a, b: a + b)
 
-
+def sub(a, b):
+  return op_map(a, b, fn=lambda a, b: a - b)
+  
 def ln(v): return map(v, fn=np.log)
 
 
@@ -420,7 +458,6 @@ def sqrt(v): return map(v, fn=np.sqrt)
 
 
 def abs(v): return map(v, fn=np.abs)
-
 
 try:
   import scipy.stats

@@ -12,7 +12,7 @@ from .local import LocalCtx, make_var, LocalInput, LocalMapExpr
 
 def tile_mapper(ex, children, op):
   ctx = blob_ctx.get()
-  #util.log_info('MapTiles: %s', map_fn)
+  #util.log_info('MapTiles: %s', op)
   #util.log_info('Fetching %d inputs', len(children))
   #util.log_info('%s %s', children, ex)
 
@@ -37,7 +37,7 @@ def tile_mapper(ex, children, op):
   result_tile = tile.from_data(result)
   tile_id = blob_ctx.get().create(result_tile).wait().blob_id
   
-  return [(ex, tile_id)]
+  return ([(ex, tile_id)], None)
 
 
 class MapExpr(Expr):

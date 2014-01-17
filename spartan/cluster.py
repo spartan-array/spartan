@@ -38,7 +38,7 @@ class AssignModeFlag(config.Flag):
 FLAGS.add(HostListFlag('hosts', default=[('localhost', 8)]))
 FLAGS.add(BoolFlag('xterm', default=False, help='Run workers in xterm'))
 FLAGS.add(BoolFlag('oprofile', default=False, help='Run workers inside of operf'))
-FLAGS.add(AssignModeFlag('assign_mode', default=AssignMode.BY_CORE))
+FLAGS.add(AssignModeFlag('assign_mode', default=AssignMode.BY_NODE))
 FLAGS.add(BoolFlag('use_single_core', default=True))
 
 FLAGS.add(BoolFlag(

@@ -44,8 +44,7 @@ def run(filename):
   signal.signal(signal.SIGQUIT, sig_handler)
   os.system('rm ./_worker_profiles/*')
 
-  FLAGS.add(StrFlag('worker_list', default='4,8,16,32,64,80'))
-
+  #config.initialize(sys.argv)
   mod_name, _ = splitext(basename(filename))
   module = imp.load_source(mod_name, filename)
   util.log_info('Running benchmarks for module: %s (%s)', module, filename)
@@ -71,6 +70,7 @@ def run(filename):
       util.log_info('Running benchmarks on %d workers', i)
       run_benchmarks(module, benchmarks, ctx, timer)
 
+  spartan.shutdown()
   if FLAGS.profile_worker:
     util.log_info('Writing worker profiles...')
     join_profiles('./_worker_profiles')

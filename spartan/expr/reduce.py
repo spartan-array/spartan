@@ -50,7 +50,7 @@ def _reduce_mapper(ex, children, op, axis, output):
     
   util.log_info('Update: %s %s', dst_extent, local_reduction)
   output.update(dst_extent, local_reduction)
-  return []
+  return ([], None)
 
 class ReduceExpr(Expr):
   __metaclass__ = Node

@@ -63,6 +63,8 @@ setup(
   ext_modules = [
     Extension('spartan.core', ['spartan/core' + suffix]),
     Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core' + suffix]),
+    Extension('spartan.sparse_update', ['spartan/sparse_update' + suffix]),
+    Extension('spartan.array.slicing', ['spartan/array/slicing' + suffix]),
   ],
   cmdclass=cmdclass,
 )

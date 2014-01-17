@@ -5,7 +5,7 @@ from spartan import expr, util, eager, force
 import test_common
 
 OUTLINKS_PER_PAGE = 10
-PAGES_PER_WORKER = 1000 * 1000 * 5
+PAGES_PER_WORKER = 1000 * 5
 
 def make_weights(tile, ex):
   num_source = ex.shape[1]

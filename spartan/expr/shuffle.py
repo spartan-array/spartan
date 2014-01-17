@@ -1,9 +1,9 @@
-from .. import blob_ctx
+from spartan import rpc
+
+from .. import blob_ctx, util
 from ..array import distarray, tile
 from ..node import Node
 from ..util import is_iterable, Assert
-from .. import util
-
 from .base import Expr, lazify
 
 
@@ -33,12 +33,15 @@ def shuffle(v, fn, tile_hint=None, target=None, kw=None):
 
 def _target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
   result = list(map_fn(inputs, ex, **fn_kw))
+  
+  futures = rpc.FutureGroup()
   if result is not None:
     for ex, v in result:
-      update_time, _ = util.timeit(lambda: target.update(ex, v))
-      #util.log_info('Update took %s seconds.' % update_time)
-
-  return []
+      #update_time, _ = util.timeit(lambda: target.update(ex, v))
+      futures.append(target.update(ex, v, wait=False))
+  
+#   util.log_warn('%s futures', len(futures))
+  return (None, futures)
 
         
 def _notarget_mapper(ex, array=None, map_fn=None, inputs=None, fn_kw=None):
@@ -54,7 +57,7 @@ def _notarget_mapper(ex, array=None, map_fn=None, inputs=None, fn_kw=None):
       tile_id = blob_ctx.get().create(result_tile).wait().blob_id
       results.append((ex, tile_id))
   
-  return results  
+  return (results, None)
 
 
 class ShuffleExpr(Expr):

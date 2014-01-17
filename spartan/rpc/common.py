@@ -5,19 +5,21 @@ The :class:`.Client` and :class:`.Server` classes here work with
 sockets which should implement the :class:`.Socket` interface.
 '''
 from cPickle import PickleError
+import cPickle
+import cStringIO
 import collections
-import weakref
+import os
+import pickle
 import sys
 import threading
 import time
 import traceback
 import types
-import cStringIO
-import pickle
-import cPickle
+import weakref
 
 from .. import cloudpickle, util, core
 from ..node import Node
+
 
 CLIENT_PENDING = weakref.WeakKeyDictionary()
 SERVER_PENDING = weakref.WeakKeyDictionary()
@@ -25,7 +27,7 @@ SERVER_PENDING = weakref.WeakKeyDictionary()
 NO_RESULT = object()
 
 DEFAULT_TIMEOUT = 1200
-WARN_THRESHOLD = 60
+WARN_THRESHOLD = 10
 
 def set_default_timeout(seconds):
   global DEFAULT_TIMEOUT
@@ -85,6 +87,20 @@ def serialize(obj):
 
 def read(f):
   return cPickle.load(f)
+# 
+#   st = time.time()
+#   start_pos = f.tell()
+#   result = cPickle.load(f)
+#   ed = time.time()
+#   end_pos = f.tell()
+#   
+#   if ed - st > 0.1:
+#     util.log_warn('Slow to load! %s' % result)
+#     with open('./slow-pickle.%d' % os.getpid(), 'w') as pickle_out:
+#       f.seek(start_pos)
+#       pickle_out.write(f.read(end_pos - start_pos))
+#     
+#   return result
 
 class PendingRequest(object):
   '''An outstanding RPC request on the server.
@@ -351,10 +367,6 @@ class Client(object):
     f = self._futures[rpc_id]
     f.done(resp)
     del self._futures[rpc_id]
-
-  def close(self):
-    self._socket.close()
-
 
 def forall(clients, method, request):
   '''Invoke ``method`` with ``request`` for each client in ``clients``

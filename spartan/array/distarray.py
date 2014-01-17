@@ -146,11 +146,12 @@ _pending_destructors = []
 
 
 class DistArrayImpl(DistArray):
-  def __init__(self, shape, dtype, tiles, reducer_fn):
+  def __init__(self, shape, dtype, tiles, reducer_fn, sparse):
     #traceback.print_stack()
     self.shape = shape
     self.dtype = dtype
     self.reducer_fn = reducer_fn
+    self.sparse = sparse
     self.ctx = blob_ctx.get()
     
     Assert.not_null(dtype)
@@ -177,7 +178,7 @@ class DistArrayImpl(DistArray):
 
 
   def __reduce__(self):
-    return (DistArrayImpl, (self.shape, self.dtype, self.tiles, self.reducer_fn))
+    return (DistArrayImpl, (self.shape, self.dtype, self.tiles, self.reducer_fn, self.sparse))
 
   def __del__(self):
     '''Destroy this array.
@@ -234,12 +235,13 @@ class DistArrayImpl(DistArray):
     
     # special case exact match against a tile 
     if region in self.tiles:
-      #util.log_info('Exact match.')
+      #util.log_warn('Exact match.')
       ex, intersection = region, region
       blob_id = self.tiles[region]
       tgt = ctx.get(blob_id, extent.offset_slice(ex, intersection))
       return tgt
     
+    #util.log_warn('Remote fetch.')
     splits = list(extent.find_overlapping(self.tiles.iterkeys(), region))
 
     #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
@@ -276,8 +278,10 @@ class DistArrayImpl(DistArray):
     
     for (ex, intersection), result in zip(splits, results):
       dst_slice = extent.offset_slice(region, intersection)
-      #util.log_info('%s %s %s %s', ex, intersection, dst_slice, result)
-      tgt[dst_slice] = result
+      #util.log_info('ex:%s region:%s intersection:%s dst_slice:%s result:%s', ex, region, intersection, dst_slice, result)
+      #util.log_info('tgt.shape:%s result.shape:%s tgt.type:%s result.type:%s', tgt[dst_slice].shape, result.shape, type(tgt), type(result))
+      if np.all(result.shape):
+        tgt[dst_slice] = result
 
     return tgt
     #return tile.data[]
@@ -285,7 +289,7 @@ class DistArrayImpl(DistArray):
   def update_slice(self, slc, data):
     return self.update(extent.from_slice(slc, self.shape), data)
      
-  def update(self, region, data):
+  def update(self, region, data, wait=True):
     ctx = blob_ctx.get()
     Assert.isinstance(region, extent.TileExtent)
     Assert.eq(region.shape, data.shape,
@@ -293,34 +297,45 @@ class DistArrayImpl(DistArray):
 
     # exact match
     if region in self.tiles:
-      util.log_info('EXACT: %s %s ', region, extent.offset_slice(region, region))
       blob_id = self.tiles[region]
       dst_slice = extent.offset_slice(region, region)
-      ctx.update(blob_id, dst_slice, data, self.reducer_fn)
-      return
+      #util.log_info('EXACT: %s %s ', region, dst_slice)
+      return ctx.update(blob_id, dst_slice, data, self.reducer_fn, wait=wait)
     
     splits = list(extent.find_overlapping(self.tiles, region))
     futures = []
-    util.log_info('%s: Updating %s tiles', region, len(splits))
+    #util.log_info('%s: Updating %s tiles with data:%s', region, len(splits), data)
     for dst_extent, intersection in splits:
-      #util.log_info('%s %s %s', region, dst_key, intersection)
+      #util.log_info('%s %s %s', region, dst_extent, intersection)
       blob_id = self.tiles[dst_extent]
 
       src_slice = extent.offset_slice(region, intersection)
       dst_slice = extent.offset_slice(dst_extent, intersection)
       
       #util.log_info('Update src:%s dst:%s data:%s', src_slice, dst_slice, data[src_slice])
+      #util.log_info('%s', dst_slice)
+      shape = [slice.stop - slice.start for slice in dst_slice]
+      if np.all(shape):
+        update_data = data[src_slice]
+        
+        if scipy.sparse.issparse(update_data): 
+          if update_data.getnnz() == 0:
+            continue
+          else:
+            update_data = update_data.tocoo()
       #update_tile = tile.from_intersection(dst_key, intersection, data[src_slice])
       #util.log_info('%s %s %s %s', dst_key.shape, intersection.shape, blob_id, update_tile)
-      
-      futures.append(ctx.update(blob_id, 
+      #util.log_info("Updating %d tile %s with dst_ex %s intersection %s with data %s slice %s", len(splits), blob_id, dst_extent, intersection, data.nonzero()[0], data[src_slice].nonzero()[0])
+        futures.append(ctx.update(blob_id, 
                                 dst_slice, 
-                                data[src_slice], 
+                                update_data, 
                                 self.reducer_fn, 
                                 wait=False))
 
-    rpc.wait_for_all(futures)
-
+    if wait:
+      rpc.wait_for_all(futures)
+    else:
+      return rpc.FutureGroup(futures)
 
 def create(shape,
            dtype=np.float,
@@ -333,11 +348,11 @@ def create(shape,
   dtype = np.dtype(dtype)
   shape = tuple(shape)
 
-  extents = compute_splits(shape, tile_hint, ctx.num_workers * 4).keys()
+  extents = compute_splits(shape, tile_hint, ctx.num_workers * 4)
   tiles = {}
   tile_type = tile.TYPE_SPARSE if sparse else tile.TYPE_DENSE
   
-  for i, ex in enumerate(extents):
+  for ex, i in extents.iteritems():    
     tiles[ex] = ctx.create(
                   tile.from_shape(ex.shape, dtype, tile_type=tile_type), 
                   hint=i)
@@ -345,7 +360,10 @@ def create(shape,
   for ex in extents:
     tiles[ex] = tiles[ex].wait().blob_id
 
-  return DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer)
+  #for ex, i in extents.iteritems():
+  #  util.log_warn("i:%d ex:%s, blob_id:%s", i, ex, tiles[ex])
+    
+  return DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
 
 def from_table(extents):
   '''
@@ -366,18 +384,22 @@ def from_table(extents):
     shape = extent.find_shape(extents.keys())
   
   if len(extents) > 0:
-    # fetch a one element array in order to get the dtype
+    # fetch one tile from the table to figure out the dtype
     key, blob_id = extents.iteritems().next()
     util.log_info('%s :: %s', key, blob_id)
+    
+    #dtype = blob_ctx.get().run_on_tile(blob_id, lambda t: t.dtype).wait()
+    
     t = blob_ctx.get().get(blob_id, None)
     Assert.isinstance(t, tile.Tile)
     dtype = t.dtype
+    sparse = (t.type == tile.TYPE_SPARSE)
     #dtype = None
   else:
     # empty table; default dtype.
     dtype = np.float
 
-  return DistArrayImpl(shape=shape, dtype=dtype, tiles=extents, reducer_fn=None)
+  return DistArrayImpl(shape=shape, dtype=dtype, tiles=extents, reducer_fn=None, sparse=sparse)
 
 class LocalWrapper(DistArray):
   '''
