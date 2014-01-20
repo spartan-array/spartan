@@ -114,7 +114,6 @@ def sparse_diagonal(shape,
                     dtype=np.float32,
                     tile_hint=None):
   return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True), _make_sparse_diagonal)
- 
 
 @disable_parakeet 
 def _tocoo(data):
@@ -122,6 +121,7 @@ def _tocoo(data):
 
 def tocoo(array):
   return map(array, fn=_tocoo)
+
 
 def zeros(shape, dtype=np.float, tile_hint=None):
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint),

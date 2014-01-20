@@ -4,6 +4,7 @@ import collections
 from spartan import util
 from spartan.util import Assert
 import numpy as np
+import slicing
 
 class TileExtent(object):
   '''A rectangular tile of a distributed array.
@@ -186,8 +187,7 @@ def offset_from(base, other):
   return create(tuple(np.array(other.ul) - np.array(base.ul)),
                 tuple(np.array(other.lr) - np.array(base.ul)),
                 other.array_shape)
-
-
+  
 
 def offset_slice(base, other):
   '''
@@ -195,8 +195,15 @@ def offset_slice(base, other):
   :param other: `TileExtent` into the same array.
   :rtype: A slice representing the local offsets of ``other`` into this tile.
   '''
-  return offset_from(base, other).to_slice()
-  
+  return slicing.offset_slice(base.ul, base.lr, other.ul, other.lr)
+
+# def offset_slice(base, other):
+#   '''
+#   :param base: `TileExtent` to use as basis
+#   :param other: `TileExtent` into the same array.
+#   :rtype: A slice representing the local offsets of ``other`` into this tile.
+#   '''
+#   return offset_from(base, other).to_slice()
 
 def from_slice(idx, shape):
   '''

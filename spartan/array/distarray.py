@@ -307,6 +307,7 @@ class DistArrayImpl(DistArray):
     #util.log_info('%s: Updating %s tiles with data:%s', region, len(splits), data)
     for dst_extent, intersection in splits:
       #util.log_info('%s %s %s', region, dst_extent, intersection)
+
       blob_id = self.tiles[dst_extent]
 
       src_slice = extent.offset_slice(region, intersection)
@@ -314,6 +315,7 @@ class DistArrayImpl(DistArray):
       
       #util.log_info('Update src:%s dst:%s data:%s', src_slice, dst_slice, data[src_slice])
       #util.log_info('%s', dst_slice)
+
       shape = [slice.stop - slice.start for slice in dst_slice]
       if np.all(shape):
         update_data = data[src_slice]

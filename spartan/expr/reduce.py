@@ -8,7 +8,7 @@ from spartan.node import Node
 from spartan.util import Assert
 
 from .base import Expr, DictExpr
-
+from .map import MapResult
 
 def _reduce_mapper(ex, children, op, axis, output):
   '''Run a local reducer for a tile, and update the appropiate 
@@ -50,7 +50,7 @@ def _reduce_mapper(ex, children, op, axis, output):
     
   util.log_info('Update: %s %s', dst_extent, local_reduction)
   output.update(dst_extent, local_reduction)
-  return ([], None)
+  return MapResult([], None)
 
 class ReduceExpr(Expr):
   __metaclass__ = Node

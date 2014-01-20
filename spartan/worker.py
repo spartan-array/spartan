@@ -118,11 +118,12 @@ class Worker(object):
         if blob_id in self._blobs:
           #util.log_info('W%d kernel start', self.id)
           blob = self._blobs[blob_id]
-          result, future = req.mapper_fn(blob_id, blob, **req.kw)
-          results[blob_id] = result
+          map_result = req.mapper_fn(blob_id, blob, **req.kw)
+          results[blob_id] = map_result.result
           
-          if future is not None:
-            futures.append(future)
+          if map_result.futures is not None:
+            futures.append(map_result.futures)
+
           
           #util.log_info('W%d kernel finish', self.id)
       
@@ -211,4 +212,4 @@ if __name__ == '__main__':
   for w in workers:
     w.join()
     
-  #print >>sys.stderr, 'All workers exited!'
+  print >>sys.stderr, 'All workers exited!'

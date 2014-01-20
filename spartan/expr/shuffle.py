@@ -5,6 +5,7 @@ from ..array import distarray, tile
 from ..node import Node
 from ..util import is_iterable, Assert
 from .base import Expr, lazify
+from.map import MapResult
 
 
 def shuffle(v, fn, tile_hint=None, target=None, kw=None):
@@ -41,7 +42,8 @@ def _target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
       futures.append(target.update(ex, v, wait=False))
   
 #   util.log_warn('%s futures', len(futures))
-  return (None, futures)
+  return MapResult(None, futures)
+
 
         
 def _notarget_mapper(ex, array=None, map_fn=None, inputs=None, fn_kw=None):
@@ -57,7 +59,7 @@ def _notarget_mapper(ex, array=None, map_fn=None, inputs=None, fn_kw=None):
       tile_id = blob_ctx.get().create(result_tile).wait().blob_id
       results.append((ex, tile_id))
   
-  return (results, None)
+  return MapResult(results, None)
 
 
 class ShuffleExpr(Expr):

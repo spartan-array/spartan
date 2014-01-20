@@ -37,8 +37,12 @@ def tile_mapper(ex, children, op):
   result_tile = tile.from_data(result)
   tile_id = blob_ctx.get().create(result_tile).wait().blob_id
   
-  return ([(ex, tile_id)], None)
-
+  return MapResult([(ex, tile_id)], None)
+ 
+class MapResult:
+  def __init__(self, result=None, futures=None):
+    self.result = result
+    self.futures = futures
 
 class MapExpr(Expr):
   __metaclass__ = Node

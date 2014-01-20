@@ -21,8 +21,7 @@ def sparse_multiply(wts, p):
     t2 = datetime.now()
     print "iteration %d sparse * dense: %s ms" % (i, millis(t1, t2))
     
-  #r = p.glom()
-  #print r
+  #print p.glom()
   #if scipy.sparse.issparse(r):
   #  print "sparse * sparse: %s ms" % millis(t1, t2)
   #  return r.todense()
@@ -35,7 +34,7 @@ def _build_site_coo(num_pages,
                     outlinks,
                     site_start,
                     site_end):
-  rows = np.zeros((num_pages * num_outlinks,), dtype=np.int32)
+  rows = np.empty((num_pages * num_outlinks,), dtype=np.int32)
   cols = np.empty((num_pages * num_outlinks,), dtype=np.int32)
   data = np.empty((num_pages * num_outlinks,), dtype=np.int32)
   
@@ -54,7 +53,7 @@ def _make_site_sparse(tile, ex,
                       same_site_prob=None):
   tile_pages = ex.shape[1]
   
-  same_site = np.random.rand(num_outlinks * tile_pages) < same_site_prob
+  same_site = np.random.rand(num_outlinks * tile_pages) <= same_site_prob
   outlink = np.zeros((num_outlinks * tile_pages), dtype=np.int32)
   outlink[same_site] = np.random.randint(ex.ul[1], ex.lr[1], np.count_nonzero(same_site))
   outlink[~same_site] = np.random.randint(0, ex.shape[0], np.count_nonzero(~same_site))
@@ -62,7 +61,7 @@ def _make_site_sparse(tile, ex,
   rows, cols, data = _build_site_coo(tile_pages, num_outlinks, outlink, 
                                      ex.ul[1], ex.lr[1])
   
-  util.log_warn('Extent: %s, Rows: %s %s', ex, np.min(rows), np.max(rows))
+  #util.log_warn('Extent: %s, Rows: %s %s', ex, np.min(rows), np.max(rows))
   
   yield ex, scipy.sparse.coo_matrix((data, (rows, cols)),
                                     shape=ex.shape,
