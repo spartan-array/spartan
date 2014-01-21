@@ -175,7 +175,7 @@ def parse(argv):
   # reset loggers so that basic config works
   logging.root = logging.RootLogger(logging.WARNING)
   logging.basicConfig(
-    format='%(created)f %(hostname)s %(filename)s:%(lineno)s [%(funcName)s] %(message)s',
+    format='%(created)f %(hostname)s:%(pid)s %(filename)s:%(lineno)s [%(funcName)s] %(message)s',
     level=FLAGS.log_level,
     stream=sys.stderr)
 

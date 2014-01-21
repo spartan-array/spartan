@@ -68,4 +68,5 @@ def run(num_pts, num_centers, num_dim):
                          'new_centers' : new_centers,
                          'new_counts' : new_counts })
     _.force()
-    new_centers = new_centers / new_counts
+    
+    new_centers = expr.eager(new_centers / new_counts)

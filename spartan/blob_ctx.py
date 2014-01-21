@@ -56,12 +56,6 @@ class BlobCtx(object):
   def _lookup(self, blob_id):
     worker_id = blob_id.worker
     return worker_id
-    #if not blob_id in self.id_map:
-    #futures = [(id, w.lookup(blob_id)) for id, w in self.workers.iteritems()]
-    #for idx, f in enumerate(futures):
-    #  if f.wait() is not None:
-    #    self.id_map[blob_id] = idx
-    #return self.id_map[blob_id]
 
   def destroy_all(self, blob_ids):
     if self.worker_id != MASTER_ID: return
@@ -109,13 +103,15 @@ class BlobCtx(object):
     return self._send(blob_id, 'update', req, wait=wait)
   
   def create_local(self):
-    assert self.worker_id != MASTER_ID
+    assert not self.is_master()
     return core.BlobId(worker=self.worker_id, id=ID_COUNTER.next())
 
   def create(self, data, hint=None):
     assert self.worker_id >= 0, self.worker_id
 
-    if self.worker_id >= MASTER_ID:
+    # workers create blobs locally; master dispatches to a 
+    # worker in round-robin order.
+    if self.is_master():
       if hint is None:
         worker_id = ID_COUNTER.next() % len(self.workers)
       else:

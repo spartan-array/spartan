@@ -19,7 +19,7 @@ Optimizations on DAGs live in `spartan.expr.optimize`.
 
 """
 
-from base import Expr, evaluate, dag, glom, eager, lazify, force,  NotShapeable
+from base import Expr, evaluate, optimized_dag, glom, eager, lazify, force,  NotShapeable
 
 from .builtins import *
 from .map import map

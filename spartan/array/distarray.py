@@ -129,14 +129,13 @@ class DistArray(object):
     #util.log_info('Glomming: %s', self.shape)
     return self.select(np.index_exp[:])
 
-
-def map_to_array(distarray, mapper_fn, kw=None):
-  results = distarray.foreach_tile(mapper_fn=mapper_fn, kw=kw)
-  extents = {}
-  for blob_id, d in results.iteritems():
-    for ex, id in d:
-      extents[ex] = id
-  return from_table(extents)
+  def map_to_array(self, mapper_fn, kw=None):
+    results = self.foreach_tile(mapper_fn=mapper_fn, kw=kw)
+    extents = {}
+    for blob_id, d in results.iteritems():
+      for ex, id in d:
+        extents[ex] = id
+    return from_table(extents)
   
 ID_COUNTER = iter(xrange(10000000))
 
@@ -293,6 +292,11 @@ class DistArrayImpl(DistArray):
     Assert.isinstance(region, extent.TileExtent)
     Assert.eq(region.shape, data.shape,
               'Size of extent does not match size of data')
+   
+    import sys
+    util.log_info('UPDATE %s', region.shape)
+    #print >>sys.stderr, 'WTF?', region.shape
+    #print >>sys.stderr, 'WTF?', region.shape
 
     # exact match
     if region in self.tiles:
@@ -304,6 +308,7 @@ class DistArrayImpl(DistArray):
     splits = list(extent.find_overlapping(self.tiles, region))
     futures = []
     #util.log_info('%s: Updating %s tiles with data:%s', region, len(splits), data)
+    
     for dst_extent, intersection in splits:
       #util.log_info('%s %s %s', region, dst_extent, intersection)
 
@@ -409,7 +414,8 @@ class LocalWrapper(DistArray):
   '''
   def __init__(self, data):
     self._data = np.asarray(data)
-    assert not isinstance(data, core.BlobId)
+    #assert not isinstance(data, core.BlobId)
+    Assert.isinstance(data, (np.ndarray, int, float))
     #print 'Wrapping: %s %s (%s)' % (data, type(data), np.isscalar(data))
     #print 'DATA: %s' % type(self._data)
 
@@ -424,13 +430,20 @@ class LocalWrapper(DistArray):
   def fetch(self, ex):
     return self._data[ex.to_slice()]
 
+  def map_to_array(self, mapper_fn, kw=None):
+    return self.foreach_tile(mapper_fn=mapper_fn, kw=kw)
+
   def foreach_tile(self, mapper_fn, kw=None):
     if kw is None: kw = {}
     ex = extent.from_slice(np.index_exp[:], self.shape)
     result = mapper_fn(ex, **kw)
     assert len(result) == 1
-    result_ex, result_data = result[0]
-
+    result_ex, tile_id = result[0]
+    
+    Assert.isinstance(tile_id, core.BlobId)
+    ctx = blob_ctx.get()
+    
+    result_data = ctx.get(tile_id, slice(None, None, None))
     return as_array(result_data)
 
 

@@ -19,7 +19,7 @@ class IndexExpr(Expr):
     Expr.node_init(self)
     assert not isinstance(self.src, ListExpr)
     assert not isinstance(self.idx, ListExpr)
-    assert not isinstance(self.idx, list)
+    assert not isinstance(self.idx, TupleExpr)
 
   def _evaluate(self, ctx, deps):
     idx = deps['idx']
@@ -69,7 +69,7 @@ def eval_Index(ctx, prim, deps):
 
   if idx.dtype == np.bool:
     # return a new array masked by `idx`
-    dst = distarray.map_to_array(src, bool_index_mapper, kw={ 'src' : src, 'idx' : idx})
+    dst = src.map_to_array(bool_index_mapper, kw={ 'src' : src, 'idx' : idx})
     return dst
   else:
     util.log_info('Integer indexing...')
@@ -80,8 +80,7 @@ def eval_Index(ctx, prim, deps):
     dst = distarray.create(join_tuple([idx.shape[0]], src.shape[1:]), dtype=src.dtype)
     
     # map over it, fetching the appropriate values for each tile.
-    return distarray.map_to_array(dst,
-                                  int_index_mapper, kw={ 'src' : src, 'idx' : idx, 'dst' : dst })
+    return dst.map_to_array(int_index_mapper, kw={ 'src' : src, 'idx' : idx, 'dst' : dst })
 
     
 def eval_Slice(ctx, prim, deps):

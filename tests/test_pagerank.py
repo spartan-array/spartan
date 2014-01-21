@@ -104,7 +104,7 @@ def pagerank_sparse(num_pages,
 #@test_common.with_ctx
 #Qdef test_pr(ctx):
 def benchmark_pr(ctx, timer):
-  num_pages = 1000 * 1000 * 50
+  num_pages = 1000 * 1000 * ctx.num_workers
   num_outlinks = 10
   density = num_outlinks * 1.0 / num_pages
   same_site_prob = 0.9

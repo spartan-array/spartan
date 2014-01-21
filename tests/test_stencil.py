@@ -15,6 +15,8 @@ ONE_TILE = (10000, 10000, 10000, 10000)
 
 @with_ctx
 def test_stencil(ctx):
+  st = time.time()
+
   IMG_SIZE = int(8 * math.sqrt(ctx.num_workers))
   FILT_SIZE = 8
   N = 8
@@ -31,7 +33,8 @@ def test_stencil(ctx):
                       tile_hint=ONE_TILE)
   
   result = stencil.stencil(images, filters, 1)
-  print result[0:1].glom()[0]
+  ed = time.time()
+  print ed - st
 
 @with_ctx
 def test_local_convolve(ctx):
@@ -43,3 +46,6 @@ def test_local_convolve(ctx):
     stencil._convolve(images, filters)
     print N, F, time.time() - st
 
+=======
+if __name__ == '__main__':
+  test_stencil()

@@ -34,7 +34,7 @@ class Master(object):
 
     futures = rpc.FutureGroup()
     for id, w in self._workers.iteritems():
-      util.log_info('Shutting down worker %d', id)
+      #util.log_info('Shutting down worker %d', id)
       futures.append(w.shutdown())
 
     # Wait a second to let our shutdown request go out.
@@ -45,7 +45,7 @@ class Master(object):
   def register(self, req, handle):
     id = len(self._workers)
     self._workers[id] = rpc.connect(req.host, req.port)
-    util.log_info('Registered worker %d of %d', id, self.num_workers)
+    util.log_info('Registered %s:%s (%d/%d)', req.host, req.port, id, self.num_workers)
 
     resp = core.RegisterResp()
     handle.done(resp)
@@ -66,6 +66,7 @@ class Master(object):
 
     self._ctx = blob_ctx.BlobCtx(blob_ctx.MASTER_ID, self._workers)
     self._initialized = True
+    util.log_info('done...')
 
   def wait_for_initialization(self):
     while not self._initialized:

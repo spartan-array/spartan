@@ -84,6 +84,19 @@ class Expr(object):
       deps[k] = visitor.visit(getattr(self, k))
 
     return expr_like(self, **deps)
+  
+  def dot(self):
+    result = 'N%s [label="%s"]\n' % (self.expr_id, self.node_type())
+   
+    for name, value in self.dependencies().items():
+      if isinstance(value, Expr):
+        result = result + 'N%s -> N%s\n' % (self.expr_id, value.expr_id) 
+  
+    for name, value in self.dependencies().items():
+      if isinstance(value, Expr):
+        result = result + value.dot()
+    return result
+   
 
   def __del__(self):
     expr_references[self.expr_id] -= 1
@@ -104,12 +117,17 @@ class Expr(object):
 
   def evaluate(self):
     '''
-    Evaluate this expression.
+    Evaluate this expression, caching the result.
+    
+    Do not override this method; implement ``_evaluate`` instead.
     '''
     from . import backend
-    return backend.evaluate(blob_ctx.get(), self.dag())
+    return backend.evaluate(blob_ctx.get(), self.optimized())
 
   def _evaluate(self, ctx, deps):
+    '''
+    Evaluate this expression.
+    '''
     raise NotImplementedError
 
   def __hash__(self):
@@ -153,7 +171,7 @@ class Expr(object):
 
   def __getitem__(self, idx):
     from .index import IndexExpr
-    return IndexExpr(src=self, idx=lazify(idx))
+    return IndexExpr(src=self, idx=idx)
 
   def __setitem__(self, k, val):
     raise Exception, 'Expressions are read-only.'
@@ -175,8 +193,8 @@ class Expr(object):
   def force(self):
     return self.evaluate()
 
-  def dag(self):
-    return dag(self)
+  def optimized(self):
+    return optimized_dag(self)
 
   def glom(self):
     return glom(self)
@@ -233,7 +251,7 @@ class Val(Expr):
     return self.val
 
   def __str__(self):
-    return 'lazy(%s)' % self.val
+    return 'Val(%s)' % self.val
 
 class CollectionExpr(Expr):
   '''
@@ -246,10 +264,12 @@ class CollectionExpr(Expr):
   _members = ['vals']
 
   def __str__(self):
-    return 'lazy(%s)' % (self.vals,)
+    return '%s(%s)' % (self.node_type(), self.vals,)
 
   def _evaluate(self, ctx, deps):
-    return deps['vals']
+    return deps
+    #return self.dependencies()
+    #return deps['vals']
 
   def __getitem__(self, idx):
     return self.vals[idx]
@@ -264,6 +284,9 @@ class DictExpr(CollectionExpr):
   def iteritems(self): return self.vals.iteritems()
   def keys(self): return self.vals.keys()
   def values(self): return self.vals.values()
+  
+  def dependencies(self):
+    return self.vals
 
   def visit(self, visitor):
     return DictExpr(vals=dict([(k, visitor.visit(v)) for (k, v) in self.vals.iteritems()]))
@@ -271,12 +294,19 @@ class DictExpr(CollectionExpr):
 
 class ListExpr(CollectionExpr):
   __metaclass__ = Node
+  def dependencies(self):
+    return dict(('v%d' % i, self.vals[i]) for i in range(len(self.vals)))
+  
   def visit(self, visitor):
     return ListExpr(vals=[visitor.visit(v) for v in self.vals])
 
 
 class TupleExpr(CollectionExpr):
   __metaclass__ = Node
+  
+  def dependencies(self):
+    return dict(('v%d' % i, self.vals[i]) for i in range(len(self.vals)))
+
   def visit(self, visitor):
     return TupleExpr(vals=tuple([visitor.visit(v) for v in self.vals]))
 
@@ -295,7 +325,7 @@ def glom(value):
   return value.glom()
 
 
-def dag(node):
+def optimized_dag(node):
   '''
   Optimize and return the DAG representing this expression.
   

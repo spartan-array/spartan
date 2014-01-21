@@ -53,7 +53,7 @@ def run(filename):
              isinstance(getattr(module, k), types.FunctionType))
           ]
 
-  spartan.initialize(sys.argv)
+  spartan.config.parse(sys.argv)
   if benchmarks:
     # csv header
     print 'num_workers,bench,time'
@@ -61,14 +61,14 @@ def run(filename):
     
     for i in workers:
       # restart the cluster
-      spartan.shutdown()
-      time.sleep(1)
       FLAGS.num_workers = i
       ctx = spartan.initialize()
       
       timer = BenchTimer(i)
       util.log_info('Running benchmarks on %d workers', i)
       run_benchmarks(module, benchmarks, ctx, timer)
+      spartan.shutdown()
+      time.sleep(1)
 
   spartan.shutdown()
   if FLAGS.profile_worker:

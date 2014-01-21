@@ -60,7 +60,7 @@ class Tile(object):
       Assert.eq(val.dtype, self.dtype)
 
     self._data = val
-
+    
   def update(self, subslice, data, reducer):
     #util.log_info('Update: %s %s', subslice, data)
     return merge(self, subslice, data, reducer)
@@ -125,10 +125,14 @@ class Tile(object):
       self._initialize_mask()
 
   def _initialize_mask(self):
+    if self.type == TYPE_SPARSE:
+      self.mask = None
+      return
+    
     if not isinstance(self.mask, np.ndarray):
       if self.mask == MASK_ALL_SET:
         self.mask = np.ones(self.shape, dtype=np.bool)
-      else:
+      elif self.mask == MASK_ALL_CLEAR:
         self.mask = np.zeros(self.shape, dtype=np.bool)
 
 
@@ -240,7 +244,6 @@ def merge(old_tile, subslice, update, reducer):
     return old_tile
     
   if old_tile.type == TYPE_DENSE:
-    #util.log_debug('Update dense to dense')
     # initialize:
     # old_data[subslice] = data
     #

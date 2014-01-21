@@ -125,12 +125,12 @@ class PendingRequest(object):
     self.done(capture_exception())
 
   def done(self, result=None):
-    # util.log_info('RPC finished in %.3f seconds' % (time.time() - self.created))
     self.finished = True
     self.result = result
 
     assert self.socket is not None
     header = { 'rpc_id' : self.rpc_id }
+    
     #util.log_info('Finished %s, %s', self.socket.addr, self.rpc_id)
     w = cStringIO.StringIO()
     cPickle.dump(header, w, -1)
@@ -164,6 +164,7 @@ class Future(object):
     self.finished_fn = None
     self._cv = threading.Condition()
     self._start = time.time()
+    self._finish = time.time() + 1000000
     self._deadline = time.time() + DEFAULT_TIMEOUT
 
     CLIENT_PENDING[self] = 1
@@ -172,6 +173,7 @@ class Future(object):
     #util.log_info('Result... %s %s', self.addr, self.rpc_id)
     self._cv.acquire()
     self.have_result = True
+    self._finish = time.time()
 
     if self.finished_fn is not None:
       self.result = self.finished_fn(result)
@@ -185,9 +187,15 @@ class Future(object):
     return self._deadline < time.time()
 
   def elapsed_time(self):
-    return time.time() - self._start
+    return min(time.time(), self._finish) - self._start
+  
+  def __repr__(self):
+    return 'Future(%s:%d) [%s]' % (self.addr, self.rpc_id, self.elapsed_time())
   
   def wait(self):
+    #if self.addr is not None:
+    #  util.log_info('Waiting for %s', self)
+    
     self._cv.acquire()
     while not self.have_result and not self.timed_out():
       # use a timeout so that ctrl-c works.
@@ -227,7 +235,11 @@ class FnFuture(object):
 
 class FutureGroup(list):
   def wait(self):
-    return [f.wait() for f in self]
+    results = []
+    for f in self:
+      #util.log_info('Waiting for %s', f)
+      results.append(f.wait())
+    return results
 
 def wait_for_all(futures):
   return [f.wait() for f in futures]

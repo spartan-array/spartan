@@ -48,7 +48,7 @@ def _reduce_mapper(ex, children, op, axis, output):
   # fix shape
   local_reduction = np.asarray(local_reduction).reshape(dst_extent.shape)
     
-  util.log_info('Update: %s %s', dst_extent, local_reduction)
+  #util.log_info('Update: %s %s', dst_extent, local_reduction)
   output.update(dst_extent, local_reduction)
   return MapResult([], None)
 

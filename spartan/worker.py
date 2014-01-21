@@ -142,7 +142,7 @@ class Worker(object):
     self._kernel_threads.apply_async(self._run_kernel, args=(req, handle))
 
   def shutdown(self, req, handle):
-    util.log_debug('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_worker)
+    util.log_info('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_worker)
     if FLAGS.profile_worker:
       try:
         os.system('mkdir -p ./_worker_profiles/')
@@ -150,7 +150,6 @@ class Worker(object):
         stats.dump_stats('./_worker_profiles/%d' % self.id)
       except Exception, ex:
         print 'Failed to write profile.', ex
-
     handle.done()
     threading.Thread(target=self._shutdown).start()
 
@@ -166,7 +165,7 @@ class Worker(object):
 
 
 def _start_worker(master, local_id):
-  util.log_debug('Worker starting up... Master: %s Profile: %s', master, FLAGS.profile_worker)
+  util.log_info('Worker starting up... Master: %s Profile: %s', master, FLAGS.profile_worker)
 
   if FLAGS.use_single_core:
     pid = os.getpid()

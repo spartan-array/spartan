@@ -22,7 +22,7 @@ def poller():
   global POLLER
   with POLLER_LOCK:
     if POLLER is None:
-      util.log_info('Started poller.. %s %s', os.getpid(), __file__)
+      util.log_debug('Started poller.. %s %s', os.getpid(), __file__)
       POLLER = ZMQPoller()
       POLLER.start()
     return POLLER
@@ -145,7 +145,7 @@ class ServerSocket(Socket):
     self._status = CONNECTED
     host, port = self.addr
     host = socket.gethostbyname(host)
-    util.log_info('Binding... %s', (host, port))
+    util.log_debug('Binding... %s', (host, port))
     
     if port == -1:
       self.addr = (host, self._zmq.bind_to_random_port('tcp://%s' % host))

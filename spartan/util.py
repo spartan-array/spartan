@@ -17,6 +17,8 @@ import traceback
 import numpy as np
 
 HOSTNAME = socket.gethostname()
+PID = os.getpid()
+
 LOGGING_CONFIGURED = False
 
 def _setup_logger():
@@ -29,27 +31,27 @@ def _setup_logger():
 
 def log_debug(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
-  kw['extra'] = { 'hostname' : HOSTNAME }
+  kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
   logging.debug(*args, **kw) 
 
 def log_info(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
-  kw['extra'] = { 'hostname' : HOSTNAME }
+  kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
   logging.info(*args, **kw) 
 
 def log_warn(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
-  kw['extra'] = { 'hostname' : HOSTNAME }
+  kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
   logging.warn(*args, **kw) 
 
 def log_error(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
-  kw['extra'] = { 'hostname' : HOSTNAME }
+  kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
   logging.error(*args, **kw) 
   
 def log_fatal(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
-  kw['extra'] = { 'hostname' : HOSTNAME }
+  kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
   logging.fatal(*args, **kw) 
 
 def findCaller(obj):

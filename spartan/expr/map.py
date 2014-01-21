@@ -30,6 +30,7 @@ def tile_mapper(ex, children, op):
 
   #util.log_info('Inputs: %s', local_values)
   result = op.evaluate(op_ctx)
+  
   #util.log_info('Result: %s', result)
   Assert.eq(ex.shape, result.shape, 'Bad shape: (%s)' % op)
   
@@ -74,12 +75,14 @@ class MapExpr(Expr):
     vals = distarray.broadcast(vals)
     largest = distarray.largest_value(vals)
 
+    util.log_info('%s', vals)
     children = dict(zip(keys, vals))
     #util.log_info('Mapping %s over %d inputs; largest = %s', op, len(children), largest.shape)
 
-    result = distarray.map_to_array(largest,
-                                    tile_mapper,
-                                    kw = { 'children' : children, 'op' : op })
+    result = largest.map_to_array(
+                tile_mapper, 
+                kw = { 'children' : children, 'op' : op })
+    
     return result
 
 def map(inputs, fn, numpy_expr=None, fn_kw=None):
