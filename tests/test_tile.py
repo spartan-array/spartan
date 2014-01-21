@@ -15,31 +15,31 @@ UPDATE_SUBSLICE = extent.create((0,0),(8,8), UPDATE_SHAPE).to_slice()
 
 class TestTile(test_common.ClusterTest):
   def test_create_dense(self):
-    t = tile.from_shape(ARRAY_SIZE, dtype=np.float64, tile_type=tile.TYPE_DENSE)
+    t = tile.from_shape(ARRAY_SIZE, dtype=np.float32, tile_type=tile.TYPE_DENSE)
     t._initialize()
     Assert.eq(t.mask.shape, ARRAY_SIZE)
     
   def test_create_sparse(self):
-    t = tile.from_shape(ARRAY_SIZE, dtype=np.float64, tile_type=tile.TYPE_SPARSE)
+    t = tile.from_shape(ARRAY_SIZE, dtype=np.float32, tile_type=tile.TYPE_SPARSE)
     t._initialize()
     Assert.eq(t.data.shape, ARRAY_SIZE)
     Assert.eq(t.mask, None) 
 
   def test_update_dense_to_dense(self):
-    t = tile.from_shape(ARRAY_SIZE, dtype=np.float64, tile_type=tile.TYPE_DENSE)
+    t = tile.from_shape(ARRAY_SIZE, dtype=np.float32, tile_type=tile.TYPE_DENSE)
     update = np.ones(UPDATE_SHAPE)
     t.update(UPDATE_SUBSLICE, update, None)
     print t.data
     
   def test_update_dense_to_sparse(self):
-    t = tile.from_shape(ARRAY_SIZE, dtype=np.float64, tile_type=tile.TYPE_SPARSE)
+    t = tile.from_shape(ARRAY_SIZE, dtype=np.float32, tile_type=tile.TYPE_SPARSE)
     update = np.ones(UPDATE_SHAPE)
     t.update(UPDATE_SUBSLICE, update, None)
     print t.data.todense()
     
   def test_update_sparse_to_dense(self):
-    t = tile.from_shape(ARRAY_SIZE, dtype=np.float64, tile_type=tile.TYPE_DENSE)
-    update = sp.lil_matrix(ARRAY_SIZE)
+    t = tile.from_shape(ARRAY_SIZE, dtype=np.float32, tile_type=tile.TYPE_DENSE)
+    update = sp.lil_matrix(ARRAY_SIZE, dtype=np.float32)
     for i in range(UPDATE_SHAPE[0]):
       update[i,i] = 1
     t.update(UPDATE_SUBSLICE, update, None)
@@ -47,8 +47,8 @@ class TestTile(test_common.ClusterTest):
     print t.mask
     
   def test_update_sparse_to_sparse(self):
-    t = tile.from_shape(ARRAY_SIZE, dtype=np.float64, tile_type=tile.TYPE_SPARSE)
-    update = sp.lil_matrix(ARRAY_SIZE)
+    t = tile.from_shape(ARRAY_SIZE, dtype=np.float32, tile_type=tile.TYPE_SPARSE)
+    update = sp.lil_matrix(ARRAY_SIZE, dtype=np.float32)
     for i in range(UPDATE_SHAPE[0]):
       update[i,i] = 1
     t.update(UPDATE_SUBSLICE, update, None)

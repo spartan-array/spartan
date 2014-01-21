@@ -9,6 +9,6 @@ class ReshapeTest(test_common.ClusterTest):
     b.force()
   
   def test_reshape2(self):
-    a = expr.arange((1000,))
+    a = expr.arange((1000,), tile_hint=[100])
     b = expr.reshape(a, (10, 100)).force()
     c = expr.reshape(b, (1000,)).force()

@@ -136,13 +136,13 @@ def ones(shape, dtype=np.float, tile_hint=None):
 
 def _arange_mapper(inputs, ex, dtype=None):
   pos = extent.ravelled_pos(ex.ul, ex.array_shape)
-  # util.log_info('Extent: %s, pos: %s', ex, pos)
+  #util.log_info('Extent: %s, shape:%s, pos: %s', ex, ex.shape, pos)
   sz = np.prod(ex.shape)
   yield (ex, np.arange(pos, pos + sz, dtype=dtype).reshape(ex.shape))
 
 
-def arange(shape, dtype=np.float):
-  return shuffle(ndarray(shape, dtype=dtype),
+def arange(shape, dtype=np.float, tile_hint=None):
+  return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
                  fn=_arange_mapper,
                  kw={'dtype': dtype})
 
@@ -335,6 +335,8 @@ def _reshape_mapper(array, ex, _dest_shape):
                 ravelled_lr, _dest_shape, target_lr)
 
   target_ex = extent.create(target_ul, np.array(target_lr) + 1, _dest_shape)
+  #util.log_info('target_ex.ul:%s, target_ex.lr:%s, target_ex.shape:%s, target_ex:%s', target_ex.ul, target_ex.lr, target_ex.shape, target_ex)
+  #util.log_info('dest_shape:%s ex:%s, tile:%s, type:%s, target:%s', _dest_shape, ex.shape, tile.shape, type(tile), target_ex.shape)
   yield target_ex, tile.reshape(target_ex.shape)
 
 

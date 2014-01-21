@@ -11,7 +11,6 @@ from . import tile, extent
 from spartan import util, core, blob_ctx, rpc
 from spartan.util import Assert
 
-
 # number of elements per tile
 DEFAULT_TILE_SIZE = 100000
 
@@ -400,6 +399,7 @@ def from_table(extents):
   else:
     # empty table; default dtype.
     dtype = np.float
+    sparse = False
 
   return DistArrayImpl(shape=shape, dtype=dtype, tiles=extents, reducer_fn=None, sparse=sparse)
 
@@ -480,7 +480,8 @@ def _slice_mapper(ex, **kw):
 
   intersection = extent.intersection(slice_extent, ex)
   if intersection is None:
-    return []
+    from spartan.expr.map import MapResult
+    return MapResult([], None)
 
   offset = extent.offset_from(slice_extent, intersection)
   offset.array_shape = slice_extent.shape
@@ -488,7 +489,7 @@ def _slice_mapper(ex, **kw):
   subslice = extent.offset_slice(ex, intersection)
 
   result = mapper_fn(offset, **fn_kw)
-  #util.log_info('Slice mapper[%s] %s %s -> %s', mapper_fn, offset, subtile, result)
+  #util.log_info('Slice mapper[%s] %s %s -> %s', mapper_fn, offset, subslice, result)
   return result
 
 class Slice(DistArray):

@@ -68,12 +68,13 @@ class Tile(object):
   def get(self, subslice=None):
     # no data, return an empty array
     if self.data is None:
-      self._initialize()
+      #self._initialize()
       #util.log_info('EMPTY %s %s', self.id, self.shape)
-#       if self.type == TYPE_SPARSE:
-#           return scipy.sparse.lil_matrix(self.shape, self.dtype)[subslice]
-#       
-#       return np.ndarray(self.shape, self.dtype)[subslice]
+      if self.type == TYPE_SPARSE:
+        shape = self.shape if subslice == None else tuple([slice.stop - slice.start for slice in subslice])
+        return scipy.sparse.coo_matrix(shape, self.dtype)
+        
+      return np.ndarray(self.shape, self.dtype)[subslice]
 
     # scalars are just returned directly.
     if len(self.data.shape) == 0:
@@ -95,6 +96,8 @@ class Tile(object):
     # dense, check our mask and return a masked segment or unmasked if
     # the mask is all filled for the selected region.
     self._initialize_mask()
+    
+    #return self.data[subslice]
     if self.mask is None or np.all(self.mask[subslice]):
       #util.log_info('%s %s %s', self.data, self.mask, subslice)
       return self.data[subslice]
@@ -118,7 +121,7 @@ class Tile(object):
         self.data = scipy.sparse.coo_matrix(self.shape, dtype=self.dtype)
     else:
       if self.data is None:
-        self.data = np.ndarray(self.shape, dtype=self.dtype)
+        self.data = np.zeros(self.shape, dtype=self.dtype)
       self._initialize_mask()
 
   def _initialize_mask(self):
@@ -247,27 +250,23 @@ def merge(old_tile, subslice, update, reducer):
     #util.log_info('%s %s', old_tile.mask, new_tile.mask)
     #util.log_info('REPLACE: %s', replaced)
     #util.log_info('UPDATE: %s', updated) 
-    if old_tile.shape == update.shape:
+    replaced = ~old_tile.mask[subslice]
+    updated = old_tile.mask[subslice]
+    
+    old_region = old_tile.data[subslice]  
+    if np.any(replaced):  
+      old_region[replaced] = update[replaced]
+    
+    if np.any(updated):
       if reducer is not None:
-        old_tile.data = reducer(old_tile.data, update)
+        old_region[updated] = reducer(old_region[updated], update[updated]) 
       else:
-        old_tile.data = update
-    else:
-      replaced = ~old_tile.mask[subslice]
-      updated = old_tile.mask[subslice]
-    
-      old_region = old_tile.data[subslice]  
-      if np.any(replaced):  
-        old_region[replaced] = update[replaced]
-    
-      if np.any(updated):
-        if reducer is not None:
-          old_region[updated] = reducer(old_region[updated], update[updated]) 
-        else:
-          old_region[updated] = update[updated] 
+        old_region[updated] = update[updated] 
     
     old_tile.mask[subslice] = True
   else:
+    if old_tile.data is not None and old_tile.data.format == 'coo':
+      old_tile.data = old_tile.data.tolil() 
     #util.log_info('Update dense to sparse')
     # TODO (SPARSE UPDATE)!!!
     # sparse update, no mask, just iterate over data items

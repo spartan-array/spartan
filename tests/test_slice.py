@@ -9,7 +9,7 @@ from spartan.expr import optimize
 from spartan.array import distarray, extent
 from spartan.util import Assert
 import test_common
-
+from spartan.expr.map import MapResult
 
 TEST_SIZE = 10
 

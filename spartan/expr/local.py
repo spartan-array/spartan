@@ -142,12 +142,12 @@ class ParakeetExpr(LocalExpr):
   def evaluate(self, ctx):
     names = self.input_names()
     fn = compile_parakeet_source(self.source)
-    #util.log_info('Parakeet: %s', fn)
+    
     kw_args = {}
     for var in names:
       value = ctx.inputs[var]
       kw_args[var] = value
-
+    
     if FLAGS.use_cuda:
       return fn(_backend='cuda', **kw_args)
     else:

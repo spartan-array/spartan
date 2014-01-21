@@ -23,7 +23,7 @@ def tile_mapper(ex, children, op):
 
   #local_values = dict([(k, v.fetch(ex)) for (k, v) in children.iteritems()])
   #util.log_info('Local %s', [type(v) for v in local_values.values()])
-  #util.log_info('Local %s', local_values.keys())
+  #util.log_info('Local %s', local_values)
   #util.log_info('Op %s', op)
 
   op_ctx = LocalCtx(inputs=local_values)

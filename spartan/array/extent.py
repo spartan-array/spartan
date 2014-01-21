@@ -197,7 +197,7 @@ def offset_slice(base, other):
   '''
   return slicing.offset_slice(base.ul, base.lr, other.ul, other.lr)
 
-# def offset_slice(base, other):
+#def offset_slice(base, other):
 #   '''
 #   :param base: `TileExtent` to use as basis
 #   :param other: `TileExtent` into the same array.
