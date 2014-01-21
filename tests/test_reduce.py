@@ -101,6 +101,12 @@ class TestReduce(test_common.ClusterTest):
     x = expr.zeros((TEST_SIZE,))
     Assert.eq(expr.count_nonzero(x).glom(), 0)
 
+  def test_count_zero(self):
+    x = expr.ones((TEST_SIZE,))
+    Assert.eq(expr.count_zero(x).glom(), 0)
+    x = expr.zeros((TEST_SIZE,))
+    Assert.eq(expr.count_zero(x).glom(), TEST_SIZE)
+
 if __name__ == '__main__':
 #   x = TestReduce(methodName='test_simple_sum')
 #   x.setUpClass()

@@ -137,6 +137,23 @@ def ravelled_pos(idx, array_shape):
   
   return rpos
 
+def find_rect(ravelled_ul, ravelled_lr, shape):
+  '''
+  Return a new (ravellled_ul, ravelled_lr) to make a rectangle for `shape`.
+  If (ravelled_ul, ravelled_lr) already forms a rectangle, just return it.
+
+  :param ravelled_ul:
+  :param ravelled_lr:
+  '''
+  if shape[-1] == 1 or ravelled_ul / shape[-1] == ravelled_lr / shape[-1]:
+    rect_ravelled_ul = ravelled_ul
+    rect_ravelled_lr = ravelled_lr
+  else:
+    rect_ravelled_ul = ravelled_ul - (ravelled_ul % shape[-1])
+    rect_ravelled_lr = ravelled_lr + (shape[-1] - ravelled_lr % shape[-1]) % shape[-1] - 1
+
+  return (rect_ravelled_ul, rect_ravelled_lr)
+
 def find_overlapping(extents, region):
   '''
   Return the extents that overlap with ``region``.   

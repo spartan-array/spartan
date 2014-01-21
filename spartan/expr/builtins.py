@@ -270,7 +270,16 @@ def count_nonzero(array):
                 dtype_fn=lambda input: np.int64,
                 local_reduce_fn=_countnonzero_local,
                 accumulate_fn = np.add)
-  
+
+def _countzero_local(ex, data, axis):
+  return np.asarray(np.prod(ex.shape) - np.count_nonzero(data))
+
+def count_zero(array):
+  return reduce(array, None,
+                dtype_fn=lambda input: np.int64,
+                local_reduce_fn=_countzero_local,
+                accumulate_fn = np.add)
+ 
 
 def size(x, axis=None):
   '''
@@ -322,23 +331,53 @@ def ravel(v):
 
 
 def _reshape_mapper(array, ex, _dest_shape):
-  tile = array.fetch(ex)
 
   ravelled_ul = extent.ravelled_pos(ex.ul, ex.array_shape)
   ravelled_lr = extent.ravelled_pos([lr - 1 for lr in ex.lr], ex.array_shape)
 
-  target_ul = extent.unravelled_pos(ravelled_ul, _dest_shape)
-  target_lr = extent.unravelled_pos(ravelled_lr, _dest_shape)
+  (target_ravelled_ul, target_ravelled_lr) = extent.find_rect(ravelled_ul, ravelled_lr, _dest_shape)
 
-  util.log_info('\n%s + %s -> %s\n%s + %s -> %s',
-                ravelled_ul, _dest_shape, target_ul,
-                ravelled_lr, _dest_shape, target_lr)
-
+  target_ul = extent.unravelled_pos(target_ravelled_ul, _dest_shape)
+  target_lr = extent.unravelled_pos(target_ravelled_lr, _dest_shape)
   target_ex = extent.create(target_ul, np.array(target_lr) + 1, _dest_shape)
-  #util.log_info('target_ex.ul:%s, target_ex.lr:%s, target_ex.shape:%s, target_ex:%s', target_ex.ul, target_ex.lr, target_ex.shape, target_ex)
-  #util.log_info('dest_shape:%s ex:%s, tile:%s, type:%s, target:%s', _dest_shape, ex.shape, tile.shape, type(tile), target_ex.shape)
+  rect_ravelled_ul = target_ravelled_ul
+  rect_ravelled_lr = target_ravelled_lr
+
+  (rect_ravelled_ul, rect_ravelled_lr) = extent.find_rect(target_ravelled_ul, target_ravelled_lr, ex.array_shape)
+
+  rect_ul = extent.unravelled_pos(rect_ravelled_ul, ex.array_shape)
+  rect_lr = extent.unravelled_pos(rect_ravelled_lr, ex.array_shape)
+  rect_ex = extent.create(rect_ul, np.array(rect_lr) + 1, ex.array_shape)
+
+  #util.log_info('\nshape = %s, _dest_shape = %s'
+                #'\ntarget_ul = %s, target_lr = %s'
+                #'\nravelled_ul = %s, target_ravelled_ul = %s, rect_ravelled_ul = %s'
+                #'\nravelled_lr = %s, target_ravelled_lr = %s, rect_ravelled_lr = %s',
+                #ex.array_shape, _dest_shape,
+                #target_ul, target_lr,
+                #ravelled_ul, target_ravelled_ul, rect_ravelled_ul,
+                #ravelled_lr, target_ravelled_lr, rect_ravelled_lr)
+
+  tile = np.ravel(array.fetch(rect_ex))
+  tile = tile[(target_ravelled_ul - rect_ravelled_ul):(target_ravelled_lr - rect_ravelled_ul) + 1]
+
   yield target_ex, tile.reshape(target_ex.shape)
 
+#def _reshape_mapper(array, ex, _dest_shape):
+  #tile = array.fetch(ex)
+
+  #ravelled_ul = extent.ravelled_pos(ex.ul, ex.array_shape)
+  #ravelled_lr = extent.ravelled_pos([lr - 1 for lr in ex.lr], ex.array_shape)
+
+  #target_ul = extent.unravelled_pos(ravelled_ul, _dest_shape)
+  #target_lr = extent.unravelled_pos(ravelled_lr, _dest_shape)
+
+  #util.log_info('\n%s + %s -> %s\n%s + %s -> %s',
+                #ravelled_ul, _dest_shape, target_ul,
+                #ravelled_lr, _dest_shape, target_lr)
+
+  #target_ex = extent.create(target_ul, np.array(target_lr) + 1, _dest_shape)
+  #yield target_ex, tile.reshape(target_ex.shape)
 
 def reshape(array, new_shape, tile_hint=None):
   '''
@@ -356,8 +395,14 @@ def reshape(array, new_shape, tile_hint=None):
 
   Assert.eq(old_size, new_size, 'Size mismatch')
 
-  return shuffle(array,
+  a = force(array)
+  target = ndarray(new_shape,
+                   dtype=a.dtype,
+                   sparse=a.sparse)
+
+  return shuffle(a,
                  _reshape_mapper,
+                 target = target,
                  tile_hint=tile_hint,
                  kw={'_dest_shape': new_shape})
 
