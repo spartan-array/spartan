@@ -423,6 +423,33 @@ def reshape(array, new_shape, tile_hint=None):
                  tile_hint=tile_hint,
                  kw={'_dest_shape': new_shape})
 
+def _transpose_mapper(array, ex, _dest_shape):
+  tile = array.fetch(ex)
+  target_ex = extent.create(ex.ul[::-1], ex.lr[::-1], _dest_shape)
+  if not array.sparse:
+    yield target_ex, np.transpose(tile)
+  else:
+    yield target_ex, tile.transpose()
+
+def transpose(array):
+  '''
+  Transpose ``array``.
+
+  Return the transpose array.
+
+  :param array: `Expr`
+  '''
+  a = force(array)
+  if a.sparse:
+    raise NotImplementedError
+  target = ndarray(a.shape[::-1],
+                   dtype = a.dtype,
+                   sparse = a.sparse)
+
+  return shuffle(a,
+                 _transpose_mapper,
+                 target = target,
+                 kw={'_dest_shape': a.shape[::-1]})
 
 def _dot_mapper(inputs, ex, av, bv):
   # read current tile of array 'a'
