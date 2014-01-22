@@ -349,14 +349,14 @@ def _reshape_mapper(array, ex, _dest_shape):
   rect_lr = extent.unravelled_pos(rect_ravelled_lr, ex.array_shape)
   rect_ex = extent.create(rect_ul, np.array(rect_lr) + 1, ex.array_shape)
 
-  util.log_info('\nshape = %s, _dest_shape = %s'
-                '\ntarget_ul = %s, target_lr = %s'
-                '\nravelled_ul = %s, target_ravelled_ul = %s, rect_ravelled_ul = %s'
-                '\nravelled_lr = %s, target_ravelled_lr = %s, rect_ravelled_lr = %s',
-                ex.array_shape, _dest_shape,
-                target_ul, target_lr,
-                ravelled_ul, target_ravelled_ul, rect_ravelled_ul,
-                ravelled_lr, target_ravelled_lr, rect_ravelled_lr)
+  util.log_debug('\nshape = %s, _dest_shape = %s, target_ex.shape = %s'
+                 '\ntarget = (%s, %s)'
+                 '\n(%s, %s), (%s, %s), (%s, %s)',
+                 ex.array_shape, _dest_shape, target_ex.shape,
+                 target_ul, target_lr,
+                 ravelled_ul, ravelled_lr,
+                 target_ravelled_ul, target_ravelled_lr,
+                 rect_ravelled_ul, rect_ravelled_lr)
 
   if not array.sparse:
     tile = np.ravel(array.fetch(rect_ex))

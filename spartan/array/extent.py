@@ -149,8 +149,12 @@ def find_rect(ravelled_ul, ravelled_lr, shape):
     rect_ravelled_ul = ravelled_ul
     rect_ravelled_lr = ravelled_lr
   else:
-    rect_ravelled_ul = ravelled_ul - (ravelled_ul % shape[-1])
-    rect_ravelled_lr = ravelled_lr + (shape[-1] - ravelled_lr % shape[-1]) % shape[-1] - 1
+    div = 1
+    for i in shape[1:]:
+      div = div * i
+    print('fegin', shape, div)
+    rect_ravelled_ul = ravelled_ul - (ravelled_ul % div)
+    rect_ravelled_lr = ravelled_lr + (div - ravelled_lr % div) % div - 1
 
   return (rect_ravelled_ul, rect_ravelled_lr)
 
