@@ -349,19 +349,32 @@ def _reshape_mapper(array, ex, _dest_shape):
   rect_lr = extent.unravelled_pos(rect_ravelled_lr, ex.array_shape)
   rect_ex = extent.create(rect_ul, np.array(rect_lr) + 1, ex.array_shape)
 
-  #util.log_info('\nshape = %s, _dest_shape = %s'
-                #'\ntarget_ul = %s, target_lr = %s'
-                #'\nravelled_ul = %s, target_ravelled_ul = %s, rect_ravelled_ul = %s'
-                #'\nravelled_lr = %s, target_ravelled_lr = %s, rect_ravelled_lr = %s',
-                #ex.array_shape, _dest_shape,
-                #target_ul, target_lr,
-                #ravelled_ul, target_ravelled_ul, rect_ravelled_ul,
-                #ravelled_lr, target_ravelled_lr, rect_ravelled_lr)
+  util.log_info('\nshape = %s, _dest_shape = %s'
+                '\ntarget_ul = %s, target_lr = %s'
+                '\nravelled_ul = %s, target_ravelled_ul = %s, rect_ravelled_ul = %s'
+                '\nravelled_lr = %s, target_ravelled_lr = %s, rect_ravelled_lr = %s',
+                ex.array_shape, _dest_shape,
+                target_ul, target_lr,
+                ravelled_ul, target_ravelled_ul, rect_ravelled_ul,
+                ravelled_lr, target_ravelled_lr, rect_ravelled_lr)
 
-  tile = np.ravel(array.fetch(rect_ex))
-  tile = tile[(target_ravelled_ul - rect_ravelled_ul):(target_ravelled_lr - rect_ravelled_ul) + 1]
-
-  yield target_ex, tile.reshape(target_ex.shape)
+  if not array.sparse:
+    tile = np.ravel(array.fetch(rect_ex))
+    tile = tile[(target_ravelled_ul - rect_ravelled_ul):(target_ravelled_lr - rect_ravelled_ul) + 1]
+    yield target_ex, tile.reshape(target_ex.shape)
+  else:
+    tile = array.fetch(rect_ex)
+    new = sp.lil_matrix(target_ex.shape, dtype=array.dtype)
+    j_max = tile.shape[1]
+    for i,row in enumerate(tile.rows):
+      for col,j in enumerate(row):
+        rect_index = i*j_max + j
+        if rect_index > target_ravelled_lr:
+          break
+        if rect_index >= target_ravelled_ul:
+          new_r,new_c = np.unravel_index(rect_index - rect_ravelled_ul, target_ex.shape)
+          new[new_r,new_c] = tile[i,j]
+    yield target_ex, new
 
 #def _reshape_mapper(array, ex, _dest_shape):
   #tile = array.fetch(ex)
@@ -396,6 +409,10 @@ def reshape(array, new_shape, tile_hint=None):
   Assert.eq(old_size, new_size, 'Size mismatch')
 
   a = force(array)
+
+  if a.sparse:
+    raise NotImplementedError
+
   target = ndarray(new_shape,
                    dtype=a.dtype,
                    sparse=a.sparse)
