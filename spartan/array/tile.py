@@ -240,6 +240,8 @@ def merge(old_tile, subslice, update, reducer):
         if reducer is not None:  
           old_tile.data[subslice] = reducer(old_tile.data[subslice], update)
         else:
+          old_tile.data = old_tile.data.tolil()
+          update = update.tolil()
           old_tile.data[subslice] = update
     return old_tile
     

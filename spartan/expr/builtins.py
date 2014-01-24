@@ -349,14 +349,14 @@ def _reshape_mapper(array, ex, _dest_shape):
   rect_lr = extent.unravelled_pos(rect_ravelled_lr, ex.array_shape)
   rect_ex = extent.create(rect_ul, np.array(rect_lr) + 1, ex.array_shape)
 
-  util.log_debug('\nshape = %s, _dest_shape = %s, target_ex.shape = %s'
-                 '\ntarget = (%s, %s)'
-                 '\n(%s, %s), (%s, %s), (%s, %s)',
-                 ex.array_shape, _dest_shape, target_ex.shape,
-                 target_ul, target_lr,
-                 ravelled_ul, ravelled_lr,
-                 target_ravelled_ul, target_ravelled_lr,
-                 rect_ravelled_ul, rect_ravelled_lr)
+  #util.log_debug('\nshape = %s, _dest_shape = %s, target_ex.shape = %s'
+                 #'\ntarget = (%s, %s)'
+                 #'\n(%s, %s), (%s, %s), (%s, %s)',
+                 #ex.array_shape, _dest_shape, target_ex.shape,
+                 #target_ul, target_lr,
+                 #ravelled_ul, ravelled_lr,
+                 #target_ravelled_ul, target_ravelled_lr,
+                 #rect_ravelled_ul, rect_ravelled_lr)
 
   if not array.sparse:
     tile = np.ravel(array.fetch(rect_ex))
@@ -369,10 +369,10 @@ def _reshape_mapper(array, ex, _dest_shape):
     for i,row in enumerate(tile.rows):
       for col,j in enumerate(row):
         rect_index = i*j_max + j
-        if rect_index > target_ravelled_lr:
-          break
-        if rect_index >= target_ravelled_ul:
-          new_r,new_c = np.unravel_index(rect_index - rect_ravelled_ul, target_ex.shape)
+        target_start = target_ravelled_ul - rect_ravelled_ul
+        target_end = target_ravelled_lr - rect_ravelled_ul
+        if rect_index >= target_start and rect_index <= target_end:
+          new_r,new_c = np.unravel_index(rect_index - target_start, target_ex.shape)
           new[new_r,new_c] = tile[i,j]
     yield target_ex, new
 
@@ -410,8 +410,8 @@ def reshape(array, new_shape, tile_hint=None):
 
   a = force(array)
 
-  if a.sparse:
-    raise NotImplementedError
+  #if a.sparse:
+    #raise NotImplementedError
 
   target = ndarray(new_shape,
                    dtype=a.dtype,
@@ -440,8 +440,8 @@ def transpose(array):
   :param array: `Expr`
   '''
   a = force(array)
-  if a.sparse:
-    raise NotImplementedError
+  #if a.sparse:
+    #raise NotImplementedError
   target = ndarray(a.shape[::-1],
                    dtype = a.dtype,
                    sparse = a.sparse)

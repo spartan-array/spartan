@@ -92,6 +92,13 @@ def create(ul, lr, array_shape):
   '''
   #stack = ''.join(traceback.format_stack())
   #counts[stack] += 1
+
+  # If we got an unrealistic (ul, lr), return None.
+  # Or rasie an exception ?
+  for i, j in zip(ul, lr):
+    if i >= j:
+     return None
+
   ex = TileExtent()
   ex.ul = tuple(ul)
   ex.lr = tuple(lr)
@@ -152,7 +159,6 @@ def find_rect(ravelled_ul, ravelled_lr, shape):
     div = 1
     for i in shape[1:]:
       div = div * i
-    print('fegin', shape, div)
     rect_ravelled_ul = ravelled_ul - (ravelled_ul % div)
     rect_ravelled_lr = ravelled_lr + (div - ravelled_lr % div) % div - 1
 

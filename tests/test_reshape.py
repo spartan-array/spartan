@@ -1,6 +1,8 @@
 from spartan import expr, util
 from spartan.util import Assert
 import test_common
+import numpy as np
+from scipy import sparse as sp
 
 
 class ReshapeTest(test_common.ClusterTest):
@@ -81,4 +83,12 @@ class ReshapeTest(test_common.ClusterTest):
     Assert.all_eq(expr.reshape(e, (12, 230, 100)).glom(), t2)
     Assert.all_eq(expr.reshape(e, (276000, 1)).glom(), t3)
     Assert.all_eq(expr.reshape(e, (1, 276000)).glom(), t4)
+
+  def test_reshape8(self):
+    t1 = expr.sparse_diagonal((257, 997)).force()
+    t2 = expr.sparse_diagonal((997, 257)).force()
+    a = expr.reshape(t1, (997, 257))
+    b = expr.reshape(t2, (257, 997))
+    Assert.all_eq(a.glom().todense(), sp.eye(257, 997).tolil().reshape((997, 257)).todense())
+    Assert.all_eq(b.glom().todense(), sp.eye(997, 257).tolil().reshape((257, 997)).todense())
 
