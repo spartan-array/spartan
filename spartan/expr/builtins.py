@@ -178,7 +178,10 @@ def mean(x, axis=None):
   :param x: `Expr`
   :param axis: integer or ``None``
   '''
-  return sum(x, axis) / x.shape[axis]
+  if axis is None:
+    return sum(x, axis) / np.prod(x.shape)
+  else:
+    return sum(x, axis) / x.shape[axis]
 
 
 def _to_structured_array(*vals):
