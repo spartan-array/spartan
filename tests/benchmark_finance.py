@@ -30,7 +30,7 @@ def benchmark_spread(ctx, timer):
   bid = eager(ones((10 * 1000 * 1000 * ctx.num_workers,)))
 
   for i in range(5):
-    timer.time_op('predict-price', lambda: finance.predict_price(ask, bid, 5))
+    timer.time_op('predict-price', lambda: force(finance.predict_price(ask, bid, 5)))
 
 # def benchmark_optimization(ctx, timer):
 #   current = eager(zeros((100 * 1000 * 1000 * ctx.num_workers,), dtype=np.float32))
