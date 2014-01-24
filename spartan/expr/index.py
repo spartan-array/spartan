@@ -7,7 +7,7 @@ from spartan.array import extent, tile, distarray
 from spartan.node import Node
 from spartan.util import Assert, join_tuple
 
-from .base import Expr, ListExpr
+from .base import Expr, ListExpr, TupleExpr
 from .map import MapResult
 
 
