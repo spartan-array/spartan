@@ -11,12 +11,12 @@ cdef public enum Reducers:
 
 
 @cython.boundscheck(False) # turn of bounds-checking for entire function
-cpdef sparse_dense_update(np.ndarray[ndim=2, dtype=DTYPE_FLT] target, 
-                         np.ndarray[ndim=2, dtype=np.uint8_t, cast=True] mask, 
-                         np.ndarray[ndim=1, dtype=DTYPE_INT] rows,
-                         np.ndarray[ndim=1, dtype=DTYPE_INT] cols,
-                         np.ndarray[ndim=1, dtype=DTYPE_FLT] data,
-                         int reducer):
+cpdef sparse_to_dense_update(np.ndarray[ndim=2, dtype=DTYPE_FLT] target, 
+                             np.ndarray[ndim=2, dtype=np.uint8_t, cast=True] mask, 
+                             np.ndarray[ndim=1, dtype=DTYPE_INT] rows,
+                             np.ndarray[ndim=1, dtype=DTYPE_INT] cols,
+                             np.ndarray[ndim=1, dtype=DTYPE_FLT] data,
+                             int reducer):
   
   cdef int i
   for i in range(rows.shape[0]):

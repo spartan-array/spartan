@@ -72,8 +72,9 @@ class TileExtent(object):
     return ravelled_pos(np.asarray(self.ul) + local_idx, self.array_shape)
 
   def add_dim(self):
+    #util.log_info('ul:%s lr:%s array_shape:%s', self.ul + (0,), self.lr + (1,), self.array_shape + (1,))
     return create(self.ul + (0,), 
-                  self.lr + (0,), 
+                  self.lr + (1,), 
                   self.array_shape + (1,))
 
   def clone(self):
@@ -273,6 +274,9 @@ def intersection(a, b):
   :rtype: The intersection of the 2 extents as a `TileExtent`, 
           or None if the intersection is empty.  
   '''
+  if a is None:
+    return None
+  
   for i in range(len(a.lr)):
     if b.lr[i] < a.ul[i]: return None
     if a.lr[i] < b.ul[i]: return None

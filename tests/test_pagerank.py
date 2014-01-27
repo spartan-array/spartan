@@ -14,7 +14,7 @@ def millis(t1, t2):
   return ms
 
 def sparse_multiply(wts, p):  
-  for i in range(20):
+  for i in range(5):
     util.log_warn('iteration %d begin!', i)
     t1 = datetime.now()
     p = expr.dot(wts, p).force()
@@ -31,22 +31,23 @@ def sparse_multiply(wts, p):
 @parakeet.jit
 def _build_site_coo(num_pages,
                     num_outlinks,
-                    outlinks,
+                    outlink,
                     site_start,
                     site_end):
-  rows = np.empty((num_pages * num_outlinks,), dtype=np.int32)
-  cols = np.empty((num_pages * num_outlinks,), dtype=np.int32)
-  data = np.empty((num_pages * num_outlinks,), dtype=np.int32)
+  rows = np.empty(num_pages * num_outlinks, dtype=np.int32)
+  cols = np.empty(num_pages * num_outlinks, dtype=np.int32)
+  data = np.empty(num_pages * num_outlinks, dtype=np.int32)
   
+
   i = 0
   for page in xrange(num_pages):
     for link in xrange(num_outlinks):
-      rows[i] = outlinks[i]
+      rows[i] = outlink[i]
       cols[i] = page
       data[i] = 1
-      i += 1
+      i = i + 1
     
-    return rows, cols, data
+  return rows, cols, data
       
 def _make_site_sparse(tile, ex,
                       num_outlinks=None,
@@ -54,18 +55,15 @@ def _make_site_sparse(tile, ex,
   tile_pages = ex.shape[1]
   
   same_site = np.random.rand(num_outlinks * tile_pages) <= same_site_prob
-  outlink = np.zeros((num_outlinks * tile_pages), dtype=np.int32)
+  outlink = np.zeros(num_outlinks * tile_pages, dtype=np.int32)
   outlink[same_site] = np.random.randint(ex.ul[1], ex.lr[1], np.count_nonzero(same_site))
   outlink[~same_site] = np.random.randint(0, ex.shape[0], np.count_nonzero(~same_site))
   
-  rows, cols, data = _build_site_coo(tile_pages, num_outlinks, outlink, 
-                                     ex.ul[1], ex.lr[1])
-  
-  #util.log_warn('Extent: %s, Rows: %s %s', ex, np.min(rows), np.max(rows))
+  rows, cols, data = _build_site_coo(tile_pages, num_outlinks, outlink, ex.ul[1], ex.lr[1])
   
   yield ex, scipy.sparse.coo_matrix((data, (rows, cols)),
                                     shape=ex.shape,
-                                    dtype=np.float32).tocsr()
+                                    dtype=np.float32)
                               
 #   rows = []
 #   cols = []
@@ -102,12 +100,13 @@ def pagerank_sparse(num_pages,
 
 
 #@test_common.with_ctx
-#Qdef test_pr(ctx):
+#def test_pr(ctx):
 def benchmark_pr(ctx, timer):
-  num_pages = 1000 * 1000 * ctx.num_workers
+  num_pages = 1000 * 1000 * 3 * ctx.num_workers
   num_outlinks = 10
   density = num_outlinks * 1.0 / num_pages
   same_site_prob = 0.9
+  print "#worker:", ctx.num_workers
   col_step = util.divup(num_pages, ctx.num_workers)
   
   wts_tile_hint = [num_pages, col_step]

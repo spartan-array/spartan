@@ -25,7 +25,7 @@ from .optimize import disable_parakeet, not_idempotent
 from .reduce import reduce
 from .shuffle import shuffle
 from .. import sparse_update
-
+from spartan import sparse_multiply
 
 def _make_ones(input): return np.ones(input.shape, input.dtype)
 def _make_zeros(input): return np.zeros(input.shape, input.dtype)
@@ -476,12 +476,17 @@ def _dot_mapper(inputs, ex, av, bv):
   
   #util.log_info('%s %s', type(a), type(b))
   
-  if not sp.issparse(a):
-    a = sp.csr_matrix(a)
-  if not sp.issparse(b):
-    b = sp.csr_matrix(b)
-    
-  result = a.dot(b)
+  #if not sp.issparse(a):
+  #  a = sp.csr_matrix(a)
+  #if not sp.issparse(b):
+  #  b = sp.csr_matrix(b)
+  
+  #result = a.dot(b)
+  
+  if isinstance(a, sp.coo_matrix) and b.shape[1] == 1:
+    result = sparse_multiply.dot_coo_dense_unordered_map(a, b)
+  else:
+    result = a.dot(b)
   
   ul = np.asarray([ex_a.ul[0], 0])
   lr = ul + result.shape
