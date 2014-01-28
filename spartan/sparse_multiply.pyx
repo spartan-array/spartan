@@ -1,7 +1,7 @@
 from cython.operator cimport dereference as deref, preincrement as inc
 from libcpp.pair cimport pair
 from libcpp.map cimport map
-from libcpp.unordered_map cimport unordered_map
+from unordered_map cimport unordered_map
 import numpy
 import scipy.sparse
 cimport numpy as np

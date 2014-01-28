@@ -401,7 +401,7 @@ def from_table(extents):
     # empty table; default dtype.
     dtype = np.float
     sparse = False
-
+  
   return DistArrayImpl(shape=shape, dtype=dtype, tiles=extents, reducer_fn=None, sparse=sparse)
 
 class LocalWrapper(DistArray):
