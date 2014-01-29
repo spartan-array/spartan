@@ -51,7 +51,7 @@ def spfn(prefix, ul, lr, suffix, ispickle, iszip, isnp = False):
     else:
       fn += "f"
     if iszip:
-      fn += "bz"
+      fn += "bz2"
   return fn
 
 def _save_reducer(ex, tile, axis, prefix = None, sparse = None, iszip = None):
@@ -79,7 +79,7 @@ def _save_reducer(ex, tile, axis, prefix = None, sparse = None, iszip = None):
       save = np.savez_compressed if iszip else np.savez
       save(spfn(prefix, ex.ul, ex.lr, "", True, True, True), 
            row = tile.row, col = tile.col, data = tile.data, shape = tile.shape)
-      ret = 5
+      ret = 2
   else:
       fp.write(tile.data)
       ret = 1
@@ -143,11 +143,12 @@ def _load_mapper(array, ex, prefix = None, sparse = None, dtype = None, iszip = 
     return [(ex, sp.coo_matrix((a['data'], (a['row'], a['col'])), a['shape']))]
   else:
     if iszip:
-      data = np.frombuffer(fp.read(), dtype=dtype).reshape(ex.shape)
+      data = np.frombuffer(fp.read(), dtype=dtype)
     else:
-      data = np.fromfile(fp, dtype=dtype).reshape(ex.shape)
+      data = np.fromfile(fp, dtype=dtype)
+    data.shape = ex.shape
     fp.close()
-    return  [(ex, data)]
+    return [(ex, data)]
     
 
 
@@ -186,11 +187,11 @@ def _pickle_reducer(ex, tile, axis, prefix = None, sparse = None, iszip = None):
   if iszip :
     fn = spfn(prefix, ex.ul, ex.lr, "", True, True)
     with bz2.BZ2File(fn, 'w', compresslevel = 1) as fp:
-      cpickle.dump(tile, fp)
+      cpickle.dump(tile, fp, -1)
   else :
     fn = spfn(prefix, ex.ul, ex.lr, "", True, False)
     with open(fn, "wb") as fp:
-      cpickle.dump(tile, fp)
+      cpickle.dump(tile, fp, -1)
 
   return np.asarray(1)
 
