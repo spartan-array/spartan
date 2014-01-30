@@ -53,8 +53,19 @@ class Expr(object):
 
   @property
   def cache(self):
-    #if self.expr_id in eval_cache:
-      #util.log_info('Cache hit %s', self.expr_id)
+    '''
+    Return a cached value for this `Expr`.
+    
+    If a cached value is not available, or the cached array is
+    invalid (missing tiles), returns None. 
+    '''
+    
+    # get distarray from eval_cache
+    # check if still valid
+    # if valid, return
+    # if not valid: check for disk data
+    # if disk data: load bad tiles back
+    # else: return None
     return eval_cache.get(self.expr_id, None)
 
   def dependencies(self):
@@ -85,7 +96,10 @@ class Expr(object):
 
     return expr_like(self, **deps)
   
-  def dot(self):
+  def graphviz(self):
+    '''
+    Return a string suitable for use with the 'dot' command.
+    '''
     result = 'N%s [label="%s"]\n' % (self.expr_id, self.node_type)
    
     for name, value in self.dependencies().items():
@@ -160,6 +174,11 @@ class Expr(object):
     return _map(self, other, fn=np.subtract)
 
   def __mul__(self, other):
+    '''
+    Multiply 2 expressions.
+    
+    :param other: `Expr`
+    '''
     return _map(self, other, fn=np.multiply)
 
   def __mod__(self, other):
@@ -211,6 +230,11 @@ class Expr(object):
     return self.evaluate()
 
   def optimized(self):
+    '''
+    Return an optimized version of this expression graph.
+    
+    :rtype: `Expr`
+    '''
     return optimized_dag(self)
 
   def glom(self):
@@ -380,7 +404,7 @@ def lazify(val):
  
   If ``val`` is already an expression, it is returned unmodified.
    
-  :param val:
+  :param val: anything.
   '''
   #util.log_info('Lazifying... %s', val)
   if isinstance(val, Expr):
@@ -399,6 +423,11 @@ def lazify(val):
 
 
 def as_array(v):
+  '''
+  Convert a numpy value or scalar into an `Expr`.
+  
+  :param v: `Expr`, numpy value or scalar.
+  '''
   if isinstance(v, Expr):
     return v
   else:
