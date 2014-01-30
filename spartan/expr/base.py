@@ -117,12 +117,29 @@ class Expr(object):
 
   def evaluate(self):
     '''
-    Evaluate this expression, caching the result.
-    
-    Do not override this method; implement ``_evaluate`` instead.
+    Evaluate an `Expr`.  
+   
+    Dependencies are evaluated prior to evaluating the expression.
     '''
-    from . import backend
-    return backend.evaluate(blob_ctx.get(), self.optimized())
+    if self.cache is not None:
+      return self.cache
+  
+    ctx = blob_ctx.get()
+    #util.log_info('Evaluting deps for %s', prim)
+    deps = {}
+    for k, vs in self.dependencies().iteritems():
+      if isinstance(vs, Expr):
+        deps[k] = vs.evaluate()
+      else:
+        assert not isinstance(vs, (dict, list)), vs
+        deps[k] = vs
+        
+    value = self._evaluate(ctx, deps)
+    if self.needs_cache:
+      #util.log_info('Caching %s -> %s', prim.expr_id, value)
+      eval_cache[self.expr_id] = value
+      
+    return value
 
   def _evaluate(self, ctx, deps):
     '''
