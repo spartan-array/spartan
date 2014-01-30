@@ -90,6 +90,7 @@ class BlobCtx(object):
 #     return self._send(blob_id, 'update', req, wait=wait)
 
   def update(self, blob_id, region, data, reducer, wait=True):
+
     req = core.UpdateReq(id=blob_id, region=region, data=data, reducer=reducer)
     
 #     import scipy.sparse

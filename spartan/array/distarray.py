@@ -10,7 +10,7 @@ import numpy as np
 from . import tile, extent
 from spartan import util, core, blob_ctx, rpc
 from spartan.util import Assert
-
+from spartan import sparse_multiply
 # number of elements per tile
 DEFAULT_TILE_SIZE = 100000
 
@@ -292,11 +292,6 @@ class DistArrayImpl(DistArray):
     Assert.isinstance(region, extent.TileExtent)
     Assert.eq(region.shape, data.shape,
               'Size of extent does not match size of data')
-   
-    import sys
-    util.log_info('UPDATE %s', region.shape)
-    #print >>sys.stderr, 'WTF?', region.shape
-    #print >>sys.stderr, 'WTF?', region.shape
 
     # exact match
     if region in self.tiles:
@@ -307,6 +302,7 @@ class DistArrayImpl(DistArray):
     
     splits = list(extent.find_overlapping(self.tiles, region))
     futures = []
+    slices = []
     #util.log_info('%s: Updating %s tiles with data:%s', region, len(splits), data)
     
     for dst_extent, intersection in splits:
@@ -316,23 +312,23 @@ class DistArrayImpl(DistArray):
 
       src_slice = extent.offset_slice(region, intersection)
       dst_slice = extent.offset_slice(dst_extent, intersection)
-      
-      #util.log_info('Update src:%s dst:%s data:%s', src_slice, dst_slice, data[src_slice])
-      #util.log_info('%s', dst_slice)
-
+   
       shape = [slice.stop - slice.start for slice in dst_slice]
-      if np.all(shape):
-        update_data = data[src_slice]
-        
-        if scipy.sparse.issparse(update_data): 
-          if update_data.getnnz() == 0:
-            continue
-          else:
-            update_data = update_data.tocoo()
+      if np.all(shape):   
+        slices.append((blob_id, src_slice, dst_slice))
+      #util.log_info('Update src:%s dst:%s data shape:%s', src_slice, dst_slice, data.shape)
+    
+    slices.sort(key=lambda x: x[1][0].start)
+    #util.log_info("Update: slices:%s", slices)
+    result = sparse_multiply.multiple_slice(data, slices)
+    
+    for (blob_id, dst_slice, update_data) in result:
+        #update_data = sparse_multiply.slice(data, src_slice)       
+        #if update_data is not None:
       #update_tile = tile.from_intersection(dst_key, intersection, data[src_slice])
       #util.log_info('%s %s %s %s', dst_key.shape, intersection.shape, blob_id, update_tile)
       #util.log_info("Updating %d tile %s with dst_ex %s intersection %s with data %s slice %s", len(splits), blob_id, dst_extent, intersection, data.nonzero()[0], data[src_slice].nonzero()[0])
-        futures.append(ctx.update(blob_id, 
+      futures.append(ctx.update(blob_id, 
                                 dst_slice, 
                                 update_data, 
                                 self.reducer_fn, 
@@ -405,7 +401,7 @@ def from_table(extents):
     # empty table; default dtype.
     dtype = np.float
     sparse = False
-
+  
   return DistArrayImpl(shape=shape, dtype=dtype, tiles=extents, reducer_fn=None, sparse=sparse)
 
 class LocalWrapper(DistArray):

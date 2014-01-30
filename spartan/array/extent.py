@@ -72,8 +72,9 @@ class TileExtent(object):
     return ravelled_pos(np.asarray(self.ul) + local_idx, self.array_shape)
 
   def add_dim(self):
+    #util.log_info('ul:%s lr:%s array_shape:%s', self.ul + (0,), self.lr + (1,), self.array_shape + (1,))
     return create(self.ul + (0,), 
-                  self.lr + (0,), 
+                  self.lr + (1,), 
                   self.array_shape + (1,))
 
   def clone(self):
@@ -92,6 +93,13 @@ def create(ul, lr, array_shape):
   '''
   #stack = ''.join(traceback.format_stack())
   #counts[stack] += 1
+
+  # If we got an unrealistic (ul, lr), return None.
+  # Or rasie an exception ?
+  for i, j in zip(ul, lr):
+    if i >= j:
+     return None
+
   ex = TileExtent()
   ex.ul = tuple(ul)
   ex.lr = tuple(lr)
@@ -152,7 +160,6 @@ def find_rect(ravelled_ul, ravelled_lr, shape):
     div = 1
     for i in shape[1:]:
       div = div * i
-    print('fegin', shape, div)
     rect_ravelled_ul = ravelled_ul - (ravelled_ul % div)
     rect_ravelled_lr = ravelled_lr + (div - ravelled_lr % div) % div - 1
 
@@ -267,6 +274,9 @@ def intersection(a, b):
   :rtype: The intersection of the 2 extents as a `TileExtent`, 
           or None if the intersection is empty.  
   '''
+  if a is None:
+    return None
+  
   for i in range(len(a.lr)):
     if b.lr[i] < a.ul[i]: return None
     if a.lr[i] < b.ul[i]: return None

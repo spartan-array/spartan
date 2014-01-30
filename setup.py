@@ -64,6 +64,7 @@ setup(
     Extension('spartan.core', ['spartan/core' + suffix]),
     Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core' + suffix]),
     Extension('spartan.sparse_update', ['spartan/sparse_update' + suffix]),
+    Extension('spartan.sparse_multiply', ['spartan/sparse_multiply' + suffix], language='c++', extra_compile_args=["-std=c++11"], extra_link_args=["-std=c++11"]),
     Extension('spartan.array.slicing', ['spartan/array/slicing' + suffix]),
   ],
   cmdclass=cmdclass,

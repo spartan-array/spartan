@@ -27,6 +27,7 @@ from .ndarray import ndarray
 from .outer import outer
 from .reduce import reduce
 from .shuffle import shuffle
+from .fio import load, save, pickle, unpickle
 
 
 Expr.outer = outer

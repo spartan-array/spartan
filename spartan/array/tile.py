@@ -220,7 +220,7 @@ def merge(old_tile, subslice, update, reducer):
     if old_tile.type == TYPE_DENSE:
       #util.log_debug('Update sparse to dense')
       update_coo = update.tocoo()
-      sparse_update.sparse_dense_update(old_tile.data, old_tile.mask, update_coo.row, update_coo.col, update_coo.data, 
+      sparse_update.sparse_to_dense_update(old_tile.data, old_tile.mask, update_coo.row, update_coo.col, update_coo.data, 
                                         sparse_update.REDUCE_ADD)
       #util.log_info('Update %s', update)
       #util.log_info('Update COO %s', update_coo) 
@@ -240,6 +240,8 @@ def merge(old_tile, subslice, update, reducer):
         if reducer is not None:  
           old_tile.data[subslice] = reducer(old_tile.data[subslice], update)
         else:
+          old_tile.data = old_tile.data.tolil()
+          update = update.tolil()
           old_tile.data[subslice] = update
     return old_tile
     

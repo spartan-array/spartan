@@ -46,6 +46,5 @@ def test_local_convolve(ctx):
     stencil._convolve(images, filters)
     print N, F, time.time() - st
 
-=======
 if __name__ == '__main__':
   test_stencil()
