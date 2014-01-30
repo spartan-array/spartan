@@ -7,7 +7,7 @@ import os
 
 class TestFIO(test_common.ClusterTest):
   def test1(self):
-    t1 = expr.arange((1000, 1000)).force()
+    t1 = expr.arange((100, 100)).force()
     expr.save(t1, "__fiotest1", False)
     Assert.all_eq(t1.glom(), expr.load("__fiotest1", False).glom())
     expr.save(t1, "__fiotest1", True)
@@ -20,7 +20,7 @@ class TestFIO(test_common.ClusterTest):
 
 
   def test2(self):
-    t1 = expr.sparse_rand((1000, 1000)).force()
+    t1 = expr.sparse_rand((100, 100)).force()
     expr.save(t1, "__fiotest3", False)
     Assert.all_eq(t1.glom().todense(), expr.load("__fiotest3", False).glom().todense())
     expr.save(t1, "__fiotest3", True)

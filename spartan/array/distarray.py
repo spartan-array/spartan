@@ -430,9 +430,12 @@ class LocalWrapper(DistArray):
     return self.foreach_tile(mapper_fn=mapper_fn, kw=kw)
 
   def foreach_tile(self, mapper_fn, kw=None):
+    #print 'Mapping: ', mapper_fn, ' over ', self._data
     if kw is None: kw = {}
     ex = extent.from_slice(np.index_exp[:], self.shape)
-    result = mapper_fn(ex, **kw)
+    map_result = mapper_fn(ex, **kw)
+    result = map_result.result
+    
     assert len(result) == 1
     result_ex, tile_id = result[0]
     
@@ -584,6 +587,8 @@ def broadcast(args):
   
   Extra dimensions are added as necessary, and dimensions of size
   1 are repeated to match the size of other arrays.
+  
+  :param args: List of `DistArray`
   '''
   
   if len(args) == 1:
@@ -632,5 +637,10 @@ def _size(v):
   return np.prod(v.shape)
 
 def largest_value(vals):
-  return sorted(vals, key=lambda v: _size(v))[-1]
+  '''
+  Return the largest array (using the underlying size for Broadcast objects).
+  
+  :param vals: List of `DistArray`. 
+  '''
+  return max(vals, key=_size)
 

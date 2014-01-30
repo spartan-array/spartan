@@ -10,15 +10,15 @@ try:
   cmdclass['build_ext'] = build_ext
   suffix = '.pyx'
 except:
-  suffix = '.c'
+  suffix = '.cpp'
 
 # Ensure Cython .c files are up to date before uploading
 def build_cython():
   print '#' * 10, 'Cythonizing extensions.'
   for f in os.popen('find spartan -name "*.pyx"').read().split('\n'):
     if not f.strip(): continue
-    print '#' * 10, 'Cythonizing %s' % f
-    assert os.system('cython "%s"' % f) == 0
+    print'#' * 10, 'Cythonizing %s' % f
+    assert os.system('cython --cplus "%s"' % f) == 0
 
 build_cython()
 from distutils.command.sdist import sdist
@@ -64,7 +64,11 @@ setup(
     Extension('spartan.core', ['spartan/core' + suffix]),
     Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core' + suffix]),
     Extension('spartan.sparse_update', ['spartan/sparse_update' + suffix]),
-    Extension('spartan.sparse_multiply', ['spartan/sparse_multiply' + suffix], language='c++', extra_compile_args=["-std=c++11"], extra_link_args=["-std=c++11"]),
+    Extension('spartan.sparse_multiply', 
+              ['spartan/sparse_multiply' + suffix], 
+              language='c++', 
+              extra_compile_args=["-std=c++11"], 
+              extra_link_args=["-std=c++11"]),
     Extension('spartan.array.slicing', ['spartan/array/slicing' + suffix]),
   ],
   cmdclass=cmdclass,

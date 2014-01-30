@@ -1,3 +1,5 @@
+# distutils: language = c++
+
 from cython.operator cimport dereference as deref, preincrement as inc
 from libcpp.pair cimport pair
 from libcpp.map cimport map

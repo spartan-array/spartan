@@ -56,6 +56,11 @@ def _reduce_mapper(ex, children, op, axis, output):
 class ReduceExpr(Expr):
   _members = ['children', 'axis', 'dtype_fn', 'op', 'accumulate_fn']
   
+  def node_init(self):
+    Expr.node_init(self)
+    assert self.dtype_fn is not None
+    assert isinstance(self.children, DictExpr)
+  
   def _evaluate(self, ctx, deps):
     children = deps['children']
     axis = deps['axis']

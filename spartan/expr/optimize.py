@@ -6,18 +6,20 @@ Optimizations over an expression graph.
 import tempfile
 
 import numpy as np
+from spartan.array.distarray import broadcast
 from spartan.config import FLAGS, BoolFlag
 from spartan.expr import local
+from spartan.expr.index import IndexExpr
 from spartan.expr.local import make_var, LocalInput, ParakeetExpr
 from spartan.expr.reduce import ReduceExpr, LocalReduceExpr
 from spartan.util import Assert
 
 from .. import util
 from .base import Expr, Val, ListExpr, AsArray, DictExpr, lazify, expr_like
-from .shuffle import ShuffleExpr
 from .map import MapExpr, LocalMapExpr
 from .ndarray import NdArrayExpr
-from spartan.array.distarray import broadcast
+from .shuffle import ShuffleExpr
+
 
 try:
   import numexpr
@@ -74,8 +76,14 @@ class OptimizePass(object):
     return self.visited[op]
 
 
-def map_like(v):
-  return isinstance(v, (MapExpr, ShuffleExpr, NdArrayExpr, Val, AsArray))
+def fusable(v):
+  return isinstance(v, (MapExpr, 
+                        ReduceExpr, 
+                        ShuffleExpr, 
+                        NdArrayExpr, 
+                        IndexExpr,
+                        Val, 
+                        AsArray))
 
 
 def merge_var(children, k, v):
@@ -106,11 +114,14 @@ class MapMapFusion(OptimizePass):
     all_maps = True
     Assert.isinstance(map_children, DictExpr)
     for k, v in map_children.iteritems():
-      if not map_like(v):
+      if not fusable(v):
+        print 'Skipping fusion: (%s -> %s)' % (k, type(v))
         all_maps = False
         break
 
-    if not all_maps or expr.op.fn in _not_idempotent:
+    if (not all_maps 
+        or isinstance(expr.op, local.ParakeetExpr)
+        or expr.op.fn in _not_idempotent):
       return expr.visit(self)
 
     #util.log_info('Original: %s', expr.op)
@@ -159,7 +170,7 @@ class ReduceMapFusion(OptimizePass):
       combined_op.add_dep(child_expr.op)
 
     return expr_like(expr,
-                     children=new_children,
+                     children=DictExpr(vals=new_children),
                      axis=expr.axis,
                      dtype_fn=expr.dtype_fn,
                      accumulate_fn=expr.accumulate_fn,
@@ -277,6 +288,23 @@ class ParakeetGeneration(OptimizePass):
     except local.CodegenException:
       util.log_info('Failed to convert to parakeet.')
       return expr.visit(self)
+    
+#   def visit_ReduceExpr(self, expr):
+#     # if we've already converted this to parakeet, stop now
+#     if isinstance(expr.op, local.ParakeetExpr):
+#       return expr.visit(self)
+# 
+#     try:
+#       source = codegen(expr.op)
+#       return expr_like(expr,
+#                        children=expr.children,
+#                        axis=expr.axis,
+#                        dtype_fn=expr.dtype_fn,
+#                        accumulate_fn=expr.accumulate_fn,
+#                        op=local.ParakeetExpr(source=source,  deps=expr.op.deps))
+#     except local.CodegenException:
+#       util.log_info('Failed to convert to parakeet.')
+#       return expr.visit(self)
 
 
 def apply_pass(klass, dag):

@@ -86,7 +86,7 @@ class Expr(object):
     return expr_like(self, **deps)
   
   def dot(self):
-    result = 'N%s [label="%s"]\n' % (self.expr_id, self.node_type())
+    result = 'N%s [label="%s"]\n' % (self.expr_id, self.node_type)
    
     for name, value in self.dependencies().items():
       if isinstance(value, Expr):
@@ -253,6 +253,7 @@ class Val(Expr):
   def __str__(self):
     return 'Val(%s)' % self.val
 
+
 class CollectionExpr(Expr):
   '''
   CollectionExpr subclasses wrap normal tuples, lists and dicts with `Expr` semantics.
@@ -264,7 +265,7 @@ class CollectionExpr(Expr):
   _members = ['vals']
 
   def __str__(self):
-    return '%s(%s)' % (self.node_type(), self.vals,)
+    return '%s(%s)' % (self.node_type, self.vals,)
 
   def _evaluate(self, ctx, deps):
     return deps
@@ -280,7 +281,6 @@ class CollectionExpr(Expr):
 
 @node_type
 class DictExpr(CollectionExpr):
-
   def iteritems(self): return self.vals.iteritems()
   def keys(self): return self.vals.keys()
   def values(self): return self.vals.values()

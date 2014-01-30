@@ -87,9 +87,9 @@ class TestReduce(test_common.ClusterTest):
   def test_simple_sum(self):
     def _(axis):
       util.log_info('Testing sum over axis %s', axis)
-      a = expr.ones((TEST_SIZE, TEST_SIZE))
+      a = expr.ones((TEST_SIZE, TEST_SIZE)) + expr.ones((TEST_SIZE, TEST_SIZE))
       b = a.sum(axis=axis)
-      Assert.all_eq(b.glom(), np.ones((TEST_SIZE, TEST_SIZE)).sum(axis))
+      Assert.all_eq(b.glom(), 2 * np.ones((TEST_SIZE, TEST_SIZE)).sum(axis))
 
     _(axis=0)
     _(axis=1)

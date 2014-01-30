@@ -33,6 +33,8 @@ def get_reverse_mro(klass):
   
 
 def node_initializer(self, *args, **kw):
+  assert len(args) == 0, 'Keyword initialization only!'
+  
   get_members = self.members
   n_args = len(args)
   n_members = len(get_members)
@@ -52,7 +54,7 @@ def node_initializer(self, *args, **kw):
     for (k,v) in kw.iteritems():
       assert k in get_members, \
         "Keyword argument '%s' not recognized for %s: %s" % \
-        (k, self.node_type(), get_members)
+        (k, self.node_type, get_members)
   else:
     raise Exception('Too many arguments for %s, expected %s' % \
                     (class_name, get_members))
@@ -82,78 +84,83 @@ def get_members(klass):
   _members_cache[klass] = m
   return m
 
-
-class Node(object):
-  def __init__(self, *args, **kw):
-    assert len(args) == 0, 'Node objects must be initialized with keywords.'
-    node_initializer(self, *args, **kw)
- 
-  def iteritems(self):
-    for k in self.members():
-      yield (k, getattr(self, k, None))
+def node_str(node):
+  member_strings = []
+  for (k,v) in node.node_items():
+    if isinstance(v, list):
+      v_str = ['[']
+      for i, v in enumerate(v):
+        v_str.append('[%d] = %s' % (i, v))
+      v_str += [']']
       
-  def itervalues(self):
-    for (_,v) in self.iteritems():
-      yield v 
+      v_str = '\n'.join(v_str)
+    else:
+      v_str = str(v)
+    member_strings.append("%s = %s" % (k, v_str))
+  child_str = '  ' + ',\n'.join(member_strings)
+  child_str = child_str.replace('\n', '\n  ')
   
-  def items(self):
-    return [(k,getattr(self,k)) for k in self.members()]
-
-  def __hash__(self):
-    # print "Warning: __hash__ not implemented for %s" % self
-    hash_values = []
-    for m in self.members():
-      v = getattr(self, m)
-      if isinstance(v, (list, tuple)):
-        v = tuple(v)
-      hash_values.append(v)
-    return hash(tuple(hash_values))
+  return "%s { \n%s \n}" % (node.node_type, child_str) 
   
-  def eq_members(self, other):
-    for (k,v) in self.iteritems():
-      if not hasattr(other, k):
-        return False
-      if getattr(other, k) != v:
-        return False
-    return True 
-  
-  def __eq__(self, other):
-    return other.__class__ is  self.__class__ and self.eq_members(other)
-
-  def __ne__(self, other):
-    return not self == other 
-  
-  def node_type(self):
-    return self.__class__.__name__
-  
-  def clone(self, **kwds):
-    cloned = copy.deepcopy(self)
-    for (k,v) in kwds.values():
-      setattr(cloned, k, v)
-    return cloned 
+def node_iteritems(node):
+  for k in node.members:
+    yield (k, getattr(node, k, None))
     
-  def __str__(self):
-    member_strings = []
-    for (k,v) in self.iteritems():
-      if isinstance(v, list):
-        v_str = ['[']
-        for i, v in enumerate(v):
-          v_str.append('[%d] = %s' % (i, v))
-        v_str += [']']
-        
-        v_str = '\n'.join(v_str)
-      else:
-        v_str = str(v)
-      member_strings.append("%s = %s" % (k, v_str))
-    child_str = '  ' + ',\n'.join(member_strings)
-    child_str = child_str.replace('\n', '\n  ')
+class Node(object):
+  def __init__(self):
+    assert 'No longer used.'
+
+# class Node(object):
+#   def __init__(self, *args, **kw):
+#     assert len(args) == 0, 'Node objects must be initialized with keywords.'
+#     node_initializer(self, *args, **kw)
+#  
+#   def iteritems(self):
+#     return node_iteritems(self)
+#       
+#   def itervalues(self):
+#     for (_,v) in self.iteritems():
+#       yield v 
+#   
+#   def items(self):
+#     return [(k,getattr(self,k)) for k in self.members()]
+# 
+#   def __hash__(self):
+#     # print "Warning: __hash__ not implemented for %s" % self
+#     hash_values = []
+#     for m in self.members():
+#       v = getattr(self, m)
+#       if isinstance(v, (list, tuple)):
+#         v = tuple(v)
+#       hash_values.append(v)
+#     return hash(tuple(hash_values))
+#   
+#   def eq_members(self, other):
+#     for (k,v) in self.iteritems():
+#       if not hasattr(other, k):
+#         return False
+#       if getattr(other, k) != v:
+#         return False
+#     return True 
+#   
+#   def __eq__(self, other):
+#     return other.__class__ is  self.__class__ and self.eq_members(other)
+# 
+#   def __ne__(self, other):
+#     return not self == other 
+#   
+#   def node_type(self):
+#     return self.__class__.__name__
+#   
+#   def clone(self, **kwds):
+#     cloned = copy.deepcopy(self)
+#     for (k,v) in kwds.values():
+#       setattr(cloned, k, v)
+#     return cloned 
+#   
+#   def __repr__(self): return node_str(self)
+#   def __str__(self): return node_str(self)
     
-    return "%s { \n%s \n}" % (self.node_type(), child_str) 
-  
-  def __repr__(self):
-    return self.__str__()
-
-
 def node_type(klass):
   '''Decorator to add node behavior to a class.'''
   def obj_init(self, *args, **kw):
@@ -164,6 +171,11 @@ def node_type(klass):
   get_reverse_mro(klass)
 
   klass.__init__ = obj_init
+  klass.__repr__ = node_str
+  klass.__str__ = node_str
+  klass.node_items = node_iteritems
+  klass.node_type = klass.__name__
+  
   #klass.__doc__ = 'Tree-like object.  Members:\n\n' + '\n'.join(':param %s: ' % k for k in mem)
   klass.members = get_members(klass)
 

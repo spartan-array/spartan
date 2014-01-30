@@ -41,7 +41,9 @@ class TestFinance(test_common.ClusterTest):
   def test_predict_price(self):
     bid = expr.randn(100)
     ask = expr.randn(100)
-    print finance.predict_price(bid, ask, 5).glom()
+    res = finance.predict_price(bid, ask, 5).optimized()
+    print res
+    print res.glom()
 
 if __name__ == '__main__':
   unittest.main(argv=sys.argv[:1])
