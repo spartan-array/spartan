@@ -4,7 +4,7 @@ from spartan import util
 from spartan.array import extent, distarray
 from spartan.expr import local
 from spartan.expr.local import make_var, LocalReduceExpr, LocalInput, LocalCtx
-from spartan.node import Node
+from spartan.node import Node, node_type
 from spartan.util import Assert
 
 from .base import Expr, DictExpr
@@ -52,8 +52,8 @@ def _reduce_mapper(ex, children, op, axis, output):
   output.update(dst_extent, local_reduction)
   return MapResult([], None)
 
+@node_type
 class ReduceExpr(Expr):
-  __metaclass__ = Node
   _members = ['children', 'axis', 'dtype_fn', 'op', 'accumulate_fn']
   
   def _evaluate(self, ctx, deps):

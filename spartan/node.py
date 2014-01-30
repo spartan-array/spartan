@@ -4,147 +4,167 @@ Provides pretty printing, equality testing, hashing and keyword initialization.
 '''  
 
 
-import numpy as np
 from itertools import izip
 import copy
 
-def list_repr(lst, compact=False):
-  v_str = ['[']
-  for i, v in enumerate(lst):
-    if compact:
-      v_str.append(str(v))
-    else:
-      v_str.append('[%d] = %s' % (i, v))
-  v_str += [']']
-
-  if compact:
-    v_str = ','.join(v_str)
+_members_cache = {}  
+_mro_cache = {}
+_reversed_mro_cache = {}
+  
+def get_mro(klass):
+  if klass in _mro_cache:
+    return _mro_cache[klass]
   else:
-    v_str = '\n'.join(v_str)
+    mro = klass.mro()
+    rev_mro = list(reversed(mro))
+    _mro_cache[klass] = mro
+    _reversed_mro_cache[klass] = rev_mro
+    return mro 
+  
+def get_reverse_mro(klass):
+  if klass in _reversed_mro_cache:
+    return _reversed_mro_cache[klass]
+  else:
+    mro = klass.mro()
+    rev_mro = list(reversed(mro))
+    _mro_cache[klass] = mro
+    _reversed_mro_cache[klass] = rev_mro
+    return rev_mro 
+  
 
-  return v_str
-
-
-class NodeTemplate(object):
-  def __init__(self, *args, **kw):
-    n_args = len(args)
-    assert n_args == 0, 'Keyword initialization only.'
-    members = self.members
-    self_dict = self.__dict__
-
-    for k in members:
-      self_dict[k] = kw.get(k)
-
+def node_initializer(self, *args, **kw):
+  get_members = self.members
+  n_args = len(args)
+  n_members = len(get_members)
+  class_name = self.__class__.__name__ 
+  self_dict = self.__dict__
+  if n_args == n_members:
+    assert len(kw) == 0
+    for (k,v) in zip(get_members,args):
+      self_dict[k] = v
+  elif n_args < n_members:
+    for field in get_members:
+      self_dict[field] = kw.get(field)
+    
+    for field, value in izip(get_members, args):
+      self_dict[field] = value
+      
     for (k,v) in kw.iteritems():
-      assert k in members, \
+      assert k in get_members, \
         "Keyword argument '%s' not recognized for %s: %s" % \
-        (k, self.node_type(), members)
+        (k, self.node_type(), get_members)
+  else:
+    raise Exception('Too many arguments for %s, expected %s' % \
+                    (class_name, get_members))
+     
+  # it's more common to not define a node initializer, 
+  # so add an extra check to avoid having to always
+  # traverse the full class hierarchy 
+  if hasattr(self, 'node_init'):
+    for C in _reversed_mro_cache[self.__class__]:
+      if 'node_init' in C.__dict__:
+        C.node_init(self)
 
-    for init in self.initializers:
-      init(self)
+    
+def get_members(klass):
+  """
+  Walk through classes in mro order, accumulating member names.
+  """
+  if klass  in _members_cache:
+    return _members_cache[klass]
+  
+  m = []
+  for c in get_mro(klass):
+    curr_members = getattr(c, '_members', []) 
+    for name in curr_members:
+      if name not in m:
+        m.append(name)  
+  _members_cache[klass] = m
+  return m
+
+
+class Node(object):
+  def __init__(self, *args, **kw):
+    assert len(args) == 0, 'Node objects must be initialized with keywords.'
+    node_initializer(self, *args, **kw)
+ 
+  def iteritems(self):
+    for k in self.members():
+      yield (k, getattr(self, k, None))
+      
+  def itervalues(self):
+    for (_,v) in self.iteritems():
+      yield v 
+  
+  def items(self):
+    return [(k,getattr(self,k)) for k in self.members()]
 
   def __hash__(self):
     # print "Warning: __hash__ not implemented for %s" % self
-    hash_value = 0x123123
-    for m in self.members:
+    hash_values = []
+    for m in self.members():
       v = getattr(self, m)
-      if isinstance(v, np.ndarray):
-        continue
-      elif isinstance(v, (list, tuple)):
-        for i in v: hash_value ^= hash(i)
-      else:
-        hash_value ^= hash(v)
-    return hash_value
-
+      if isinstance(v, (list, tuple)):
+        v = tuple(v)
+      hash_values.append(v)
+    return hash(tuple(hash_values))
+  
   def eq_members(self, other):
-    #print 'EQ:', self.__class__.__name__
     for (k,v) in self.iteritems():
       if not hasattr(other, k):
         return False
       if getattr(other, k) != v:
         return False
-    return True
-
+    return True 
+  
   def __eq__(self, other):
     return other.__class__ is  self.__class__ and self.eq_members(other)
 
   def __ne__(self, other):
-    return not self == other
-
+    return not self == other 
+  
   def node_type(self):
     return self.__class__.__name__
-
+  
   def clone(self, **kwds):
     cloned = copy.deepcopy(self)
     for (k,v) in kwds.values():
       setattr(cloned, k, v)
-    return cloned
-
+    return cloned 
+    
   def __str__(self):
     member_strings = []
     for (k,v) in self.iteritems():
       if isinstance(v, list):
-        v_str = list_repr(v)
+        v_str = ['[']
+        for i, v in enumerate(v):
+          v_str.append('[%d] = %s' % (i, v))
+        v_str += [']']
+        
+        v_str = '\n'.join(v_str)
       else:
         v_str = str(v)
       member_strings.append("%s = %s" % (k, v_str))
     child_str = '  ' + ',\n'.join(member_strings)
     child_str = child_str.replace('\n', '\n  ')
-
-    return "%s { \n%s \n}" % (self.node_type(), child_str)
-
+    
+    return "%s { \n%s \n}" % (self.node_type(), child_str) 
+  
   def __repr__(self):
     return self.__str__()
 
-  def iteritems(self):
-    for k in self.members:
-      yield (k, getattr(self, k, None))
 
-  def itervalues(self):
-    for (_,v) in self.iteritems():
-      yield v
+def node_type(klass):
+  '''Decorator to add node behavior to a class.'''
+  def obj_init(self, *args, **kw):
+    node_initializer(self, *args, **kw)
+  
+  mem = get_members(klass)
+  get_mro(klass)
+  get_reverse_mro(klass)
 
-  def items(self):
-    return [(k,getattr(self,k)) for k in self.members]
+  klass.__init__ = obj_init
+  #klass.__doc__ = 'Tree-like object.  Members:\n\n' + '\n'.join(':param %s: ' % k for k in mem)
+  klass.members = get_members(klass)
 
-
-class Node(object):
-  '''Metaclass for making treelike objects.'''
-
-  @classmethod
-  def members(cls):
-    return cls.members
-
-  def __new__(cls, name, bases, attrs):
-    members = set()
-    for m in attrs.get('_members', []):
-      members.add(m)
-
-    for klass in bases:
-      for superklass in klass.mro():
-        for m in getattr(superklass, '_members', []):
-          members.add(m)
-    members = list(members)
-
-    attrs['members'] = members
-    attrs['__doc__'] = '\n'.join([':attribute %s: (initialized by Node)' % n for n in members])
-
-    bases = list(bases)
-    if object in bases:
-      bases = [b for b in bases if b is not object]
-
-    bases += [NodeTemplate]
-    bases = tuple(bases)
-    new_class = type(name, bases, attrs)
-
-    # find node_init methods and build a list to invoke at init time.
-    initializers = []
-    for C in new_class.mro():
-      if 'node_init' in C.__dict__:
-        initializers.append(C.node_init)
-
-    new_class.initializers = initializers
-    #print name, initializers
-    return new_class
-
-
+  return klass

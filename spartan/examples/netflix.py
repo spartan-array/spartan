@@ -6,6 +6,8 @@ import numpy as np
 import scipy.sparse
 
 from spartan import util, expr, node
+from spartan.node import node_type
+
 from spartan.expr import lazify
 
 #import parakeet
@@ -113,8 +115,8 @@ def _compute_strata(V):
   
   return strata
 
+@node_type
 class NetflixSGD(expr.Expr):
-  __metaclass__ = node.Node
   _members = ['V', 'M', 'U']
 
   def _evaluate(self, ctx, deps):

@@ -1,10 +1,10 @@
 from .base import Expr
 import numpy as np
-from spartan.node import Node
+from spartan.node import Node, node_type
 
 
+@node_type
 class OuterProductExpr(Expr):
-  __metaclass__ = Node
   _members = ['children', 'map_fn', 'map_fn_kw', 'reduce_fn', 'reduce_fn_kw']
   
 def outer_product(a, b, map_fn, reduce_fn):

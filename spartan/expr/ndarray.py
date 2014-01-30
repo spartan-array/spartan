@@ -1,10 +1,10 @@
 from .base import Expr
-from ..node import Node
+from ..node import Node, node_type
 from spartan.array import tile, distarray
 import numpy as np
 
+@node_type
 class NdArrayExpr(Expr):
-  __metaclass__ = Node
   _members = ['_shape', 'sparse', 'dtype', 'tile_hint', 'reduce_fn']
 
   def __str__(self):

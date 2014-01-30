@@ -4,15 +4,14 @@ Indexing operations (slicing and filtering).
 import numpy as np
 from spartan import util, blob_ctx
 from spartan.array import extent, tile, distarray
-from spartan.node import Node
+from spartan.node import Node, node_type
 from spartan.util import Assert, join_tuple
 
 from .base import Expr, ListExpr, TupleExpr
 from .map import MapResult
 
-
+@node_type
 class IndexExpr(Expr):
-  __metaclass__ = Node
   _members = ['src', 'idx']
 
   def node_init(self):

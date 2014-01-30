@@ -4,7 +4,7 @@ import collections
 
 from .. import util, blob_ctx
 from ..array import distarray, tile
-from ..node import Node
+from ..node import Node, node_type
 from ..util import Assert
 from .base import DictExpr, Expr, as_array
 from .local import LocalCtx, make_var, LocalInput, LocalMapExpr
@@ -45,8 +45,8 @@ class MapResult:
     self.result = result
     self.futures = futures
 
+@node_type
 class MapExpr(Expr):
-  __metaclass__ = Node
   _members = ['children', 'op']
 
   def compute_shape(self):

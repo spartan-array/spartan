@@ -215,7 +215,7 @@ def merge(old_tile, subslice, update, reducer):
     return old_tile
 
   assert not isinstance(update, np.ma.MaskedArray)
-  
+ 
   if scipy.sparse.issparse(update):
     if old_tile.type == TYPE_DENSE:
       #util.log_debug('Update sparse to dense')

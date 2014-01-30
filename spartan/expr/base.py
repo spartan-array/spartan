@@ -9,7 +9,7 @@ import weakref
 
 import numpy as np
 
-from ..node import Node
+from ..node import Node, node_type
 from .. import blob_ctx, node, util
 from ..util import Assert
 from ..array import distarray
@@ -207,13 +207,13 @@ Expr.__radd__ = Expr.__add__
 Expr.__rmul__ = Expr.__mul__
 Expr.__rdiv__ = Expr.__div__
 
+@node_type
 class AsArray(Expr):
   '''Promote a value to be array-like.
 
   This should be wrapped around most user-inputs that may be
   used in an array context, e.g. (``1 + x => map((as_array(1), as_array(x)), +)``)
   '''
-  __metaclass__ = Node
   _members = ['val']
 
   def visit(self, visitor):
@@ -230,9 +230,9 @@ class AsArray(Expr):
     return 'V(%s)' % self.val
 
 
+@node_type
 class Val(Expr):
   '''Wrap an existing value into an expression.'''
-  __metaclass__ = Node
   _members = ['val']
 
   needs_cache = False
@@ -278,8 +278,8 @@ class CollectionExpr(Expr):
     return iter(self.vals)
 
 
+@node_type
 class DictExpr(CollectionExpr):
-  __metaclass__ = Node
 
   def iteritems(self): return self.vals.iteritems()
   def keys(self): return self.vals.keys()
@@ -292,8 +292,8 @@ class DictExpr(CollectionExpr):
     return DictExpr(vals=dict([(k, visitor.visit(v)) for (k, v) in self.vals.iteritems()]))
 
 
+@node_type
 class ListExpr(CollectionExpr):
-  __metaclass__ = Node
   def dependencies(self):
     return dict(('v%d' % i, self.vals[i]) for i in range(len(self.vals)))
   
@@ -301,8 +301,8 @@ class ListExpr(CollectionExpr):
     return ListExpr(vals=[visitor.visit(v) for v in self.vals])
 
 
+@node_type
 class TupleExpr(CollectionExpr):
-  __metaclass__ = Node
   
   def dependencies(self):
     return dict(('v%d' % i, self.vals[i]) for i in range(len(self.vals)))

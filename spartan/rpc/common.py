@@ -18,7 +18,7 @@ import types
 import weakref
 
 from .. import cloudpickle, util, core
-from ..node import Node
+from ..node import Node, node_type
 
 
 CLIENT_PENDING = weakref.WeakKeyDictionary()
@@ -35,16 +35,16 @@ def set_default_timeout(seconds):
   util.log_info('Set default timeout to %s seconds.', DEFAULT_TIMEOUT)
 
 
+@node_type
 class RPCException(object):
-  __metaclass__ = Node
   _members = ['py_exc']
 
+@node_type
 class PickledData(object):
   '''
   Helper class: indicates that this message has already been pickled,
   and should be sent as is, rather than being re-pickled.
   '''
-  __metaclass__ = Node
   _members = ['data']
 
 class SocketBase(object):

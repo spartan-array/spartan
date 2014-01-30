@@ -7,7 +7,7 @@ import numpy as np
 
 from spartan import util, cloudpickle
 from spartan.util import Assert
-from spartan.node import Node
+from spartan.node import Node, node_type
 
 from struct import pack, unpack
 
@@ -47,59 +47,59 @@ cdef class Message(object):
   def __reduce__(Message self):
     return (self.__class__, tuple(), self.__dict__)
 
+@node_type
 class RegisterReq(Message):
-  __metaclass__ = Node
   _members = ['host', 'port']
 
 
+@node_type
 class RegisterResp(Message):
-  __metaclass__ = Node
   pass
 
+@node_type
 class Initialize(Message):
-  __metaclass__ = Node
   _members = ['id', 'peers']
 
 
+@node_type
 class NewBlob(Message):
-  __metaclass__ = Node
   _members = ['id', 'data']
 
 
+@node_type
 class GetReq(Message):
-  __metaclass__ = Node
   _members = ['id', 'subslice']
 
 
+@node_type
 class GetResp(Message):
-  __metaclass__ = Node
   _members = ['id', 'data']
 
 
+@node_type
 class DestroyReq(Message):
-  __metaclass__ = Node
   _members = ['ids' ]
 
+@node_type
 class UpdateReq(Message):
-  __metaclass__ = Node
   _members = ['id', 'region', 'data', 'reducer']
   
+@node_type
 class KernelReq(Message):
-  __metaclass__ = Node
   _members = ['blobs', 'mapper_fn', 'reduce_fn', 'kw']
 
 
+@node_type
 class KernelResp(Message):
-  __metaclass__ = Node
   _members = ['result']
 
 
+@node_type
 class CreateReq(Message):
-  __metaclass__ = Node
   _members = ['blob_id', 'data']
 
 
+@node_type
 class CreateResp(Message):
-  __metaclass__ = Node
   _members = ['blob_id']
 

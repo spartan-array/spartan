@@ -13,7 +13,7 @@ import imp
 
 from spartan import util
 from spartan.util import Assert
-from spartan.node import Node
+from spartan.node import Node, node_type
 
 var_id = iter(xrange(1000000))
 
@@ -24,11 +24,12 @@ def make_var():
   return 'k%d' % var_id.next()
 
 
+@node_type
 class LocalCtx(object):
-  __metaclass__ = Node
   _members = ['inputs']
 
 
+@node_type
 class LocalExpr(object):
   '''Represents an internal operation to be performed in the context of a tile.'''
   _members = ['deps']
@@ -43,9 +44,9 @@ class LocalExpr(object):
     return util.flatten([v.input_names() for v in self.deps], unique=True)
 
 
+@node_type
 class LocalInput(LocalExpr):
   '''An externally supplied input.'''
-  __metaclass__ = Node
   _members = ['idx']
 
   def __str__(self):
@@ -61,6 +62,7 @@ class LocalInput(LocalExpr):
     return [self.idx]
 
 
+@node_type
 class FnCallExpr(LocalExpr):
   '''Evaluate a function call.
   
@@ -70,7 +72,6 @@ class FnCallExpr(LocalExpr):
   Constants (axis of a reduction, datatype, etc), can be supplied via the ``kw``
   argument.
   '''
-  __metaclass__ = Node
   _members = ['kw', 'fn', 'pretty_fn']
 
   def node_init(self):
@@ -98,9 +99,11 @@ class FnCallExpr(LocalExpr):
 # The local operation of map and reduce expressions is practically
 # identical.  Reductions take an axis and extent argument in
 # addition to the normal function call arguments.
+@node_type
 class LocalMapExpr(FnCallExpr):
   _op_type = 'map'
 
+@node_type
 class LocalReduceExpr(FnCallExpr):
   _op_type = 'reduce'
 
@@ -135,8 +138,8 @@ def compile_parakeet_source(src):
   return module._jit_fn
 
 
+@node_type
 class ParakeetExpr(LocalExpr):
-  __metaclass__ = Node
   _members = ['deps', 'source']
 
   def evaluate(self, ctx):
