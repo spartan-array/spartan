@@ -19,6 +19,7 @@ from .base import Expr, Val, ListExpr, AsArray, DictExpr, lazify, expr_like
 from .map import MapExpr, LocalMapExpr
 from .ndarray import NdArrayExpr
 from .shuffle import ShuffleExpr
+from .write_array import WriteArrayExpr
 
 
 try:
