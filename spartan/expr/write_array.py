@@ -29,6 +29,12 @@ class WriteArrayExpr(Expr):
     return deps['array']
 
 def make_from_numpy(source):
+  '''
+  Make a distarray from a numpy array
+
+  :param source: `numpy.ndarray` or npy/npz file name 
+  :rtype: `Expr`
+  '''
   if isinstance(source, str):
     npa = np.load(source)
     if source.endswith("npz"):
