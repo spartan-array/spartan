@@ -11,6 +11,8 @@ from . import tile, extent
 from spartan import util, core, blob_ctx, rpc
 from spartan.util import Assert
 from spartan import sparse_multiply
+from spartan.config import FLAGS
+
 # number of elements per tile
 DEFAULT_TILE_SIZE = 100000
 
@@ -354,11 +356,22 @@ def create(shape,
   tiles = {}
   tile_type = tile.TYPE_SPARSE if sparse else tile.TYPE_DENSE
   
-  for ex, i in extents.iteritems():    
-    tiles[ex] = ctx.create(
+  if FLAGS.tile_assignment_strategy == 'round_robin':
+    for ex, i in extents.iteritems():    
+      tiles[ex] = ctx.create(
+                    tile.from_shape(ex.shape, dtype, tile_type=tile_type), 
+                    hint=i)
+  elif FLAGS.tile_assignment_strategy == 'performance':
+    req = core.WorkerScoreReq()
+    worker_scores = ctx._send_to_worker(blob_ctx.MASTER_ID, 'get_worker_scores', req).result
+    for ex, i in extents.iteritems():    
+      tiles[ex] = ctx.create(
                   tile.from_shape(ex.shape, dtype, tile_type=tile_type), 
-                  hint=i)
-
+                  hint=worker_scores[i%len(worker_scores)][0])
+  else: #random
+    for ex in extents:
+      tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype, tile_type=tile_type))
+      
   for ex in extents:
     tiles[ex] = tiles[ex].wait().blob_id
 
@@ -391,11 +404,7 @@ def from_table(extents):
     util.log_info('%s :: %s', key, blob_id)
     
     #dtype = blob_ctx.get().run_on_tile(blob_id, lambda t: t.dtype).wait()
-    
-    t = blob_ctx.get().get(blob_id, None)
-    Assert.isinstance(t, tile.Tile)
-    dtype = t.dtype
-    sparse = (t.type == tile.TYPE_SPARSE)
+    dtype, sparse = blob_ctx.get().tile_op(blob_id, lambda t: (t.dtype, t.type == tile.TYPE_SPARSE)).result
     #dtype = None
   else:
     # empty table; default dtype.

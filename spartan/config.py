@@ -120,6 +120,7 @@ FLAGS.add(IntFlag('num_workers', default=3))
 FLAGS.add(IntFlag('port_base', default=10000,
                   help='Port to listen on (master = port_base, workers=port_base + N)'))
 FLAGS.add(StrFlag('worker_list', default='4,8,16,32,64,80'))
+FLAGS.add(StrFlag('tile_assignment_strategy', default='round_robin', help='Decide tile to worker mapping (round_robin, random, performance)'))
 
 def parse(argv):
   '''Parse configuration from flags and/or configuration file.'''

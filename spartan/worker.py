@@ -14,8 +14,8 @@ from . import config, util, rpc, core, blob_ctx
 from .config import FLAGS, StrFlag, IntFlag, BoolFlag
 from .rpc import zeromq
 from .util import Assert
-
-
+import psutil
+    
 class Worker(object):
   def __init__(self, master):
     self.id = -1
@@ -25,6 +25,9 @@ class Worker(object):
     self._master = master
     self._running = True
     self._ctx = None
+    self.worker_status = core.WorkerStatus(psutil.TOTAL_PHYMEM, psutil.NUM_CPUS,
+                                           psutil.phymem_usage().percent, psutil.cpu_percent(), time.time(),
+                                           [], [])
     
     self._lock = threading.Lock()
     
@@ -45,6 +48,7 @@ class Worker(object):
     req = core.RegisterReq()
     req.host = hostname
     req.port = self._server.addr[1]
+    req.worker_status = self.worker_status
     master.register(req)
 
 
@@ -78,6 +82,10 @@ class Worker(object):
       resp = core.CreateResp(blob_id=id)
     handle.done(resp)
 
+  def tile_op(self, req, handle):
+    resp = core.ResultResp(result=req.fn(self._blobs[req.blob_id]))
+    handle.done(resp)
+        
   def destroy(self, req, handle):
     with self._lock:
       for id in req.ids:
@@ -108,7 +116,8 @@ class Worker(object):
   def _run_kernel(self, req, handle):
     if FLAGS.profile_worker:
       self._kernel_prof.enable()
-      
+    
+    start_time = time.time()  
     futures = []
     try:
       blob_ctx.set(self._ctx)
@@ -133,14 +142,18 @@ class Worker(object):
       handle.done(results)
     except:
       util.log_warn('Exception occurred during kernel call', exc_info=1)
+      self.worker_status.add_task_failure(req)
       handle.exception()
+    
+    finish_time = time.time()
+    self.worker_status.add_task_report(req, start_time, finish_time)
     
     if FLAGS.profile_worker:
       self._kernel_prof.disable()
 
   def run_kernel(self, req, handle):
     self._kernel_threads.apply_async(self._run_kernel, args=(req, handle))
-
+      
   def shutdown(self, req, handle):
     util.log_info('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_worker)
     if FLAGS.profile_worker:
@@ -158,11 +171,19 @@ class Worker(object):
     time.sleep(0.1)
     self._running = False
     self._server.shutdown()
-
+  
   def wait_for_shutdown(self):
+    last_heartbeat = time.time()
     while self._running:
-      time.sleep(0.1)
-
+      now = time.time()
+      if now - last_heartbeat < FLAGS.heartbeat_interval:
+        time.sleep(0.1)
+        continue
+      
+      self.worker_status.update_status(psutil.phymem_usage().percent, psutil.cpu_percent(), now)
+      req = core.HeartbeatReq(worker_id=self.id, worker_status=self.worker_status)
+      #self._master.heartbeat(req)
+      last_heartbeat = time.time()
 
 def _start_worker(master, local_id):
   util.log_info('Worker starting up... Master: %s Profile: %s', master, FLAGS.profile_worker)
@@ -180,6 +201,7 @@ if __name__ == '__main__':
 
   FLAGS.add(StrFlag('master'))
   FLAGS.add(IntFlag('count'))
+  FLAGS.add(IntFlag('heartbeat_interval'))
 
   #resource.setrlimit(resource.RLIMIT_AS, (8 * 1000 * 1000 * 1000,
   #                                        8 * 1000 * 1000 * 1000))
@@ -187,6 +209,7 @@ if __name__ == '__main__':
   config.parse(sys.argv)
   assert FLAGS.master is not None
   assert FLAGS.count > 0
+  assert FLAGS.heartbeat_interval > 0
 
   util.log_info('Starting %d workers on %s', FLAGS.count, socket.gethostname())
 

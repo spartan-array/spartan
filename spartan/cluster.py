@@ -7,7 +7,7 @@ import time
 
 from spartan import config, util
 import spartan
-from spartan.config import FLAGS, BoolFlag
+from spartan.config import FLAGS, BoolFlag, IntFlag
 import spartan.master
 import spartan.worker
 
@@ -45,7 +45,8 @@ FLAGS.add(BoolFlag(
   'use_threads',
   help='When running locally, use threads instead of forking. (slow, for debugging)',
   default=True))
-
+FLAGS.add(IntFlag('heartbeat_interval', default=3, help='Heartbeat Interval in each worker'))
+FLAGS.add(IntFlag('worker_failed_heartbeat_threshold', default=20, help='the max number of heartbeat that a worker can delay'))
 
 def _start_remote_worker(worker, st, ed):
   if FLAGS.use_threads and worker == 'localhost':
@@ -76,7 +77,8 @@ def _start_remote_worker(worker, st, ed):
           #'gdb', '-ex', 'run', '--args',
           'python', '-m spartan.worker',
           '--master=%s:%d' % (socket.gethostname(), FLAGS.port_base),
-          '--count=%d' % (ed - st)
+          '--count=%d' % (ed - st),
+          '--heartbeat_interval=%d' % FLAGS.heartbeat_interval
           ]
 
   # add flags from config/user

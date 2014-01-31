@@ -43,6 +43,23 @@ class BlobCtx(object):
 
     return pending_req
 
+  def _send_to_worker(self, worker_id, method, req, wait=True):
+    if self.active == False:
+      util.log_debug('Ctx disabled.')
+      return None
+
+    # short-circuit for requests to the local worker
+    if worker_id == self.worker_id:
+      pending_req = rpc.Future(None, -1)
+      getattr(self.local_worker, method)(req, pending_req)
+    else:
+      pending_req = getattr(self.workers[worker_id], method)(req)
+
+    if wait:
+      return pending_req.wait()
+
+    return pending_req
+  
   def _send_all(self, method, req, wait=True):
     if self.active == False:
       util.log_debug('Ctx disabled.')
@@ -148,7 +165,11 @@ class BlobCtx(object):
         result[blob_id] = v
     return result
 
-
+  def tile_op(self, blob_id, fn):
+    req = core.TileOpReq(blob_id=blob_id,
+                         fn=fn)
+    return self._send(blob_id, 'tile_op', req)
+  
 _ctx = threading.local()
 
 
