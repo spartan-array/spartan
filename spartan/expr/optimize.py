@@ -83,7 +83,8 @@ def fusable(v):
                         NdArrayExpr, 
                         IndexExpr,
                         Val, 
-                        AsArray))
+                        AsArray,
+                        WriteArrayExpr))
 
 
 def merge_var(children, k, v):
