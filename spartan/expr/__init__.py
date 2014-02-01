@@ -28,7 +28,7 @@ from .outer import outer
 from .reduce import reduce
 from .shuffle import shuffle
 from .write_array import make_from_numpy
-from .fio import load, save, pickle, unpickle
+from .fio import *
 
 
 Expr.outer = outer

@@ -32,29 +32,38 @@ import cPickle as cpickle
 from struct import unpack, pack
 from .base import force
 from .base import glom
-from .map import map
+from .map import map, MapResult
 from .ndarray import ndarray
 from .reduce import reduce
 from .shuffle import shuffle
+from ..array import tile
+from .. import blob_ctx
+from ..util import Assert
+from ..array import distarray
 import os
 import bz2
 import ast
 
-def spfn(prefix, ul, lr, suffix, ispickle, iszip, isnp = False):
-  fn = prefix + "/" + prefix + "_" + str(ul) + "_" + str(lr)
-  if suffix != "":
+def spfn(**kw):
+  fn = kw['path'] + "/" + kw['prefix'] + "/" + kw['prefix'] +  \
+        "_" + str(kw['ul']) + "_" + str(kw['lr'])
+  if kw['suffix'] != "":
     fn += "_" + suffix 
-  if not isnp:
+  if not kw['isnp']:
     fn += "_" + "sp"
-    if ispickle:
+    if kw['ispickle']:
       fn += "p"
     else:
       fn += "f"
-    if iszip:
+    if kw['iszip']:
       fn += "bz2"
   return fn
 
-def _save_reducer(ex, tile, axis, prefix = None, sparse = None, iszip = None):
+def _save_reducer(ex, tile, axis, path = None, prefix = None, iszip = None):
+  if not os.path.exists(path + '/' + prefix):
+    os.makedirs(path + '/' + prefix)
+
+  sparse = True if sp.issparse(tile) else False
   tile_dict = {'ul' : ex.ul, 'lr' : ex.lr, 'shape' : tile.shape,
                'dtype' : str(tile.dtype), 
                'type' : "SPARSE" if sparse else "DENSITY"}
@@ -66,19 +75,24 @@ def _save_reducer(ex, tile, axis, prefix = None, sparse = None, iszip = None):
   cnt += chr(len(dict_cnt) % 256) + chr(len(dict_cnt) / 256) + dict_cnt
 
   # Now data
+  kw = {'path' : path, 'prefix' : prefix, 'suffix' : '',
+        'ul' : ex.ul, 'lr' : ex.lr, 'ispickle' : False, 'isnp' : False}
   if iszip:
-    fn = spfn(prefix, ex.ul, ex.lr, "", False, True)
+    kw['iszip'] = True
+    fn = spfn(**kw)
     fp = bz2.BZ2File(fn, 'w', compresslevel = 1)
   else:
-    fn = spfn(prefix, ex.ul, ex.lr, "", False, False)
+    kw['iszip'] = False
+    fn = spfn(**kw)
     fp = open(fn, 'w')
 
   fp.write(cnt)
   if sparse:
       tile = tile.tocoo()
       save = np.savez_compressed if iszip else np.savez
-      save(spfn(prefix, ex.ul, ex.lr, "", True, True, True), 
-           row = tile.row, col = tile.col, data = tile.data, shape = tile.shape)
+      kw['isnp'] = True
+      save(spfn(**kw), row = tile.row, col = tile.col, 
+           data = tile.data, shape = tile.shape)
       ret = 2
   else:
       fp.write(tile.data)
@@ -86,22 +100,12 @@ def _save_reducer(ex, tile, axis, prefix = None, sparse = None, iszip = None):
   fp.close()
   return np.asarray(ret)
 
-def save(array, prefix, iszip = False):
-  '''
-  Save ``array'' to prefix_xxx.
-  
-  This expr is not lazy and return value is np.ndarray
-  Returns number of saved files (not including _dist.spf)
+def _save(path, prefix, array, iszip):
+  path = path + '/' + prefix
+  if not os.path.exists(path):
+    os.makedirs(path)
 
-  :param array: Expr or distarray
-  :param prefix: Prefix of all file names
-  :param iszip: Zip files or not
-  '''
-  array = force(array)
-  if not os.path.exists(prefix):
-    os.makedirs(prefix)
-
-  with open(prefix + "/" + prefix + "_dist.spf", "w") as fp:
+  with open(path + '/' + prefix + "_dist.spf", "w") as fp:
     for dim in array.shape:
       fp.write(str(dim) + " ")
     fp.write("\n")
@@ -113,20 +117,39 @@ def save(array, prefix, iszip = False):
       fp.write("SPARSE\n")
     else:
       fp.write("DENSITY\n")
+
+def save(array, prefix, path = '.', iszip = False):
+  '''
+  Save ``array'' to prefix_xxx.
+  
+  This expr is not lazy and return value is np.ndarray
+  Returns number of saved files (not including _dist.spf)
+
+  :param path: Path to store the directory `prefix'' 
+  :param array: Expr or distarray
+  :param prefix: Prefix of all file names
+  :param iszip: Zip files or not
+  '''
+  array = force(array)
+  _save(path, prefix, array, iszip)
       
   ret = glom(reduce(array, None,
                     dtype_fn=lambda input: np.int64,
                     local_reduce_fn= _save_reducer,
                     accumulate_fn = np.add,
-                    fn_kw={'prefix': prefix, 'sparse': array.sparse, 'iszip': iszip}))
-  return ret + 1
+                    fn_kw={'prefix': prefix, 'path' : path, 'iszip': iszip}))
+  return ret
 
-def _load_mapper(array, ex, prefix = None, sparse = None, dtype = None, iszip = None):
+def _load_mapper(array, ex, prefix = None, path = None, sparse = None, dtype = None, iszip = None):
+  kw = {'path' : path, 'prefix' : prefix, 'suffix' : '',
+        'ul' : ex.ul, 'lr' : ex.lr, 'ispickle' : False, 'isnp' : False}
   if iszip:
-    fn = spfn(prefix, ex.ul, ex.lr, "", False, True)
+    kw['iszip'] = True
+    fn = spfn(**kw)
     fp = bz2.BZ2File(fn, 'r')
   else:
-    fn = spfn(prefix, ex.ul, ex.lr, "", False, False)
+    kw['iszip'] = False
+    fn = spfn(**kw)
     fp = open(fn, 'r') 
 
   # In current implementation, these information are redundent
@@ -139,7 +162,8 @@ def _load_mapper(array, ex, prefix = None, sparse = None, dtype = None, iszip = 
 
   if sparse:
     fp.close()
-    a = np.load(spfn(prefix, ex.ul, ex.lr, '', False, True, True) + '.npz')
+    kw['isnp'] = True
+    a = np.load(spfn(**kw) + '.npz')
     return [(ex, sp.coo_matrix((a['data'], (a['row'], a['col'])), a['shape']))]
   else:
     if iszip:
@@ -149,10 +173,27 @@ def _load_mapper(array, ex, prefix = None, sparse = None, dtype = None, iszip = 
     data.shape = ex.shape
     fp.close()
     return [(ex, data)]
-    
 
+def _load(path, prefix, iszip):
+  fn = path + "/" + prefix + "/" + prefix + "_dist.spf"
+  if not os.path.exists(fn):
+    raise IOException
 
-def load(prefix, iszip = False):
+  with open(fn) as fp:
+    line = fp.readline()
+    shape = line.strip().split()
+    shape = [int(i) for i in shape]
+    line = fp.readline()
+    tile_hint = line.strip().split()
+    tile_hint = [int(i) for i in tile_hint]
+    line = fp.readline()
+    dtype = np.dtype("".join(line.strip()))
+    line = fp.readline()
+    sparse = True if line.find("SPARSE") != -1 else False
+
+  return {'shape' : shape, 'sparse' : sparse, 'dtype' : dtype, 'tile_hint' : tile_hint}
+
+def load(prefix, path = '.', iszip = False):
   '''
   Load prefix to a new array.
 
@@ -160,42 +201,37 @@ def load(prefix, iszip = False):
   Returns a new array with extents/tiles from prefix
 
   :param prefix: Prefix of all file names
+  :param path: Path to store the directory `prefix'' 
   :param iszip: Zip all files
   '''
-  fn = prefix + "/" + prefix + "_dist.spf"
-  if not os.path.exists(fn):
-    raise IOException
+  info = _load(path, prefix, iszip)
 
-  with open(fn) as fp:
-    line = fp.readline()
-    shape = line.strip().split()
-    shape = [int(i) for i in shape]
-    line = fp.readline()
-    tile_hint = line.strip().split()
-    tile_hint = [int(i) for i in tile_hint]
-    line = fp.readline()
-    dtype = np.dtype("".join(line.strip()))
-    line = fp.readline()
-    sparse = True if line.find("SPARSE") != -1 else False
+  return shuffle(ndarray(info['shape'], dtype=info['dtype'], 
+                         tile_hint=info['tile_hint'], sparse=info['sparse']), 
+                 fn = _load_mapper, 
+                 kw = {'path' : path, 'prefix' : prefix, 'sparse' : info['sparse'], 
+                       'dtype' : info['dtype'], 'iszip' : iszip})
 
-  return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint, 
-                  sparse=sparse), fn = _load_mapper, 
-                  kw = {'prefix' : prefix, 'sparse' : sparse, 
-                        'dtype' : dtype, 'iszip' : iszip})
+def _pickle_reducer(ex, tile, axis, path = None, prefix = None, sparse = None, iszip = None):
+  if not os.path.exists(path + '/' + prefix):
+    os.makedirs(path + '/' + prefix)
 
-def _pickle_reducer(ex, tile, axis, prefix = None, sparse = None, iszip = None):
+  kw = {'path' : path, 'prefix' : prefix, 'suffix' : '',
+        'ul' : ex.ul, 'lr' : ex.lr, 'ispickle' : True, 'isnp' : False}
   if iszip :
-    fn = spfn(prefix, ex.ul, ex.lr, "", True, True)
+    kw['iszip'] = True
+    fn = spfn(**kw)
     with bz2.BZ2File(fn, 'w', compresslevel = 1) as fp:
       cpickle.dump(tile, fp, -1)
   else :
-    fn = spfn(prefix, ex.ul, ex.lr, "", True, False)
+    kw['iszip'] = False
+    fn = spfn(**kw)
     with open(fn, "wb") as fp:
       cpickle.dump(tile, fp, -1)
 
   return np.asarray(1)
 
-def pickle(array, prefix, iszip=False):
+def pickle(array, prefix, path = '.', iszip=False):
   '''
   Save ``array'' to prefix_xxx. Use cPickle.
   
@@ -203,45 +239,37 @@ def pickle(array, prefix, iszip=False):
   Returns the number of saved files.
 
   :param array: Expr or distarray
+  :param path: Path to store the directory `prefix'' 
   :param prefix: Prefix of all file names
+  :param iszip: Zip all files
   '''
   array = force(array)
-  if not os.path.exists(prefix):
-    os.makedirs(prefix)
+  _save(path, prefix, array, iszip)
 
-  with open(prefix + "/" + prefix + "_dist.spf", "w") as fp:
-    for dim in array.shape:
-      fp.write(str(dim) + " ")
-    fp.write("\n")
-    for dim in array.tile_shape():
-      fp.write(str(dim) + " ")
-    fp.write("\n")
-    fp.write(str(array.dtype) + "\n")
-    if array.sparse:
-      fp.write("SPARSE\n")
-    else:
-      fp.write("DENSITY\n")
+  ret = force(reduce(array, None,
+                     dtype_fn=lambda input: np.int64,
+                     local_reduce_fn= _pickle_reducer,
+                     accumulate_fn = np.add,
+                     fn_kw={'path' : path, 'prefix': prefix, 'iszip' : iszip}))
+  return ret
 
-  ret = glom(reduce(array, None,
-                    dtype_fn=lambda input: np.int64,
-                    local_reduce_fn= _pickle_reducer,
-                    accumulate_fn = np.add,
-                    fn_kw={'prefix': prefix, 'iszip' : iszip}))
-  return ret + 1
-
-def _unpickle_mapper(array, ex, prefix = None, iszip = None):
+def _unpickle_mapper(array, ex, path = None, prefix = None, iszip = None):
+  kw = {'path' : path, 'prefix' : prefix, 'suffix' : '',
+        'ul' : ex.ul, 'lr' : ex.lr, 'ispickle' : True, 'isnp' : False}
   if iszip:
-    fn = spfn(prefix, ex.ul, ex.lr, "", True, True)
+    kw['iszip'] = True
+    fn = spfn(**kw)
     with bz2.BZ2File(fn, 'r') as fp:
       data = cpickle.load(fp)
   else:
-    fn = spfn(prefix, ex.ul, ex.lr, "", True, False)
+    kw['iszip'] = False
+    fn = spfn(**kw)
     with open(fn, "rb") as fp:
       data = cpickle.load(fp)
 
   return [(ex, data)]
 
-def unpickle(prefix, iszip = False):
+def unpickle(prefix, path = '.', iszip = False):
   '''
   Load prefix_xxx to a new array. Use cPickle.
 
@@ -249,25 +277,101 @@ def unpickle(prefix, iszip = False):
   Returns a new array with extents/tiles from fn
 
   :param prefix: Prefix of all file names
+  :param path: Path to store the directory `prefix'' 
+  :param iszip: Zip all files
   '''
+  info = _load(path, prefix, iszip)
 
-  fn = prefix + "/" + prefix + "_dist.spf"
-  if not os.path.exists(fn):
-    raise IOException
+  return shuffle(ndarray(info['shape'], dtype=info['dtype'], 
+                         tile_hint=info['tile_hint'], sparse=info['sparse']), 
+                 fn = _unpickle_mapper, 
+                 kw = {'path' : path, 'prefix' : prefix, 'iszip' : iszip})
 
-  with open(fn) as fp:
-    line = fp.readline()
-    shape = line.strip().split()
-    shape = [int(i) for i in shape]
-    line = fp.readline()
-    tile_hint = line.strip().split()
-    tile_hint = [int(i) for i in tile_hint]
-    line = fp.readline()
-    dtype = np.dtype("".join(line.strip()))
-    line = fp.readline()
-    sparse = True if line.find("SPARSE") != -1 else False
+def tile_mapper(blob_id, blob, tiles = None, user_fn=None, **kw):
+  for k, v in tiles.iteritems():
+    if v == blob_id:
+      ex = k
+      break
 
-  return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint, 
-                  sparse=sparse), fn = _unpickle_mapper, 
-                  kw = {'prefix' : prefix, 'iszip' : iszip})
+  ctx = blob_ctx.get()
+  results = []
+  
+  user_result = user_fn(None, ex, **kw)
+  if user_result is not None:
+    for ex, v in user_result:
+      Assert.eq(ex.shape, v.shape, 'Bad shape from %s' % user_fn)
+      result_tile = tile.from_data(v)
+      tile_id = ctx.create(result_tile).wait().blob_id
+      results.append((ex, tile_id))
+  
+  return MapResult(results, None)
+
+def foreach_tile(mapper_fn, tiles, kw=None):
+    ctx = blob_ctx.get()
+
+    if kw is None: kw = {}
+    kw['tiles'] = tiles
+    kw['user_fn'] = mapper_fn
+
+    return ctx.map(tiles.values(),
+                   mapper_fn = tile_mapper,
+                   reduce_fn = None,
+                   kw=kw)
+
+def _partial_load(path, prefix, extents, iszip, ispickle):
+  info = _load(path, prefix, iszip)
+  tile_type = tile.TYPE_SPARSE if info['sparse'] else tile.TYPE_DENSE
+
+  ctx = blob_ctx.get()
+  tiles = {}
+  for ex, i in extents.iteritems():    
+    tiles[ex] = ctx.create(
+                  tile.from_shape(ex.shape, info['dtype'], tile_type=tile_type), 
+                  hint=i)
+
+  for ex in extents:
+    tiles[ex] = tiles[ex].wait().blob_id
+  
+  mapper = _load_mapper if not ispickle else _unpickle_mapper
+  if ispickle:
+    kw = {'path' : path, 'prefix' : prefix, 'iszip' : iszip}
+  else:
+    kw = {'path' : path, 'prefix' : prefix, 'sparse' : info['sparse'], 
+          'dtype' : info['dtype'], 'iszip' : iszip}
+  result = foreach_tile(mapper, tiles, kw = kw)
+
+  loaded_tiles = {}
+  for blob_id, v in result.iteritems():
+    for ex, newid in v:
+      loaded_tiles[ex] = newid
+
+  distarray._pending_destructors.extend(tiles.values())
+
+  return loaded_tiles
+
+def partial_load(extents, prefix, path = ".", iszip = False):
+  '''
+  Load some tiles from ``prefix" to some workers.
+  This expr is not lazy and return blob_id(s)
+
+  :param extents: A dictionary which contains extents->workers
+  :param prefix: Prefix of all file names
+  :param path: Path to store the directory `prefix'' 
+  :param iszip: Zip all files
+  :rtype A dictionary which contains extents->blob_id
+  '''
+  return _partial_load(path, prefix, extents, iszip, False)
+
+def partial_unpickle(extents, prefix, path = ".", iszip = False):
+  '''
+  Unpickle some tiles from ``prefix" to some workers.
+  This expr is not lazy and return blob_id(s)
+
+  :param extents: A dictionary which contains extents->workers
+  :param prefix: Prefix of all file names
+  :param path: Path to store the directory `prefix'' 
+  :param iszip: Zip all files
+  :rtype A dictionary which contains extents->blob_ids
+  '''
+  return _partial_load(path, prefix, extents, iszip, True)
 
