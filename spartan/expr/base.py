@@ -52,8 +52,44 @@ def expr_like(expr, **kw):
   #util.log_info('Copied %s', new_expr)
   return new_expr
 
-eval_cache = {}
-expr_references = collections.defaultdict(int)
+# Pulled out as a class so that we can add documentation.
+class EvalCache(object):
+  '''
+  Expressions can be copied around and changed during optimization
+  or due to user actions; we want to ensure that a cache entry can
+  be found using any of the equivalent expression nodes.
+
+  To that end, expressions are identfied by an expression id; when
+  an expression is copied, the expression ID remains the same.
+
+  The cache tracks results based on expression ID's.  Since this is
+  no longer directly linked to an expressions lifetime, we have to
+  manually track reference counts here, and clear items from the
+  cache when the reference count hits zero.
+  '''
+  def __init__(self):
+    self.refs = collections.defaultdict(int)
+    self.cache = {}
+
+  def set(self, exprid, value):
+    assert not exprid in self.cache, 'Trying to replace an existing cache entry!'
+    self.cache[exprid] = value
+
+  def get(self, exprid):
+    return self.cache.get(exprid, None)
+
+  def register(self, exprid):
+    self.refs[exprid] += 1
+
+  def deregister(self, expr_id):
+    self.refs[expr_id] -= 1
+    if self.refs[expr_id] == 0:
+      #util.log_info('Destroying...')
+      if expr_id in self.cache: 
+        del self.cache[expr_id]
+      del self.refs[expr_id]
+
+eval_cache = EvalCache()
 
 class ExprTrace(object):
   def __init__(self, stack = None, level = None):
@@ -106,7 +142,7 @@ class Expr(object):
     # if not valid: check for disk data
     # if disk data: load bad tiles back
     # else: return None
-    return eval_cache.get(self.expr_id, None)
+    return eval_cache.get(self.expr_id)
 
   def dependencies(self):
     '''
@@ -153,12 +189,7 @@ class Expr(object):
    
 
   def __del__(self):
-    expr_references[self.expr_id] -= 1
-    if expr_references[self.expr_id] == 0:
-      if self.expr_id in eval_cache: del eval_cache[self.expr_id]
-      del expr_references[self.expr_id]
-
-    #util.log_info('Cache size: %s', len(eval_cache))
+    eval_cache.deregister(self.expr_id)
 
   def node_init(self):
     #assert self.expr_id is not None
@@ -170,7 +201,7 @@ class Expr(object):
     if self.stack_trace is None:
       self.stack_trace = ExprTrace()
 
-    expr_references[self.expr_id] += 1
+    eval_cache.register(self.expr_id)
 
   def evaluate(self):
     '''
@@ -204,7 +235,7 @@ class Expr(object):
 
     if self.needs_cache:
       #util.log_info('Caching %s -> %s', prim.expr_id, value)
-      eval_cache[self.expr_id] = value
+      eval_cache.set(self.expr_id, value)
       
     return value
 
