@@ -7,12 +7,14 @@ into a series of primitive array operations.
 import collections
 import weakref
 
+import traceback
 import numpy as np
 
 from ..node import Node, node_type
 from .. import blob_ctx, node, util
 from ..util import Assert
 from ..array import distarray
+from ..config import FLAGS
 
 
 class NotShapeable(Exception):
@@ -37,16 +39,15 @@ def expr_like(expr, **kw):
 
   The new expression has the same id, but is initialized using ``kw``
   '''
-  trace = kw.pop('trace', None)
   kw['expr_id'] = expr.expr_id
-  new_expr = expr.__class__(**kw)
-
-  # Copy traceback stack
-  if trace == None:
-    new_expr.trace = expr.trace
+  trace = kw.pop('trace', None)
+  if trace != None and FLAGS.optimized_stack:
+    trace.fuse_trace(expr.stack_trace)
+    kw['stack_trace'] = trace
   else:
-    trace.fuse_trace(expr.trace)
-    new_expr.trace = trace
+    kw['stack_trace'] = expr.stack_trace
+
+  new_expr = expr.__class__(**kw)
 
   #util.log_info('Copied %s', new_expr)
   return new_expr
@@ -58,10 +59,20 @@ class ExprTrace(object):
   def __init__(self, stack = None, level = None):
     self.stack = []
     self.level = 0
-    if stack != None:
-      self.stack = stack
     if level != None:
       self.level = level
+
+    if stack != None:
+      self.stack = stack
+    else:
+      trace = traceback.format_stack()[:-1]
+      # Little hack to remove unittest traceback
+      for i, s in enumerate(trace):
+        if s.find('unittest/case.py') != -1:
+          idx = i
+      self.stack = ['-' * 80 + '\n']
+      self.stack += ['Expr Creation Traceback (most recent call last):\n']
+      self.stack += trace[idx + 1:]
 
   def append(self, trace):
     self.stack += trace.stack
@@ -75,24 +86,10 @@ class ExprTrace(object):
     self.stack = deli1 + self.stack + trace.stack + deli2
 
 class Expr(object):
-  _members = ['expr_id']
+  _members = ['expr_id', 'stack_trace']
 
   # should evaluation of this object be cached
   needs_cache = True
-
-  def __new__(cls, *args, **kargs):
-    inst = object.__new__(cls, *args, **kargs)
-    import traceback
-    trace = traceback.format_stack()[:-1]
-    # Little hack to remove unittest traceback
-    for i, s in enumerate(trace):
-      if s.find('unittest/case.py') != -1:
-        idx = i
-    stack = ['Creation Traceback \'' + cls.__name__ + '\' (most recent call last):\n']
-    stack += ['----------------------------------------------------------------------\n']
-    stack += trace[idx + 1:]
-    setattr(inst, 'trace', ExprTrace(stack, 0))
-    return inst
 
   @property
   def cache(self):
@@ -170,6 +167,9 @@ class Expr(object):
     else:
       Assert.isinstance(self.expr_id, int)
 
+    if self.stack_trace is None:
+      self.stack_trace = ExprTrace()
+
     expr_references[self.expr_id] += 1
 
   def evaluate(self):
@@ -193,8 +193,12 @@ class Expr(object):
     try:
       value = self._evaluate(ctx, deps)
     except Exception as e:
-      for s in self.trace.stack:
-        import sys
+      import sys
+      from ..config import FLAGS
+      if not FLAGS.optimized_stack:
+        sys.stderr.write('\nTop Expr creation stack traceback.'
+                         ' (Use --optimized_stack=True for more detailed)\n')
+      for s in self.stack_trace.stack:
         sys.stderr.write(s)
       raise
 
