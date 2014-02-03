@@ -15,7 +15,7 @@ from spartan.expr.reduce import ReduceExpr, LocalReduceExpr
 from spartan.util import Assert
 
 from .. import util
-from .base import Expr, Val, ListExpr, AsArray, DictExpr, lazify, expr_like
+from .base import Expr, Val, ListExpr, AsArray, DictExpr, lazify, expr_like, ExprTrace
 from .map import MapExpr, LocalMapExpr
 from .ndarray import NdArrayExpr
 from .shuffle import ShuffleExpr
@@ -131,6 +131,7 @@ class MapMapFusion(OptimizePass):
     combined_op = LocalMapExpr(fn=expr.op.fn,
                                kw=expr.op.kw,
                                pretty_fn=expr.op.pretty_fn)
+    trace = ExprTrace()
     for name, child_expr in map_children.iteritems():
       if isinstance(child_expr, MapExpr):
         for k, v in child_expr.children.iteritems():
@@ -138,14 +139,17 @@ class MapMapFusion(OptimizePass):
 
         #util.log_info('Merging: %s', child_expr.op)
         combined_op.add_dep(child_expr.op)
+        trace.append(child_expr.trace)
       else:
         key = make_var()
         combined_op.add_dep(LocalInput(idx=key))
         children[key] = child_expr
+        trace.append(child_expr.trace)
 
     return expr_like(expr,
                      children=DictExpr(vals=children),
-                     op=combined_op)
+                     op=combined_op,
+                     trace=trace)
 
 
 class ReduceMapFusion(OptimizePass):
@@ -166,17 +170,20 @@ class ReduceMapFusion(OptimizePass):
                                   deps=[expr.op.deps[0]])
 
     new_children = {}
+    trace = ExprTrace()
     for name, child_expr in old_children.iteritems():
       for k, v in child_expr.children.iteritems():
         merge_var(new_children, k, v)
       combined_op.add_dep(child_expr.op)
+      trace.append(child_expr.trace)
 
     return expr_like(expr,
                      children=DictExpr(vals=new_children),
                      axis=expr.axis,
                      dtype_fn=expr.dtype_fn,
                      accumulate_fn=expr.accumulate_fn,
-                     op=combined_op)
+                     op=combined_op,
+                     trace=trace)
 
 
 class CollapsedCachedExpressions(OptimizePass):

@@ -37,19 +37,62 @@ def expr_like(expr, **kw):
 
   The new expression has the same id, but is initialized using ``kw``
   '''
+  trace = kw.pop('trace', None)
   kw['expr_id'] = expr.expr_id
   new_expr = expr.__class__(**kw)
+
+  # Copy traceback stack
+  if trace == None:
+    new_expr.trace = expr.trace
+  else:
+    trace.fuse_trace(expr.trace)
+    new_expr.trace = trace
+
   #util.log_info('Copied %s', new_expr)
   return new_expr
 
 eval_cache = {}
 expr_references = collections.defaultdict(int)
 
+class ExprTrace(object):
+  def __init__(self, stack = None, level = None):
+    self.stack = []
+    self.level = 0
+    if stack != None:
+      self.stack = stack
+    if level != None:
+      self.level = level
+
+  def append(self, trace):
+    self.stack += trace.stack
+    if self.level < trace.level:
+      self.level = trace.level
+
+  def fuse_trace(self, trace):
+    self.level += 1
+    deli1 = ['>>>>>>' * self.level + ' Level %d fuse \n' % self.level]
+    deli2 = ['<<<<<<' * self.level + ' Level %d fuse \n' % self.level]
+    self.stack = deli1 + self.stack + trace.stack + deli2
+
 class Expr(object):
   _members = ['expr_id']
 
   # should evaluation of this object be cached
   needs_cache = True
+
+  def __new__(cls, *args, **kargs):
+    inst = object.__new__(cls, *args, **kargs)
+    import traceback
+    trace = traceback.format_stack()[:-1]
+    # Little hack to remove unittest traceback
+    for i, s in enumerate(trace):
+      if s.find('unittest/case.py') != -1:
+        idx = i
+    stack = ['Creation Traceback \'' + cls.__name__ + '\' (most recent call last):\n']
+    stack += ['----------------------------------------------------------------------\n']
+    stack += trace[idx + 1:]
+    setattr(inst, 'trace', ExprTrace(stack, 0))
+    return inst
 
   @property
   def cache(self):
@@ -147,8 +190,14 @@ class Expr(object):
       else:
         assert not isinstance(vs, (dict, list)), vs
         deps[k] = vs
-        
-    value = self._evaluate(ctx, deps)
+    try:
+      value = self._evaluate(ctx, deps)
+    except Exception as e:
+      for s in self.trace.stack:
+        import sys
+        sys.stderr.write(s)
+      raise
+
     if self.needs_cache:
       #util.log_info('Caching %s -> %s', prim.expr_id, value)
       eval_cache[self.expr_id] = value
