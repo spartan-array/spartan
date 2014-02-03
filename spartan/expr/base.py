@@ -448,7 +448,8 @@ def eager(node):
   
   :param node: `Expr` to evaluate.
   '''
-  return lazify(force(node))
+  force(node)
+  return node
 
 
 def lazify(val):
