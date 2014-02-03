@@ -77,28 +77,31 @@ def _save_reducer(ex, tile, axis, path = None, prefix = None, iszip = None):
   # Now data
   kw = {'path' : path, 'prefix' : prefix, 'suffix' : '',
         'ul' : ex.ul, 'lr' : ex.lr, 'ispickle' : False, 'isnp' : False}
-  if iszip:
-    kw['iszip'] = True
-    fn = spfn(**kw)
-    fp = bz2.BZ2File(fn, 'w', compresslevel = 1)
-  else:
-    kw['iszip'] = False
-    fn = spfn(**kw)
-    fp = open(fn, 'w')
+  try:
+    if iszip:
+      kw['iszip'] = True
+      fn = spfn(**kw)
+      fp = bz2.BZ2File(fn, 'w', compresslevel = 1)
+    else:
+      kw['iszip'] = False
+      fn = spfn(**kw)
+      fp = open(fn, 'w')
 
-  fp.write(cnt)
-  if sparse:
-      tile = tile.tocoo()
-      save = np.savez_compressed if iszip else np.savez
-      kw['isnp'] = True
-      save(spfn(**kw), row = tile.row, col = tile.col, 
-           data = tile.data, shape = tile.shape)
-      ret = 2
-  else:
-      fp.write(tile.data)
-      ret = 1
-  fp.close()
-  return np.asarray(ret)
+    fp.write(cnt)
+    if sparse:
+        tile = tile.tocoo()
+        save = np.savez_compressed if iszip else np.savez
+        kw['isnp'] = True
+        save(spfn(**kw), row = tile.row, col = tile.col,
+             data = tile.data, shape = tile.shape)
+    else:
+        fp.write(tile.data)
+    fp.close()
+  except Exception as e:
+    util.log_error('Save %s tile(%s, %s) failed : %s' % prefix, ul, lr, e)
+    return np.asarray(0)
+
+  return np.asarray(1)
 
 def _save(path, prefix, array, iszip):
   path = path + '/' + prefix
@@ -122,7 +125,7 @@ def save(array, prefix, path = '.', iszip = False):
   '''
   Save ``array'' to prefix_xxx.
   
-  This expr is not lazy and return value is np.ndarray
+  This expr is not lazy and return True if success.
   Returns number of saved files (not including _dist.spf)
 
   :param path: Path to store the directory `prefix'' 
@@ -136,9 +139,10 @@ def save(array, prefix, path = '.', iszip = False):
   ret = glom(reduce(array, None,
                     dtype_fn=lambda input: np.int64,
                     local_reduce_fn= _save_reducer,
-                    accumulate_fn = np.add,
+                    accumulate_fn = np.multiply,
                     fn_kw={'prefix': prefix, 'path' : path, 'iszip': iszip}))
-  return ret
+
+  return True if ret == 1 else False
 
 def _load_mapper(array, ex, prefix = None, path = None, sparse = None, dtype = None, iszip = None):
   kw = {'path' : path, 'prefix' : prefix, 'suffix' : '',
@@ -218,16 +222,21 @@ def _pickle_reducer(ex, tile, axis, path = None, prefix = None, sparse = None, i
 
   kw = {'path' : path, 'prefix' : prefix, 'suffix' : '',
         'ul' : ex.ul, 'lr' : ex.lr, 'ispickle' : True, 'isnp' : False}
-  if iszip :
-    kw['iszip'] = True
-    fn = spfn(**kw)
-    with bz2.BZ2File(fn, 'w', compresslevel = 1) as fp:
-      cpickle.dump(tile, fp, -1)
-  else :
-    kw['iszip'] = False
-    fn = spfn(**kw)
-    with open(fn, "wb") as fp:
-      cpickle.dump(tile, fp, -1)
+
+  try:
+    if iszip :
+      kw['iszip'] = True
+      fn = spfn(**kw)
+      with bz2.BZ2File(fn, 'w', compresslevel = 1) as fp:
+        cpickle.dump(tile, fp, -1)
+    else :
+      kw['iszip'] = False
+      fn = spfn(**kw)
+      with open(fn, "wb") as fp:
+        cpickle.dump(tile, fp, -1)
+  except Exception as e:
+    util.log_error('Save %s tile(%s, %s) failed : %s' % prefix, ul, lr, e)
+    return np.asarray(0)
 
   return np.asarray(1)
 
@@ -235,7 +244,7 @@ def pickle(array, prefix, path = '.', iszip=False):
   '''
   Save ``array'' to prefix_xxx. Use cPickle.
   
-  This expr is not lazy and return value is np.ndarray
+  This expr is not lazy and return True if success.
   Returns the number of saved files.
 
   :param array: Expr or distarray
@@ -246,12 +255,13 @@ def pickle(array, prefix, path = '.', iszip=False):
   array = force(array)
   _save(path, prefix, array, iszip)
 
-  ret = force(reduce(array, None,
-                     dtype_fn=lambda input: np.int64,
-                     local_reduce_fn= _pickle_reducer,
-                     accumulate_fn = np.add,
-                     fn_kw={'path' : path, 'prefix': prefix, 'iszip' : iszip}))
-  return ret
+  ret = glom(reduce(array, None,
+                    dtype_fn=lambda input: np.int64,
+                    local_reduce_fn= _pickle_reducer,
+                    accumulate_fn = np.multiply,
+                    fn_kw={'path' : path, 'prefix': prefix, 'iszip' : iszip}))
+
+  return True if ret == 1 else False
 
 def _unpickle_mapper(array, ex, path = None, prefix = None, iszip = None):
   kw = {'path' : path, 'prefix' : prefix, 'suffix' : '',
