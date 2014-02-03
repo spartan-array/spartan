@@ -9,7 +9,6 @@ from test_common import with_ctx
 TEST_SIZE = 100
 
 class RavelTest(test_common.ClusterTest):
-  TILE_SIZE = 47
   def test_ravel(self):
     x = expr.arange((TEST_SIZE, TEST_SIZE))
     n = np.arange(TEST_SIZE * TEST_SIZE).reshape((TEST_SIZE, TEST_SIZE))

@@ -11,7 +11,6 @@ rate = 0.005
 volatility = 0.001
 
 class TestFinance(test_common.ClusterTest):
-  TILE_SIZE = 5
   def setUp(self):
     if not hasattr(self, 'current'):
       self.current = eager(expr.abs(10 + expr.randn(10)))

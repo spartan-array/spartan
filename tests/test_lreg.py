@@ -22,4 +22,3 @@ def test_linear_regression(ctx):
     grad = expr.sum(diff, axis=0)
     grad = grad.glom().reshape((N_DIM, 1))
     w = w - (grad * 1e-6)
-    

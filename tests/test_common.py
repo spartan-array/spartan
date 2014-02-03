@@ -80,31 +80,11 @@ class ClusterTest(unittest.TestCase):
   '''
   Helper class for running cluster tests.
   
-  Ensures a cluster instance is available before running any test
-  cases, and resets the TILE_SIZE for distarray between test runs.
+  Ensures a cluster instance is available before running any tests.
   '''
-  TILE_SIZE = None
-  flags = None
-  
   @classmethod
   def setUpClass(cls):
     cls.ctx = spartan.initialize()
-    cls.old_tilesize = distarray.DEFAULT_TILE_SIZE
-    if cls.TILE_SIZE is not None:
-      distarray.DEFAULT_TILE_SIZE = cls.TILE_SIZE
-
-    cls.old_flags = {}
-    if cls.flags is not None:
-      for k, v in cls.flags.iteritems():
-        cls.old_flags[k] = getattr(config.FLAGS, k)
-        setattr(config.FLAGS, k, v)
-
-  @classmethod
-  def tearDownClass(cls):
-    distarray.DEFAULT_TILE_SIZE = cls.old_tilesize
-    for k, v in cls.old_flags.iteritems():
-      setattr(config.FLAGS, k, v)
-
 
 def with_ctx(fn):
   def test_fn():

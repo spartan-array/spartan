@@ -9,7 +9,6 @@ XDIM = (100, 50)
 YDIM = (50, 100)
 
 class MatMulTest(test_common.ClusterTest):
-  TILE_SIZE = 500
   def test_matmul(self):
     x = expr.arange(XDIM, dtype=np.int).astype(np.float32)
     y = expr.arange(YDIM, dtype=np.int).astype(np.float32)

@@ -22,7 +22,6 @@ def add_one_tile(tile):
   return tile + 1
 
 class SliceTest(test_common.ClusterTest):
-  TILE_SIZE = 10
   def test_slice_get(self):
     x = expr.arange((TEST_SIZE, TEST_SIZE))
     z = x[5:8, 5:8]

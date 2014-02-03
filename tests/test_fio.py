@@ -127,3 +127,6 @@ class TestFIO(test_common.ClusterTest):
     util.log_info('Unpickle a %s sparse array in %s with zip', t1.shape, time_a)
     os.system("rm -rf __fiotest3 __fiotest4")
 
+if __name__ == '__main__':
+  import unittest
+  unittest.main()
