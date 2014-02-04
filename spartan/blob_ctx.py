@@ -146,7 +146,7 @@ class BlobCtx(object):
     req = core.CreateReq(blob_id=blob_id, data=data)
     return self._send(blob_id, 'create', req, wait=False)
 
-  def map(self, blob_ids, mapper_fn, reduce_fn, kw):
+  def partial_map(self, targets, blob_ids, mapper_fn, reduce_fn, kw):
     if self.active == False:
       util.log_debug('Ctx disabled.')
       return None
@@ -158,12 +158,19 @@ class BlobCtx(object):
 
     #util.log_info('%s', req)
 
-    futures = rpc.forall(self.workers.itervalues(), 'run_kernel', req).wait()
+    futures = rpc.forall(targets, 'run_kernel', req).wait()
     result = {}
     for f in futures:
       for blob_id, v in f.iteritems():
         result[blob_id] = v
     return result
+
+  def map(self, blob_ids, mapper_fn, reduce_fn, kw):
+    return self.partial_map(self.workers.itervalues(),
+                            blob_ids,
+                            mapper_fn,
+                            reduce_fn,
+                            kw)
 
   def tile_op(self, blob_id, fn):
     req = core.TileOpReq(blob_id=blob_id,

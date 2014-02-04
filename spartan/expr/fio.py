@@ -316,17 +316,21 @@ def tile_mapper(blob_id, blob, tiles = None, user_fn=None, **kw):
   
   return MapResult(results, None)
 
-def foreach_tile(mapper_fn, tiles, kw=None):
+def map_tiles(targets, mapper_fn, tiles, kw=None):
     ctx = blob_ctx.get()
 
     if kw is None: kw = {}
     kw['tiles'] = tiles
     kw['user_fn'] = mapper_fn
 
-    return ctx.map(tiles.values(),
-                   mapper_fn = tile_mapper,
-                   reduce_fn = None,
-                   kw=kw)
+    for i in targets.iterkeys():
+      targets[i] = ctx.workers[i]
+
+    return ctx.partial_map(targets.itervalues(),
+                           tiles.values(),
+                           mapper_fn = tile_mapper,
+                           reduce_fn = None,
+                           kw=kw)
 
 def _partial_load(path, prefix, extents, iszip, ispickle):
   info = _load(path, prefix, iszip)
@@ -334,10 +338,12 @@ def _partial_load(path, prefix, extents, iszip, ispickle):
 
   ctx = blob_ctx.get()
   tiles = {}
+  targets = {}
   for ex, i in extents.iteritems():    
     tiles[ex] = ctx.create(
                   tile.from_shape(ex.shape, info['dtype'], tile_type=tile_type), 
                   hint=i)
+    targets[i] = 1
 
   for ex in extents:
     tiles[ex] = tiles[ex].wait().blob_id
@@ -348,7 +354,7 @@ def _partial_load(path, prefix, extents, iszip, ispickle):
   else:
     kw = {'path' : path, 'prefix' : prefix, 'sparse' : info['sparse'], 
           'dtype' : info['dtype'], 'iszip' : iszip}
-  result = foreach_tile(mapper, tiles, kw = kw)
+  result = map_tiles(targets, mapper, tiles, kw = kw)
 
   loaded_tiles = {}
   for blob_id, v in result.iteritems():
