@@ -542,7 +542,7 @@ def _dot_mapper(inputs, ex, av, bv):
   time_a, a = util.timeit(lambda: av.fetch(ex_a))
   #util.log_info('Fetched...%s in %s', ex_a, time_a)
   time_b, b = util.timeit(lambda: bv.fetch(ex_b))
-  util.log_info('Fetched...ax:%s in %s, bx:%s in %s', ex_a, time_a, ex_b, time_b)
+  util.log_debug('Fetched...ax:%s in %s, bx:%s in %s', ex_a, time_a, ex_b, time_b)
 
   #util.log_info('%s %s %s', type(a), a.shape, a.dtype)
   #util.log_info('%s %s %s', type(b), b.shape, b.dtype)
@@ -602,7 +602,7 @@ def dot(a, b):
   sparse = av.sparse and bv.sparse
   target = ndarray((a.shape[0], b.shape[1]),
                    dtype=av.dtype,
-                   tile_hint=bv.tile_shape(),
+                   tile_hint=np.maximum(av.tile_shape(), bv.tile_shape()),
                    reduce_fn=np.add,
                    sparse=sparse)
   

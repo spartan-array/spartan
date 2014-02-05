@@ -65,16 +65,13 @@ class MapExpr(Expr):
     children = deps['children']
     op = self.op
 
-    #for c in children:
-    #  util.log_info('Child: %s', c)
-
     #util.log_info('Codegen for expression: %s', local.codegen(op))
 
     keys = children.keys()
     vals = children.values()
     vals = distarray.broadcast(vals)
     largest = distarray.largest_value(vals)
-   
+
     children = dict(zip(keys, vals))
     #util.log_info('Mapping %s over %d inputs; largest = %s', op, len(children), largest.shape)
 

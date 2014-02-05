@@ -103,12 +103,12 @@ class ExprTrace(object):
     else:
       trace = traceback.format_stack()[:-1]
       # Little hack to remove unittest traceback
-      for i, s in enumerate(trace):
-        if s.find('unittest/case.py') != -1:
-          idx = i
-      self.stack = ['-' * 80 + '\n']
+      #for i, s in enumerate(trace):
+      #  if s.find('unittest/case.py') != -1:
+      #    idx = i
+      #self.stack = ['-' * 80 + '\n']
       self.stack += ['Expr Creation Traceback (most recent call last):\n']
-      self.stack += trace[idx + 1:]
+      self.stack += trace
 
   def append(self, trace):
     self.stack += trace.stack
@@ -226,6 +226,8 @@ class Expr(object):
     except Exception as e:
       import sys
       from ..config import FLAGS
+      print >>sys.stderr, 'Error executing %s' % self
+
       if not FLAGS.optimized_stack:
         sys.stderr.write('\nTop Expr creation stack traceback.'
                          ' (Use --optimized_stack=True for more detailed)\n')
@@ -288,6 +290,10 @@ class Expr(object):
 
   def __neg__(self):
     return _map(self, fn=np.negative)
+
+  def reshape(self, new_shape):
+    from . import builtins
+    return builtins.reshape(self, new_shape)
 
   def __getitem__(self, idx):
     from .index import IndexExpr
