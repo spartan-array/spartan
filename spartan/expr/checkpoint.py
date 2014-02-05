@@ -6,7 +6,6 @@ from .fio import save
 from ..array.distarray import from_replica
 from fio import partial_load, load
 from .. import blob_ctx
-from ..rpc import TimeoutException
 
 @node_type
 class CheckpointExpr(Expr):
@@ -40,11 +39,7 @@ class CheckpointExpr(Expr):
   def _evaluate(self, ctx, deps): 
     result = deps['children']
     if self.mode == 'disk':
-      try:
-        save(result, "%s" % self.expr_id, path = self.path, iszip = False) 
-      except TimeoutException as ex:
-        util.log_info('checkpoint expr %d need to retry' % self.expr_id)
-        return self.evaluate()
+      save(result, "%s" % self.expr_id, path = self.path, iszip = False) 
         
     self.ready = True
     return result

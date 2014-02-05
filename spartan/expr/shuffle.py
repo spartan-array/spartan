@@ -6,7 +6,6 @@ from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from .base import Expr, lazify
 from.map import MapResult
-from ..rpc import TimeoutException
 
 def shuffle(v, fn, tile_hint=None, target=None, kw=None):
   '''
@@ -78,15 +77,10 @@ class ShuffleExpr(Expr):
 
     map_fn = self.map_fn
     
-    try:
-      if target is not None:
-        v.foreach_tile(mapper_fn = _target_mapper,
-                       kw = dict(map_fn=map_fn, inputs=v, target=target, fn_kw=fn_kw))
-      else:
-        target = v.map_to_array(mapper_fn = _notarget_mapper,
-                                kw = dict(inputs=v, map_fn=map_fn, fn_kw=fn_kw))
-    except TimeoutException as ex:
-      util.log_info('shuffle expr %d need to retry' % self.expr_id)
-      return self.evaluate()
-       
-    return target
+    if target is not None:
+      v.foreach_tile(mapper_fn = _target_mapper,
+                     kw = dict(map_fn=map_fn, inputs=v, target=target, fn_kw=fn_kw))
+      return target
+    else:
+      return v.map_to_array(mapper_fn = _notarget_mapper,
+                              kw = dict(inputs=v, map_fn=map_fn, fn_kw=fn_kw))

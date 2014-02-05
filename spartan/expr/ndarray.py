@@ -3,7 +3,6 @@ from ..node import Node, node_type
 from spartan.array import tile, distarray
 import numpy as np
 from .. import util
-from ..rpc import TimeoutException
 
 @node_type
 class NdArrayExpr(Expr):
@@ -30,17 +29,10 @@ class NdArrayExpr(Expr):
     dtype = self.dtype
     tile_hint = self.tile_hint
     
-    result = None
-    try:
-      result = distarray.create(shape, dtype,
+    return distarray.create(shape, dtype,
                             reducer=self.reduce_fn,
                             tile_hint=tile_hint,
                             sparse=self.sparse)
-    except TimeoutException as ex:
-      util.log_info('ndarray expr %d need to retry' % self.expr_id)
-      return self.evaluate()
-
-    return result
 
 def ndarray(shape, 
             dtype=np.float, 

@@ -9,7 +9,6 @@ from spartan.util import Assert
 
 from .base import Expr, DictExpr
 from .map import MapResult
-from ..rpc import TimeoutException
 
 def _reduce_mapper(ex, children, op, axis, output):
   '''Run a local reducer for a tile, and update the appropiate 
@@ -81,18 +80,14 @@ class ReduceExpr(Expr):
 
     shape = extent.shape_for_reduction(vals[0].shape, axis)
     
-    try:
-      output_array = distarray.create(shape, dtype,
+    output_array = distarray.create(shape, dtype,
                                     reducer=tile_accum)
 
-    # util.log_info('Reducing into array %s', output_array)
-      largest.foreach_tile(_reduce_mapper, kw={'children' : children,
-                                               'op' : op,
-                                               'axis' : axis,
-                                               'output' : output_array})
-    except TimeoutException as ex:
-      util.log_info('reduce expr %d need to retry' % self.expr_id)
-      return self.evaluate()
+  # util.log_info('Reducing into array %s', output_array)
+    largest.foreach_tile(_reduce_mapper, kw={'children' : children,
+                                             'op' : op,
+                                             'axis' : axis,
+                                             'output' : output_array})
 
     return output_array
 

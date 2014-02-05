@@ -15,6 +15,7 @@ from .. import blob_ctx, node, util
 from ..util import Assert
 from ..array import distarray
 from ..config import FLAGS
+from ..rpc import TimeoutException
 
 class NotShapeable(Exception):
   pass
@@ -230,6 +231,9 @@ class Expr(object):
         deps[k] = vs
     try:
       value = self._evaluate(ctx, deps)
+    except TimeoutException as ex:
+      util.log_info('%s %d need to retry', self.__class__, self.expr_id)
+      return self.evaluate()
     except Exception as e:
       import sys
       from ..config import FLAGS

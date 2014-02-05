@@ -465,6 +465,7 @@ class LocalWrapper(DistArray):
   '''
   def __init__(self, data):
     self._data = np.asarray(data)
+    self.bad_tiles = []
     #assert not isinstance(data, core.BlobId)
     Assert.isinstance(data, (np.ndarray, int, float))
     #print 'Wrapping: %s %s (%s)' % (data, type(data), np.isscalar(data))
@@ -574,6 +575,11 @@ class Slice(DistArray):
     offsets = [extent.offset_from(self.slice, ex) for ex in intersections]
     self.tiles = offsets
     self.dtype = darray.dtype
+  
+  @property
+  def bad_tiles(self):
+    bad_intersections = [extent.intersection(self.slice, ex) for ex in self.darray.bad_tiles]
+    return [ex for ex in bad_intersections if ex is not None]
     
   def foreach_tile(self, mapper_fn, kw):
     return self.darray.foreach_tile(mapper_fn = _slice_mapper,
@@ -603,7 +609,8 @@ class Broadcast(DistArray):
     self.base = base
     self.shape = shape
     self.dtype = base.dtype
-
+    self.bad_tiles = []
+    
   def __repr__(self):
     return 'Broadcast(%s -> %s)' % (self.base, self.shape)
   

@@ -9,7 +9,6 @@ from spartan.util import Assert, join_tuple
 
 from .base import Expr, ListExpr, TupleExpr
 from .map import MapResult
-from ..rpc import TimeoutException
 
 @node_type
 class IndexExpr(Expr):
@@ -25,18 +24,13 @@ class IndexExpr(Expr):
     idx = deps['idx']
     assert not isinstance(idx, list) 
     util.log_info('Indexing: %s', idx)
-    result = None
-    try:
-      if isinstance(idx, tuple) or\
-         isinstance(idx, slice) or\
-         np.isscalar(idx):
-        result = eval_Slice(ctx, self, deps)
-      else:
-        result = eval_Index(ctx, self, deps)
-    except TimeoutException as ex:
-      util.log_info('index expr %d need to retry' % self.expr_id)
-      return self.evaluate()
-    return result
+    
+    if isinstance(idx, tuple) or\
+       isinstance(idx, slice) or\
+       np.isscalar(idx):
+      return eval_Slice(ctx, self, deps)
+    else:
+      return eval_Index(ctx, self, deps)
 
 def int_index_mapper(ex, src, idx, dst):
   '''Map over the index array, fetching rows from the data array.'''
