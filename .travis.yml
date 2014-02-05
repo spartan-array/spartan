@@ -5,5 +5,5 @@ before_install:
    - sudo apt-get update -qq
    - sudo apt-get install cython python-numpy python-scipy
 install: 
-  - LANG=C "pip install ."
+  - LANG=C pip install .
 script: nosetests -v
