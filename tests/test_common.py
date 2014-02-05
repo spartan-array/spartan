@@ -70,7 +70,6 @@ def run(filename):
       spartan.shutdown()
       time.sleep(1)
 
-  spartan.shutdown()
   if FLAGS.profile_worker:
     util.log_info('Writing worker profiles...')
     join_profiles('./_worker_profiles')
