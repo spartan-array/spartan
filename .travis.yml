@@ -1,7 +1,9 @@
 language: python
 python:
   - "2.7"
+before_install:
+   - sudo apt-get update -qq
+   - sudo apt-get install cython python-numpy python-scipy
 install: 
-  - "pip install --use-mirrors numpy cython nose"
   - "pip install ."
 script: nosetests -v
