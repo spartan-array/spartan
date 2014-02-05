@@ -41,7 +41,8 @@ setup(
     'yappi',
     'numpy',
     'cython',
-	'pyzmq',
+    'pyzmq',
+    'psutil',
     #'sphinx_bootstrap_theme',
   ],
   classifiers=[
