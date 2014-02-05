@@ -117,11 +117,21 @@ FLAGS.add(BoolFlag('profile_master', default=False))
 FLAGS.add(BoolFlag('cluster', default=False))
 FLAGS.add(LogLevelFlag('log_level', logging.INFO))
 FLAGS.add(IntFlag('num_workers', default=3))
-FLAGS.add(IntFlag('port_base', default=10000,
-                  help='Port to listen on (master = port_base, workers=port_base + N)'))
-FLAGS.add(StrFlag('worker_list', default='4,8,16,32,64,80'))
+FLAGS.add(IntFlag('port_base', default=10000, help='Port master should listen on'))
 FLAGS.add(StrFlag('tile_assignment_strategy', default='round_robin', help='Decide tile to worker mapping (round_robin, random, performance)'))
 FLAGS.add(BoolFlag('optimized_stack', default=False))
+
+
+# print flags in sorted order
+# from http://stackoverflow.com/questions/12268602/sort-argparse-help-alphabetically
+from argparse import HelpFormatter
+from operator import attrgetter
+
+class SortingHelpFormatter(HelpFormatter):
+  def add_arguments(self, actions):
+    actions = sorted(actions, key=attrgetter('option_strings'))
+    super(SortingHelpFormatter, self).add_arguments(actions)
+
 
 def parse(argv):
   '''Parse configuration from flags and/or configuration file.'''
@@ -161,9 +171,11 @@ def parse(argv):
       print >>sys.stderr, 'Failed to parse config file: %s' % config_file
       sys.exit(1)
 
-  parser = argparse.ArgumentParser()
+  parser = argparse.ArgumentParser(
+    formatter_class=SortingHelpFormatter)
+
   for name, flag in FLAGS:
-    parser.add_argument('--' + name, type=str)
+    parser.add_argument('--' + name, type=str, help=flag.help)
 
   if os.getenv('SPARTAN_OPTS'):
     argv += os.getenv('SPARTAN_OPTS').split(' ')

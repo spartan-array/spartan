@@ -12,8 +12,8 @@ import sys
 import time
 import types
 import unittest
-from spartan.array import distarray
 
+FLAGS.add(StrFlag('worker_list', default='4,8,16,32,64,80'))
 
 def sig_handler(sig, frame):
   import threading
@@ -43,6 +43,7 @@ def run_benchmarks(module, benchmarks, master, timer):
 def run(filename):
   signal.signal(signal.SIGQUIT, sig_handler)
   os.system('rm ./_worker_profiles/*')
+
 
   #config.initialize(sys.argv)
   mod_name, _ = splitext(basename(filename))
