@@ -20,7 +20,6 @@ def build_cython():
     print'#' * 10, 'Cythonizing %s' % f
     assert os.system('cython --cplus "%s"' % f) == 0
 
-build_cython()
 from distutils.command.sdist import sdist
 class cython_sdist(sdist):
   '''Build Cython .c files for source distribution.'''
