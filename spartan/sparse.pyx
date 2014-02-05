@@ -1,5 +1,4 @@
 # distutils: language = c++
-
 from cython.operator cimport dereference as deref, preincrement as inc
 from libcpp.pair cimport pair
 from libcpp.map cimport map
@@ -13,92 +12,30 @@ from datetime import datetime
 ctypedef np.float32_t DTYPE_FLT
 ctypedef np.int32_t DTYPE_INT
 
-def millis(t1, t2):
-    dt = t2 - t1
-    ms = (dt.days * 24 * 60 * 60 + dt.seconds) * 1000 + dt.microseconds / 1000.0
-    return ms
-
+cdef public enum Reducers:
+  REDUCE_ADD = 0
+  REDUCE_MUL = 1
+  REDUCE_NONE = 2
+  
 @cython.boundscheck(False) # turn of bounds-checking for entire function
-def sparse_matmat_multiply(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not None):
-    """Multiply a sparse coo matrix by a dense matrix
+cpdef sparse_to_dense_update(np.ndarray[ndim=2, dtype=DTYPE_FLT] target, 
+                             np.ndarray[ndim=2, dtype=np.uint8_t, cast=True] mask, 
+                             np.ndarray[ndim=1, dtype=DTYPE_INT] rows,
+                             np.ndarray[ndim=1, dtype=DTYPE_INT] cols,
+                             np.ndarray[ndim=1, dtype=DTYPE_FLT] data,
+                             int reducer):
+  
+  cdef int i
+  for i in range(rows.shape[0]):
+    if reducer == REDUCE_NONE or mask[rows[i], cols[i]] == 0:
+      target[rows[i], cols[i]] = data[i]
+    elif reducer == REDUCE_ADD:
+      target[rows[i], cols[i]] = target[rows[i], cols[i]] + data[i]
+    elif reducer == REDUCE_MUL:
+      target[rows[i], cols[i]] = target[rows[i], cols[i]] * data[i]
     
-    Parameters
-    ----------
-    X : scipy.sparse.coo_matrix
-        A sparse matrix, of size N x M
-    W : np.ndarray[dtype=DTYPE_FLT, ndim=2]
-        A dense matrix, of size M x P.
-        
-    Returns
-    -------
-    A : scipy.sparse.coo_matrix
-        A sparse matrix, of size N x P, the result of multiplying X by W.
-	"""
-
-    if X.shape[1] != W.shape[0]:
-        raise ValueError('Matrices are not aligned!')
-    	
-    cdef np.ndarray[DTYPE_INT, ndim=1] rows = X.row
-    cdef np.ndarray[DTYPE_INT, ndim=1] cols = X.col
-    cdef np.ndarray[DTYPE_FLT, ndim=1] data = X.data
+    mask[rows[i], cols[i]] = 1
     
-    cdef int n = rows.shape[0]
-    cdef int p = W.shape[1]    
-    
-    size = rows.shape[0] * W.shape[1]
-    
-    cdef np.ndarray[DTYPE_INT] new_rows, new_cols
-    cdef np.ndarray[DTYPE_FLT] new_data
-    new_rows = numpy.zeros(size, dtype=numpy.int32)
-    new_cols = numpy.zeros(size, dtype=numpy.int32)
-    new_data = numpy.zeros(size, dtype=numpy.float32)
-
-    cdef int i,j,k
-
-    for j in range(p):
-        k = j * n
-        for i in range(n):
-            new_rows[k+i] = rows[i]
-            new_cols[k+i] = j
-            new_data[k+i] = data[i] * W[cols[i], j]
-            
-    return scipy.sparse.coo_matrix((new_data, (new_rows, new_cols)), shape=(X.shape[0], W.shape[1]))
- 
-@cython.boundscheck(False) # turn of bounds-checking for entire function   
-def sparse_matvec_multiply(X not None, np.ndarray[ndim=1, dtype=DTYPE_FLT] W not None):
-    """Multiply a sparse coo matrix by a dense vector
-    
-    Parameters
-    ----------
-    X : scipy.sparse.coo_matrix
-        A sparse matrix, of size N x M
-    W : np.ndarray[dtype=float64_t, ndim=1]
-        A dense vector, of size M.
-        
-    Returns
-    -------
-    A : dictionary {index: value}
-        A sparse vector, the result of multiplying X by W.
-    """
-
-    if X.shape[1] != W.shape[0]:
-        raise ValueError('Matrices are not aligned!')
-    	
-    cdef np.ndarray[DTYPE_INT, ndim=1] rows = X.row
-    cdef np.ndarray[DTYPE_INT, ndim=1] cols = X.col
-    cdef np.ndarray[DTYPE_FLT, ndim=1] data = X.data
-    
-    #cdef unordered_map[DTYPE_INT, DTYPE_FLT] new_data
-    cdef np.ndarray[DTYPE_FLT] new_data
-    new_data = numpy.zeros(X.shape[0], dtype=numpy.float64)
-    
-    cdef int i, n = rows.shape[0]    
-    for i in range(n):
-        new_data[rows[i]] += data[i] * W[cols[i]]
-    
-    #return None
-    return new_data
-
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
 def dot_coo_dense_dict(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not None):
     """Multiply a sparse coo matrix by a dense vector
@@ -112,13 +49,12 @@ def dot_coo_dense_dict(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not Non
         
     Returns
     -------
-    A : dictionary {index: value}
-        A sparse vector, the result of multiplying X by W.
+    A : coo matrix, the result of multiplying X by W.
     """
 
     if X.shape[1] != W.shape[0] and W.shape[1] != 1:
         raise ValueError('Matrices are not aligned!')
-    	
+      
     cdef np.ndarray[DTYPE_INT, ndim=1] rows = X.row
     cdef np.ndarray[DTYPE_INT, ndim=1] cols = X.col
     cdef np.ndarray[DTYPE_FLT, ndim=1] data = X.data
@@ -175,13 +111,12 @@ def dot_coo_dense_unordered_map(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] 
         
     Returns
     -------
-    A : dictionary {index: value}
-        A sparse vector, the result of multiplying X by W.
+    A : coo matrix, the result of multiplying X by W.
     """
 
     if X.shape[1] != W.shape[0] and W.shape[1] != 1:
         raise ValueError('Matrices are not aligned!')
-    	
+      
     cdef np.ndarray[DTYPE_INT, ndim=1] rows = X.row
     cdef np.ndarray[DTYPE_INT, ndim=1] cols = X.col
     cdef np.ndarray[DTYPE_FLT, ndim=1] data = X.data
@@ -214,69 +149,6 @@ def dot_coo_dense_unordered_map(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] 
     return scipy.sparse.coo_matrix((new_data, (new_rows, new_cols)), shape=(X.shape[0], 1))
 
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
-def dot_coo_dense_dict_unsorted(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not None):
-    """Multiply a sparse coo matrix by a dense vector
-    
-    Parameters
-    ----------
-    X : scipy.sparse.coo_matrix
-        A sparse matrix, of size N x M
-    W : np.ndarray[dtype=DTYPE_FLT, ndim=1]
-        A dense vector, of size M.
-        
-    Returns
-    -------
-    A : dictionary {index: value}
-        A sparse vector, the result of multiplying X by W.
-    """
-
-    if X.shape[1] != W.shape[0] and W.shape[1] != 1:
-        raise ValueError('Matrices are not aligned!')
-    	
-    cdef np.ndarray[DTYPE_INT, ndim=1] rows = X.row
-    cdef np.ndarray[DTYPE_INT, ndim=1] cols = X.col
-    cdef np.ndarray[DTYPE_FLT, ndim=1] data = X.data
-    
-    #cdef map[DTYPE_INT, DTYPE_FLT] result
-    cdef dict result = {}
-    #cdef np.ndarray[DTYPE_FLT] result
-    #result = numpy.zeros(X.shape[0], dtype=numpy.float64)
-    
-    cdef int i   
-    for i in range(rows.shape[0]):
-        #result[rows[i]] += data[i] * W[cols[i], 0]
-        if not result.has_key(rows[i]):
-            result[rows[i]] = data[i] * W[cols[i], 0]
-        else:
-            result[rows[i]] += data[i] * W[cols[i], 0]
-    
-    cdef int size = len(result)
-    #cdef int size = result.size()
-    cdef np.ndarray[DTYPE_INT] new_rows = numpy.zeros(size, dtype=numpy.int32)
-    cdef np.ndarray[DTYPE_INT] new_cols = numpy.zeros(size, dtype=numpy.int32)
-    cdef np.ndarray[DTYPE_FLT] new_data = numpy.zeros(size, dtype=numpy.float32)
-
-    #result_list = sorted(result.iteritems(), key=lambda d:d[0])
-    
-    i = 0
-    for (key, val) in result.iteritems():
-        new_rows[i] = key
-        new_data[i] = val
-        i = i + 1
-
-    #cdef pair[DTYPE_INT, DTYPE_FLT] entry
-    #cdef map[DTYPE_INT, DTYPE_FLT].iterator iter = result.begin()
-    #i = 0
-    #while iter != result.end():
-    #    entry = deref(iter)
-    #    new_rows[i] = entry.first
-    #    new_data[i] = entry.second
-    #    i = i + 1
-    #    inc(iter)
-
-    return scipy.sparse.coo_matrix((new_data, (new_rows, new_cols)), shape=(X.shape[0], 1))
-
-@cython.boundscheck(False) # turn of bounds-checking for entire function   
 def dot_coo_dense_vec(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not None):
     """Multiply a sparse coo matrix by a dense vector
     
@@ -289,13 +161,12 @@ def dot_coo_dense_vec(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not None
         
     Returns
     -------
-    A : dictionary {index: value}
-        A sparse vector, the result of multiplying X by W.
+    A : coo matrix, the result of multiplying X by W.
     """
 
     if X.shape[1] != W.shape[0] and W.shape[1] != 1:
         raise ValueError('Matrices are not aligned!')
-    	
+      
     cdef np.ndarray[DTYPE_INT, ndim=1] rows = X.row
     cdef np.ndarray[DTYPE_INT, ndim=1] cols = X.col
     cdef np.ndarray[DTYPE_FLT, ndim=1] data = X.data
@@ -312,7 +183,6 @@ def dot_coo_dense_vec(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not None
     cdef np.ndarray[DTYPE_FLT] new_data = result[new_rows]
 
     return scipy.sparse.coo_matrix((new_data, (new_rows, new_cols)), shape=(X.shape[0], 1))
-
 
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
 def slice(X not None, tuple slices):
@@ -391,29 +261,3 @@ def multiple_slice_coo(X not None, list slices):
 
         idx = end_idx
     return results
-
-@cython.boundscheck(False) # turn of bounds-checking for entire function   
-def multiple_slice_coo_unsorted(X not None, list slices):
-
-    cdef np.ndarray[DTYPE_INT, ndim=1] rows = X.row
-    cdef np.ndarray[DTYPE_INT, ndim=1] cols = X.col
-    cdef np.ndarray[DTYPE_FLT, ndim=1] data = X.data
-
-    cdef i, idx
-    cdef list slice_start = [s_slice[0].start for (bid, s_slice, d_slice) in slices]
-    cdef list new_data = [[] for i in range(len(slice_start))] 
-    cdef list new_rows = [[] for i in range(len(slice_start))]
-    for i in range(rows.size):
-        idx = numpy.searchsorted(slice_start, rows[i], side='right') - 1
-        if rows[i] < slices[idx][1][0].stop:
-            new_rows[idx].append(rows[i]-slice_start[idx])
-            new_data[idx].append(data[i])
- 
-    cdef list results = []
-    for i in range(len(slices)):
-        results.append((slices[i][0], slices[i][2], scipy.sparse.coo_matrix((new_data[i], (new_rows[i], numpy.zeros(len(new_rows[i]), dtype=numpy.int32))), 
-                                            shape=tuple([slice.stop-slice.start for slice in slices[i][1]]))))
-
-    return results
-
-

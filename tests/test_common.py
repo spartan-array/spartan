@@ -85,7 +85,7 @@ class ClusterTest(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     cls.ctx = spartan.initialize()
-
+    
 def with_ctx(fn):
   def test_fn():
       ctx = spartan.initialize()

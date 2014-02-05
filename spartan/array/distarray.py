@@ -10,7 +10,7 @@ import numpy as np
 from . import tile, extent
 from spartan import util, core, blob_ctx, rpc
 from spartan.util import Assert
-from spartan import sparse_multiply
+from spartan import sparse
 from spartan.config import FLAGS
 
 # number of elements per tile
@@ -323,10 +323,10 @@ class DistArrayImpl(DistArray):
     
     slices.sort(key=lambda x: x[1][0].start)
     #util.log_info("Update: slices:%s", slices)
-    result = sparse_multiply.multiple_slice(data, slices)
+    result = sparse.multiple_slice(data, slices)
     
     for (blob_id, dst_slice, update_data) in result:
-        #update_data = sparse_multiply.slice(data, src_slice)       
+        #update_data = sparse.slice(data, src_slice)       
         #if update_data is not None:
       #update_tile = tile.from_intersection(dst_key, intersection, data[src_slice])
       #util.log_info('%s %s %s %s', dst_key.shape, intersection.shape, blob_id, update_tile)

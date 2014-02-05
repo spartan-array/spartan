@@ -4,8 +4,8 @@ import scipy.sparse
 import itertools
 from . import extent
 from spartan import util
-from .. import sparse_update
 from spartan.util import Assert
+from spartan import sparse
 
 TYPE_EMPTY = 0
 TYPE_DENSE = 1
@@ -220,8 +220,8 @@ def merge(old_tile, subslice, update, reducer):
     if old_tile.type == TYPE_DENSE:
       #util.log_debug('Update sparse to dense')
       update_coo = update.tocoo()
-      sparse_update.sparse_to_dense_update(old_tile.data, old_tile.mask, update_coo.row, update_coo.col, update_coo.data, 
-                                        sparse_update.REDUCE_ADD)
+      sparse.sparse_to_dense_update(old_tile.data, old_tile.mask, update_coo.row, update_coo.col, update_coo.data, 
+                                        sparse.REDUCE_ADD)
       #util.log_info('Update %s', update)
       #util.log_info('Update COO %s', update_coo) 
       #util.log_info('New mask: %s', old_tile.mask)
