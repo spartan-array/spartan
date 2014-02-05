@@ -29,7 +29,7 @@ class TestScan(test_common.ClusterTest):
     axis = None
     a = expr.ones(ARRAY_SIZE, dtype=np.float32, tile_hint=tile_hint)
     c = expr.scan(a, reduce_fn=np.sum, scan_fn=np.cumsum, accum_fn=None, axis=axis)
-    
+
     print c.glom()
     
 if __name__ == '__main__':

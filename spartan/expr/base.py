@@ -16,7 +16,6 @@ from ..util import Assert
 from ..array import distarray
 from ..config import FLAGS
 
-
 class NotShapeable(Exception):
   pass
 
@@ -72,7 +71,7 @@ class EvalCache(object):
     self.cache = {}
 
   def set(self, exprid, value):
-    assert not exprid in self.cache, 'Trying to replace an existing cache entry!'
+    #assert not exprid in self.cache, 'Trying to replace an existing cache entry!'
     self.cache[exprid] = value
 
   def get(self, exprid):
@@ -127,7 +126,10 @@ class Expr(object):
   # should evaluation of this object be cached
   needs_cache = True
 
-  @property
+  def load_data(self, cached_result):
+    #util.log_info('expr:%s load_data from not checkpoint node', self.expr_id)
+    return None
+
   def cache(self):
     '''
     Return a cached value for this `Expr`.
@@ -135,14 +137,18 @@ class Expr(object):
     If a cached value is not available, or the cached array is
     invalid (missing tiles), returns None. 
     '''
-    
+    result = eval_cache.get(self.expr_id)
+    if result is not None and len(result.bad_tiles) == 0:
+      return result
+    return self.load_data(result)
+
     # get distarray from eval_cache
     # check if still valid
     # if valid, return
     # if not valid: check for disk data
     # if disk data: load bad tiles back
     # else: return None
-    return eval_cache.get(self.expr_id)
+    #return eval_cache.get(self.expr_id, None)
 
   def dependencies(self):
     '''
@@ -209,8 +215,9 @@ class Expr(object):
    
     Dependencies are evaluated prior to evaluating the expression.
     '''
-    if self.cache is not None:
-      return self.cache
+    cache = self.cache()
+    if cache is not None:
+      return cache
   
     ctx = blob_ctx.get()
     #util.log_info('Evaluting deps for %s', prim)
@@ -308,8 +315,9 @@ class Expr(object):
     
     If the value has been computed already this always succeeds.
     '''
-    if self.cache is not None:
-      return self.cache.shape
+    cache = self.cache()
+    if cache is not None:
+      return cache.shape
 
     try:
       return self.compute_shape()

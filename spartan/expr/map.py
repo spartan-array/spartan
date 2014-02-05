@@ -8,7 +8,7 @@ from ..node import Node, node_type
 from ..util import Assert
 from .base import DictExpr, Expr, as_array
 from .local import LocalCtx, make_var, LocalInput, LocalMapExpr
-
+from ..rpc import TimeoutException
 
 def tile_mapper(ex, children, op):
   ctx = blob_ctx.get()
@@ -74,11 +74,14 @@ class MapExpr(Expr):
 
     children = dict(zip(keys, vals))
     #util.log_info('Mapping %s over %d inputs; largest = %s', op, len(children), largest.shape)
-
-    result = largest.map_to_array(
+    try:
+      result = largest.map_to_array(
                 tile_mapper, 
                 kw = { 'children' : children, 'op' : op })
-    
+    except TimeoutException as ex:
+      util.log_info('map expr %d need to retry' % self.expr_id)
+      return self.evaluate()
+
     return result
 
 def map(inputs, fn, numpy_expr=None, fn_kw=None):

@@ -1,6 +1,7 @@
 from . import util, rpc, core
 import threading
 from .util import Assert
+import random
 
 MASTER_ID = 65536
 ID_COUNTER = iter(xrange(10000000))
@@ -60,12 +61,16 @@ class BlobCtx(object):
 
     return pending_req
   
-  def _send_all(self, method, req, wait=True):
+  def _send_all(self,  method, req, targets=None, wait=True):
     if self.active == False:
       util.log_debug('Ctx disabled.')
       return None
 
-    futures = rpc.forall(self.workers.itervalues(), method, req)
+    if targets is None:
+      available_workers = self._send_to_worker(MASTER_ID, 'get_available_workers', core.NoneParamReq()).result
+      targets = [self.workers[worker_id] for worker_id in available_workers]
+      
+    futures = rpc.forall(targets, method, req)
     if wait:
       return futures.wait()
     return futures
@@ -124,6 +129,21 @@ class BlobCtx(object):
     assert not self.is_master()
     return core.BlobId(worker=self.worker_id, id=ID_COUNTER.next())
 
+  def register_blob(self, blob_id, array):
+    req = core.RegisterBlobReq(blob_id=blob_id, array=array)
+    return self._send_to_worker(MASTER_ID, 'register_blob', req, wait=False)
+  
+  def get_workers_for_reload(self, array):
+    req = core.GetWorkersForReloadReq(array=array)
+    return self._send_to_worker(MASTER_ID, 'get_workers_for_reload', req).result
+  
+  def get_worker_scores(self):
+    return self._send_to_worker(MASTER_ID, 'get_worker_scores', core.NoneParamReq()).result
+  
+  def heartbeat(self, worker_id, worker_status):
+    req = core.HeartbeatReq(worker_id=worker_id, worker_status=worker_status)
+    return self._send_to_worker(MASTER_ID, 'heartbeat', req, wait=False)
+  
   def create(self, data, hint=None):
     assert self.worker_id >= 0, self.worker_id
 
@@ -134,6 +154,10 @@ class BlobCtx(object):
         worker_id = ID_COUNTER.next() % len(self.workers)
       else:
         worker_id = hint % len(self.workers)
+        
+      if worker_id not in self.local_worker._available_workers:
+        worker_id = random.choice(self.local_worker._available_workers)
+        
       id = -1
     else:
       worker_id = self.worker_id
@@ -147,18 +171,12 @@ class BlobCtx(object):
     return self._send(blob_id, 'create', req, wait=False)
 
   def partial_map(self, targets, blob_ids, mapper_fn, reduce_fn, kw):
-    if self.active == False:
-      util.log_debug('Ctx disabled.')
-      return None
-
     req = core.KernelReq(blobs=blob_ids,
                          mapper_fn=mapper_fn,
                          reduce_fn=reduce_fn,
                          kw=kw)
 
-    #util.log_info('%s', req)
-
-    futures = rpc.forall(targets, 'run_kernel', req).wait()
+    futures = self._send_all('run_kernel', req, targets=targets)
     result = {}
     for f in futures:
       for blob_id, v in f.iteritems():
@@ -166,7 +184,7 @@ class BlobCtx(object):
     return result
 
   def map(self, blob_ids, mapper_fn, reduce_fn, kw):
-    return self.partial_map(self.workers.itervalues(),
+    return self.partial_map(None,
                             blob_ids,
                             mapper_fn,
                             reduce_fn,

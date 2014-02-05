@@ -607,7 +607,7 @@ def dot(a, b):
                    sparse=sparse)
   
   return shuffle(av, _dot_mapper, target=target, kw=dict(av=av, bv=bv))
- 
+    
 def op_map(*args, **kw):
   fn = kw['fn']
   return map(args, fn)

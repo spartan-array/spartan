@@ -28,6 +28,7 @@ from .outer import outer
 from .reduce import reduce
 from .shuffle import shuffle
 from .write_array import make_from_numpy
+from .checkpoint import checkpoint
 from .fio import *
 
 

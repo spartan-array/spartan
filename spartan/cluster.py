@@ -4,6 +4,7 @@ import subprocess
 import sys
 import threading
 import time
+import shutil
 
 from spartan import config, util
 import spartan
@@ -46,7 +47,7 @@ FLAGS.add(BoolFlag(
   help='When running locally, use threads instead of forking. (slow, for debugging)',
   default=True))
 FLAGS.add(IntFlag('heartbeat_interval', default=3, help='Heartbeat Interval in each worker'))
-FLAGS.add(IntFlag('worker_failed_heartbeat_threshold', default=20, help='the max number of heartbeat that a worker can delay'))
+FLAGS.add(IntFlag('worker_failed_heartbeat_threshold', default=10, help='the max number of heartbeat that a worker can delay'))
 
 def _start_remote_worker(worker, st, ed):
   if FLAGS.use_threads and worker == 'localhost':
@@ -107,6 +108,10 @@ def start_cluster(num_workers, use_cluster_workers):
   :param num_workers:
   :param use_cluster_workers:
   '''
+  #clean the checkpoint directory
+  if os.path.exists(FLAGS.checkpoint_path):
+    shutil.rmtree(FLAGS.checkpoint_path)
+  
   master = spartan.master.Master(FLAGS.port_base, num_workers)
 
   if not use_cluster_workers:

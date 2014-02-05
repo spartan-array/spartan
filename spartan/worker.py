@@ -60,7 +60,8 @@ class Worker(object):
     util.log_debug('Worker %d initializing...', req.id)
     for id, (host, port) in req.peers.iteritems():
       self._peers[id] = rpc.connect(host, port)
-
+    self._peers[blob_ctx.MASTER_ID] = self._master
+    
     self.id = req.id
     self._ctx = blob_ctx.BlobCtx(self.id, self._peers, self)
     blob_ctx.set(self._ctx)
@@ -176,13 +177,12 @@ class Worker(object):
     last_heartbeat = time.time()
     while self._running:
       now = time.time()
-      if now - last_heartbeat < FLAGS.heartbeat_interval:
+      if now - last_heartbeat < FLAGS.heartbeat_interval or not self._initialized:
         time.sleep(0.1)
         continue
       
       self.worker_status.update_status(psutil.phymem_usage().percent, psutil.cpu_percent(), now)
-      req = core.HeartbeatReq(worker_id=self.id, worker_status=self.worker_status)
-      #self._master.heartbeat(req)
+      self._ctx.heartbeat(self.id, self.worker_status)
       last_heartbeat = time.time()
 
 def _start_worker(master, local_id):

@@ -152,6 +152,7 @@ class DistArrayImpl(DistArray):
     self.dtype = dtype
     self.reducer_fn = reducer_fn
     self.sparse = sparse
+    self.bad_tiles = []
     self.ctx = blob_ctx.get()
     
     Assert.not_null(dtype)
@@ -362,8 +363,7 @@ def create(shape,
                     tile.from_shape(ex.shape, dtype, tile_type=tile_type), 
                     hint=i)
   elif FLAGS.tile_assignment_strategy == 'performance':
-    req = core.WorkerScoreReq()
-    worker_scores = ctx._send_to_worker(blob_ctx.MASTER_ID, 'get_worker_scores', req).result
+    worker_scores = ctx.get_worker_scores()
     for ex, i in extents.iteritems():    
       tiles[ex] = ctx.create(
                   tile.from_shape(ex.shape, dtype, tile_type=tile_type), 
@@ -378,7 +378,47 @@ def create(shape,
   #for ex, i in extents.iteritems():
   #  util.log_warn("i:%d ex:%s, blob_id:%s", i, ex, tiles[ex])
     
-  return DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
+  array = DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
+  
+  for blob_id in tiles.values():
+    ctx.register_blob(blob_id, array)
+    
+  return array
+
+def from_replica(X):
+  '''Make a new, empty DistArray from X'''
+  ctx = blob_ctx.get()
+  dtype = X.dtype
+  shape = X.shape
+  reducer = X.reducer_fn
+  sparse = X.sparse
+  tile_type = tile.TYPE_SPARSE if sparse else tile.TYPE_DENSE
+  tiles = {}
+  worker_to_tiles = {}
+  for ex, blob_id in X.tiles.iteritems():
+    if blob_id.worker not in worker_to_tiles:
+      worker_to_tiles[blob_id.worker] = [ex]
+    else:
+      worker_to_tiles[blob_id.worker].append(ex)
+  
+  for worker_id, ex_list in worker_to_tiles.iteritems():
+    for ex in ex_list:
+      tiles[ex] = ctx.create(
+                  tile.from_shape(ex.shape, dtype, tile_type=tile_type), 
+                  hint=worker_id+1)
+      
+  for ex in tiles:
+    tiles[ex] = tiles[ex].wait().blob_id
+
+  #for ex, i in extents.iteritems():
+  #  util.log_warn("i:%d ex:%s, blob_id:%s", i, ex, tiles[ex])
+    
+  array = DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
+  
+  for blob_id in tiles.values():
+    ctx.register_blob(blob_id, array)
+    
+  return array
 
 def from_table(extents):
   '''
@@ -411,7 +451,13 @@ def from_table(extents):
     dtype = np.float
     sparse = False
   
-  return DistArrayImpl(shape=shape, dtype=dtype, tiles=extents, reducer_fn=None, sparse=sparse)
+  array = DistArrayImpl(shape=shape, dtype=dtype, tiles=extents, reducer_fn=None, sparse=sparse)
+  
+  ctx = blob_ctx.get()
+  for blob_id in extents.values():
+    ctx.register_blob(blob_id, array)
+  
+  return array
 
 class LocalWrapper(DistArray):
   '''

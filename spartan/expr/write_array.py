@@ -3,6 +3,8 @@ from .ndarray import ndarray
 from ..node import Node, node_type
 from spartan.array import tile, distarray, extent
 import numpy as np
+from .. import util
+from ..rpc import TimeoutException
 
 @node_type
 class WriteArrayExpr(Expr):
@@ -25,7 +27,12 @@ class WriteArrayExpr(Expr):
     lr = shape
     ul = [0 * i for i in shape]
     ex = extent.create(ul, lr, shape)
-    deps['array'].update(ex, deps['npa'])
+    try:
+      deps['array'].update(ex, deps['npa'])
+    except TimeoutException as ex:
+      util.log_info('write array expr %d need to retry' % self.expr_id)
+      return self.evaluate()
+    
     return deps['array']
 
 def make_from_numpy(source):

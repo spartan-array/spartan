@@ -81,11 +81,11 @@ class TestFIO(test_common.ClusterTest):
 
   def test5(self):
     t1 = expr.randn(100, 100).force()
-    expr.save(t1, "__fiotest1", '/tmp', False)
-    expr.pickle(t1, "__fiotest2", '/tmp', False)
-    Assert.all_eq(t1.glom(), expr.load("__fiotest1", '/tmp', False).glom())
-    Assert.all_eq(t1.glom(), expr.unpickle("__fiotest2", '/tmp', False).glom())
-    os.system('rm -rf /tmp/__fiotest1 /tmp/__fiotest2')
+    expr.save(t1, "__fiotest1", '/hdfs', False)
+    expr.pickle(t1, "__fiotest2", '/hdfs', False)
+    Assert.all_eq(t1.glom(), expr.load("__fiotest1", '/hdfs', False).glom())
+    Assert.all_eq(t1.glom(), expr.unpickle("__fiotest2", '/hdfs', False).glom())
+    os.system('rm -rf /hdfs/__fiotest1 /hdfs/__fiotest2')
  
   def profile1(self):
     t1 = expr.arange((1000, 1000)).force()

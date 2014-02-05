@@ -44,7 +44,8 @@ cdef class BlobId(object):
 cdef class WorkerStatus(object):
   cdef public long total_physical_memory
   cdef public int num_processors
-  cdef public float mem_usage, cpu_usage, last_report_time
+  cdef public float mem_usage, cpu_usage
+  cdef public double last_report_time
   cdef public list task_reports, task_failures
   
   def __init__(self, phy_memory, num_processors, mem_usage, cpu_usage, last_report_time, task_reports, task_failures):
@@ -149,9 +150,17 @@ class HeartbeatReq(Message):
   _members = ['worker_id', 'worker_status']
 
 @node_type
-class WorkerScoreReq(Message):
+class NoneParamReq(Message):
   pass
 
 @node_type
 class TileOpReq(Message):
   _members = ['blob_id', 'fn']
+  
+@node_type
+class RegisterBlobReq(Message):
+  _members = ['blob_id', 'array']
+  
+@node_type
+class GetWorkersForReloadReq(Message):
+  _members = ['array']

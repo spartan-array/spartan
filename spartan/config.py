@@ -120,6 +120,7 @@ FLAGS.add(IntFlag('num_workers', default=3))
 FLAGS.add(IntFlag('port_base', default=10000, help='Port master should listen on'))
 FLAGS.add(StrFlag('tile_assignment_strategy', default='round_robin', help='Decide tile to worker mapping (round_robin, random, performance)'))
 FLAGS.add(BoolFlag('optimized_stack', default=False))
+FLAGS.add(StrFlag('checkpoint_path', default='/tmp/spartan/checkpoint/', help='Path for saving checkpoint information'))
 
 
 # print flags in sorted order

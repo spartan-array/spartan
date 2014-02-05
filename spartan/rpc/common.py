@@ -26,7 +26,8 @@ SERVER_PENDING = weakref.WeakKeyDictionary()
 
 NO_RESULT = object()
 
-DEFAULT_TIMEOUT = 1200
+#DEFAULT_TIMEOUT = 1200
+DEFAULT_TIMEOUT = 60
 WARN_THRESHOLD = 10
 
 def set_default_timeout(seconds):
@@ -79,12 +80,13 @@ def serialize(obj):
   #x = cStringIO.StringIO()
   #serialization.write(obj, x)
   #return x.getvalue()
-  #util.log_info('Pickling: %s', obj)
+  #util.log_info('Pickling: %s', obj)  
   try:
     return cPickle.dumps(obj, -1)
   except (pickle.PicklingError, PickleError, TypeError):
+    #print >>sys.stderr, 'Failed to cPickle: %s' % obj
     return cloudpickle.dumps(obj, -1)
-
+    
 def read(f):
   return cPickle.load(f)
 # 
@@ -120,7 +122,7 @@ class PendingRequest(object):
     while self.result is NO_RESULT:
       time.sleep(0.01)
     return self.result
-
+  
   def exception(self):
     self.done(capture_exception())
 
@@ -143,6 +145,17 @@ class PendingRequest(object):
       self.done(result=RPCException(py_exc='done() not called on request.'))
 
 
+class TimeoutException(Exception):
+  '''Wrap a timeout exception.'''
+  def __init__(self, tb):
+    self._tb = tb
+
+  def __repr__(self):
+    return 'TimeoutException:' + self._tb
+
+  def __str__(self):
+    return repr(self)
+  
 class RemoteException(Exception):
   '''Wrap a uncaught remote exception.'''
   def __init__(self, tb):
@@ -209,7 +222,7 @@ class Future(object):
 
     if not self.have_result and self.timed_out():
       util.log_info('timed out!')
-      raise Exception('Timed out on remote call (%s %s)', self.addr, self.rpc_id)
+      raise TimeoutException('Timed out on remote call (%s %s)' % (self.addr, self.rpc_id))
 
     if isinstance(self.result, RPCException):
       raise RemoteException(self.result.py_exc)
