@@ -1,28 +1,29 @@
 import cPickle
 import random
+import scipy.sparse
+import sys
 import zipfile
 
 import numpy as np
-import scipy.sparse
-
 from spartan import util, expr, node
+from spartan.expr import lazify
 from spartan.node import node_type
 
-from spartan.expr import lazify
-
-#import parakeet
-# EPSILON = 1e-5
+# import parakeet
 # @util.synchronized
 # @parakeet.jit
 # def _sgd_inner(rows, cols, vals, u, m):
+#   EPSILON = np.float32(1e-5)
+#   total_error = 0
 #   for offset, mid, rating in zip(rows, cols, vals):
 #     u_idx = offset
 #     m_idx = mid
 #     guess = np.dot(u[u_idx], m[m_idx].T)
 #     diff = rating - guess
+#     total_error += abs(diff)
 #     u[u_idx] += u[u_idx] * diff * EPSILON
 #     m[m_idx] += u[u_idx] * diff * EPSILON
-#   
+#   return total_error
 
 from netflix_core import _sgd_inner
 FILE_START = 1
@@ -68,6 +69,8 @@ def fake_netflix_mapper(inputs, ex, p_rating=None):
   mids = np.random.randint(0, ex.shape[1], n_ratings)
   ratings = np.random.randint(0, 5, n_ratings).astype(np.float32)
 
+  util.log_info('%s %s %s %s', ex, p_rating, ex.size, len(ratings))
+
   data = scipy.sparse.coo_matrix((ratings, (uids, mids)), shape=ex.shape)
   yield ex, data
   
@@ -76,20 +79,17 @@ def sgd_netflix_mapper(inputs, ex, V=None, M=None, U=None, worklist=None):
     return
   
   v = V.fetch(ex)
-  #v = v.tocoo()
-    
   u = U.select(ex[0].to_slice()) # size: (ex.shape[0] * r)
   m = M.select(ex[1].to_slice()) # size: (ex.shape[1] * r)
+  
+  err = _sgd_inner(v.row.astype(np.int64), 
+                   v.col.astype(np.int64),
+                   v.data, u, m)
 
-  _sgd_inner(v.row.astype(np.int64),
-             v.col.astype(np.int64), 
-             v.data, u, m)
-
-  #U.update(ex[0], u)
-  #M.update(ex[1], m)
   U.update_slice(ex[0].to_slice(), u)
   M.update_slice(ex[1].to_slice(), m)
   
+  #print '%s %s %s' % (ex.ravelled_pos(), v.row.shape[0], err)
   return []
 
 def strata_overlap(extents, v):

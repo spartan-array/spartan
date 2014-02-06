@@ -2,7 +2,9 @@ import numpy as np
 cimport numpy as np
 cimport cython
 
-cdef float EPSILON = 1e-6
+from libc.math cimport fabs
+
+cdef float EPSILON = 1e-5
  
 @cython.wraparound(False)
 @cython.boundscheck(False)
@@ -13,7 +15,8 @@ cpdef _sgd_inner(np.ndarray[np.int64_t, ndim=1] rows,
                 np.ndarray[np.float32_t, ndim=2] m):
    
   cdef unsigned int i, offset, mid, u_idx, m_idx
-  cdef np.float32_t guess, diff, rating
+  cdef np.float32_t guess, diff, rating, total_error
+  total_error = 0
   cdef unsigned int rank = m.shape[1]
    
   for i in range(rows.shape[0]):
@@ -31,11 +34,12 @@ cpdef _sgd_inner(np.ndarray[np.int64_t, ndim=1] rows,
       guess = guess + u[u_idx, i] * m[m_idx, i]
      
     diff = rating - guess
+    total_error += fabs(diff)
     for i in range(rank):
-      u[u_idx, i] = u[u_idx, i] + diff * EPSILON
-      m[m_idx, i] = m[m_idx, i] + diff * EPSILON
+      u[u_idx, i] += u[u_idx, i] * diff * EPSILON
+      m[m_idx, i] += m[m_idx, i] * diff * EPSILON
       
-  return None
+  return total_error
 
 
 
