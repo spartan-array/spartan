@@ -32,7 +32,7 @@ class Worker(object):
     
     self._lock = threading.Lock()
     
-    #fix the "no _children attribute" exception.
+    #Patch to fix buggy assumption by multiprocessing library  
     if not hasattr(threading.current_thread(), "_children"):
       threading.current_thread()._children = weakref.WeakKeyDictionary()
     
