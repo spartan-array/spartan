@@ -31,6 +31,7 @@ from .write_array import make_from_numpy
 from .checkpoint import checkpoint
 from .fio import *
 from .reshape import reshape
+from .transpose import transpose
 
 
 Expr.outer = outer

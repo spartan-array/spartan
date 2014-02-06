@@ -75,12 +75,6 @@ class ReshapeExpr(Expr):
   def __str__(self):
     return 'Reshape[%d] %s to %s' % (self.expr_id, self.expr, self.new_shape)
 
-  def visit(self, visitor):
-    return ReshapeExpr(array = self.array, new_shape = self.new_shape)
-
-  def compute_shape(self):
-    return self.new_shape;
-
   def _evaluate(self, ctx, deps):
     v = deps['array']
     shape = deps['new_shape']
@@ -103,7 +97,7 @@ def reshape(array, new_shape, tile_hint=None):
   :param tile_hint: `tuple` or None
   '''
 
-  #Assert.isinstance(new_shape, tuple)
+  Assert.isinstance(new_shape, tuple)
   array = lazify(array)
 
   return ReshapeExpr(array=array,
