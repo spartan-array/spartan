@@ -9,7 +9,6 @@ from spartan import util, expr, node
 from spartan.node import node_type
 
 from spartan.expr import lazify
-from spartan.rpc import TimeoutException
 
 #import parakeet
 # EPSILON = 1e-5
@@ -125,20 +124,18 @@ class NetflixSGD(expr.Expr):
 
     strata = _compute_strata(V)
     util.log_info('Start eval')
-    try:
-      for i, stratum in enumerate(strata):
-        util.log_info('Processing stratum: %d of %d (size = %d)', i, len(strata), len(stratum))
-        #for ex in stratum: print ex
-  
-        worklist = set(stratum)
-        expr.shuffle(V, sgd_netflix_mapper,
-                     target=None,
-                     kw={'V' : lazify(V), 'M' : lazify(M), 'U' : lazify(U),
-                         'worklist' : worklist }).force()
-      util.log_info('Eval done.')
-    except TimeoutException as ex:
-      util.log_info('NetflixSGD expr %d need to retry' % self.expr_id)
-      return self.evaluate()
+    
+    for i, stratum in enumerate(strata):
+      util.log_info('Processing stratum: %d of %d (size = %d)', i, len(strata), len(stratum))
+      #for ex in stratum: print ex
+
+      worklist = set(stratum)
+      expr.shuffle(V, sgd_netflix_mapper,
+                   target=None,
+                   kw={'V' : lazify(V), 'M' : lazify(M), 'U' : lazify(U),
+                       'worklist' : worklist }).force()
+                       
+    util.log_info('Eval done.')
 
 def sgd(V, M, U):
   return NetflixSGD(V=V, M=M, U=U)

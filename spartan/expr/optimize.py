@@ -199,9 +199,10 @@ class CollapsedCachedExpressions(OptimizePass):
 
   def visit_default(self, expr):
     #util.log_info('Visit: %s, %s', expr.expr_id, expr.cache)
-    if expr.cache is not None:
+    cache = expr.cache()
+    if cache is not None:
       util.log_info('Collapsing %s', expr.typename())
-      return lazify(expr.cache)
+      return lazify(cache)
     else:
       return expr.visit(self)
 
