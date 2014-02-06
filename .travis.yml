@@ -4,8 +4,8 @@ python:
 virtualenv:
   system_site_packages: true
 before_install:
-   - sudo apt-get update -qq
-   - sudo apt-get install cython python-numpy python-scipy python-zmq
+   - sudo apt-get update
+   - sudo apt-get install cython python-numpy python-scipy
 install: 
-  - LANG=C pip install .
+  - LANG=C python setup.py develop
 script: nosetests -v
