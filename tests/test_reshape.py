@@ -85,8 +85,8 @@ class ReshapeTest(test_common.ClusterTest):
     Assert.all_eq(expr.reshape(e, (1, 276000)).glom(), t4)
 
   def test_reshape8(self):
-    t1 = expr.sparse_diagonal((257, 457)).force()
-    t2 = expr.sparse_diagonal((457, 257)).force()
+    t1 = expr.sparse_diagonal((257, 457))
+    t2 = expr.sparse_diagonal((457, 257))
     a = expr.reshape(t1, (457, 257))
     b = expr.reshape(t2, (257, 457))
     Assert.all_eq(a.glom().todense(), sp.eye(257, 457).tolil().reshape((457, 257)).todense())
