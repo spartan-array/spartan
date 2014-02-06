@@ -1,7 +1,8 @@
 from spartan import expr, util
-from spartan.expr import stencil
 from test_common import with_ctx
 from math import sqrt
+import parakeet
+from spartan.expr import stencil
 
 N_COLORS = 3
 IMG_SIZE = (N_COLORS, 16, 16)
@@ -9,6 +10,7 @@ FILTER_SIZE = (5, 5)
 N_IMGS = 1
 N_FILTERS = 1
 ONE_TILE = (10000, 10000, 10000, 10000)
+
 
 @with_ctx
 def test_convnet(ctx):

@@ -1,15 +1,16 @@
 from spartan import expr, util
 from spartan.array import distarray
-from spartan.expr import stencil
 from spartan.util import Assert, divup
 from test_common import with_ctx
 import math
 import numpy as np
 import pickle
+import parakeet
 import test_common
 import time
 
 
+from spartan.expr import stencil
 
 ONE_TILE = (10000, 10000, 10000, 10000)
 
@@ -45,6 +46,3 @@ def test_local_convolve(ctx):
     st = time.time()
     stencil._convolve(images, filters)
     print N, F, time.time() - st
-
-if __name__ == '__main__':
-  test_stencil()
