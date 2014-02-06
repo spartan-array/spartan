@@ -10,13 +10,13 @@ import sys
 import fcntl
 import time
 import zmq
-
 from .common import Group, SocketBase
 from spartan import util
 
 POLLER = None
 POLLER_LOCK = threading.Lock()
 PROFILER = None
+CV = threading.Condition()
 
 def poller():
   global POLLER
@@ -162,6 +162,12 @@ class ServerSocket(Socket):
     packet = self._zmq.recv_multipart(copy=False, track=False)
     source, rest = packet[0], packet[1:]
     stub_socket = StubSocket(source, self, rest)
+    
+    if hasattr(self, "_handler") == False:
+      CV.acquire()
+      CV.wait()
+      CV.release()
+
     self._handler(stub_socket)
 
   def zmq(self):

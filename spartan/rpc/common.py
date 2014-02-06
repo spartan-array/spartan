@@ -16,7 +16,6 @@ import time
 import traceback
 import types
 import weakref
-
 from .. import cloudpickle, util, core
 from ..node import Node, node_type
 
@@ -262,6 +261,12 @@ class Server(object):
   def __init__(self, socket):
     self._socket = socket
     self._socket.register_handler(self.handle_read)
+    
+    import zeromq
+    zeromq.CV.acquire()
+    zeromq.CV.notify() 
+    zeromq.CV.release()
+
     self._methods = {}
     self._timers = collections.defaultdict(util.Timer)
     self._running = False
