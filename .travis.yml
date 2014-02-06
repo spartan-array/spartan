@@ -1,9 +1,11 @@
 language: python
 python:
   - "2.7"
+virtualenv:
+  system_site_packages: true
 before_install:
    - sudo apt-get update -qq
-   - sudo apt-get install cython python-numpy python-scipy
+   - sudo apt-get install cython python-numpy python-scipy python-zmq
 install: 
   - LANG=C pip install .
 script: nosetests -v
