@@ -117,8 +117,8 @@ class Master(object):
     resp = core.ResultResp(result=sorted(self._worker_scores.iteritems(), key=lambda x: x[1], reverse=True))
     handle.done(resp)
                         
-  def mark_bad_tiles(self, worker_id):
-    util.log_info('failed worker:%s', worker_id)
+  def mark_failed_worker(self, worker_id):
+    util.log_info('Marking worker %s as failed.', worker_id)
     self._available_workers.remove(worker_id)
     for (blob_id, array) in self._worker_to_blob_array[worker_id]:
       array.bad_tiles.append(array.blob_to_ex[blob_id])
@@ -127,7 +127,7 @@ class Master(object):
     now = time.time()
     for worker_id in self._available_workers:
       if now - self._worker_statuses[worker_id].last_report_time > FLAGS.heartbeat_interval * FLAGS.worker_failed_heartbeat_threshold:
-        self.mark_bad_tiles(worker_id)
+        self.mark_failed_worker(worker_id)
   
   def is_slow_worker(self, worker_id):
     if self._worker_scores[worker_id] < self._worker_avg_score * 0.5:
