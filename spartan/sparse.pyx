@@ -137,8 +137,7 @@ def dot_coo_dense_unordered_map(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] 
     cdef unordered_map[DTYPE_INT, DTYPE_FLT].iterator iter = result.begin()
     i = 0
     while iter != result.end():
-        entry = deref(iter)
-        new_rows[i] = entry.first
+        new_rows[i] = deref(iter).first
         i = i + 1
         inc(iter)
 

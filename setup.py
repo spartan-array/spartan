@@ -42,6 +42,7 @@ setup(
     'cython',
     'pyzmq',
     'psutil',
+    'parakeet',
     #'sphinx_bootstrap_theme',
   ],
   classifiers=[
