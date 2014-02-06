@@ -15,7 +15,8 @@ from .config import FLAGS, StrFlag, IntFlag, BoolFlag
 from .rpc import zeromq
 from .util import Assert
 import psutil
-    
+import weakref
+
 class Worker(object):
   def __init__(self, master):
     self.id = -1
@@ -30,6 +31,10 @@ class Worker(object):
                                            [], [])
     
     self._lock = threading.Lock()
+    
+    #fix the "no _children attribute" exception.
+    if not hasattr(threading.current_thread(), "_children"):
+      threading.current_thread()._children = weakref.WeakKeyDictionary()
     
     self._kernel_threads = ThreadPool(processes=1)
     
