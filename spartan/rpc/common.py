@@ -261,12 +261,6 @@ class Server(object):
   def __init__(self, socket):
     self._socket = socket
     self._socket.register_handler(self.handle_read)
-    
-    import zeromq
-    zeromq.CV.acquire()
-    zeromq.CV.notify() 
-    zeromq.CV.release()
-
     self._methods = {}
     self._timers = collections.defaultdict(util.Timer)
     self._running = False
@@ -294,6 +288,7 @@ class Server(object):
   def serve_nonblock(self):
 #    util.log_info('Running.')
     self._running = True
+    self._socket.start_listening()
 
   def register_object(self, obj):
     for name in dir(obj):

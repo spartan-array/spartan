@@ -16,7 +16,6 @@ from spartan import util
 POLLER = None
 POLLER_LOCK = threading.Lock()
 PROFILER = None
-CV = threading.Condition()
 
 def poller():
   global POLLER
@@ -130,8 +129,12 @@ class Socket(SocketBase):
 class ServerSocket(Socket):
   def __init__(self, ctx, sock_type, hostport):
     Socket.__init__(self, ctx, sock_type, hostport)
+    self.started_listen = False
     self.addr = hostport
     self.bind()
+  
+  def start_listening(self):
+    self.started_listen = True
 
   def send(self, msg):
     '''Send ``msg`` to a remote client.
@@ -159,15 +162,13 @@ class ServerSocket(Socket):
     poller().add(self, zmq.POLLIN)
 
   def handle_read(self, socket):
+    if self.started_listen == False:
+      #ignore the message if it's not been started.
+      return
+
     packet = self._zmq.recv_multipart(copy=False, track=False)
     source, rest = packet[0], packet[1:]
     stub_socket = StubSocket(source, self, rest)
-    
-    if hasattr(self, "_handler") == False:
-      CV.acquire()
-      CV.wait()
-      CV.release()
-
     self._handler(stub_socket)
 
   def zmq(self):
