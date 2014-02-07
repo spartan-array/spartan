@@ -35,8 +35,14 @@ class Master(object):
       yappi.start()
       atexit.register(_dump_profile)
 
+  def __del__(self):
+    '''Make sure that we shutdown the cluster when the master goes away.'''
+    self.shutdown()
 
   def shutdown(self):
+    if self._ctx.active is False:
+      return
+
     self._ctx.active = False
 
     futures = rpc.FutureGroup()
