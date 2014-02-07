@@ -12,15 +12,15 @@ from .. import util
 from ..util import Assert
 from.map import MapResult
 
-def _write_mapper(ex, source = None, sregion = None, dslice = None):
+def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
   intersection = extent.intersection(ex, sregion)
 
   futures = rpc.FutureGroup()
   if intersection != None:
-    dlr = np.asarray(intersection.lr) - np.asarray(sregion.ul)
-    dul = np.asarray(intersection.ul) - np.asarray(sregion.ul)
-    dex = extent.create(tuple(dul), tuple(dlr), dslice.shape)
-    v = dslice.fetch(dex)
+    dst_lr = np.asarray(intersection.lr) - np.asarray(sregion.ul)
+    dst_ul = np.asarray(intersection.ul) - np.asarray(sregion.ul)
+    dst_ex = extent.create(tuple(dst_ul), tuple(dst_lr), dst_slice.shape)
+    v = dst_slice.fetch(dst_ex)
     futures.append(source.update(intersection, v, wait=False))
 
   return MapResult(None, futures)
@@ -28,47 +28,47 @@ def _write_mapper(ex, source = None, sregion = None, dslice = None):
 
 @node_type
 class WriteArrayExpr(Expr):
-  _members = ['array', 'sslices', 'data', 'dslices']
+  _members = ['array', 'src_slices', 'data', 'dst_slices']
 
   def __str__(self):
     return 'WriteArrayExpr[%d] %s %s %s' % (self.expr_id, self.array, self.data)
   
   def _evaluate(self, ctx, deps):
     array = deps['array']
-    sslices = deps['sslices']
+    src_slices = deps['src_slices']
     data = deps['data']
-    dslices = deps['dslices']
+    dst_slices = deps['dst_slices']
 
-    sregion = extent.from_slice(sslices, array.shape)
+    sregion = extent.from_slice(src_slices, array.shape)
     if isinstance(data, np.ndarray):
       if sregion.shape == data.shape:
          array.update(sregion, data)
       else:
-         array.update(sregion, data[dslices])
+         array.update(sregion, data[dst_slices])
     elif isinstance(data, distarray.DistArray):
-      dslice = distarray.Slice(data, dslices)
-      Assert.eq(sregion.shape, dslice.shape)
+      dst_slice = distarray.Slice(data, dst_slices)
+      Assert.eq(sregion.shape, dst_slice.shape)
       array.foreach_tile(mapper_fn = _write_mapper,
                          kw = {'source':array, 'sregion':sregion,
-                               'dslice':dslice})
+                               'dst_slice':dst_slice})
     else:
       raise TypeError
 
     return array
 
 
-def write(array, sslices, data, dslices):
+def write(array, src_slices, data, dst_slices):
   '''
-  array[sslices] = data[dslices]
+  array[src_slices] = data[dst_slices]
 
   :param array: Expr or distarray
-  :param sslices: slices for array
+  :param src_slices: slices for array
   :param data: data
-  :param dslices: slices for data
+  :param dst_slices: slices for data
   :rtype: `Expr`
   '''
-  return WriteArrayExpr(array = array, sslices = sslices,
-                        data = data, dslices = dslices)
+  return WriteArrayExpr(array = array, src_slices = src_slices,
+                        data = data, dst_slices = dst_slices)
 
 
 def make_from_numpy(source):
@@ -89,7 +89,7 @@ def make_from_numpy(source):
   elif isinstance(source, np.ndarray):
     npa = source
   else:
-    raise TypeError
+    raise TypeError("Expected ndarray or DistArray, got: %s" % type(data))
   
   array = ndarray(shape = npa.shape, dtype = npa.dtype)
   slices = tuple([slice(0, i) for i in npa.shape])
