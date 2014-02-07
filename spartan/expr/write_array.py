@@ -1,33 +1,75 @@
+'''
+Distarray write operations and expr.
+'''
+
+import numpy as np
+from spartan import rpc
 from .base import Expr
 from .ndarray import ndarray
 from ..node import Node, node_type
 from spartan.array import tile, distarray, extent
-import numpy as np
 from .. import util
+from ..util import Assert
+from.map import MapResult
+
+def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
+  intersection = extent.intersection(ex, sregion)
+
+  futures = rpc.FutureGroup()
+  if intersection != None:
+    dst_lr = np.asarray(intersection.lr) - np.asarray(sregion.ul)
+    dst_ul = np.asarray(intersection.ul) - np.asarray(sregion.ul)
+    dst_ex = extent.create(tuple(dst_ul), tuple(dst_lr), dst_slice.shape)
+    v = dst_slice.fetch(dst_ex)
+    futures.append(source.update(intersection, v, wait=False))
+
+  return MapResult(None, futures)
+
 
 @node_type
 class WriteArrayExpr(Expr):
-  _members = ['array', 'npa']
+  _members = ['array', 'src_slices', 'data', 'dst_slices']
 
   def __str__(self):
-    return 'dist_array(%s, %s)' % (self.npa.shape, self.npa.dtype)
+    return 'WriteArrayExpr[%d] %s %s %s' % (self.expr_id, self.array, self.data)
   
-  def visit(self, visitor):
-    return WriteArrayExpr(array = self.array, npa = self.npa)
-  
-  def dependencies(self):
-    return dict([(k, getattr(self, k)) for k in self.members])
-  
-  def compute_shape(self):
-    return self.npa.shape;
- 
   def _evaluate(self, ctx, deps):
-    shape = deps['npa'].shape
-    lr = shape
-    ul = [0 * i for i in shape]
-    ex = extent.create(ul, lr, shape)
-    deps['array'].update(ex, deps['npa'])
-    return deps['array']
+    array = deps['array']
+    src_slices = deps['src_slices']
+    data = deps['data']
+    dst_slices = deps['dst_slices']
+
+    sregion = extent.from_slice(src_slices, array.shape)
+    if isinstance(data, np.ndarray):
+      if sregion.shape == data.shape:
+         array.update(sregion, data)
+      else:
+         array.update(sregion, data[dst_slices])
+    elif isinstance(data, distarray.DistArray):
+      dst_slice = distarray.Slice(data, dst_slices)
+      Assert.eq(sregion.shape, dst_slice.shape)
+      array.foreach_tile(mapper_fn = _write_mapper,
+                         kw = {'source':array, 'sregion':sregion,
+                               'dst_slice':dst_slice})
+    else:
+      raise TypeError
+
+    return array
+
+
+def write(array, src_slices, data, dst_slices):
+  '''
+  array[src_slices] = data[dst_slices]
+
+  :param array: Expr or distarray
+  :param src_slices: slices for array
+  :param data: data
+  :param dst_slices: slices for data
+  :rtype: `Expr`
+  '''
+  return WriteArrayExpr(array = array, src_slices = src_slices,
+                        data = data, dst_slices = dst_slices)
+
 
 def make_from_numpy(source):
   '''
@@ -47,8 +89,10 @@ def make_from_numpy(source):
   elif isinstance(source, np.ndarray):
     npa = source
   else:
-    raise TypeError
+    raise TypeError("Expected ndarray or DistArray, got: %s" % type(data))
   
   array = ndarray(shape = npa.shape, dtype = npa.dtype)
-  return WriteArrayExpr(array = array, npa = npa)
+  slices = tuple([slice(0, i) for i in npa.shape])
+
+  return write(array, slices, npa, slices)
      
