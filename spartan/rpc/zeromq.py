@@ -129,12 +129,12 @@ class Socket(SocketBase):
 class ServerSocket(Socket):
   def __init__(self, ctx, sock_type, hostport):
     Socket.__init__(self, ctx, sock_type, hostport)
-    self.started_listen = False
+    self._listen = False
     self.addr = hostport
     self.bind()
   
-  def start_listening(self):
-    self.started_listen = True
+  def listen(self):
+    self._listen = True
 
   def send(self, msg):
     '''Send ``msg`` to a remote client.
@@ -162,7 +162,7 @@ class ServerSocket(Socket):
     poller().add(self, zmq.POLLIN)
 
   def handle_read(self, socket):
-    if self.started_listen == False:
+    if self._listen == False:
       #ignore the message if it's not been started.
       return
 

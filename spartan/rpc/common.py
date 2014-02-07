@@ -288,7 +288,7 @@ class Server(object):
   def serve_nonblock(self):
 #    util.log_info('Running.')
     self._running = True
-    self._socket.start_listening()
+    self._socket.listen()
 
   def register_object(self, obj):
     for name in dir(obj):
