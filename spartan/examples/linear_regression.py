@@ -3,7 +3,8 @@ import spartan
 from spartan import expr
 
 def linear_regression(x, y, iterations):
-  w = np.random.rand(x.shape[1], 1)
+  N_DIM = x.shape[1]
+  w = np.random.rand(N_DIM, 1)
   x = expr.eager(x)
   y = expr.eager(y)
 
