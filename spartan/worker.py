@@ -12,7 +12,7 @@ import time
 
 from . import config, util, rpc, core, blob_ctx
 from .config import FLAGS, StrFlag, IntFlag, BoolFlag
-from .rpc import zeromq
+from .rpc import zeromq, TimeoutException
 from .util import Assert
 import psutil
 import weakref
@@ -187,7 +187,13 @@ class Worker(object):
         continue
       
       self.worker_status.update_status(psutil.phymem_usage().percent, psutil.cpu_percent(), now)
-      self._ctx.heartbeat(self.id, self.worker_status)
+      future = self._ctx.heartbeat(self.id, self.worker_status)  
+      try:
+        future.wait()
+      except TimeoutException, ex:
+        util.log_info("Exit due to heartbeat message timeout.")
+        sys.exit(0)
+
       last_heartbeat = time.time()
 
 def _start_worker(master, local_id):
