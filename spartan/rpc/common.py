@@ -16,7 +16,6 @@ import time
 import traceback
 import types
 import weakref
-
 from .. import cloudpickle, util, core
 from ..node import Node, node_type
 
@@ -289,6 +288,7 @@ class Server(object):
   def serve_nonblock(self):
 #    util.log_info('Running.')
     self._running = True
+    self._socket.listen()
 
   def register_object(self, obj):
     for name in dir(obj):

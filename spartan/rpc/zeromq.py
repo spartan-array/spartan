@@ -10,7 +10,6 @@ import sys
 import fcntl
 import time
 import zmq
-
 from .common import Group, SocketBase
 from spartan import util
 
@@ -130,8 +129,12 @@ class Socket(SocketBase):
 class ServerSocket(Socket):
   def __init__(self, ctx, sock_type, hostport):
     Socket.__init__(self, ctx, sock_type, hostport)
+    self._listen = False
     self.addr = hostport
     self.bind()
+  
+  def listen(self):
+    self._listen = True
 
   def send(self, msg):
     '''Send ``msg`` to a remote client.
@@ -159,6 +162,10 @@ class ServerSocket(Socket):
     poller().add(self, zmq.POLLIN)
 
   def handle_read(self, socket):
+    if self._listen == False:
+      #ignore the message if it's not been started.
+      return
+
     packet = self._zmq.recv_multipart(copy=False, track=False)
     source, rest = packet[0], packet[1:]
     stub_socket = StubSocket(source, self, rest)
