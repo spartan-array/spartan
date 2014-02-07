@@ -69,7 +69,7 @@ class FileWatchdog(threading.Thread):
   (This occurs when an ssh connection is terminated, for example.)
   """
 
-  def __init__(self, file_handle=sys.stdout, on_closed=lambda: os._exit(1)):
+  def __init__(self, file_handle=sys.stdin, on_closed=lambda: os._exit(1)):
     '''
     
     :param file_handle:
@@ -84,7 +84,8 @@ class FileWatchdog(threading.Thread):
     f = [self.file_handle]
     while 1:
       r, w, x = select.select(f, f, f, 1.0)
-      if r:
+      #print >>sys.stderr, 'Watchdog running... %s %s %s' % (r, w, x)
+      if r or x:
         self.on_closed()
         return
       time.sleep(0.1)
