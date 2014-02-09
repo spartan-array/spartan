@@ -139,6 +139,11 @@ class DistArray(object):
         extents[ex] = id
     return from_table(extents)
   
+  def _get_ndim(self):
+    return len(self.shape)
+
+  ndim = property(_get_ndim)
+
 ID_COUNTER = iter(xrange(10000000))
 
 # List of tiles to be destroyed at the next safe point.
