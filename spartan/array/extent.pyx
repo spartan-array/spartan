@@ -4,12 +4,18 @@ import collections
 from spartan import util
 from spartan.util import Assert
 import numpy as np
+cimport numpy as np
 
 cimport cython
+
+# Can't understand following declaration errors
+# Following line makes parakeet with old cython (0.15) report error
+#ctypedef unsigned int coordinate_t
+# Following line makes parakeet report error
+#ctypedef unsigned long long coordinate_t
+
+ctypedef np.int64_t coordinate_t
 # Hopfully, 32-dimension is enough.
-# Parakeet can't convert numpy.int64
-#ctypedef unsigned long long[32] coordinate_t
-ctypedef unsigned int coordinate_t
 cdef enum:
   MAX_DIM=32
 
@@ -31,7 +37,7 @@ cdef class TileExtent(object):
   cdef public tuple array_shape
   cdef coordinate_t c_ul[MAX_DIM]
   cdef coordinate_t c_lr[MAX_DIM]
-  cdef unsigned c_ul_len, c_lr_len
+  cdef unsigned int c_ul_len, c_lr_len
 
   def get_ul(self):
     return tuple([self.c_ul[i] for i in range(self.c_ul_len)])
@@ -134,11 +140,11 @@ cdef class TileExtent(object):
 #import traceback
 counts = collections.defaultdict(int)
 
-cdef c_create(coordinate_t *ul, coordinate_t *lr, array_shape, unsigned ul_len):
+cdef c_create(coordinate_t *ul, coordinate_t *lr, array_shape, unsigned int ul_len):
   cdef TileExtent ex = TileExtent()
 
   # If we got an unrealistic (ul, lr), return None.
-  cdef unsigned none = 0 
+  cdef unsigned int none = 0
   with nogil:
     ex.c_ul_len = ex.c_lr_len = ul_len
     for idx in range(ex.c_ul_len):
@@ -186,7 +192,7 @@ cpdef create(ul, lr, array_shape):
 def from_shape(shp):
   cdef coordinate_t ul[MAX_DIM]
   cdef coordinate_t lr[MAX_DIM]
-  cdef unsigned ul_len, i
+  cdef unsigned int ul_len, i
 
   ul_len = len(shp)
   for i in range(ul_len):
@@ -289,7 +295,7 @@ def compute_slice(TileExtent base, idx):
     
   cdef coordinate_t ul[MAX_DIM]
   cdef coordinate_t lr[MAX_DIM]
-  cdef unsigned i
+  cdef unsigned int i
 
   array_shape = base.array_shape
   for i in range(base.c_ul_len):
@@ -322,7 +328,7 @@ def offset_from(TileExtent base, TileExtent other):
   '''
   cdef coordinate_t ul[MAX_DIM]
   cdef coordinate_t lr[MAX_DIM]
-  cdef unsigned i
+  cdef unsigned int i
 
   for i in range(base.c_ul_len):
     if (other.c_ul[i] < base.ul[i]) or (other.c_lr[i] > base.lr[i]):
@@ -400,7 +406,7 @@ def from_slice(idx, shape):
     
   cdef coordinate_t ul[MAX_DIM]
   cdef coordinate_t lr[MAX_DIM] 
-  cdef unsigned ul_len, i
+  cdef unsigned int ul_len, i
  
   ul_len = len(shape)
   for i in range(ul_len):
@@ -447,7 +453,7 @@ cpdef intersection(TileExtent a, TileExtent b):
   
   cdef coordinate_t ul[MAX_DIM]
   cdef coordinate_t lr[MAX_DIM]
-  cdef unsigned i
+  cdef unsigned int i
 
   for i in range(a.c_ul_len):
     if b.c_lr[i] < a.c_ul[i]: return None
@@ -498,7 +504,7 @@ def drop_axis(TileExtent ex, axis):
   
   cdef coordinate_t ul[MAX_DIM]
   cdef coordinate_t lr[MAX_DIM]
-  cdef unsigned i
+  cdef unsigned int i
 
   shape = list(ex.array_shape)
   del shape[axis]
