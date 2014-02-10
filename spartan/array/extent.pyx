@@ -9,7 +9,7 @@ cimport cython
 # Hopfully, 32-dimension is enough.
 # Parakeet can't convert numpy.int64
 #ctypedef unsigned long long[32] coordinate_t
-ctypedef unsigned coordinate_t
+ctypedef unsigned int coordinate_t
 cdef enum:
   MAX_DIM=32
 
