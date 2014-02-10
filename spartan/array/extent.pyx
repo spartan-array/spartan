@@ -42,10 +42,10 @@ cdef class TileExtent(object):
   def get_lr(self):
     return tuple([self.c_lr[i] for i in range(self.c_lr_len)])
 
-  def set_lr(self, tuple _lr):
-    self.c_lr_len = len(_lr)
+  def set_lr(self, tuple lr):
+    self.c_lr_len = len(lr)
     for i in range(self.c_lr_len):
-      self.c_lr[i] = _lr[i]
+      self.c_lr[i] = lr[i]
 
   ul = property(get_ul, set_ul)
   lr = property(get_lr, set_lr)
@@ -84,6 +84,7 @@ cdef class TileExtent(object):
   
   def __repr__(self):
     return 'extent(' + ','.join('%s:%s' % (a, b) for a, b in zip(self.ul, self.lr)) + ')'
+
   
   def __getitem__(self, idx):
     return create((self.ul[idx],),
@@ -92,6 +93,8 @@ cdef class TileExtent(object):
 
   def __hash__(self):
     return hash(self.ul)
+    #return hash(self.ul[-2:])
+    #return ravelled_pos(self.ul, self.array_shape)
     
   def __richcmp__(self, other, operation):
     if operation == 2: # eq
@@ -105,7 +108,7 @@ cdef class TileExtent(object):
 
   def ravelled_pos(self):
     return ravelled_pos(self.ul, self.array_shape)
-     
+  
   def to_global(self, idx, axis):
     '''Convert ``idx`` from a local offset in this tile to a global offset.'''
     if axis is not None:
