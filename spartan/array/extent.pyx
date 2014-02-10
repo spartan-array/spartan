@@ -9,7 +9,9 @@ cimport cython
 # Hopfully, 32-dimension is enough.
 # Parakeet can't convert numpy.int64
 #ctypedef unsigned long long[32] coordinate_t
-ctypedef unsigned[32] coordinate_t
+ctypedef unsigned coordinate_t
+cdef enum:
+  MAX_DIM=32
 
 cdef class TileExtent(object):
   '''A rectangular tile of a distributed array.
@@ -27,8 +29,8 @@ cdef class TileExtent(object):
   compute global position information.
   '''
   cdef public tuple array_shape
-  cdef coordinate_t c_ul
-  cdef coordinate_t c_lr
+  cdef coordinate_t c_ul[MAX_DIM]
+  cdef coordinate_t c_lr[MAX_DIM]
   cdef unsigned c_ul_len, c_lr_len
 
   def get_ul(self):
@@ -132,7 +134,7 @@ cdef class TileExtent(object):
 #import traceback
 counts = collections.defaultdict(int)
 
-cdef c_create(coordinate_t ul, coordinate_t lr, array_shape, unsigned ul_len):
+cdef c_create(coordinate_t *ul, coordinate_t *lr, array_shape, unsigned ul_len):
   cdef TileExtent ex = TileExtent()
 
   # If we got an unrealistic (ul, lr), return None.
@@ -182,8 +184,8 @@ cpdef create(ul, lr, array_shape):
 #def from_shape(shp):
   #return create(tuple([0] * len(shp)), tuple(v for v in shp), shp)
 def from_shape(shp):
-  cdef coordinate_t ul
-  cdef coordinate_t lr
+  cdef coordinate_t ul[MAX_DIM]
+  cdef coordinate_t lr[MAX_DIM]
   cdef unsigned ul_len, i
 
   ul_len = len(shp)
@@ -285,8 +287,8 @@ def compute_slice(TileExtent base, idx):
   if not isinstance(idx, tuple):
     idx = (idx,)
     
-  cdef coordinate_t ul
-  cdef coordinate_t lr
+  cdef coordinate_t ul[MAX_DIM]
+  cdef coordinate_t lr[MAX_DIM]
   cdef unsigned i
 
   array_shape = base.array_shape
@@ -318,8 +320,8 @@ def offset_from(TileExtent base, TileExtent other):
   :param other: `TileExtent` into the same array.
   :rtype: A new extent using this extent as a basis, instead of (0,0,0...) 
   '''
-  cdef coordinate_t ul
-  cdef coordinate_t lr
+  cdef coordinate_t ul[MAX_DIM]
+  cdef coordinate_t lr[MAX_DIM]
   cdef unsigned i
 
   for i in range(base.c_ul_len):
@@ -396,8 +398,8 @@ def from_slice(idx, shape):
     idx = tuple(list(idx) + [slice(None, None, None) 
                              for _ in range(len(shape) - len(idx))])
     
-  cdef coordinate_t ul
-  cdef coordinate_t lr 
+  cdef coordinate_t ul[MAX_DIM]
+  cdef coordinate_t lr[MAX_DIM] 
   cdef unsigned ul_len, i
  
   ul_len = len(shape)
@@ -443,8 +445,8 @@ cpdef intersection(TileExtent a, TileExtent b):
   if a is None:
     return None
   
-  cdef coordinate_t ul
-  cdef coordinate_t lr
+  cdef coordinate_t ul[MAX_DIM]
+  cdef coordinate_t lr[MAX_DIM]
   cdef unsigned i
 
   for i in range(a.c_ul_len):
@@ -494,8 +496,8 @@ def drop_axis(TileExtent ex, axis):
   if axis is None: return create((), (), ())
   if axis < 0: axis = ex.c_ul_len + axis
   
-  cdef coordinate_t ul
-  cdef coordinate_t lr
+  cdef coordinate_t ul[MAX_DIM]
+  cdef coordinate_t lr[MAX_DIM]
   cdef unsigned i
 
   shape = list(ex.array_shape)
