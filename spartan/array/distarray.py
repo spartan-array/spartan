@@ -139,10 +139,9 @@ class DistArray(object):
         extents[ex] = id
     return from_table(extents)
   
-  def _get_ndim(self):
+  @property
+  def ndim(self):
     return len(self.shape)
-
-  ndim = property(_get_ndim)
 
 ID_COUNTER = iter(xrange(10000000))
 

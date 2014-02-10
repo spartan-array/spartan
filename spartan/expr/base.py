@@ -126,6 +126,10 @@ class Expr(object):
 
   # should evaluation of this object be cached
   needs_cache = True
+  
+  @property
+  def ndim(self):
+    return len(self.shape)
 
   def load_data(self, cached_result):
     #util.log_info('expr:%s load_data from not checkpoint node', self.expr_id)
