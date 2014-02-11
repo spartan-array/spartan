@@ -24,7 +24,7 @@ class BlobCtx(object):
   def is_master(self):
     return self.worker_id == MASTER_ID
 
-  def _send(self, id, method, req, wait=True):
+  def _send(self, id, method, req, wait=True, timeout=None):
     if self.active == False:
       util.log_debug('Ctx disabled.')
       return None
@@ -37,14 +37,14 @@ class BlobCtx(object):
       pending_req = rpc.Future(None, -1)
       getattr(self.local_worker, method)(req, pending_req)
     else:
-      pending_req = getattr(self.workers[worker_id], method)(req)
+      pending_req = getattr(self.workers[worker_id], method)(req, timeout)
 
     if wait:
       return pending_req.wait()
 
     return pending_req
 
-  def _send_to_worker(self, worker_id, method, req, wait=True):
+  def _send_to_worker(self, worker_id, method, req, wait=True, timeout=None):
     if self.active == False:
       util.log_debug('Ctx disabled.')
       return None
@@ -54,14 +54,14 @@ class BlobCtx(object):
       pending_req = rpc.Future(None, -1)
       getattr(self.local_worker, method)(req, pending_req)
     else:
-      pending_req = getattr(self.workers[worker_id], method)(req)
+      pending_req = getattr(self.workers[worker_id], method)(req, timeout)
 
     if wait:
       return pending_req.wait()
 
     return pending_req
   
-  def _send_all(self,  method, req, targets=None, wait=True):
+  def _send_all(self,  method, req, targets=None, wait=True, timeout=None):
     if self.active == False:
       util.log_debug('Ctx disabled.')
       return None
@@ -70,7 +70,7 @@ class BlobCtx(object):
       available_workers = self._send_to_worker(MASTER_ID, 'get_available_workers', core.NoneParamReq()).result
       targets = [self.workers[worker_id] for worker_id in available_workers]
       
-    futures = rpc.forall(targets, method, req)
+    futures = rpc.forall(targets, method, req, timeout)
     if wait:
       return futures.wait()
     return futures
@@ -90,7 +90,7 @@ class BlobCtx(object):
   def destroy(self, blob_id):
     return self.destroy_all([blob_id])
 
-  def get(self, blob_id, subslice, callback=None, wait=True):
+  def get(self, blob_id, subslice, callback=None, wait=True, timeout=None):
     Assert.isinstance(blob_id, core.BlobId)
     req = core.GetReq(id=blob_id, subslice=subslice)
 #     if self._lookup(blob_id) == self.worker_id:
@@ -99,7 +99,7 @@ class BlobCtx(object):
 #       util.log_warn('real get!')
     if callback is None:
       if wait:
-        return self._send(blob_id, 'get', req).data
+        return self._send(blob_id, 'get', req, wait=True, timeout=timeout).data
       else:
         return self._send(blob_id, 'get', req, wait=False)
     else:
@@ -111,7 +111,7 @@ class BlobCtx(object):
 #     req = core.UpdateReq(id=blob_id, data=data, reducer=reducer)
 #     return self._send(blob_id, 'update', req, wait=wait)
 
-  def update(self, blob_id, region, data, reducer, wait=True):
+  def update(self, blob_id, region, data, reducer, wait=True, timeout=None):
 
     req = core.UpdateReq(id=blob_id, region=region, data=data, reducer=reducer)
     
@@ -123,7 +123,7 @@ class BlobCtx(object):
 #     else:
 #       util.log_warn('update to remote!')
       
-    return self._send(blob_id, 'update', req, wait=wait)
+    return self._send(blob_id, 'update', req, wait=wait, timeout=timeout)
   
   def create_local(self):
     assert not self.is_master()
@@ -140,11 +140,11 @@ class BlobCtx(object):
   def get_worker_scores(self):
     return self._send_to_worker(MASTER_ID, 'get_worker_scores', core.NoneParamReq()).result
   
-  def heartbeat(self, worker_id, worker_status):
+  def heartbeat(self, worker_id, worker_status, timeout=None):
     req = core.HeartbeatReq(worker_id=worker_id, worker_status=worker_status)
-    return self._send_to_worker(MASTER_ID, 'heartbeat', req, wait=False)
+    return self._send_to_worker(MASTER_ID, 'heartbeat', req, wait=False, timeout=timeout)
   
-  def create(self, data, hint=None):
+  def create(self, data, hint=None, timeout=None):
     assert self.worker_id >= 0, self.worker_id
 
     # workers create blobs locally; master dispatches to a 
@@ -168,27 +168,27 @@ class BlobCtx(object):
     #util.log_info('%s %s %s %s', new_id, worker_id, data.shape, ''.join(traceback.format_stack()))
 
     req = core.CreateReq(blob_id=blob_id, data=data)
-    return self._send(blob_id, 'create', req, wait=False)
+    return self._send(blob_id, 'create', req, wait=False, timeout=timeout)
 
-  def partial_map(self, targets, blob_ids, mapper_fn, reduce_fn, kw):
+  def partial_map(self, targets, blob_ids, mapper_fn, reduce_fn, kw, timeout=None):
     req = core.KernelReq(blobs=blob_ids,
                          mapper_fn=mapper_fn,
                          reduce_fn=reduce_fn,
                          kw=kw)
-
-    futures = self._send_all('run_kernel', req, targets=targets)
+    futures = self._send_all('run_kernel', req, targets=targets, timeout=timeout)
     result = {}
     for f in futures:
       for blob_id, v in f.iteritems():
         result[blob_id] = v
     return result
 
-  def map(self, blob_ids, mapper_fn, reduce_fn, kw):
+  def map(self, blob_ids, mapper_fn, reduce_fn, kw, timeout=None):
     return self.partial_map(None,
                             blob_ids,
                             mapper_fn,
                             reduce_fn,
-                            kw)
+                            kw,
+                            timeout)
 
   def tile_op(self, blob_id, fn):
     req = core.TileOpReq(blob_id=blob_id,
