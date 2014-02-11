@@ -31,7 +31,7 @@ class TestFinance(test_common.ClusterTest):
     arr = expr.randn(100)
     movers = finance.find_change(arr)
     #util.log_info(optimize(movers))
-    util.log_info(movers.glom().compressed())
+    util.log_info(movers.glom())
    
   def test_print_graph(self):
     put, call = finance.black_scholes(self.current, self.strike, maturity, rate, volatility)
@@ -41,7 +41,7 @@ class TestFinance(test_common.ClusterTest):
     bid = expr.randn(100)
     ask = expr.randn(100)
     res = finance.predict_price(bid, ask, 5).optimized()
-    print res
+    #print res
     print res.glom()
 
 if __name__ == '__main__':
