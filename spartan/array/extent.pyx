@@ -35,25 +35,25 @@ cdef class TileExtent(object):
   compute global position information.
   '''
   cdef public tuple array_shape
-  cdef coordinate_t c_ul[MAX_DIM]
-  cdef coordinate_t c_lr[MAX_DIM]
-  cdef unsigned int c_ul_len, c_lr_len
+  cdef coordinate_t _ul[MAX_DIM]
+  cdef coordinate_t _lr[MAX_DIM]
+  cdef unsigned int _ul_len
 
   def get_ul(self):
-    return tuple([self.c_ul[i] for i in range(self.c_ul_len)])
+    return tuple([self._ul[i] for i in range(self._ul_len)])
 
   def set_ul(self, tuple ul):
-    self.c_ul_len = len(ul)
-    for i in range(self.c_ul_len):
-      self.c_ul[i] = ul[i]
+    self._ul_len = len(ul)
+    for i in range(self._ul_len):
+      self._ul[i] = ul[i]
 
   def get_lr(self):
-    return tuple([self.c_lr[i] for i in range(self.c_lr_len)])
+    return tuple([self._lr[i] for i in range(self._ul_len)])
 
   def set_lr(self, tuple lr):
-    self.c_lr_len = len(lr)
-    for i in range(self.c_lr_len):
-      self.c_lr[i] = lr[i]
+    self._ul_len = len(lr)
+    for i in range(self._ul_len):
+      self._lr[i] = lr[i]
 
   ul = property(get_ul, set_ul)
   lr = property(get_lr, set_lr)
@@ -62,31 +62,24 @@ cdef class TileExtent(object):
   def size(self):
     return np.prod(self.shape)
   
-  #@property
-  #def shape(self):
-    #result = np.asarray(self.lr) - np.asarray(self.ul)
-    #result[result == 0] = 1
-    ##util.log_info('Shape: %s', result)
-    #return tuple(result)
-
   @property
   def shape(self):
     result = []
-    for i in range(self.c_ul_len):
-      result.append(self.c_lr[i] - self.c_ul[i])
+    for i in range(self._ul_len):
+      result.append(self._lr[i] - self._ul[i])
       result[i] = 1 if result[i] == 0 else result[i]
     return tuple(result)
   
   @property
   def ndim(self):
-    return self.c_ul_len
+    return self._ul_len
 
   def __reduce__(self):
     return create, (self.ul, self.lr, self.array_shape)
   
   def to_slice(self):
     result = []
-    for i in range(self.c_ul_len):
+    for i in range(self._ul_len):
       result.append(slice(self.ul[i], self.lr[i], None))
     return tuple(result)
   
@@ -113,6 +106,8 @@ cdef class TileExtent(object):
       return not isinstance(other, TileExtent) or \
              self.ul != other.ul or \
              self.lr != other.lr
+    else:
+      assert False, 'Unsupported comparison operation %d' % operation
 
   def ravelled_pos(self):
     return ravelled_pos(self.ul, self.array_shape)
@@ -127,40 +122,35 @@ cdef class TileExtent(object):
 
   def add_dim(self):
     #util.log_info('ul:%s lr:%s array_shape:%s', self.ul + (0,), self.lr + (1,), self.array_shape + (1,))
-    self.c_ul[self.c_ul_len] = 0
-    self.c_lr[self.c_lr_len] = 1
-    return c_create(self.c_ul, 
-                    self.c_lr, 
-                    self.array_shape + (1,), 
-                    self.c_ul_len + 1)
+    return create(self.ul + (0,),
+                  self.lr + (1,),
+                  self.array_shape + (1,))
 
   def clone(self):
-    return c_create(self.c_ul, self.c_lr, self.array_shape, self.c_ul_len)
+    return c_create(self._ul, self._lr, self.array_shape, self._ul_len)
  
 #import traceback
 counts = collections.defaultdict(int)
 
-cdef c_create(coordinate_t *ul, coordinate_t *lr, array_shape, unsigned int ul_len):
-  cdef TileExtent ex = TileExtent()
-
-  # If we got an unrealistic (ul, lr), return None.
-  cdef unsigned int none = 0
-  with nogil:
-    ex.c_ul_len = ex.c_lr_len = ul_len
-    for idx in range(ex.c_ul_len):
-      if ul[idx] >= lr[idx]:
-        none = 1 
-      ex.c_ul[idx] = ul[idx]
-      ex.c_lr[idx] = lr[idx]
-  if none == 1:
-    return  None
+cdef _valid(TileExtent ex, coordinate_t *ul, coordinate_t *lr, array_shape):
+  for idx in range(ex._ul_len):
+    # If we got an unrealistic (ul, lr), return None.
+    if ul[idx] >= lr[idx]:
+      return None
+    ex._ul[idx] = ul[idx]
+    ex._lr[idx] = lr[idx]
 
   if array_shape is not None:
     ex.array_shape = tuple(array_shape)
   else:
     ex.array_shape = None
-  
   return ex
+
+cdef c_create(coordinate_t *ul, coordinate_t *lr, array_shape, unsigned int ul_len):
+  cdef TileExtent ex = TileExtent()
+  ex._ul_len = ul_len
+
+  return _valid(ex, ul, lr, array_shape)
   
 cpdef create(ul, lr, array_shape):
   '''
@@ -171,24 +161,16 @@ cpdef create(ul, lr, array_shape):
   :param array_shape:
   '''
   cdef TileExtent ex = TileExtent()
+  ex._ul_len = len(ul)
 
-  # If we got an unrealistic (ul, lr), return None.
-  ex.c_ul_len = ex.c_lr_len = len(ul)
-  for idx in range(ex.c_ul_len):
-    if ul[idx] >= lr[idx]:
-      return None
-    ex.c_ul[idx] = ul[idx]
-    ex.c_lr[idx] = lr[idx]
+  # In order to reuse code, we copy twice.
+  # If it is too slow, duplicate _valid code to here.
+  for idx in range(ex._ul_len):
+    ex._ul[idx] = ul[idx]
+    ex._lr[idx] = lr[idx]
 
-  if array_shape is not None:
-    ex.array_shape = tuple(array_shape)
-  else:
-    ex.array_shape = None
-  
-  return ex
+  return _valid(ex, ex._ul, ex._lr, array_shape)
 
-#def from_shape(shp):
-  #return create(tuple([0] * len(shp)), tuple(v for v in shp), shp)
 def from_shape(shp):
   cdef coordinate_t ul[MAX_DIM]
   cdef coordinate_t lr[MAX_DIM]
@@ -259,30 +241,6 @@ def find_overlapping(extents, region):
     if overlap is not None:
       yield (ex, overlap)
       
-#def compute_slice(base, idx):
-  #'''Return a new ``TileExtent`` representing ``base[idx]``
-  
-  #:param base: `TileExtent`
-  #:param idx: int, slice, or tuple(slice,...)
-  #'''
-  #assert not np.isscalar(idx), idx
-  #if not isinstance(idx, tuple):
-    #idx = (idx,)
-    
-  #ul = []
-  #lr = []
-  #array_shape = base.array_shape
-  
-  #for i in range(len(base.ul)):
-    #if i >= len(idx):
-      #ul.append(base.ul[i])
-      #lr.append(base.lr[i])
-    #else:
-      #start, stop, step = idx[i].indices(base.shape[i])
-      #ul.append(base.ul[i] + start)
-      #lr.append(base.ul[i] + stop)
-  
-  #return create(ul, lr, array_shape)
 def compute_slice(TileExtent base, idx):
   '''Return a new ``TileExtent`` representing ``base[idx]``
   
@@ -298,7 +256,7 @@ def compute_slice(TileExtent base, idx):
   cdef unsigned int i
 
   array_shape = base.array_shape
-  for i in range(base.c_ul_len):
+  for i in range(base._ul_len):
     if i >= len(idx):
       ul[i] = base.ul[i]
       lr[i] = base.lr[i]
@@ -307,19 +265,8 @@ def compute_slice(TileExtent base, idx):
       ul[i] = base.ul[i] + start
       lr[i] = base.ul[i] + stop
   
-  return c_create(ul, lr, array_shape, base.c_ul_len)
+  return c_create(ul, lr, array_shape, base._ul_len)
 
-#def offset_from(base, other):
-  #'''
-  #:param base: `TileExtent` to use as basis
-  #:param other: `TileExtent` into the same array.
-  #:rtype: A new extent using this extent as a basis, instead of (0,0,0...) 
-  #'''
-  #assert np.all(other.ul >= base.ul), (other, base)
-  #assert np.all(other.lr <= base.lr), (other, base)
-  #return create(tuple(np.array(other.ul) - np.array(base.ul)),
-                #tuple(np.array(other.lr) - np.array(base.ul)),
-                #other.array_shape)
 def offset_from(TileExtent base, TileExtent other):
   '''
   :param base: `TileExtent` to use as basis
@@ -330,65 +277,24 @@ def offset_from(TileExtent base, TileExtent other):
   cdef coordinate_t lr[MAX_DIM]
   cdef unsigned int i
 
-  for i in range(base.c_ul_len):
-    if (other.c_ul[i] < base.ul[i]) or (other.c_lr[i] > base.lr[i]):
+  for i in range(base._ul_len):
+    if (other._ul[i] < base.ul[i]) or (other._lr[i] > base.lr[i]):
       assert False
-    ul[i] = other.c_ul[i] - base.c_ul[i]
-    lr[i] = other.c_lr[i] - base.c_ul[i]
+    ul[i] = other._ul[i] - base._ul[i]
+    lr[i] = other._lr[i] - base._ul[i]
 
-  return c_create(ul, lr, other.array_shape, base.c_ul_len)
+  return c_create(ul, lr, other.array_shape, base._ul_len)
 
-#@cython.boundscheck(False) # turn of bounds-checking for entire function
-#cpdef _offset_slice(tuple base_ul,
-                 #tuple base_lr,
-                 #tuple other_ul,
-                 #tuple other_lr):
-  #return tuple([slice(ul-base, lr-base, None) for ul, lr, base in zip(other_ul, other_lr, base_ul)])
 cpdef offset_slice(TileExtent base, TileExtent other):
   '''
   :param base: `TileExtent` to use as basis
   :param other: `TileExtent` into the same array.
   :rtype: A slice representing the local offsets of ``other`` into this tile.
   '''
-  return tuple([slice(other.c_ul[i] - base.c_ul[i], 
-                       other.c_lr[i] - base.c_ul[i], 
-                       None) for i in range(base.c_ul_len)])
-  #return _offset_slice(base.ul, base.lr, other.ul, other.lr)
+  return tuple([slice(other._ul[i] - base._ul[i],
+                       other._lr[i] - base._ul[i],
+                       None) for i in range(base._ul_len)])
 
-#def from_slice(idx, shape):
-  #'''
-  #Construct a `TileExtent` from a slice or tuple of slices.
-  
-  #:param idx: int, slice, or tuple(slice...)
-  #:param shape: shape of the input array
-  #:rtype: `TileExtent` corresponding to ``idx``.
-  #'''
-  #if not isinstance(idx, tuple):
-    #idx = (idx,)
-  
-  #if len(idx) < len(shape):
-    #idx = tuple(list(idx) + [slice(None, None, None) 
-                             #for _ in range(len(shape) - len(idx))])
-    
-  #ul = []
-  #lr = []
- 
-  #for i in range(len(shape)):
-    #dim = shape[i]
-    #slc = idx[i]
-    
-    #if np.isscalar(slc):
-      #slc = int(slc)
-      #slc = slice(slc, slc + 1, None)
-    
-    #if slc.start > 0: assert slc.start <= dim
-    #if slc.stop > 0: assert slc.stop <= dim
-    
-    #indices = slc.indices(dim)
-    #ul.append(indices[0])
-    #lr.append(indices[1])
-    
-  #return create(tuple(ul), tuple(lr), shape)
 def from_slice(idx, shape):
   '''
   Construct a `TileExtent` from a slice or tuple of slices.
@@ -426,23 +332,6 @@ def from_slice(idx, shape):
     
   return c_create(ul, lr, shape, ul_len)
 
-#def intersection(a, b):
-  #'''
-  #:rtype: The intersection of the 2 extents as a `TileExtent`, 
-          #or None if the intersection is empty.  
-  #'''
-  #if a is None:
-    #return None
-  
-  #for i in range(len(a.lr)):
-    #if b.lr[i] < a.ul[i]: return None
-    #if a.lr[i] < b.ul[i]: return None
-    
-  #Assert.eq(a.array_shape, b.array_shape)
-  
-  #return create(np.maximum(b.ul, a.ul),
-                #np.minimum(b.lr, a.lr),
-                #a.array_shape)
 cpdef intersection(TileExtent a, TileExtent b):
   '''
   :rtype: The intersection of the 2 extents as a `TileExtent`, 
@@ -455,15 +344,15 @@ cpdef intersection(TileExtent a, TileExtent b):
   cdef coordinate_t lr[MAX_DIM]
   cdef unsigned int i
 
-  for i in range(a.c_ul_len):
-    if b.c_lr[i] < a.c_ul[i]: return None
-    if a.c_lr[i] < b.c_ul[i]: return None
-    ul[i] = a.c_ul[i] if a.c_ul[i] >= b.c_ul[i] else b.c_ul[i]
-    lr[i] = a.c_lr[i] if a.c_lr[i] <  b.c_lr[i] else b.c_lr[i]
+  for i in range(a._ul_len):
+    if b._lr[i] < a._ul[i]: return None
+    if a._lr[i] < b._ul[i]: return None
+    ul[i] = a._ul[i] if a._ul[i] >= b._ul[i] else b._ul[i]
+    lr[i] = a._lr[i] if a._lr[i] <  b._lr[i] else b._lr[i]
     
   Assert.eq(a.array_shape, b.array_shape)
   
-  return c_create(ul, lr, a.array_shape, a.c_ul_len)
+  return c_create(ul, lr, a.array_shape, a._ul_len)
 
 
 def shape_for_reduction(input_shape, axis):
@@ -487,20 +376,9 @@ def shapes_match(offset, data):
   '''
   return np.all(offset.shape == data.shape)
 
-#def drop_axis(ex, axis):
-  #if axis is None: return create((), (), ())
-  #if axis < 0: axis = len(ex.ul) + axis
-  
-  #ul = list(ex.ul)
-  #lr = list(ex.lr)
-  #shape = list(ex.array_shape)
-  #del ul[axis]
-  #del lr[axis]
-  #del shape[axis]
-  #return create(ul, lr, shape)
 def drop_axis(TileExtent ex, axis):
   if axis is None: return create((), (), ())
-  if axis < 0: axis = ex.c_ul_len + axis
+  if axis < 0: axis = ex._ul_len + axis
   
   cdef coordinate_t ul[MAX_DIM]
   cdef coordinate_t lr[MAX_DIM]
@@ -509,14 +387,14 @@ def drop_axis(TileExtent ex, axis):
   shape = list(ex.array_shape)
   del shape[axis]
   for i in range(axis):
-    ul[i] = ex.c_ul[i]
-    lr[i] = ex.c_lr[i]
+    ul[i] = ex._ul[i]
+    lr[i] = ex._lr[i]
 
-  for i in range(axis + 1, ex.c_ul_len):
-    ul[i - 1] = ex.c_ul[i]
-    lr[i - 1] = ex.c_lr[i]
+  for i in range(axis + 1, ex._ul_len):
+    ul[i - 1] = ex._ul[i]
+    lr[i - 1] = ex._lr[i]
 
-  return c_create(ul, lr, shape, ex.c_ul_len - 1)
+  return c_create(ul, lr, shape, ex._ul_len - 1)
  
 def index_for_reduction(index, axis):
   return drop_axis(index, axis)
