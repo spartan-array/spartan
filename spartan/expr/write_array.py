@@ -3,6 +3,7 @@ Distarray write operations and expr.
 '''
 
 import numpy as np
+import scipy.sparse as sp
 from spartan import rpc
 from .base import Expr
 from .ndarray import ndarray
@@ -40,7 +41,7 @@ class WriteArrayExpr(Expr):
     dst_slices = deps['dst_slices']
 
     sregion = extent.from_slice(src_slices, array.shape)
-    if isinstance(data, np.ndarray):
+    if isinstance(data, np.ndarray) or sp.issparse(data):
       if sregion.shape == data.shape:
          array.update(sregion, data)
       else:
@@ -78,6 +79,7 @@ def make_from_numpy(source):
   :param source: `numpy.ndarray` or npy/npz file name 
   :rtype: `Expr`
   '''
+  sparse = False
   if isinstance(source, str):
     npa = np.load(source)
     if source.endswith("npz"):
@@ -88,10 +90,13 @@ def make_from_numpy(source):
       npa = source
   elif isinstance(source, np.ndarray):
     npa = source
+  elif sp.issparse(source):
+    npa = source
+    sparse = True
   else:
     raise TypeError("Expected ndarray or DistArray, got: %s" % type(data))
   
-  array = ndarray(shape = npa.shape, dtype = npa.dtype)
+  array = ndarray(shape = npa.shape, dtype = npa.dtype, sparse = sparse)
   slices = tuple([slice(0, i) for i in npa.shape])
 
   return write(array, slices, npa, slices)
