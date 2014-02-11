@@ -11,7 +11,9 @@ def center_data(X, y, fit_intercept, normalize=False):
   """
   if fit_intercept:
     X_mean = X.mean(axis = 0)
+    X_mean = expr.reshape(X_mean, (1, X_mean.shape[0]))
     X -= X_mean
+    
     if normalize:
       X_std = expr.sqrt(expr.sum(X ** 2, axis=0)).force()
       X_std[X_std == 0] = 1
@@ -19,9 +21,8 @@ def center_data(X, y, fit_intercept, normalize=False):
     else:
       X_std = expr.ones(X.shape[1])
     
-    #problem with broadcast object
     y_mean = y.mean(axis=0)
-    #y -= y_mean
+    y -= y_mean
   else:
     X_mean = expr.zeros(X.shape[1])
     X_std = expr.ones(X.shape[1])
@@ -93,6 +94,7 @@ class LinearRegression(LinearModel):
 
     for i in range(self.iterations):
       yp = expr.dot(X, self._coef)
+      print expr.sum((yp - y) ** 2).glom()
       diff = X * (yp - y)
       grad = expr.sum(diff, axis=0).glom().reshape((N_DIM, 1))
       self._coef = self._coef - grad * 1e-6  
