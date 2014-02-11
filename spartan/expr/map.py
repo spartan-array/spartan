@@ -72,6 +72,9 @@ class MapExpr(Expr):
     largest = distarray.largest_value(vals)
 
     children = dict(zip(keys, vals))
+    for k, child in children.iteritems():
+      util.log_debug('Map children: %s', child)
+
     #util.log_info('Mapping %s over %d inputs; largest = %s', op, len(children), largest.shape)
 
     return largest.map_to_array(
