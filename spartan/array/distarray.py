@@ -699,8 +699,8 @@ def broadcast(args):
 
 def _size(v):
   if isinstance(v, Broadcast):
-    return np.prod(v.base.shape)
-  return np.prod(v.shape)
+    return (0, np.prod(v.base.shape)) 
+  return (1, np.prod(v.shape))
 
 def largest_value(vals):
   '''
