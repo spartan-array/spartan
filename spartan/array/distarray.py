@@ -232,7 +232,7 @@ class DistArrayImpl(DistArray):
     Assert.isinstance(region, extent.TileExtent)
     Assert.eq(region.array_shape, self.shape)
     Assert.eq(len(region.ul), len(self.shape))
-    assert np.all(region.lr <= self.shape), (region, self.shape)
+    assert np.all(region.lr <= self.shape), 'Requested region is out of bounds: %s > %s' % (region, self.shape)
     #util.log_info('FETCH: %s %s', self.shape, region)
 
     ctx = blob_ctx.get()
@@ -596,7 +596,6 @@ class Slice(DistArray):
     return self.darray.fetch(offset)
 
 
-
 def broadcast_mapper(ex, tile, mapper_fn=None, bcast_obj=None):
   raise NotImplementedError
 
@@ -614,17 +613,20 @@ class Broadcast(DistArray):
     self.shape = shape
     self.dtype = base.dtype
     self.bad_tiles = []
+
     
   def __repr__(self):
     return 'Broadcast(%s -> %s)' % (self.base, self.shape)
-  
+ 
   def fetch(self, ex):
     # make a template to pass to numpy broadcasting
     template = np.ndarray(ex.shape, dtype=self.base.dtype)
-    
-    # drop extra dimensions
+   
+    # convert the extent to the base form
+
+    # first drop extra dimensions
     while len(ex.shape) > len(self.base.shape):
-      ex = extent.drop_axis(ex, -1)
+      ex = extent.drop_axis(ex, 0)
       
     # fold down expanded dimensions
     ul = []
@@ -637,9 +639,8 @@ class Broadcast(DistArray):
       else:
         ul.append(ex.ul[i])
         lr.append(ex.lr[i])
-    
+  
     ex = extent.create(ul, lr, self.base.shape) 
-
     fetched = self.base.fetch(ex)
     
     _, bcast = np.broadcast_arrays(template, fetched)
