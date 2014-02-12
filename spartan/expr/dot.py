@@ -32,21 +32,21 @@ def _dot_mapper(inputs, ex, av, bv):
   #util.log_info('%s %s %s', type(a), a.shape, a.dtype)
   #util.log_info('%s %s %s', type(b), b.shape, b.dtype)
   #util.log_info('%s %s', bv.shape, len(bv.tiles))
-  
+
   #util.log_info('%s %s', type(a), type(b))
-  
+
   #if not sp.issparse(a):
   #  a = sp.csr_matrix(a)
   #if not sp.issparse(b):
   #  b = sp.csr_matrix(b)
-  
+
   #result = a.dot(b)
-  
+
   if isinstance(a, sp.coo_matrix) and b.shape[1] == 1:
     result = sparse.dot_coo_dense_unordered_map(a, b)
   else:
     result = a.dot(b)
-  
+
   ul = np.asarray([ex_a.ul[0], 0])
   lr = ul + result.shape
   target_shape = (av.shape[0], bv.shape[1])
@@ -93,19 +93,19 @@ class DotExpr(Expr):
                                 sparse=sparse)
       fn_kw = dict(av = av, bv = bv)
       av.foreach_tile(mapper_fn = target_mapper,
-                      kw = dict(map_fn=_dot_mapper, 
-                                inputs=av, 
-                                target=target, 
+                      kw = dict(map_fn=_dot_mapper,
+                                inputs=av,
+                                target=target,
                                 fn_kw=fn_kw))
       return target
 
 def dot(a, b):
   '''
   Compute the dot product (matrix multiplication) of 2 arrays.
-  
-  :param a: `Expr` or `numpy.ndarray` 
+
+  :param a: `Expr` or `numpy.ndarray`
   :param b: `Expr` or `numpy.ndarray`
   :rtype: `Expr`
   '''
-  return DotExpr(matrix_a = a, matrix_b = b) 
+  return DotExpr(matrix_a = a, matrix_b = b)
 
