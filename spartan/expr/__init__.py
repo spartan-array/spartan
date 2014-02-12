@@ -32,7 +32,6 @@ from .checkpoint import checkpoint
 from .fio import *
 from .reshape import reshape
 from .transpose import transpose
-from .dot import dot
 
 
 Expr.outer = outer
