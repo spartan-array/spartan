@@ -11,6 +11,7 @@ from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from ..array import extent, tile, distarray
 from .map import MapResult
+from .shuffle import target_mapper
 
 def _transpose_mapper(array, ex, _dest_shape):
   tile = array.fetch(ex)
@@ -19,16 +20,6 @@ def _transpose_mapper(array, ex, _dest_shape):
     yield target_ex, np.transpose(tile)
   else:
     yield target_ex, tile.transpose()
-
-def _target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
-  result = list(map_fn(inputs, ex, **fn_kw))
-
-  futures = rpc.FutureGroup()
-  if result is not None:
-    for ex, v in result:
-      futures.append(target.update(ex, v, wait=False))
-
-  return MapResult(None, futures)
 
 @node_type
 class TransposeExpr(Expr):
@@ -43,7 +34,7 @@ class TransposeExpr(Expr):
     fn_kw = {'_dest_shape' : shape}
 
     target = distarray.create(shape, dtype = v.dtype, sparse = v.sparse)
-    v.foreach_tile(mapper_fn = _target_mapper,
+    v.foreach_tile(mapper_fn = target_mapper,
                    kw = {'map_fn':_transpose_mapper, 'inputs':v,
                          'target':target, 'fn_kw':fn_kw})
     return target
