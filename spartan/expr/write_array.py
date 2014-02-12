@@ -79,7 +79,6 @@ def make_from_numpy(source):
   :param source: `numpy.ndarray` or npy/npz file name 
   :rtype: `Expr`
   '''
-  sparse = False
   if isinstance(source, str):
     npa = np.load(source)
     if source.endswith("npz"):
@@ -92,11 +91,10 @@ def make_from_numpy(source):
     npa = source
   elif sp.issparse(source):
     npa = source
-    sparse = True
   else:
     raise TypeError("Expected ndarray or DistArray, got: %s" % type(data))
   
-  array = ndarray(shape = npa.shape, dtype = npa.dtype, sparse = sparse)
+  array = ndarray(shape = npa.shape, dtype = npa.dtype, sparse = sp.issparse(npa))
   slices = tuple([slice(0, i) for i in npa.shape])
 
   return write(array, slices, npa, slices)
