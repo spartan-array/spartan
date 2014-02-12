@@ -237,8 +237,12 @@ class Assert(object):
 
 
   @staticmethod
-  def eq(a, b, msg=''):
-    assert (a == b), 'Failed: %s == %s (%s)' % (a, b, msg)
+  def eq(a, b, fmt='', *args):
+    if a == b:
+      return
+    else:
+      msg = fmt % args
+      assert False, 'Failed: %s == %s (%s)' % (a, b, msg)
 
   @staticmethod
   def ne(a, b):

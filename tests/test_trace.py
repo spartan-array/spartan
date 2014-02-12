@@ -2,11 +2,15 @@ from spartan import expr
 from spartan.util import Assert
 from spartan import util
 from spartan.array import extent
+from spartan.config import FLAGS
+
 import numpy as np
-from scipy import sparse as sp
 import test_common
 import sys
 import os
+
+from scipy import sparse as sp
+
 
 class RedirectStdStreams(object):
   def __init__(self, stdout=None, stderr=None):
@@ -30,9 +34,17 @@ class RedirectStdStreams(object):
 # Since nobody will check the output of OK unittest,
 # capture it to make output cleaerer.
 class TestTrace(test_common.ClusterTest):
+  def setUp(self):
+    FLAGS.capture_expr_stack = 1
+    FLAGS.opt_keep_stack = 1
+
+  def tearDown(self):
+    FLAGS.capture_expr_stack = 0
+    FLAGS.opt_keep_stack = 0
+
   def test_trace(self):
-    devnull = open(os.devnull, 'w')
-    with RedirectStdStreams(stdout = devnull, stderr = devnull):
+    #devnull = open(os.devnull, 'w')
+    #with RedirectStdStreams(stdout = devnull, stderr = devnull):
       t1 = expr.randn(100, 100)
       t2 = expr.randn(200, 100)
       t3 = expr.add(t1, t2)
@@ -70,3 +82,8 @@ class TestTrace(test_common.ClusterTest):
         t9.force()
       except Exception as e:
         pass
+
+
+if __name__ == '__main__':
+  import unittest
+  unittest.main()

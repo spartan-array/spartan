@@ -7,6 +7,7 @@ into a series of primitive array operations.
 import collections
 import weakref
 
+import sys
 import traceback
 import numpy as np
 
@@ -40,9 +41,10 @@ def expr_like(expr, **kw):
   The new expression has the same id, but is initialized using ``kw``
   '''
   kw['expr_id'] = expr.expr_id
+  
   trace = kw.pop('trace', None)
-  if trace != None and FLAGS.optimized_stack:
-    trace.fuse_trace(expr.stack_trace)
+  if trace != None and FLAGS.opt_keep_stack:
+    trace.fuse(expr.stack_trace)
     kw['stack_trace'] = trace
   else:
     kw['stack_trace'] = expr.stack_trace
@@ -89,37 +91,43 @@ class EvalCache(object):
         del self.cache[expr_id]
       del self.refs[expr_id]
 
-eval_cache = EvalCache()
-
 class ExprTrace(object):
-  def __init__(self, stack = None, level = None):
-    self.stack = []
-    self.level = 0
-    if level != None:
-      self.level = level
-
-    if stack != None:
-      self.stack = stack
+  '''Stores where an expression was originally created, which
+  allows us to give better error reports'''
+  def __init__(self):
+    if FLAGS.capture_expr_stack:
+      self.stack_list = [traceback.extract_stack(sys._getframe(3))]
     else:
-      trace = traceback.format_stack()[:-1]
-      # Little hack to remove unittest traceback
-      #for i, s in enumerate(trace):
-      #  if s.find('unittest/case.py') != -1:
-      #    idx = i
-      #self.stack = ['-' * 80 + '\n']
-      self.stack += ['Expr Creation Traceback (most recent call last):\n']
-      self.stack += trace
+      self.stack_list = []
 
-  def append(self, trace):
-    self.stack += trace.stack
-    if self.level < trace.level:
-      self.level = trace.level
+  def format_stack(self):
+    trace = []
+    for i, st in enumerate(self.stack_list):
+      trace.append('Stack %d of %d' % (i, len(self.stack_list)))
+      trace.append('-' * 80 + '\n')
+      for (filename, lineno, fname, txt) in st:
+        trace.append('%d >>> %s:%s [%s]: %s\n' % (i, filename, lineno, fname, txt[:60]))
+      #trace.extend(st)
+    return trace
 
-  def fuse_trace(self, trace):
-    self.level += 1
-    deli1 = ['>>>>>>' * self.level + ' Level %d fuse \n' % self.level]
-    deli2 = ['<<<<<<' * self.level + ' Level %d fuse \n' % self.level]
-    self.stack = deli1 + self.stack + trace.stack + deli2
+  def dump(self):
+    if not FLAGS.capture_expr_stack:
+      print >>sys.stderr, 'Stack tracking for expressions is disabled.  Use --capture_expr_stack=1 to enable.'
+      return
+
+    print >>sys.stderr, 'Expr creation stack traceback.'
+    if not FLAGS.opt_keep_stack:
+      print >>sys.stderr, '    Use --opt_keep_stack=True to see expressions merged during optimization.'
+    
+    for s in self.format_stack():
+      sys.stderr.write(s)
+
+  def fuse(self, trace):
+    self.stack_list.extend(trace.stack_list)
+
+
+
+eval_cache = EvalCache()
 
 class Expr(object):
   _members = ['expr_id', 'stack_trace']
@@ -239,15 +247,8 @@ class Expr(object):
       util.log_info('%s %d need to retry', self.__class__, self.expr_id)
       return self.evaluate()
     except Exception as e:
-      import sys
-      from ..config import FLAGS
       print >>sys.stderr, 'Error executing expression'
-
-      if not FLAGS.optimized_stack:
-        sys.stderr.write('\nTop Expr creation stack traceback.'
-                         ' (Use --optimized_stack=True for more detailed)\n')
-      for s in self.stack_trace.stack:
-        sys.stderr.write(s)
+      self.stack_trace.dump()
       raise
 
     if self.needs_cache:
