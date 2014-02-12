@@ -27,11 +27,12 @@ from .ndarray import ndarray
 from .outer import outer
 from .reduce import reduce
 from .shuffle import shuffle
-from .write_array import make_from_numpy, write
+from .write_array import *
 from .checkpoint import checkpoint
 from .fio import *
 from .reshape import reshape
 from .transpose import transpose
+from .dot import dot
 
 
 Expr.outer = outer
