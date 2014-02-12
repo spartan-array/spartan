@@ -11,6 +11,7 @@ from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from ..array import extent, tile, distarray
 from .map import MapResult
+from .shuffle import target_mapper
 
 def _reshape_mapper(array, ex, _dest_shape):
 
@@ -58,16 +59,6 @@ def _reshape_mapper(array, ex, _dest_shape):
           new[new_r,new_c] = tile[i,j]
     yield target_ex, new
 
-def _target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
-  result = list(map_fn(inputs, ex, **fn_kw))
-
-  futures = rpc.FutureGroup()
-  if result is not None:
-    for ex, v in result:
-      futures.append(target.update(ex, v, wait=False))
-
-  return MapResult(None, futures)
-
 @node_type
 class ReshapeExpr(Expr):
   _members = ['array', 'new_shape', 'tile_hint']
@@ -81,7 +72,7 @@ class ReshapeExpr(Expr):
     fn_kw = {'_dest_shape' : shape}
 
     target = distarray.create(shape, dtype = v.dtype, sparse = v.sparse)
-    v.foreach_tile(mapper_fn = _target_mapper,
+    v.foreach_tile(mapper_fn = target_mapper,
                    kw = {'map_fn':_reshape_mapper, 'inputs':v,
                          'target':target, 'fn_kw':fn_kw})
     return target

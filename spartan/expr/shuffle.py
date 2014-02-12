@@ -31,7 +31,7 @@ def shuffle(v, fn, tile_hint=None, target=None, kw=None):
                      fn_kw=kw)
 
 
-def _target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
+def target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
   result = list(map_fn(inputs, ex, **fn_kw))
   
   futures = rpc.FutureGroup()
@@ -45,7 +45,7 @@ def _target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
 
 
         
-def _notarget_mapper(ex, array=None, map_fn=None, inputs=None, fn_kw=None):
+def notarget_mapper(ex, array=None, map_fn=None, inputs=None, fn_kw=None):
   #util.log_info('MapExtents: %s', map_fn)
   ctx = blob_ctx.get()
   results = []
@@ -78,9 +78,9 @@ class ShuffleExpr(Expr):
     map_fn = self.map_fn
     
     if target is not None:
-      v.foreach_tile(mapper_fn = _target_mapper,
+      v.foreach_tile(mapper_fn = target_mapper,
                      kw = dict(map_fn=map_fn, inputs=v, target=target, fn_kw=fn_kw))
       return target
     else:
-      return v.map_to_array(mapper_fn = _notarget_mapper,
+      return v.map_to_array(mapper_fn = notarget_mapper,
                               kw = dict(inputs=v, map_fn=map_fn, fn_kw=fn_kw))
