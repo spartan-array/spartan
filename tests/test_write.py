@@ -6,25 +6,25 @@ import test_common
 import os
 
 class TestWrite(test_common.ClusterTest):
-  def test_make_from_np1d(self):
+  def test_from_np1d(self):
     npa = np.random.random((100, 100))
     np.save('_test_write1', npa)
     np.savez('_test_write2', npa)
-    t1 = expr.make_from_numpy('_test_write1.npy')
-    t2 = expr.make_from_numpy('_test_write2.npz')
-    t3 = expr.make_from_numpy(npa)
+    t1 = expr.from_file('_test_write1.npy')
+    t2 = expr.from_file('_test_write2.npz')
+    t3 = expr.from_numpy(npa)
     Assert.all_eq(t1.glom(), npa)
     Assert.all_eq(t2.glom(), npa)
     Assert.all_eq(t3.glom(), npa)
     os.system('rm -rf _test_write1.npy _test_write2.npz')
 
-  def test_make_from_np2d(self):
+  def test_from_np2d(self):
     npa = np.random.random(10000)
     np.save('_test_write3', npa)
     np.savez('_test_write4', npa)
-    t1 = expr.make_from_numpy('_test_write3.npy')
-    t2 = expr.make_from_numpy('_test_write4.npz')
-    t3 = expr.make_from_numpy(npa)
+    t1 = expr.from_file('_test_write3.npy')
+    t2 = expr.from_file('_test_write4.npz')
+    t3 = expr.from_numpy(npa)
     Assert.all_eq(t1.glom(), npa)
     Assert.all_eq(t2.glom(), npa)
     Assert.all_eq(t3.glom(), npa)

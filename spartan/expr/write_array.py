@@ -71,28 +71,38 @@ def write(array, src_slices, data, dst_slices):
   return WriteArrayExpr(array = array, src_slices = src_slices,
                         data = data, dst_slices = dst_slices)
 
+# TODO: Many applications use matlab format. Maybe we should support it.
+def from_file(fn, file_type = 'numpy'):
+  '''
+  Make a distarray from a file.
+  Currently support npy/npz.
 
-def make_from_numpy(source):
+  :param fn: `file name`
+  :rtype: `Expr`
+  '''
+
+  if file_type == 'numpy':
+    npa = np.load(fn)
+    if fn.endswith("npz"):
+      # We expect only one npy in npz
+      for k, v in npa.iteritems():
+        fn = v
+      npa.close()
+      npa = fn
+  else:
+    raise NotImplementedError("Only support npy/npz now. Got %s" % file_type)
+
+  return from_numpy(npa)
+
+def from_numpy(npa):
   '''
   Make a distarray from a numpy array
 
-  :param source: `numpy.ndarray` or npy/npz file name 
+  :param npa: `numpy.ndarray`
   :rtype: `Expr`
   '''
-  if isinstance(source, str):
-    npa = np.load(source)
-    if source.endswith("npz"):
-      # We expect only one npy in npz
-      for k, v in npa.iteritems():
-        source = v
-      npa.close()
-      npa = source
-  elif isinstance(source, np.ndarray):
-    npa = source
-  elif sp.issparse(source):
-    npa = source
-  else:
-    raise TypeError("Expected ndarray or DistArray, got: %s" % type(data))
+  if (not isinstance(npa, np.ndarray)) and (not sp.issparse(npa)):
+    raise TypeError("Expected ndarray, got: %s" % type(npa))
   
   array = ndarray(shape = npa.shape, dtype = npa.dtype, sparse = sp.issparse(npa))
   slices = tuple([slice(0, i) for i in npa.shape])
