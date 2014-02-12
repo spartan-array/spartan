@@ -43,8 +43,8 @@ class TestTrace(test_common.ClusterTest):
     FLAGS.opt_keep_stack = 0
 
   def test_trace(self):
-    #devnull = open(os.devnull, 'w')
-    #with RedirectStdStreams(stdout = devnull, stderr = devnull):
+    devnull = open(os.devnull, 'w')
+    with RedirectStdStreams(stdout = devnull, stderr = devnull):
       t1 = expr.randn(100, 100)
       t2 = expr.randn(200, 100)
       t3 = expr.add(t1, t2)
