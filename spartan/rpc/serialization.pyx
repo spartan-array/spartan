@@ -243,7 +243,7 @@ cpdef read_function(f):
 cpdef _write(obj, f):
   if obj is None:
     f.write('E')
-  elif isinstance(obj, np.ndarray):
+  elif isinstance(obj, np.ndarray) and not np.ma.isMaskedArray(obj):
     # sparse arrays will fail the np.ndarray check and are handled by cPickle
     f.write('N')
     if not obj.flags['C_CONTIGUOUS']:
