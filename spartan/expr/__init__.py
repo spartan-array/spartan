@@ -27,7 +27,7 @@ from .ndarray import ndarray
 from .outer import outer
 from .reduce import reduce
 from .shuffle import shuffle
-from .write_array import *
+from .write_array import from_numpy, from_file, write
 from .checkpoint import checkpoint
 from .fio import *
 from .reshape import reshape

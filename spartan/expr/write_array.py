@@ -71,20 +71,17 @@ def write(array, src_slices, data, dst_slices):
   return WriteArrayExpr(array = array, src_slices = src_slices,
                         data = data, dst_slices = dst_slices)
 
-#
 # TODO: Many applications use matlab format. Maybe we should support it.
-# def from_mat(fn):
-#
-
-def from_npy(fn):
+def from_file(fn, file_type = 'numpy'):
   '''
-  Make a distarray from a numpy file. Since npy only stores dense arrays, 
-  this expr only supports dense arrays.
+  Make a distarray from a file.
+  Currently support npy/npz.
 
-  :param fn: `npy/npz file name`
+  :param fn: `file name`
   :rtype: `Expr`
   '''
-  if isinstance(fn, str):
+
+  if file_type == 'numpy':
     npa = np.load(fn)
     if fn.endswith("npz"):
       # We expect only one npy in npz
@@ -93,12 +90,9 @@ def from_npy(fn):
       npa.close()
       npa = fn
   else:
-    raise TypeError("Expected string, got: %s" % type(data))
+    raise NotImplementedError("Only support npy/npz now. Got %s" % file_type)
 
-  array = ndarray(shape = npa.shape, dtype = npa.dtype)
-  slices = tuple([slice(0, i) for i in npa.shape])
-
-  return write(array, slices, npa, slices)
+  return from_numpy(npa)
 
 def from_numpy(npa):
   '''
