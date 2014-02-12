@@ -73,8 +73,8 @@ class Group(tuple):
   pass
 
 def serialize_to(obj, writer):
-  #serialization.write(obj, writer)
-  writer.write(serialize(obj))
+  serialization.write(obj, writer)
+  #writer.write(serialize(obj))
 
 def serialize(obj):
   #w = cStringIO.StringIO()
@@ -83,11 +83,11 @@ def serialize(obj):
   return w.getvalue()
   
   #util.log_info('Pickling: %s', obj)  
-  try:
-    return cPickle.dumps(obj, -1)
-  except (pickle.PicklingError, PickleError, TypeError):
-    #print >>sys.stderr, 'Failed to cPickle: %s' % obj
-    return cloudpickle.dumps(obj, -1)
+  #try:
+  #  return cPickle.dumps(obj, -1)
+  #except (pickle.PicklingError, PickleError, TypeError):
+  #  #print >>sys.stderr, 'Failed to cPickle: %s' % obj
+  #  return cloudpickle.dumps(obj, -1)
     
 def read(f):
   return serialization.read(f)

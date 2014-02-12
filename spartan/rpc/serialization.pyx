@@ -243,16 +243,16 @@ cpdef read_function(f):
 cpdef _write(obj, f):
   if obj is None:
     f.write('E')
-  elif isinstance(obj, np.ndarray) and not np.ma.is_masked(obj):
+  elif isinstance(obj, np.ndarray):
     # sparse arrays will fail the np.ndarray check and are handled by cPickle
     f.write('N')
-    cPickle.dump(obj, f, protocol=-1)
-  #  obj = np.ascontiguousarray(obj)
-  #  cPickle.dump(obj.dtype, f, protocol= -1)
-  #  cPickle.dump(obj.shape, f, protocol= -1)
-  #  cPickle.dump(obj.strides, f, protocol= -1)
-  #  write_int(obj.nbytes, f)
-  #  f.write(obj)
+    if not obj.flags['C_CONTIGUOUS']:
+      obj = np.ascontiguousarray(obj)
+    cPickle.dump(obj.dtype, f, protocol= -1)
+    cPickle.dump(obj.shape, f, protocol= -1)
+    cPickle.dump(obj.strides, f, protocol= -1)
+    write_int(obj.nbytes, f)
+    f.write(obj)
     #write_str(buffer(obj), f)
   elif isinstance(obj, Message):
     f.write('M')
@@ -298,7 +298,6 @@ cpdef read(f):
   if datatype == 'E':
     return None
   elif datatype == 'N':
-    return cPickle.load(f)
     dtype = cPickle.load(f)
     shape = cPickle.load(f)
     strides = cPickle.load(f)
