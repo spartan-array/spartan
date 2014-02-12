@@ -241,7 +241,7 @@ class Expr(object):
     except Exception as e:
       import sys
       from ..config import FLAGS
-      print >>sys.stderr, 'Error executing %s' % self
+      print >>sys.stderr, 'Error executing expression'
 
       if not FLAGS.optimized_stack:
         sys.stderr.write('\nTop Expr creation stack traceback.'

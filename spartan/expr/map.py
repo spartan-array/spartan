@@ -31,7 +31,7 @@ def tile_mapper(ex, children, op):
   result = op.evaluate(op_ctx)
   
   #util.log_info('Result: %s', result)
-  Assert.eq(ex.shape, result.shape, 'Bad shape: (%s)' % op)
+  Assert.eq(ex.shape, result.shape, 'Bad shape -- source = %s, result = %s, op = (%s)' % (local_values, result, op))
   
   # make a new tile and return it
   result_tile = tile.from_data(result)

@@ -18,6 +18,7 @@ import types
 import weakref
 from .. import cloudpickle, util, core
 from ..node import Node, node_type
+from . import serialization
 
 
 CLIENT_PENDING = weakref.WeakKeyDictionary()
@@ -72,22 +73,25 @@ class Group(tuple):
   pass
 
 def serialize_to(obj, writer):
-  #serialization.write(obj, writer)
-  writer.write(serialize(obj))
+  serialization.write(obj, writer)
+  #writer.write(serialize(obj))
 
 def serialize(obj):
-  #x = cStringIO.StringIO()
-  #serialization.write(obj, x)
-  #return x.getvalue()
+  #w = cStringIO.StringIO()
+  w = serialization.Writer()
+  serialization.write(obj, w)
+  return w.getvalue()
+  
   #util.log_info('Pickling: %s', obj)  
-  try:
-    return cPickle.dumps(obj, -1)
-  except (pickle.PicklingError, PickleError, TypeError):
-    #print >>sys.stderr, 'Failed to cPickle: %s' % obj
-    return cloudpickle.dumps(obj, -1)
+  #try:
+  #  return cPickle.dumps(obj, -1)
+  #except (pickle.PicklingError, PickleError, TypeError):
+  #  #print >>sys.stderr, 'Failed to cPickle: %s' % obj
+  #  return cloudpickle.dumps(obj, -1)
     
 def read(f):
-  return cPickle.load(f)
+  return serialization.read(f)
+  #return cPickle.load(f)
 # 
 #   st = time.time()
 #   start_pos = f.tell()
@@ -133,7 +137,8 @@ class PendingRequest(object):
     header = { 'rpc_id' : self.rpc_id }
     
     #util.log_info('Finished %s, %s', self.socket.addr, self.rpc_id)
-    w = cStringIO.StringIO()
+    #w = cStringIO.StringIO()
+    w = serialization.Writer()
     cPickle.dump(header, w, -1)
     serialize_to(result, w)
     self.socket.send(w.getvalue())
@@ -304,7 +309,8 @@ class Server(object):
     #util.log_info('Reading...')
 
     data = socket.recv()
-    reader = cStringIO.StringIO(data)
+    #reader = cStringIO.StringIO(data)
+    reader = serialization.Reader(data)
     header = cPickle.load(reader)
 
     #util.log_info('Call[%s] %s %s', header['method'], self._socket.addr, header['rpc_id'])
@@ -359,7 +365,8 @@ class Client(object):
       rpc_id = self._rpc_id.next()
       header = { 'method' : method, 'rpc_id' : rpc_id }
 
-      w = cStringIO.StringIO()
+      #w = cStringIO.StringIO()
+      w = serialization.Writer()
       cPickle.dump(header, w, -1)
       if isinstance(request, PickledData):
         w.write(request.data)
@@ -384,7 +391,8 @@ class Client(object):
 
   def handle_read(self, socket):
     data = socket.recv()
-    reader = cStringIO.StringIO(data)
+    #reader = cStringIO.StringIO(data)
+    reader = serialization.Reader(data)
     header = cPickle.load(reader)
     resp = read(reader)
     #resp = cPickle.load(reader)
