@@ -70,7 +70,7 @@ setup(
               language='c++', 
               extra_compile_args=["-std=c++0x"], 
               extra_link_args=["-std=c++11"]),
-    Extension('spartan.array.slicing', ['spartan/array/slicing' + suffix]),
+    Extension('spartan.array.extent', ['spartan/array/extent' + suffix]),
   ],
   cmdclass=cmdclass,
 )

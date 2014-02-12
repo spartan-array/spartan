@@ -173,7 +173,7 @@ class RemoteException(Exception):
 
 
 class Future(object):
-  def __init__(self, addr, rpc_id):
+  def __init__(self, addr, rpc_id, timeout=None):
     self.addr = addr
     self.rpc_id = rpc_id
     self.have_result = False
@@ -182,8 +182,9 @@ class Future(object):
     self._cv = threading.Condition()
     self._start = time.time()
     self._finish = time.time() + 1000000
-    self._deadline = time.time() + DEFAULT_TIMEOUT
-
+    if timeout is None:
+      timeout = DEFAULT_TIMEOUT
+    self._deadline = time.time() + timeout
     CLIENT_PENDING[self] = 1
 
   def done(self, result=None):
@@ -343,10 +344,10 @@ class ProxyMethod(object):
     self.client = client
     self.method = method
 
-  def __call__(self, request=None):
+  def __call__(self, request=None, timeout=None):
 #    if len(serialized) > 800000:
 #      util.log_info('%s::\n %s; \n\n\n %s', self.method, ''.join(traceback.format_stack()), request)
-    return self.client.send(self.method, request)
+    return self.client.send(self.method, request, timeout)
 
 class Client(object):
   def __init__(self, socket):
@@ -360,7 +361,7 @@ class Client(object):
   def __reduce__(self, *args, **kwargs):
     raise cPickle.PickleError('Not pickleable.')
 
-  def send(self, method, request):
+  def send(self, method, request, timeout):
     with self._lock:
       rpc_id = self._rpc_id.next()
       header = { 'method' : method, 'rpc_id' : rpc_id }
@@ -374,7 +375,7 @@ class Client(object):
         serialize_to(request, w)
 
       data = w.getvalue()
-      f = Future(self.addr(), rpc_id)
+      f = Future(self.addr(), rpc_id, timeout)
       self._futures[rpc_id] = f
       #util.log_info('Send %s, %s', self.addr(), rpc_id)
       self._socket.send(data)
@@ -401,7 +402,7 @@ class Client(object):
     f.done(resp)
     del self._futures[rpc_id]
 
-def forall(clients, method, request):
+def forall(clients, method, request, timeout=None):
   '''Invoke ``method`` with ``request`` for each client in ``clients``
 
   ``request`` is only serialized once, so this is more efficient when
@@ -412,7 +413,7 @@ def forall(clients, method, request):
   futures = []
   pickled = PickledData(data=serialize(request))
   for c in clients:
-    futures.append(getattr(c, method)(pickled))
+    futures.append(getattr(c, method)(pickled, timeout=timeout))
 
   return FutureGroup(futures)
 

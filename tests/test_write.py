@@ -6,31 +6,31 @@ import test_common
 import os
 
 class TestWrite(test_common.ClusterTest):
-  def test1(self):
+  def test_from_np1d(self):
     npa = np.random.random((100, 100))
     np.save('_test_write1', npa)
     np.savez('_test_write2', npa)
-    t1 = expr.make_from_numpy('_test_write1.npy')
-    t2 = expr.make_from_numpy('_test_write2.npz')
-    t3 = expr.make_from_numpy(npa)
+    t1 = expr.from_file('_test_write1.npy')
+    t2 = expr.from_file('_test_write2.npz')
+    t3 = expr.from_numpy(npa)
     Assert.all_eq(t1.glom(), npa)
     Assert.all_eq(t2.glom(), npa)
     Assert.all_eq(t3.glom(), npa)
     os.system('rm -rf _test_write1.npy _test_write2.npz')
 
-  def test2(self):
+  def test_from_np2d(self):
     npa = np.random.random(10000)
     np.save('_test_write3', npa)
     np.savez('_test_write4', npa)
-    t1 = expr.make_from_numpy('_test_write3.npy')
-    t2 = expr.make_from_numpy('_test_write4.npz')
-    t3 = expr.make_from_numpy(npa)
+    t1 = expr.from_file('_test_write3.npy')
+    t2 = expr.from_file('_test_write4.npz')
+    t3 = expr.from_numpy(npa)
     Assert.all_eq(t1.glom(), npa)
     Assert.all_eq(t2.glom(), npa)
     Assert.all_eq(t3.glom(), npa)
     os.system('rm -rf _test_write3.npy _test_write4.npz')
 
-  def test3(self):
+  def test_slices_from_np(self):
     npa = np.random.random(10000).reshape(100, 100)
     slices1 = (slice(0, 50), slice(0, 50))
     slices2 = (slice(0, 50), slice(50, 100))
@@ -43,7 +43,7 @@ class TestWrite(test_common.ClusterTest):
     t5 = expr.write(t4, slices4, npa, slices4)
     Assert.all_eq(t5.glom(), npa)
 
-  def test4(self):
+  def test_slices_from_slices(self):
     slices1 = (slice(0, 50), slice(0, 50))
     slices2 = (slice(0, 50), slice(50, 100))
     slices3 = (slice(50, 100), slice(0, 50))

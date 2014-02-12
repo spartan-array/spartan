@@ -5,7 +5,7 @@ import sys
 import threading
 import time
 import shutil
-
+from spartan import rpc
 from spartan import config, util
 import spartan
 from spartan.config import FLAGS, BoolFlag, IntFlag
@@ -108,6 +108,7 @@ def start_cluster(num_workers, use_cluster_workers):
   :param num_workers:
   :param use_cluster_workers:
   '''
+  rpc.set_default_timeout(FLAGS.default_rpc_timeout)
   #clean the checkpoint directory
   if os.path.exists(FLAGS.checkpoint_path):
     shutil.rmtree(FLAGS.checkpoint_path)

@@ -17,6 +17,9 @@ from .util import Assert
 import psutil
 import weakref
 
+#timeout for hearbeat messsage
+HEARTBEAT_TIMEOUT=10
+
 class Worker(object):
   def __init__(self, master):
     self.id = -1
@@ -187,7 +190,7 @@ class Worker(object):
         continue
       
       self.worker_status.update_status(psutil.phymem_usage().percent, psutil.cpu_percent(), now)
-      future = self._ctx.heartbeat(self.id, self.worker_status)  
+      future = self._ctx.heartbeat(self.id, self.worker_status, HEARTBEAT_TIMEOUT)  
       try:
         future.wait()
       except TimeoutException, ex:
@@ -198,7 +201,7 @@ class Worker(object):
 
 def _start_worker(master, local_id):
   util.log_info('Worker starting up... Master: %s Profile: %s', master, FLAGS.profile_worker)
-
+  rpc.set_default_timeout(FLAGS.default_rpc_timeout)
   if FLAGS.use_single_core:
     pid = os.getpid()
     os.system('taskset -pc %d %d > /dev/null' % (local_id * 2, pid))
