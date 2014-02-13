@@ -35,6 +35,12 @@ def _find_cluster_mapper(inputs, ex, d_pts, old_centers,
     l_counts[i,0] = matching.sum()
     l_centers[i] = pts[matching].sum(axis=0)
   
+  #Add reducer function to dest array.
+  if new_centers.reducer_fn is None:
+    new_centers.reducer_fn = lambda a, b : a + b
+  if new_counts.reducer_fn is None:
+    new_counts.reducer_fn = lambda a, b : a + b
+
   # update centroid positions
   new_centers.update(extent.from_shape(new_centers.shape), l_centers)
   new_counts.update(extent.from_shape(new_counts.shape), l_counts)
@@ -53,12 +59,17 @@ class KMeans(object):
     ----------
     X : array-like or sparse matrix, shape=(n_samples, n_features)
     """
+    reducer_fn = lambda a,b : a + b
     num_dim = X.shape[1]
     centers = expr.rand(self.n_clusters, num_dim)
     new_centers = expr.ndarray((self.n_clusters, num_dim))
     new_counts = expr.ndarray((self.n_clusters, 1)) 
     
     for i in range(self.max_iter):
+      # Reset them to zero.
+      new_counts = expr.map(new_counts, fn = lambda input: np.zeros(input.shape, input.dtype))
+      new_centers = expr.map(new_centers, fn = lambda input: np.zeros(input.shape, input.dtype))
+      
       _ = expr.shuffle(X,
                         _find_cluster_mapper,
                         kw={'d_pts' : X,
