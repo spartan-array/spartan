@@ -257,7 +257,7 @@ class Assert(object):
 
   @staticmethod
   def le(a, b, fmt='', *args):
-    assert a > b, 'Failed: %s <= %s (%s)' % (a, b, fmt % args)
+    assert a <= b, 'Failed: %s <= %s (%s)' % (a, b, fmt % args)
 
   @staticmethod
   def true(expr):
