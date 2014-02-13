@@ -235,37 +235,29 @@ class Assert(object):
     assert np.allclose(a, b), 'Failed: \n%s close to \n%s' % (a, b)
     return
 
-
   @staticmethod
   def eq(a, b, fmt='', *args):
-    if a == b:
-      return
-    else:
-      msg = fmt % args
-      assert False, 'Failed: %s == %s (%s)' % (a, b, msg)
+    assert a == b, 'Failed: %s == %s (%s)' % (a, b, fmt % args)
 
   @staticmethod
-  def ne(a, b):
-    assert (a != b), 'Failed: %s != %s' % (a, b)
+  def ne(a, b, fmt='', *args):
+    assert a != b, 'Failed: %s != %s (%s)' % (a, b, fmt % args)
 
   @staticmethod
-  def gt(a, b):
-    assert (a > b), 'Failed: %s > %s' % (a, b)
+  def gt(a, b, fmt='', *args):
+    assert a > b, 'Failed: %s > %s (%s)' % (a, b, fmt % args)
 
   @staticmethod
-  def lt(a, b):
-    assert (a < b), 'Failed: %s < %s' % (a, b)
+  def lt(a, b, fmt='', *args):
+    assert a < b, 'Failed: %s < %s (%s)' % (a, b, fmt % args)
 
   @staticmethod
-  def ge(a, b):
-    assert (a >= b), 'Failed: %s >= %s' % (a, b)
+  def ge(a, b, fmt='', *args):
+    assert a >= b, 'Failed: %s >= %s (%s)' % (a, b, fmt % args)
 
   @staticmethod
-  def le(a, b, msg=None):
-    if msg is None:
-      assert (a <= b), 'Failed: %s <= %s' % (a, b)
-    else:
-      assert (a <= b), 'Failed: %s <= %s [%s]' % (a, b, msg)
+  def le(a, b, fmt='', *args):
+    assert a > b, 'Failed: %s <= %s (%s)' % (a, b, fmt % args)
 
   @staticmethod
   def true(expr):
