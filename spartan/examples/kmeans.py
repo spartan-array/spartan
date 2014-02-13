@@ -41,7 +41,7 @@ def _find_cluster_mapper(inputs, ex, d_pts, old_centers,
     matching = closest == i
     l_counts[i,0] = matching.sum()
     l_centers[i] = pts[matching].sum(axis=0)
-    
+  
   # update centroid positions
   new_centers.update(extent.from_shape(new_centers.shape), l_centers)
   new_counts.update(extent.from_shape(new_counts.shape), l_counts)
