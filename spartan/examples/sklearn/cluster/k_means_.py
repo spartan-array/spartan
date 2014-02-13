@@ -59,16 +59,13 @@ class KMeans(object):
     ----------
     X : array-like or sparse matrix, shape=(n_samples, n_features)
     """
-    reducer_fn = lambda a,b : a + b
     num_dim = X.shape[1]
     centers = expr.rand(self.n_clusters, num_dim)
-    new_centers = expr.ndarray((self.n_clusters, num_dim))
-    new_counts = expr.ndarray((self.n_clusters, 1)) 
     
     for i in range(self.max_iter):
       # Reset them to zero.
-      new_counts = expr.map(new_counts, fn = lambda input: np.zeros(input.shape, input.dtype))
-      new_centers = expr.map(new_centers, fn = lambda input: np.zeros(input.shape, input.dtype))
+      new_centers = expr.zeros((self.n_clusters, num_dim))
+      new_counts = expr.zeros((self.n_clusters, 1)) 
       
       _ = expr.shuffle(X,
                         _find_cluster_mapper,
@@ -77,5 +74,6 @@ class KMeans(object):
                             'new_centers' : new_centers,
                             'new_counts' : new_counts})
       _.force()
+      
       new_centers = new_centers / new_counts
-      new_centers, centers = centers, new_centers
+      centers = new_centers
