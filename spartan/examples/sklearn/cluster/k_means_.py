@@ -14,7 +14,7 @@ def _find_closest(pts, centers):
     p = pts[i]
     for j in xrange(centers.shape[0]):
       c = centers[j]
-      dist = np.dot(p, c) 
+      dist = np.sum(p ** 2 - c ** 2)
       if dist < min_dist:
         min_dist = dist
         min_idx = j
@@ -35,12 +35,6 @@ def _find_cluster_mapper(inputs, ex, d_pts, old_centers,
     l_counts[i,0] = matching.sum()
     l_centers[i] = pts[matching].sum(axis=0)
   
-  #Add reducer function to dest array.
-  if new_centers.reducer_fn is None:
-    new_centers.reducer_fn = lambda a, b : a + b
-  if new_counts.reducer_fn is None:
-    new_counts.reducer_fn = lambda a, b : a + b
-
   # update centroid positions
   new_centers.update(extent.from_shape(new_centers.shape), l_centers)
   new_counts.update(extent.from_shape(new_counts.shape), l_counts)
@@ -64,8 +58,8 @@ class KMeans(object):
     
     for i in range(self.max_iter):
       # Reset them to zero.
-      new_centers = expr.zeros((self.n_clusters, num_dim))
-      new_counts = expr.zeros((self.n_clusters, 1)) 
+      new_centers = expr.ndarray((self.n_clusters, num_dim), reduce_fn=lambda a, b: a + b)
+      new_counts = expr.ndarray((self.n_clusters, 1), reduce_fn=lambda a, b: a + b)
       
       _ = expr.shuffle(X,
                         _find_cluster_mapper,
