@@ -71,3 +71,4 @@ class KMeans(object):
       
       new_centers = new_centers / new_counts
       centers = new_centers
+    return centers
