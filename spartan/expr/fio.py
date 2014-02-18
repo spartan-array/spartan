@@ -32,7 +32,8 @@ import cPickle as cpickle
 from struct import unpack, pack
 from .base import force
 from .base import glom
-from .map import map, LocalKernelResult
+from .map import map
+from ..core import LocalKernelResult
 from .ndarray import ndarray
 from .reduce import reduce
 from .shuffle import shuffle

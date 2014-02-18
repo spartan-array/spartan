@@ -8,10 +8,10 @@ import scipy.sparse
 import numpy as np
 
 from . import tile, extent
-from spartan import util, core, blob_ctx, rpc
-from spartan.util import Assert
-from spartan import sparse
-from spartan.config import FLAGS
+from .. import util, core, blob_ctx, rpc, sparse
+from ..core import LocalKernelResult
+from ..util import Assert
+from ..config import FLAGS
 
 # number of elements per tile
 DEFAULT_TILE_SIZE = 100000
@@ -552,7 +552,6 @@ def _slice_mapper(ex, **kw):
 
   intersection = extent.intersection(slice_extent, ex)
   if intersection is None:
-    from spartan.expr.map import LocalKernelResult
     return LocalKernelResult([], None)
 
   offset = extent.offset_from(slice_extent, intersection)

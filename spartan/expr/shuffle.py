@@ -2,10 +2,10 @@ from spartan import rpc
 
 from .. import blob_ctx, util
 from ..array import distarray, tile
+from ..core import LocalKernelResult
 from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from .base import Expr, lazify
-from.map import LocalKernelResult
 
 def shuffle(v, fn, tile_hint=None, target=None, kw=None):
   '''
