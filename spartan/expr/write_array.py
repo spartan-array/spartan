@@ -11,7 +11,7 @@ from ..node import Node, node_type
 from spartan.array import tile, distarray, extent
 from .. import util
 from ..util import Assert
-from.map import MapResult
+from.map import LocalKernelResult
 
 def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
   intersection = extent.intersection(ex, sregion)
@@ -24,7 +24,7 @@ def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
     v = dst_slice.fetch(dst_ex)
     futures.append(source.update(intersection, v, wait=False))
 
-  return MapResult(None, futures)
+  return LocalKernelResult(None, futures)
 
 
 @node_type

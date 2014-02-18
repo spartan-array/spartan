@@ -552,8 +552,8 @@ def _slice_mapper(ex, **kw):
 
   intersection = extent.intersection(slice_extent, ex)
   if intersection is None:
-    from spartan.expr.map import MapResult
-    return MapResult([], None)
+    from spartan.expr.map import LocalKernelResult
+    return LocalKernelResult([], None)
 
   offset = extent.offset_from(slice_extent, intersection)
   offset.array_shape = slice_extent.shape
