@@ -1,10 +1,10 @@
-dense Package
+array Package
 =============
 
 :mod:`distarray` Module
 -----------------------
 
-.. automodule:: spartan.dense.distarray
+.. automodule:: spartan.array.distarray
     :members:
     :undoc-members:
     :show-inheritance:
@@ -12,7 +12,7 @@ dense Package
 :mod:`extent` Module
 --------------------
 
-.. automodule:: spartan.dense.extent
+.. automodule:: spartan.array.extent
     :members:
     :undoc-members:
     :show-inheritance:
@@ -20,7 +20,7 @@ dense Package
 :mod:`tile` Module
 ------------------
 
-.. automodule:: spartan.dense.tile
+.. automodule:: spartan.array.tile
     :members:
     :undoc-members:
     :show-inheritance:

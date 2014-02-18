@@ -13,7 +13,7 @@ import numpy as np
 
 from ..node import Node, node_type
 from .. import blob_ctx, node, util
-from ..util import Assert
+from ..util import Assert, copy_docstring
 from ..array import distarray
 from ..config import FLAGS
 from ..rpc import TimeoutException
@@ -356,6 +356,10 @@ class Expr(object):
     except NotShapeable:
       return evaluate(self).shape
 
+  @property
+  def size(self):
+    return np.prod(self.shape)
+  
   def force(self):
     '''
     Evaluate this expression (and all dependencies).
@@ -419,12 +423,14 @@ class Val(Expr):
 
   needs_cache = False
 
+  @copy_docstring(Expr.visit)
   def visit(self, visitor):
     return self
 
   def dependencies(self):
     return {}
 
+  @copy_docstring(Expr.visit)
   def compute_shape(self):
     return self.val.shape
 

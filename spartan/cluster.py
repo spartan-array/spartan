@@ -1,3 +1,14 @@
+'''
+Functions for managing a cluster of machines.
+
+Spartan currently supports running workers as either threads in the
+current process, or by using ssh to connect to one or more 
+machines.
+
+A Spartan "worker" is a single process; more than one worker can be
+run on a machine; typically one worker is run per core.
+'''
+
 import os.path
 import socket
 import subprocess
@@ -49,7 +60,16 @@ FLAGS.add(BoolFlag(
 FLAGS.add(IntFlag('heartbeat_interval', default=3, help='Heartbeat Interval in each worker'))
 FLAGS.add(IntFlag('worker_failed_heartbeat_threshold', default=10, help='the max number of heartbeat that a worker can delay'))
 
-def _start_remote_worker(worker, st, ed):
+def start_remote_worker(worker, st, ed):
+  '''
+  Start processes on a worker machine.
+  
+  The machine will launch worker processes ``st`` through ``ed``. 
+  
+  :param worker: hostname to connect to.
+  :param st: First process index to start.
+  :param ed: Last process to start.
+  '''
   if FLAGS.use_threads and worker == 'localhost':
     util.log_info('Using threads.')
     for i in range(st, ed):
@@ -116,7 +136,7 @@ def start_cluster(num_workers, use_cluster_workers):
   master = spartan.master.Master(FLAGS.port_base, num_workers)
 
   if not use_cluster_workers:
-    _start_remote_worker('localhost', 0, num_workers)
+    start_remote_worker('localhost', 0, num_workers)
   else:
     available_workers = sum([cnt for _, cnt in FLAGS.hosts])
     assert available_workers >= num_workers, 'Insufficient slots to run all workers.'
@@ -129,7 +149,7 @@ def start_cluster(num_workers, use_cluster_workers):
         sz = util.divup(num_workers, num_hosts)
       
       sz = min(sz, num_workers - count)
-      _start_remote_worker(worker, count, count + sz)
+      start_remote_worker(worker, count, count + sz)
       count += sz
       if count == num_workers:
         break

@@ -68,6 +68,8 @@ def _make_sparse_diagonal(tile, ex):
   
 def rand(*shape, **kw):
   '''
+  Return a random array sampled from the uniform distribution on [0, 1).
+  
   :param tile_hint: A tuple indicating the desired tile shape for this array.
   '''
   tile_hint = None
@@ -83,6 +85,11 @@ def rand(*shape, **kw):
 
 
 def randn(*shape, **kw):
+  '''
+  Return a random array sampled from the standard normal distribution.
+  
+  :param tile_hint: A tuple indicating the desired tile shape for this array.
+  '''
   tile_hint = None
   if 'tile_hint' in kw:
     tile_hint = kw['tile_hint']
@@ -107,7 +114,13 @@ def sparse_rand(shape,
 def sparse_empty(shape,
                  dtype=np.float32,
                  tile_hint=None):
-    return ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True)
+  '''Return an empty sparse array of the given shape.
+  
+  :param shape: `tuple`.  Shape of the resulting array.
+  :param dtype: `np.dtype`
+  :param tile_hint: A tuple indicating the desired tile shape for this array.
+  '''
+  return ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True)
 
 def sparse_diagonal(shape,
                     dtype=np.float32,
@@ -119,18 +132,39 @@ def _tocoo(data):
   return data.tocoo()
 
 def tocoo(array):
+  '''
+  Convert ``array`` to use COO (coordinate) format for tiles. 
+  
+  :param array: Sparse `Expr`.
+  :rtype: A new array in COO format.
+  '''
   return map(array, fn=_tocoo)
 
 
 def zeros(shape, dtype=np.float, tile_hint=None):
+  '''
+  Create a distributed array over the given shape and dtype, filled with zeros.
+  
+  :param shape:
+  :param dtype:
+  :param tile_hint:
+  :rtype: `Expr`
+  '''
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
              fn=_make_zeros)
 
 
 def ones(shape, dtype=np.float, tile_hint=None):
+  '''
+  Create a distributed array over the given shape and dtype, filled with ones.
+  
+  :param shape:
+  :param dtype:
+  :param tile_hint:
+  :rtype: `Expr`
+  '''
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
              fn=_make_ones)
-
 
 
 def _arange_mapper(inputs, ex, dtype=None):
@@ -141,6 +175,17 @@ def _arange_mapper(inputs, ex, dtype=None):
 
 
 def arange(shape, dtype=np.float, tile_hint=None):
+  '''
+  An extended version of `np.arange`.  
+  
+  Returns a new array of the given shape and dtype. Values of the
+  array are equivalent to running: ``np.arange(np.prod(shape)).ravel(shape)``.
+  
+  :param shape:
+  :param dtype:
+  :param tile_hint:
+  :rtype: `Expr`
+  '''
   return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
                  fn=_arange_mapper,
                  kw={'dtype': dtype})
@@ -342,6 +387,11 @@ def _countnonzero_local(ex, data, axis):
   return np.asarray(np.count_nonzero(data))
 
 def count_nonzero(array):
+  '''
+  Return the number of nonzero values in ``array``.
+  :param array: DistArray or `Expr`.
+  :rtype: np.int64
+  '''
   return reduce(array, None,
                 dtype_fn=lambda input: np.int64,
                 local_reduce_fn=_countnonzero_local,
@@ -379,7 +429,7 @@ def astype(x, dtype):
   
   See `numpy.ndarray.astype`.
   
-  :param x:
+  :param x: `Expr` or `DistArray`
   :param dtype:
   '''
   assert x is not None
@@ -401,32 +451,22 @@ def ravel(v):
   "Ravel" ``v`` to a one-dimensional array of shape (size(v),).
   
   See `numpy.ndarray.ravel`.
-  :param v:
+  :param v: `Expr` or `DistArray`
   '''
   return shuffle(v, _ravel_mapper)
 
 
-def op_map(*args, **kw):
-  fn = kw['fn']
-  return map(args, fn)
- 
-def add(a, b):
-  return op_map(a, b, fn=lambda a, b: a + b)
+def add(a, b): return map((a, b), fn=np.add)
 
-def sub(a, b):
-  return op_map(a, b, fn=lambda a, b: a - b)
+def sub(a, b): return map((a, b), fn=np.subtract)
   
 def ln(v): return map(v, fn=np.log)
 
-
 def log(v): return map(v, fn=np.log)
-
 
 def exp(v): return map(v, fn=np.exp)
 
-
 def sqrt(v): return map(v, fn=np.sqrt)
-
 
 def abs(v): return map(v, fn=np.abs)
 
