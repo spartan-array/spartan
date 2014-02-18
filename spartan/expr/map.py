@@ -8,6 +8,7 @@ from ..node import Node, node_type
 from ..util import Assert
 from .base import DictExpr, Expr, as_array
 from .local import LocalCtx, make_var, LocalInput, LocalMapExpr
+from ..core import LocalKernelResult
 
 def tile_mapper(ex, children, op):
   ctx = blob_ctx.get()
@@ -39,13 +40,8 @@ def tile_mapper(ex, children, op):
   result_tile = tile.from_data(result)
   tile_id = blob_ctx.get().create(result_tile).wait().blob_id
   
-  return MapResult([(ex, tile_id)], None)
+  return LocalKernelResult([(ex, tile_id)], None)
  
-class MapResult:
-  def __init__(self, result=None, futures=None):
-    self.result = result
-    self.futures = futures
-
 @node_type
 class MapExpr(Expr):
   _members = ['children', 'op']

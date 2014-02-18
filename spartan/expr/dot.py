@@ -11,7 +11,7 @@ from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from ..array import extent, tile, distarray
 from .shuffle import target_mapper, notarget_mapper
-from .map import MapResult
+from ..core import LocalKernelResult
 
 def _dot_mapper(inputs, ex, av, bv):
   # read current tile of array 'a'

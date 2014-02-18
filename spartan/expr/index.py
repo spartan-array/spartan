@@ -8,7 +8,7 @@ from spartan.node import Node, node_type
 from spartan.util import Assert, join_tuple
 
 from .base import Expr, ListExpr, TupleExpr
-from .map import MapResult
+from ..core import LocalKernelResult
 
 @node_type
 class IndexExpr(Expr):
@@ -48,7 +48,7 @@ def int_index_mapper(ex, src, idx, dst):
   #util.log_info('%s %s', output_ex.shape, np.array(output).shape)
   output_tile = tile.from_data(np.array(output))
   tile_id = blob_ctx.get().create(output_tile).wait().blob_id
-  return MapResult([(output_ex, tile_id)], None)
+  return LocalKernelResult([(output_ex, tile_id)], None)
 
 def bool_index_mapper(ex, src, idx):
   val = src.fetch(ex)
@@ -58,7 +58,7 @@ def bool_index_mapper(ex, src, idx):
   masked_val = np.ma.masked_array(val, mask)
   output_tile = tile.from_data(masked_val)
   tile_id = blob_ctx.get().create(output_tile).wait().blob_id
-  return MapResult([(ex, tile_id)], None)
+  return LocalKernelResult([(ex, tile_id)], None)
 
 def eval_Index(ctx, prim, deps):
   src = deps['src']

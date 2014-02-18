@@ -10,7 +10,7 @@ from .. import blob_ctx, util
 from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from ..array import extent, tile, distarray
-from .map import MapResult
+from ..core import LocalKernelResult
 from .shuffle import target_mapper
 
 def _reshape_mapper(array, ex, _dest_shape):
