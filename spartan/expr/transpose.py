@@ -14,10 +14,11 @@ from ..core import LocalKernelResult
 from .shuffle import target_mapper
 
 class Transpose(distarray.DistArray):
-  '''A transpose object mimics the behavior of Numpy transpose.
+  '''Transpose the underlying array base.
 
-  In the overrided fetch function, the transpose object reports
-  correct tiles according to requested extents and base shape.
+  Transpose does not create a copy of the base array. Instead the fetch 
+  method is overridden: the dimensions for the requested extent are 
+  reversed and the "transposed" request is sent to the underlying base array.
   '''
 
   def __init__(self, base):
