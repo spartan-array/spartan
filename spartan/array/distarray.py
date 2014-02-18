@@ -506,11 +506,18 @@ class LocalWrapper(DistArray):
     return as_array(result_data)
 
 
-def as_array(data):
+def as_array(data): 
+  '''
+  Convert ``data`` to behave like a `DistArray`.
+  
+  If ``data`` is already a `DistArray`, it is returned unchanged.
+  Otherwise, ``data`` is wrapped to have a `DistArray` interface.
+  
+  :param data: An input array or array-like value.
+  '''
   if isinstance(data, DistArray):
     return data
 
-  # TODO(power) -- promote numpy arrays to distarrays?
   return LocalWrapper(data)
 
 

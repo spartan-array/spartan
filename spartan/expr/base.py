@@ -92,8 +92,16 @@ class EvalCache(object):
       del self.refs[expr_id]
 
 class ExprTrace(object):
-  '''Stores where an expression was originally created, which
-  allows us to give better error reports'''
+  '''
+  Captures the stack trace for an expression.
+  
+  Lazy evaluation and optimization can result in stack traces that are very far
+  from the actual source of an error.  To combat this, expressions track their
+  original creation point, which is logged when an error occurs.
+  
+  Multiple stack traces can be tracked, as certain optimizations
+  will combine multiple expressions together.
+  '''
   def __init__(self):
     if FLAGS.capture_expr_stack:
       self.stack_list = [traceback.extract_stack(sys._getframe(3))]
@@ -126,10 +134,21 @@ class ExprTrace(object):
     self.stack_list.extend(trace.stack_list)
 
 
-
 eval_cache = EvalCache()
 
 class Expr(object):
+  '''
+  Base class for all expressions.
+  
+  `Expr` objects capture user operations.
+  
+  An expression can have one or more dependencies, which must
+  be evaluated before the expression itself.
+  
+  Expressions may be evaluated (using `Expr.force`), the 
+  result of evaluating an expression is cached until the expression
+  itself is reclaimed. 
+  ''' 
   _members = ['expr_id', 'stack_trace']
 
   # should evaluation of this object be cached
@@ -165,10 +184,7 @@ class Expr(object):
 
   def dependencies(self):
     '''
-    Return a dictionary mapping from name -> dependency.
-    
-    Dependencies may either be a list or single value.
-    Dependencies of type `Expr` are recursively evaluated.
+    :rtype: Dictionary mapping from name to `Expr`. 
     '''
     return dict([(k, getattr(self, k)) for k in self.members])
 
@@ -197,16 +213,15 @@ class Expr(object):
     '''
     result = 'N%s [label="%s"]\n' % (self.expr_id, self.node_type)
    
-    for name, value in self.dependencies().items():
+    for _, value in self.dependencies().items():
       if isinstance(value, Expr):
         result = result + 'N%s -> N%s\n' % (self.expr_id, value.expr_id) 
   
-    for name, value in self.dependencies().items():
+    for _, value in self.dependencies().items():
       if isinstance(value, Expr):
         result = result + value.dot()
     return result
    
-
   def __del__(self):
     eval_cache.deregister(self.expr_id)
 
@@ -243,10 +258,10 @@ class Expr(object):
         deps[k] = vs
     try:
       value = self._evaluate(ctx, deps)
-    except TimeoutException as ex:
+    except TimeoutException:
       util.log_info('%s %d need to retry', self.__class__, self.expr_id)
       return self.evaluate()
-    except Exception as e:
+    except Exception:
       print >>sys.stderr, 'Error executing expression'
       self.stack_trace.dump()
       raise
@@ -308,6 +323,12 @@ class Expr(object):
     return _map(self, fn=np.negative)
 
   def reshape(self, new_shape):
+    '''
+    Return a new array with shape``new_shape``, and data from 
+    this array.
+    
+    :param new_shape: `tuple` with same total size as original shape.
+    '''
     from . import builtins
     return builtins.reshape(self, new_shape)
 
@@ -320,9 +341,11 @@ class Expr(object):
 
   @property
   def shape(self):
-    '''Try to compute the shape of this DAG.
+    '''Try to compute the shape of this expression.
     
     If the value has been computed already this always succeeds.
+    
+    :rtype: `tuple`
     '''
     cache = self.cache()
     if cache is not None:
@@ -334,6 +357,9 @@ class Expr(object):
       return evaluate(self).shape
 
   def force(self):
+    '''
+    Evaluate this expression (and all dependencies).
+    '''
     return self.evaluate()
 
   def optimized(self):
@@ -345,15 +371,23 @@ class Expr(object):
     return optimized_dag(self)
 
   def glom(self):
+    '''
+    Evaluate this expression and convert the resulting 
+    distributed array into a Numpy array.
+    
+    :rtype: `np.ndarray`
+    '''
     return glom(self)
 
   def __reduce__(self):
     return evaluate(self).__reduce__()
 
+
 Expr.__rsub__ = Expr.__sub__
 Expr.__radd__ = Expr.__add__
 Expr.__rmul__ = Expr.__mul__
 Expr.__rdiv__ = Expr.__div__
+
 
 @node_type
 class AsArray(Expr):
@@ -380,11 +414,10 @@ class AsArray(Expr):
 
 @node_type
 class Val(Expr):
-  '''Wrap an existing value into an expression.'''
+  '''Convert an existing value to an expression.'''
   _members = ['val']
 
   needs_cache = False
-
 
   def visit(self, visitor):
     return self
@@ -404,10 +437,10 @@ class Val(Expr):
 
 class CollectionExpr(Expr):
   '''
-  CollectionExpr subclasses wrap normal tuples, lists and dicts with `Expr` semantics.
+  `CollectionExpr` subclasses wrap normal tuples, lists and dicts with `Expr` semantics.
   
-  visit() and evaluate() are supported; these thread the visitor through
-  child elements as expected.
+  `CollectionExpr.visit` and `CollectionExpr.evaluate` will visit or evaluate
+  all of the tuple, list or dictionary elements in this expression.
   '''
   needs_cache = False
   _members = ['vals']
@@ -487,9 +520,18 @@ def optimized_dag(node):
 
 
 def force(node):
+  '''
+  Evaluate ``node``.
+  :param node: `Expr`
+  '''
   return evaluate(node)
 
 def evaluate(node):
+  '''
+  Evaluate ``node``.
+  
+  :param node: `Expr`
+  '''
   if isinstance(node, Expr):
     return node.evaluate()
 
