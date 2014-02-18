@@ -5,13 +5,15 @@ Distarray write operations and expr.
 import numpy as np
 import scipy.sparse as sp
 from spartan import rpc
+from spartan.array import tile, distarray, extent
+
+from .. import util
+from ..core import LocalKernelResult
+from ..node import Node, node_type
+from ..util import Assert
 from .base import Expr
 from .ndarray import ndarray
-from ..node import Node, node_type
-from spartan.array import tile, distarray, extent
-from .. import util
-from ..util import Assert
-from.map import MapResult
+
 
 def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
   intersection = extent.intersection(ex, sregion)
@@ -24,7 +26,7 @@ def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
     v = dst_slice.fetch(dst_ex)
     futures.append(source.update(intersection, v, wait=False))
 
-  return MapResult(None, futures)
+  return LocalKernelResult(None, futures)
 
 
 @node_type
@@ -43,9 +45,9 @@ class WriteArrayExpr(Expr):
     sregion = extent.from_slice(src_slices, array.shape)
     if isinstance(data, np.ndarray) or sp.issparse(data):
       if sregion.shape == data.shape:
-         array.update(sregion, data)
+        array.update(sregion, data)
       else:
-         array.update(sregion, data[dst_slices])
+        array.update(sregion, data[dst_slices])
     elif isinstance(data, distarray.DistArray):
       dst_slice = distarray.Slice(data, dst_slices)
       Assert.eq(sregion.shape, dst_slice.shape)

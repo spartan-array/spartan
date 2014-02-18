@@ -41,6 +41,7 @@ cdef class BlobId(object):
   def __repr__(BlobId self):
     return 'B(%d.%d)' % (self.worker, self.id)
 
+
 cdef class WorkerStatus(object):
   cdef public long total_physical_memory
   cdef public int num_processors
@@ -83,6 +84,7 @@ cdef class WorkerStatus(object):
                   str(self.mem_usage), str(self.cpu_usage), 
                   str(self.task_reports), str(self.task_failures))
     
+
 cdef class Message(object):
   def __reduce__(Message self):
     return (self.__class__, tuple(), self.__dict__)
@@ -92,6 +94,7 @@ cdef class Message(object):
   
   def __repr__(Message self):
     return '%s:%s' % (self.__class__, str(self.__dict__['kw']))
+
 
 @node_type  
 class RegisterReq(Message):
@@ -128,7 +131,21 @@ class DestroyReq(Message):
 @node_type
 class UpdateReq(Message):
   _members = ['id', 'region', 'data', 'reducer']
+
+
+class LocalKernelResult(object):
+  '''The local result returned from a kernel invocation.
   
+  `LocalKernelResult.result` is returned to the master.
+  `LocalKernelResult.futures` may be None, or a list of futures
+  that must be waited for before returning the result of this
+  kernel.
+  ''' 
+  def __init__(self, result=None, futures=None):
+    self.result = result
+    self.futures = futures
+  
+
 @node_type
 class KernelReq(Message):
   _members = ['blobs', 'mapper_fn', 'reduce_fn', 'kw']

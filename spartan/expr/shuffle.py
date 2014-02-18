@@ -2,10 +2,10 @@ from spartan import rpc
 
 from .. import blob_ctx, util
 from ..array import distarray, tile
+from ..core import LocalKernelResult
 from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from .base import Expr, lazify
-from.map import MapResult
 
 def shuffle(v, fn, tile_hint=None, target=None, kw=None):
   '''
@@ -41,7 +41,7 @@ def target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
       futures.append(target.update(ex, v, wait=False))
   
 #   util.log_warn('%s futures', len(futures))
-  return MapResult(None, futures)
+  return LocalKernelResult(None, futures)
 
 
         
@@ -58,7 +58,7 @@ def notarget_mapper(ex, array=None, map_fn=None, inputs=None, fn_kw=None):
       tile_id = blob_ctx.get().create(result_tile).wait().blob_id
       results.append((ex, tile_id))
   
-  return MapResult(results, None)
+  return LocalKernelResult(results, None)
 
 
 @node_type

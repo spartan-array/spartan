@@ -32,7 +32,8 @@ import cPickle as cpickle
 from struct import unpack, pack
 from .base import force
 from .base import glom
-from .map import map, MapResult
+from .map import map
+from ..core import LocalKernelResult
 from .ndarray import ndarray
 from .reduce import reduce
 from .shuffle import shuffle
@@ -314,7 +315,7 @@ def tile_mapper(blob_id, blob, tiles = None, user_fn=None, **kw):
       tile_id = ctx.create(result_tile).wait().blob_id
       results.append((ex, tile_id))
   
-  return MapResult(results, None)
+  return LocalKernelResult(results, None)
 
 def map_tiles(targets, mapper_fn, tiles, kw=None):
     ctx = blob_ctx.get()
