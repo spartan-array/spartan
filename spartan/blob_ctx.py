@@ -140,8 +140,8 @@ class BlobCtx(object):
   def get_worker_scores(self):
     return self._send_to_worker(MASTER_ID, 'get_worker_scores', core.NoneParamReq()).result
   
-  def heartbeat(self, worker_id, worker_status, timeout=None):
-    req = core.HeartbeatReq(worker_id=worker_id, worker_status=worker_status)
+  def heartbeat(self, worker_status, timeout=None):
+    req = core.HeartbeatReq(worker_id=self.worker_id, worker_status=worker_status)
     return self._send_to_worker(MASTER_ID, 'heartbeat', req, wait=False, timeout=timeout)
   
   def create(self, data, hint=None, timeout=None):

@@ -11,6 +11,15 @@ from .local import LocalCtx, make_var, LocalInput, LocalMapExpr
 from ..core import LocalKernelResult
 
 def tile_mapper(ex, children, op):
+  '''
+  Run for each tile of a `Map` operation.
+  
+  Evaluate the map function on the local tile and return a result.
+  
+  :param ex: `Extent`
+  :param children: Input arrays for this operation.
+  :param op: `LocalExpr` to evaluate.
+  '''
   ctx = blob_ctx.get()
   #util.log_info('MapTiles: %s', op)
   #util.log_info('Fetching %d inputs', len(children))

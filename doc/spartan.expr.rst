@@ -9,14 +9,6 @@ expr Package
     :undoc-members:
     :show-inheritance:
 
-:mod:`backend` Module
----------------------
-
-.. automodule:: spartan.expr.backend
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 :mod:`base` Module
 ------------------
 
@@ -33,10 +25,42 @@ expr Package
     :undoc-members:
     :show-inheritance:
 
+:mod:`checkpoint` Module
+------------------------
+
+.. automodule:: spartan.expr.checkpoint
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+:mod:`dot` Module
+-----------------
+
+.. automodule:: spartan.expr.dot
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+:mod:`fio` Module
+-----------------
+
+.. automodule:: spartan.expr.fio
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 :mod:`index` Module
 -------------------
 
 .. automodule:: spartan.expr.index
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+:mod:`local` Module
+-------------------
+
+.. automodule:: spartan.expr.local
     :members:
     :undoc-members:
     :show-inheritance:
@@ -89,6 +113,14 @@ expr Package
     :undoc-members:
     :show-inheritance:
 
+:mod:`reshape` Module
+---------------------
+
+.. automodule:: spartan.expr.reshape
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 :mod:`shuffle` Module
 ---------------------
 
@@ -101,6 +133,22 @@ expr Package
 ---------------------
 
 .. automodule:: spartan.expr.stencil
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+:mod:`transpose` Module
+-----------------------
+
+.. automodule:: spartan.expr.transpose
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+:mod:`write_array` Module
+-------------------------
+
+.. automodule:: spartan.expr.write_array
     :members:
     :undoc-members:
     :show-inheritance:

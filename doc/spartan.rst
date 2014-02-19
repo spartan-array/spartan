@@ -9,6 +9,21 @@ spartan Package
     :undoc-members:
     :show-inheritance:
 
+:mod:`blob_ctx` Module
+----------------------
+
+.. automodule:: spartan.blob_ctx
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+:mod:`core` Module
+----------------------
+
+.. automodule:: spartan.core
+    :members:
+    :undoc-members:
+    :show-inheritance:
 
 :mod:`cluster` Module
 ---------------------
@@ -26,14 +41,6 @@ spartan Package
     :undoc-members:
     :show-inheritance:
 
-:mod:`core` Module
-------------------
-
-.. automodule:: spartan.core
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 :mod:`master` Module
 --------------------
 
@@ -42,13 +49,6 @@ spartan Package
     :undoc-members:
     :show-inheritance:
 
-:mod:`msg` Module
------------------
-
-.. automodule:: spartan.msg
-    :members:
-    :undoc-members:
-    :show-inheritance:
 
 :mod:`node` Module
 ------------------
@@ -79,9 +79,8 @@ Subpackages
 
 .. toctree::
 
-    spartan.dense
+    spartan.array
     spartan.examples
     spartan.expr
     spartan.rpc
-    spartan.sparse
 

@@ -20,7 +20,6 @@ DEFAULT_TILE_SIZE = 100000
 def take_first(a,b):
   return a
 
-
 def compute_splits(shape, tile_hint=None, num_shards=-1):
   '''Split an array of shape ``shape`` into `Extent`s containing roughly `TILE_SIZE` elements.
  
@@ -86,12 +85,31 @@ def _tile_mapper(blob_id, blob, array=None, user_fn=None, **kw):
 
 
 class DistArray(object):
-  '''The interface required for distributed arrays.'''
+  '''The interface required for distributed arrays.
+  
+  A distributed array should support:
+  
+     * ``fetch(ex)`` to fetch data
+     * ``update(ex, data)`` to combine an update with existing data
+     * ``foreach_tile(fn, kw)``
+  '''
 
   def fetch(self, ex):
+    '''Fetch the region specified by extent from this array.
+    
+    Args:
+      ex (Extent): Region to fetch
+    
+    Returns:
+      np.ndarray: Data from region.
+    
+    '''
     raise NotImplementedError
 
   def update(self, ex, data):
+    raise NotImplementedError
+  
+  def foreach_tile(self, mapper_fn, kw):
     raise NotImplementedError
 
   def __repr__(self):
@@ -506,11 +524,18 @@ class LocalWrapper(DistArray):
     return as_array(result_data)
 
 
-def as_array(data):
+def as_array(data): 
+  '''
+  Convert ``data`` to behave like a `DistArray`.
+  
+  If ``data`` is already a `DistArray`, it is returned unchanged.
+  Otherwise, ``data`` is wrapped to have a `DistArray` interface.
+  
+  :param data: An input array or array-like value.
+  '''
   if isinstance(data, DistArray):
     return data
 
-  # TODO(power) -- promote numpy arrays to distarrays?
   return LocalWrapper(data)
 
 
@@ -564,6 +589,13 @@ def _slice_mapper(ex, **kw):
   return result
 
 class Slice(DistArray):
+  '''
+  Represents a Numpy multi-dimensional slice on a base `DistArray`.
+  
+  Slices in Spartan do not result in a copy.  A `Slice` object is
+  returned instead.  Slice objects support mapping (``foreach_tile``)
+  and fetch operations.
+  '''
   def __init__(self, darray, idx):
     if not isinstance(idx, extent.TileExtent):
       idx = extent.from_slice(idx, darray.shape)
@@ -595,11 +627,12 @@ class Slice(DistArray):
     return self.darray.fetch(offset)
 
 
+
 def broadcast_mapper(ex, tile, mapper_fn=None, bcast_obj=None):
   raise NotImplementedError
 
 class Broadcast(DistArray):
-  '''A broadcast object mimics the behavior of Numpy broadcasting.
+  '''Mimics the behavior of Numpy broadcasting.
   
   Takes an input of shape (x, y) and a desired output shape (x, y, z),
   the broadcast object reports shape=(x,y,z) and overrides __getitem__

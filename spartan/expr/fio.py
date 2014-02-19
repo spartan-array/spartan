@@ -8,15 +8,15 @@ These include --
   The format is based on npy format, see
   https://github.com/numpy/numpy/blob/master/doc/neps/npy-format.txt for the detail.
 
-  If the ``prefix" for files is "foo", a file, foo_distarray.spf is used to 
+  If the ``prefix`` for files is "foo", a file, foo_distarray.spf is used to 
   represent the distarray-wise information including array_shape, tiles. For each 
   tile, spartan uses one format-modifed npy file to represent it, foo_$ul_$lr.spf. 
   If the tile is a sparse tile, one additional npz file, foo_$ul_$lr.npz, is used to 
   represent the data (as coo_matrix). 
-  All files are in the ``prefix" directory.
+  All files are in the ``prefix`` directory.
 
-  Spartan adds several extra key in ``dictionary" field of npy to record the information 
-  of tile. If the tile is sparse, the ``data" field contains nothing since all data 
+  Spartan adds several extra key in ``dictionary`` field of npy to record the information 
+  of tile. If the tile is sparse, the ``data`` field contains nothing since all data 
   is represented by the other npz file. 
 
 * pickle/unpickle
@@ -25,11 +25,21 @@ These include --
   compatible issues.
 '''
 
+import ast
+import os
+from struct import unpack, pack
 import sys
+
+import bz2
+import cPickle as cpickle
 import numpy as np
 import scipy.sparse as sp
-import cPickle as cpickle
-from struct import unpack, pack
+from spartan import util
+
+from .. import blob_ctx
+from ..array import distarray
+from ..array import tile
+from ..util import Assert
 from .base import force
 from .base import glom
 from .map import map
@@ -37,19 +47,18 @@ from ..core import LocalKernelResult
 from .ndarray import ndarray
 from .reduce import reduce
 from .shuffle import shuffle
-from ..array import tile
-from .. import blob_ctx
-from ..util import Assert
-from ..array import distarray
-import os
-import bz2
-import ast
 
-def spfn(**kw):
+
+def save_filename(**kw):
+  '''
+  Return the path to write a save file to, based on the
+  input parameters.
+  '''
+  #TODO(fegin): change this to use default arguments instead of kw and add comments
   fn = kw['path'] + "/" + kw['prefix'] + "/" + kw['prefix'] +  \
         "_" + str(kw['ul']) + "_" + str(kw['lr'])
   if kw['suffix'] != "":
-    fn += "_" + suffix 
+    fn += "_" + kw['suffix'] 
   if not kw['isnp']:
     fn += "_" + "sp"
     if kw['ispickle']:
@@ -81,11 +90,11 @@ def _save_reducer(ex, tile, axis, path = None, prefix = None, iszip = None):
   try:
     if iszip:
       kw['iszip'] = True
-      fn = spfn(**kw)
+      fn = save_filename(**kw)
       fp = bz2.BZ2File(fn, 'w', compresslevel = 1)
     else:
       kw['iszip'] = False
-      fn = spfn(**kw)
+      fn = save_filename(**kw)
       fp = open(fn, 'w')
 
     fp.write(cnt)
@@ -93,14 +102,14 @@ def _save_reducer(ex, tile, axis, path = None, prefix = None, iszip = None):
         tile = tile.tocoo()
         save = np.savez_compressed if iszip else np.savez
         kw['isnp'] = True
-        save(spfn(**kw), row = tile.row, col = tile.col,
+        save(save_filename(**kw), row = tile.row, col = tile.col,
              data = tile.data, shape = tile.shape)
     else:
         fp.write(tile.data)
     fp.close()
   except Exception as e:
-    util.log_error('Save %s tile(%s, %s) failed : %s' % prefix, ul, lr, e)
-    return np.asarray(0)
+    util.log_error('Save %s tile(%s, %s) failed : %s' % prefix, ex.ul, ex.lr, e)
+    raise
 
   return np.asarray(1)
 
@@ -124,7 +133,7 @@ def _save(path, prefix, array, iszip):
 
 def save(array, prefix, path = '.', iszip = False):
   '''
-  Save ``array'' to prefix_xxx.
+  Save ``array`` to prefix_xxx.
   
   This expr is not lazy and return True if success.
   Returns number of saved files (not including _dist.spf)
@@ -133,6 +142,7 @@ def save(array, prefix, path = '.', iszip = False):
   :param array: Expr or distarray
   :param prefix: Prefix of all file names
   :param iszip: Zip files or not
+  
   '''
   array = force(array)
   _save(path, prefix, array, iszip)
@@ -150,11 +160,11 @@ def _load_mapper(array, ex, prefix = None, path = None, sparse = None, dtype = N
         'ul' : ex.ul, 'lr' : ex.lr, 'ispickle' : False, 'isnp' : False}
   if iszip:
     kw['iszip'] = True
-    fn = spfn(**kw)
+    fn = save_filename(**kw)
     fp = bz2.BZ2File(fn, 'r')
   else:
     kw['iszip'] = False
-    fn = spfn(**kw)
+    fn = save_filename(**kw)
     fp = open(fn, 'r') 
 
   # In current implementation, these information are redundent
@@ -168,7 +178,7 @@ def _load_mapper(array, ex, prefix = None, path = None, sparse = None, dtype = N
   if sparse:
     fp.close()
     kw['isnp'] = True
-    a = np.load(spfn(**kw) + '.npz')
+    a = np.load(save_filename(**kw) + '.npz')
     return [(ex, sp.coo_matrix((a['data'], (a['row'], a['col'])), a['shape']))]
   else:
     if iszip:
@@ -182,7 +192,7 @@ def _load_mapper(array, ex, prefix = None, path = None, sparse = None, dtype = N
 def _load(path, prefix, iszip):
   fn = path + "/" + prefix + "/" + prefix + "_dist.spf"
   if not os.path.exists(fn):
-    raise IOException
+    raise IOError
 
   with open(fn) as fp:
     line = fp.readline()
@@ -206,7 +216,7 @@ def load(prefix, path = '.', iszip = False):
   Returns a new array with extents/tiles from prefix
 
   :param prefix: Prefix of all file names
-  :param path: Path to store the directory `prefix'' 
+  :param path: Path to store the directory ``prefix`` 
   :param iszip: Zip all files
   '''
   info = _load(path, prefix, iszip)
@@ -227,23 +237,23 @@ def _pickle_reducer(ex, tile, axis, path = None, prefix = None, sparse = None, i
   try:
     if iszip :
       kw['iszip'] = True
-      fn = spfn(**kw)
+      fn = save_filename(**kw)
       with bz2.BZ2File(fn, 'w', compresslevel = 1) as fp:
         cpickle.dump(tile, fp, -1)
     else :
       kw['iszip'] = False
-      fn = spfn(**kw)
+      fn = save_filename(**kw)
       with open(fn, "wb") as fp:
         cpickle.dump(tile, fp, -1)
   except Exception as e:
-    util.log_error('Save %s tile(%s, %s) failed : %s' % prefix, ul, lr, e)
-    return np.asarray(0)
+    util.log_error('Save %s tile(%s, %s) failed : %s' % prefix, ex.ul, ex.lr, e)
+    raise
 
   return np.asarray(1)
 
 def pickle(array, prefix, path = '.', iszip=False):
   '''
-  Save ``array'' to prefix_xxx. Use cPickle.
+  Save ``array`` to prefix_xxx. Use cPickle.
   
   This expr is not lazy and return True if success.
   Returns the number of saved files.
@@ -269,12 +279,12 @@ def _unpickle_mapper(array, ex, path = None, prefix = None, iszip = None):
         'ul' : ex.ul, 'lr' : ex.lr, 'ispickle' : True, 'isnp' : False}
   if iszip:
     kw['iszip'] = True
-    fn = spfn(**kw)
+    fn = save_filename(**kw)
     with bz2.BZ2File(fn, 'r') as fp:
       data = cpickle.load(fp)
   else:
     kw['iszip'] = False
-    fn = spfn(**kw)
+    fn = save_filename(**kw)
     with open(fn, "rb") as fp:
       data = cpickle.load(fp)
 
@@ -290,6 +300,7 @@ def unpickle(prefix, path = '.', iszip = False):
   :param prefix: Prefix of all file names
   :param path: Path to store the directory `prefix'' 
   :param iszip: Zip all files
+  
   '''
   info = _load(path, prefix, iszip)
 
@@ -368,7 +379,7 @@ def _partial_load(path, prefix, extents, iszip, ispickle):
 
 def partial_load(extents, prefix, path = ".", iszip = False):
   '''
-  Load some tiles from ``prefix" to some workers.
+  Load some tiles from ``prefix`` to some workers.
   This expr is not lazy and return blob_id(s)
 
   :param extents: A dictionary which contains extents->workers
@@ -376,12 +387,13 @@ def partial_load(extents, prefix, path = ".", iszip = False):
   :param path: Path to store the directory `prefix'' 
   :param iszip: Zip all files
   :rtype A dictionary which contains extents->blob_id
+  
   '''
   return _partial_load(path, prefix, extents, iszip, False)
 
 def partial_unpickle(extents, prefix, path = ".", iszip = False):
   '''
-  Unpickle some tiles from ``prefix" to some workers.
+  Unpickle some tiles from ``prefix`` to some workers.
   This expr is not lazy and return blob_id(s)
 
   :param extents: A dictionary which contains extents->workers
@@ -389,6 +401,7 @@ def partial_unpickle(extents, prefix, path = ".", iszip = False):
   :param path: Path to store the directory `prefix'' 
   :param iszip: Zip all files
   :rtype A dictionary which contains extents->blob_ids
+  
   '''
   return _partial_load(path, prefix, extents, iszip, True)
 

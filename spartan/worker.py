@@ -21,6 +21,15 @@ import weakref
 HEARTBEAT_TIMEOUT=10
 
 class Worker(object):
+  '''
+  Workers manage array data and computation.
+  
+  `Worker._blobs` is a map from tile id's to data.
+  
+  Workers periodically send a heartbeat message to the master; if the
+  master cannot be contacted for a sufficiently long interval, workers
+  shut themselves down.   
+  '''
   def __init__(self, master):
     self.id = -1
     self._initialized = False
@@ -30,7 +39,9 @@ class Worker(object):
     self._running = True
     self._ctx = None
     self.worker_status = core.WorkerStatus(psutil.TOTAL_PHYMEM, psutil.NUM_CPUS,
-                                           psutil.phymem_usage().percent, psutil.cpu_percent(), time.time(),
+                                           psutil.phymem_usage().percent, 
+                                           psutil.cpu_percent(), 
+                                           time.time(),
                                            [], [])
     
     self._lock = threading.Lock()
@@ -59,12 +70,16 @@ class Worker(object):
     req.worker_status = self.worker_status
     master.register(req)
 
-
-
-  def get_worker(self, worker_id):
-    return self._peers[worker_id]
-
   def initialize(self, req, handle):
+    '''
+    Initialize worker.
+    
+    Assigns this worker a unique identifier and sets up connections to all other workers in the process.
+    
+    :param req: `Initialize`
+    :param handle: `PendingRequest`
+    
+    '''
     util.log_debug('Worker %d initializing...', req.id)
     for id, (host, port) in req.peers.iteritems():
       self._peers[id] = rpc.connect(host, port)
@@ -77,6 +92,13 @@ class Worker(object):
     handle.done()
     
   def create(self, req, handle):
+    '''
+    Create a new tile.
+    
+    :param req: `CreateReq`
+    :param handle: `PendingRequest`
+    
+    '''
     with self._lock:
       assert self._initialized
       #util.log_info('Creating: %s', req.blob_id)
@@ -96,6 +118,13 @@ class Worker(object):
     handle.done(resp)
         
   def destroy(self, req, handle):
+    '''
+    Delete zero or more blobs.
+    
+    :param req: `DestroyReq`
+    :param handle: `PendingRequest`
+    
+    '''
     with self._lock:
       for id in req.ids:
         if id in self._blobs:
@@ -106,6 +135,13 @@ class Worker(object):
     handle.done()
 
   def update(self, req, handle):
+    '''
+    Apply an update to a tile.
+    
+    :param req: `UpdateReq`
+    :param handle: `PendingRequest`
+    
+    '''
     #util.log_info('W%d Update: %s', self.id, req.id)
     with self._lock:
       blob =  self._blobs[req.id]
@@ -114,6 +150,13 @@ class Worker(object):
     handle.done()
 
   def get(self, req, handle):
+    '''
+    Fetch a portion of a tile.
+    
+    :param req: `GetReq`
+    :param handle: `PendingRequest`
+    
+    '''
     if req.subslice is None:
       #util.log_info('GET: %s', type(self._blobs[req.id]))
       resp = core.GetResp(data=self._blobs[req.id])
@@ -123,6 +166,15 @@ class Worker(object):
       handle.done(resp)
 
   def _run_kernel(self, req, handle):
+    '''
+    Run a kernel over the tiles resident on this worker.
+    
+    (This operation is run in a separate thread from the main worker loop).
+    
+    :param req: `KernelReq`
+    :param handle: `PendingRequest`
+    
+    '''
     if FLAGS.profile_worker:
       self._kernel_prof.enable()
     
@@ -161,9 +213,26 @@ class Worker(object):
       self._kernel_prof.disable()
 
   def run_kernel(self, req, handle):
+    '''
+    Run a kernel on tiles local to this worker.
+    
+    :param req: `KernelReq`
+    :param handle: `PendingRequest`
+    
+    '''
     self._kernel_threads.apply_async(self._run_kernel, args=(req, handle))
       
   def shutdown(self, req, handle):
+    '''
+    Shutdown this worker.
+    
+    Shutdown is deferred to another thread to ensure the RPC reply
+    is sent before the poll loop is killed.
+    
+    :param req: 
+    :param handle:
+    
+    '''
     util.log_info('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_worker)
     if FLAGS.profile_worker:
       try:
@@ -182,6 +251,11 @@ class Worker(object):
     self._server.shutdown()
   
   def wait_for_shutdown(self):
+    '''
+    Wait for the worker to shutdown.
+    
+    Periodically send heartbeat updates to the master.
+    '''
     last_heartbeat = time.time()
     while self._running:
       now = time.time()
@@ -190,16 +264,26 @@ class Worker(object):
         continue
       
       self.worker_status.update_status(psutil.phymem_usage().percent, psutil.cpu_percent(), now)
-      future = self._ctx.heartbeat(self.id, self.worker_status, HEARTBEAT_TIMEOUT)  
+      future = self._ctx.heartbeat(self.worker_status, HEARTBEAT_TIMEOUT)  
       try:
         future.wait()
-      except TimeoutException, ex:
+      except TimeoutException:
         util.log_info("Exit due to heartbeat message timeout.")
         sys.exit(0)
 
       last_heartbeat = time.time()
 
+
 def _start_worker(master, local_id):
+  '''
+  Start a worker, register it with the master process, and wait
+  until the worker is shutdown.
+  
+  Runs in a subprocess.
+  
+  :param master: (host, port)
+  :param local_id: index (from 0..#num_workers) of this worker on the local machine.
+  '''
   util.log_info('Worker starting up... Master: %s Profile: %s', master, FLAGS.profile_worker)
   rpc.set_default_timeout(FLAGS.default_rpc_timeout)
   if FLAGS.use_single_core:

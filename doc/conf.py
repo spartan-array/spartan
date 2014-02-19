@@ -12,7 +12,9 @@
 # serve to show the default.
 
 import sys, os
-import sphinx_bootstrap_theme
+#import sphinx_bootstrap_theme
+
+sys.path.insert(0, os.path.abspath('../build/lib.linux-x86_64-2.7/'))
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -27,6 +29,7 @@ import sphinx_bootstrap_theme
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 
+              'sphinxcontrib.napoleon',
               'sphinx.ext.intersphinx', 
               'sphinx.ext.viewcode',
               ]
@@ -80,7 +83,7 @@ default_role = 'py:obj'
 
 # If true, the current module name will be prepended to all description
 # unit titles (such as .. function::).
-#add_module_names = True
+add_module_names = False
 
 # If true, sectionauthor and moduleauthor directives will be shown in the
 # output. They are ignored by default.
@@ -100,7 +103,7 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'bootstrap'
+html_theme = 'pyramid'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -108,7 +111,7 @@ html_theme = 'bootstrap'
 #html_theme_options = {}
 
 # Add any paths that contain custom themes here, relative to this directory.
-html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
+#html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
@@ -137,7 +140,7 @@ html_static_path = ['_static']
 
 # If true, SmartyPants will be used to convert quotes and dashes to
 # typographically correct entities.
-#html_use_smartypants = True
+html_use_smartypants = True
 
 # Custom sidebar templates, maps document names to template names.
 #html_sidebars = {}
@@ -173,7 +176,7 @@ html_static_path = ['_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'Spartandoc'
+htmlhelp_basename = 'spartan-doc'
 
 
 # -- Options for LaTeX output --------------------------------------------------

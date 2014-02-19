@@ -385,6 +385,12 @@ def as_list(x):
 
 
 def get_core_mapping():
+  '''
+  Read /proc/cpuinfo and return a dictionary mapping from:
+  
+  ``processor_id -> (package, core)``
+  
+  '''
   lines = open('/proc/cpuinfo').read().strip().split('\n')
   package_id = core_id = None
   id = 0
@@ -402,17 +408,12 @@ def get_core_mapping():
   return cpus
 
 
-def get_good_cores():
-  """
-  Return a list of processor ids that correspond to the primary thread on each core.
-  :return:
-  """
-  cpus = get_core_mapping()
-  unique = {}
-
-
 def memoize(f):
-  '''Cache outputs of ``f``'''
+  '''Decorator.
+  
+  Cache outputs of ``f``; repeated calls with the same arguments will be
+  served from the cache.
+  '''
   _cache = {}
   def wrapped(*args):
     if not args in _cache:
@@ -423,3 +424,17 @@ def memoize(f):
   wrapped.__doc__ = f.__doc__
   return wrapped
 
+def copy_docstring(source_function):
+  '''
+  Decorator.
+  
+  Copy the docstring from ``source_function`` to this function.
+  '''
+  def _decorator(func):
+    source_doc = source_function.__doc__
+    if func.__doc__ == None:
+      func.__doc__ = source_doc
+    else:
+      func.__doc__ = source_doc + '\n\n' + func.__doc__
+    return func
+  return _decorator
