@@ -25,8 +25,8 @@ class CheckpointExpr(Expr):
         ctx = blob_ctx.get()
         extents = ctx.get_workers_for_reload(cached_result)
         new_blobs = partial_load(extents, "%s" % self.expr_id, path = self.path, iszip = False)
-        for ex, blob_id in new_blobs.iteritems():
-          cached_result.tiles[ex] = blob_id
+        for ex, tile_id in new_blobs.iteritems():
+          cached_result.tiles[ex] = tile_id
           cached_result.bad_tiles.remove(ex)
         return cached_result
       else:

@@ -1,5 +1,11 @@
 '''
-Distarray write operations and expr.
+Operations for updating slices of arrays.
+
+To preserve the non-mutation semantics required for optimizations
+to be correct, writing to an array should not actually mutate the
+original array, but should instead create a new array with the 
+appropriate region updated.  This code currently mutates arrays
+in place, and therefore should be used with care.
 '''
 
 import numpy as np
@@ -26,7 +32,7 @@ def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
     v = dst_slice.fetch(dst_ex)
     futures.append(source.update(intersection, v, wait=False))
 
-  return LocalKernelResult(None, futures)
+  return LocalKernelResult(result=None, futures=futures)
 
 
 @node_type
@@ -69,6 +75,7 @@ def write(array, src_slices, data, dst_slices):
   :param data: data
   :param dst_slices: slices for data
   :rtype: `Expr`
+  
   '''
   return WriteArrayExpr(array = array, src_slices = src_slices,
                         data = data, dst_slices = dst_slices)
@@ -81,6 +88,7 @@ def from_file(fn, file_type = 'numpy'):
 
   :param fn: `file name`
   :rtype: `Expr`
+  
   '''
 
   if file_type == 'numpy':
@@ -102,6 +110,7 @@ def from_numpy(npa):
 
   :param npa: `numpy.ndarray`
   :rtype: `Expr`
+  
   '''
   if (not isinstance(npa, np.ndarray)) and (not sp.issparse(npa)):
     raise TypeError("Expected ndarray, got: %s" % type(npa))

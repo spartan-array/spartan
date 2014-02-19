@@ -131,6 +131,7 @@ def _save(path, prefix, array, iszip):
     else:
       fp.write("DENSITY\n")
 
+
 def save(array, prefix, path = '.', iszip = False):
   '''
   Save ``array`` to prefix_xxx.
@@ -138,7 +139,7 @@ def save(array, prefix, path = '.', iszip = False):
   This expr is not lazy and return True if success.
   Returns number of saved files (not including _dist.spf)
 
-  :param path: Path to store the directory `prefix'' 
+  :param path: Path to store the directory ``prefix`` 
   :param array: Expr or distarray
   :param prefix: Prefix of all file names
   :param iszip: Zip files or not
@@ -259,9 +260,10 @@ def pickle(array, prefix, path = '.', iszip=False):
   Returns the number of saved files.
 
   :param array: Expr or distarray
-  :param path: Path to store the directory `prefix'' 
+  :param path: Path to store the directory ``prefix`` 
   :param prefix: Prefix of all file names
   :param iszip: Zip all files
+  
   '''
   array = force(array)
   _save(path, prefix, array, iszip)
@@ -298,7 +300,7 @@ def unpickle(prefix, path = '.', iszip = False):
   Returns a new array with extents/tiles from fn
 
   :param prefix: Prefix of all file names
-  :param path: Path to store the directory `prefix'' 
+  :param path: Path to store the directory ``prefix`` 
   :param iszip: Zip all files
   
   '''
@@ -309,9 +311,9 @@ def unpickle(prefix, path = '.', iszip = False):
                  fn = _unpickle_mapper, 
                  kw = {'path' : path, 'prefix' : prefix, 'iszip' : iszip})
 
-def tile_mapper(blob_id, blob, tiles = None, user_fn=None, **kw):
+def _tile_mapper(tile_id, blob, tiles = None, user_fn=None, **kw):
   for k, v in tiles.iteritems():
-    if v == blob_id:
+    if v == tile_id:
       ex = k
       break
 
@@ -323,12 +325,12 @@ def tile_mapper(blob_id, blob, tiles = None, user_fn=None, **kw):
     for ex, v in user_result:
       Assert.eq(ex.shape, v.shape, 'Bad shape from %s' % user_fn)
       result_tile = tile.from_data(v)
-      tile_id = ctx.create(result_tile).wait().blob_id
+      tile_id = ctx.create(result_tile).wait().tile_id
       results.append((ex, tile_id))
   
-  return LocalKernelResult(results, None)
+  return LocalKernelResult(result=results)
 
-def map_tiles(targets, mapper_fn, tiles, kw=None):
+def _map_tiles(targets, mapper_fn, tiles, kw=None):
     ctx = blob_ctx.get()
 
     if kw is None: kw = {}
@@ -340,9 +342,9 @@ def map_tiles(targets, mapper_fn, tiles, kw=None):
 
     return ctx.partial_map(targets.itervalues(),
                            tiles.values(),
-                           mapper_fn = tile_mapper,
-                           reduce_fn = None,
+                           mapper_fn = _tile_mapper,
                            kw=kw)
+
 
 def _partial_load(path, prefix, extents, iszip, ispickle):
   info = _load(path, prefix, iszip)
@@ -358,7 +360,7 @@ def _partial_load(path, prefix, extents, iszip, ispickle):
     targets[i] = 1
 
   for ex in extents:
-    tiles[ex] = tiles[ex].wait().blob_id
+    tiles[ex] = tiles[ex].wait().tile_id
   
   mapper = _load_mapper if not ispickle else _unpickle_mapper
   if ispickle:
@@ -366,10 +368,10 @@ def _partial_load(path, prefix, extents, iszip, ispickle):
   else:
     kw = {'path' : path, 'prefix' : prefix, 'sparse' : info['sparse'], 
           'dtype' : info['dtype'], 'iszip' : iszip}
-  result = map_tiles(targets, mapper, tiles, kw = kw)
+  result = _map_tiles(targets, mapper, tiles, kw = kw)
 
   loaded_tiles = {}
-  for blob_id, v in result.iteritems():
+  for tile_id, v in result.iteritems():
     for ex, newid in v:
       loaded_tiles[ex] = newid
 
@@ -377,30 +379,34 @@ def _partial_load(path, prefix, extents, iszip, ispickle):
 
   return loaded_tiles
 
+
 def partial_load(extents, prefix, path = ".", iszip = False):
   '''
-  Load some tiles from ``prefix`` to some workers.
-  This expr is not lazy and return blob_id(s)
+  Load some tiles from ``prefix`` to some workers.  
+  
+  This expr is not lazy and return tile_id(s).
 
   :param extents: A dictionary which contains extents->workers
   :param prefix: Prefix of all file names
-  :param path: Path to store the directory `prefix'' 
+  :param path: Path to store the directory ``prefix`` 
   :param iszip: Zip all files
-  :rtype A dictionary which contains extents->blob_id
-  
+  :rtype: A dictionary which contains extents->tile_id
+
   '''
   return _partial_load(path, prefix, extents, iszip, False)
+
 
 def partial_unpickle(extents, prefix, path = ".", iszip = False):
   '''
   Unpickle some tiles from ``prefix`` to some workers.
-  This expr is not lazy and return blob_id(s)
+  
+  This expr is not lazy and return tile_id(s).
 
   :param extents: A dictionary which contains extents->workers
   :param prefix: Prefix of all file names
-  :param path: Path to store the directory `prefix'' 
+  :param path: Path to store the directory ``prefix``
   :param iszip: Zip all files
-  :rtype A dictionary which contains extents->blob_ids
+  :rtype: A dictionary which contains extents->tile_ids
   
   '''
   return _partial_load(path, prefix, extents, iszip, True)

@@ -1,9 +1,8 @@
-'''Lazy arrays.
-
-Expr operations are not performed immediately, but are set aside
-and built into a control flow graph, which is then compiled
-into a series of primitive array operations.
 '''
+Defines the base class of all expressions (`Expr`), as 
+well as common subclasses for collections.
+'''
+
 import collections
 import weakref
 
@@ -19,7 +18,10 @@ from ..config import FLAGS
 from ..rpc import TimeoutException
 
 class NotShapeable(Exception):
-  pass
+  '''
+  Thrown when the shape for an expression cannot be computed without 
+  first evaluating the expression. 
+  '''
 
 unique_id = iter(xrange(10000000))
 
@@ -30,10 +32,9 @@ def _map(*args, **kw):
   (Map is implemented in map.py)
   '''
   fn = kw['fn']
-  numpy_expr = kw.get('numpy_expr', None)
 
   from .map import map
-  return map(args, fn, numpy_expr)
+  return map(args, fn)
 
 def expr_like(expr, **kw):
   '''Construct a new expression like ``expr``.
@@ -184,7 +185,8 @@ class Expr(object):
 
   def dependencies(self):
     '''
-    :rtype: Dictionary mapping from name to `Expr`. 
+    Returns:
+      Dictionary mapping from name to `Expr`. 
     '''
     return dict([(k, getattr(self, k)) for k in self.members])
 
@@ -193,13 +195,18 @@ class Expr(object):
     Compute the shape of this expression.
     
     If the shape is not available (data dependent), raises `NotShapeable`.
+    
+    Returns:
+      tuple: Shape of this expression.
     '''
     raise NotShapeable
 
   def visit(self, visitor):
     '''
-    Apply visitor to all children of this node, returning a new `Expr` of the same type. 
+    Apply visitor to all children of this node, returning a new `Expr` of the same type.
+     
     :param visitor: `OptimizePass`
+    
     '''
     deps = {}
     for k in self.members:
@@ -242,6 +249,11 @@ class Expr(object):
     Evaluate an `Expr`.  
    
     Dependencies are evaluated prior to evaluating the expression.
+    The result of the evaluation is stored in the expression cache,
+    future calls to evaluate will return the cached value.
+    
+    Returns:
+      DistArray:
     '''
     cache = self.cache()
     if cache is not None:
@@ -275,6 +287,10 @@ class Expr(object):
   def _evaluate(self, ctx, deps):
     '''
     Evaluate this expression.
+    
+    Args:
+      ctx: `BlobCtx` for interacting with the cluster
+      deps (dict): Map from name to `DistArray` or scalar.
     '''
     raise NotImplementedError
 
@@ -328,6 +344,7 @@ class Expr(object):
     this array.
     
     :param new_shape: `tuple` with same total size as original shape.
+    
     '''
     from . import builtins
     return builtins.reshape(self, new_shape)
@@ -346,6 +363,7 @@ class Expr(object):
     If the value has been computed already this always succeeds.
     
     :rtype: `tuple`
+    
     '''
     cache = self.cache()
     if cache is not None:
@@ -361,9 +379,7 @@ class Expr(object):
     return np.prod(self.shape)
   
   def force(self):
-    '''
-    Evaluate this expression (and all dependencies).
-    '''
+    'Evaluate this expression (and all dependencies).'
     return self.evaluate()
 
   def optimized(self):
@@ -371,6 +387,7 @@ class Expr(object):
     Return an optimized version of this expression graph.
     
     :rtype: `Expr`
+    
     '''
     return optimized_dag(self)
 
@@ -380,6 +397,7 @@ class Expr(object):
     distributed array into a Numpy array.
     
     :rtype: `np.ndarray`
+    
     '''
     return glom(self)
 
