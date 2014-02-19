@@ -12,7 +12,15 @@ def _build_mapper(ex,
                   min_samples_leaf,
                   max_features,
                   bootstrap):
-  """ mapper kernel for building classifier forest """
+  """
+  Mapper kernel for building a random forest classifier.  
+
+  Each kernel instance fetches the entirety of the feature and prediction 
+  (X and y) arrays, and invokes sklearn to create a local random forest classifier.
+
+  The criterion, max_depth, min_samples_split, min_samples_leaf, 
+  max_features and bootstrap options are passed to the `sklearn.RandomForest` method.
+  """
   n_estimators = ex.shape[0]
   X = X.glom()
   y = y.glom()
@@ -132,16 +140,16 @@ class RandomForestClassifier(object):
     n_workers = ctx.num_workers
     
     if self.n_estimators < n_workers:
-      tile_hint = (1, 1)
+      tile_hint = (1,)
     else:
-      tile_hint = (self.n_estimators / n_workers, 1)
+      tile_hint = (self.n_estimators / n_workers,)
     
     """
     task_array is used for deciding how many trees each worker needs to train.
     e.g. If we train 20 trees on 5 workers. Then the tile looks like: 
-          (0:4, 0:1), (4:8, 0:1), (8:12, 0:1), (12:16, 0:1), (16:20, 0:1)
+          (0:4), (4:8), (8:12), (12:16), (16:20)
     """
-    task_array = expr.ndarray((self.n_estimators, 1), tile_hint=tile_hint)
+    task_array = expr.ndarray((self.n_estimators,), tile_hint=tile_hint)
     task_array = task_array.force()
 
     X = X.force()

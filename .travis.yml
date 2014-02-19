@@ -10,4 +10,5 @@ install:
   - LANG=C pip install dsltools
   - LANG=C pip install cython
   - LANG=C python setup.py develop
+  - LANG=C pip install sklearn
 script: nosetests -v --logging-level=INFO --logging-clear-handlers --logging-format='%(filename)s:%(lineno)s [%(funcName)s] %(message)s'
