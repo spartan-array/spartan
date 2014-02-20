@@ -107,12 +107,13 @@ def reshape(array, new_shape, tile_hint=None):
   '''
   Reshape/retile ``array``.
 
-  Returns a ReshapeExpr with the given shape.
-
   Args: 
-    array (Expr): Source array to be reshaped.
+    array : `Expr` to reshape.
     new_shape (tuple): Target shape.
     tile_hint (tuple):
+
+  Returns:
+    `ReshapeExpr`: Reshaped array.
   '''
 
   Assert.isinstance(new_shape, tuple)
