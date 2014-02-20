@@ -79,11 +79,11 @@ exclude_patterns = ['_build']
 default_role = 'py:obj'
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
-#add_function_parentheses = True
+add_function_parentheses = True
 
 # If true, the current module name will be prepended to all description
 # unit titles (such as .. function::).
-add_module_names = False
+add_module_names = True
 
 # If true, sectionauthor and moduleauthor directives will be shown in the
 # output. They are ignored by default.
@@ -265,7 +265,25 @@ intersphinx_mapping = { 'http://docs.scipy.org/doc/numpy': None,
 
 autodoc_default_flags = [
   'members',
-  'undoc-members',
+  'no-special-members',
+  'no-private-members',
   'show-inheritance'
   ]
 
+autoclass_content = 'both'
+#nitpicky = True
+
+def skip_boring(app, what, name, obj, skip, options):
+  if name in ['members', 'node_items', 'node_type']:
+    return True
+  return False
+
+# def patch_refs(app, env, node, contnode):
+#   builder = app.builder
+#   reftype = node['reftype']
+#   reftarget = node['reftarget']
+#   
+  
+def setup(app):
+  #app.connect('missing-reference', patch_refs)
+  app.connect('autodoc-skip-member', skip_boring)

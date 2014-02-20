@@ -65,14 +65,6 @@ expr Package
     :undoc-members:
     :show-inheritance:
 
-:mod:`loop` Module
-------------------
-
-.. automodule:: spartan.expr.loop
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 :mod:`map` Module
 -----------------
 

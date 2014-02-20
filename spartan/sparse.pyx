@@ -225,16 +225,16 @@ def multiple_slice(X not None, list slices):
         return multiple_slice_coo(X, slices)
     elif scipy.sparse.issparse(X):
         l = []
-        for (blob_id, src_slice, dst_slice) in slices:
+        for (tile_id, src_slice, dst_slice) in slices:
             result = X[src_slice].tocoo()
             if result.getnnz() == 0:
                 continue
-            l.append((blob_id, dst_slice, result))
+            l.append((tile_id, dst_slice, result))
         return l
     else:
         l = []
-        for (blob_id, src_slice, dst_slice) in slices:
-            l.append((blob_id, dst_slice, X[src_slice]))
+        for (tile_id, src_slice, dst_slice) in slices:
+            l.append((tile_id, dst_slice, X[src_slice]))
         return l
 
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
@@ -246,7 +246,7 @@ def multiple_slice_coo(X not None, list slices):
 
     cdef list results = []
     cdef int idx = 0, end_idx
-    for (blob_id, src_slice, dst_slice) in slices:
+    for (tile_id, src_slice, dst_slice) in slices:
         if src_slice[0].stop <= rows[idx]:
             continue
 
@@ -255,7 +255,7 @@ def multiple_slice_coo(X not None, list slices):
 
         end_idx = numpy.searchsorted(rows[idx:], src_slice[0].stop) + idx
         #print src_slice[0], rows[idx], rows[end_idx-1]
-        results.append((blob_id, dst_slice, scipy.sparse.coo_matrix((data[idx:end_idx], (rows[idx:end_idx]-src_slice[0].start, cols[idx:end_idx])), 
+        results.append((tile_id, dst_slice, scipy.sparse.coo_matrix((data[idx:end_idx], (rows[idx:end_idx]-src_slice[0].start, cols[idx:end_idx])),
                                             shape=tuple([slice.stop-slice.start for slice in src_slice]))))
 
         idx = end_idx

@@ -1,5 +1,18 @@
 #!/usr/bin/env python
 
+'''
+This module defines the `Worker` class and related helper functions.
+
+Workers in Spartan manage array data and computation; methods are 
+available for creating, updating, reading and deleting *tiles* of
+arrays.  Workers can also run a user-specified function on a set
+of tiles.
+
+Workers periodically send a heartbeat message to the master; if the
+master cannot be contacted for a sufficiently long interval, workers
+shut themselves down.   
+'''
+
 import cProfile
 import multiprocessing
 from multiprocessing.pool import ThreadPool
@@ -22,13 +35,15 @@ HEARTBEAT_TIMEOUT=10
 
 class Worker(object):
   '''
-  Workers manage array data and computation.
+  Spartan workers generally correspond to one core of a machine.
   
-  `Worker._blobs` is a map from tile id's to data.
+  Workers manage the storage of array data and running of kernel
+  functions.
   
-  Workers periodically send a heartbeat message to the master; if the
-  master cannot be contacted for a sufficiently long interval, workers
-  shut themselves down.   
+  Attributes:
+      id (int): The unique identifier for this worker
+      _peers (dict): Mapping from worker id to RPC client
+      _blobs (dict): Mapping from tile id to tile.
   '''
   def __init__(self, master):
     self.id = -1
@@ -76,8 +91,9 @@ class Worker(object):
     
     Assigns this worker a unique identifier and sets up connections to all other workers in the process.
     
-    :param req: `Initialize`
-    :param handle: `PendingRequest`
+    Args:
+        req (InitializeReq): foo
+        handle (PendingRequest): bar
     
     '''
     util.log_debug('Worker %d initializing...', req.id)
@@ -95,26 +111,26 @@ class Worker(object):
     '''
     Create a new tile.
     
-    :param req: `CreateReq`
+    :param req: `CreateTileReq`
     :param handle: `PendingRequest`
     
     '''
     with self._lock:
       assert self._initialized
-      #util.log_info('Creating: %s', req.blob_id)
-      Assert.eq(req.blob_id.worker, self.id)
+      #util.log_info('Creating: %s', req.tile_id)
+      Assert.eq(req.tile_id.worker, self.id)
   
-      if req.blob_id.id == -1:
-        id = self._ctx.create_local()
+      if req.tile_id.id == -1:
+        id = self._ctx.new_tile_id()
       else:
-        id = req.blob_id
+        id = req.tile_id
   
       self._blobs[id] = req.data
-      resp = core.CreateResp(blob_id=id)
+      resp = core.CreateTileResp(tile_id=id)
     handle.done(resp)
 
   def tile_op(self, req, handle):
-    resp = core.ResultResp(result=req.fn(self._blobs[req.blob_id]))
+    resp = core.RunKernelResp(result=req.fn(self._blobs[req.tile_id]))
     handle.done(resp)
         
   def destroy(self, req, handle):
@@ -183,13 +199,13 @@ class Worker(object):
     try:
       blob_ctx.set(self._ctx)
       results = {}
-      for blob_id in req.blobs:
-        #util.log_info('%s %s', blob_id, blob_id in self._blobs)
-        if blob_id in self._blobs:
+      for tile_id in req.blobs:
+        #util.log_info('%s %s', tile_id, tile_id in self._blobs)
+        if tile_id in self._blobs:
           #util.log_info('W%d kernel start', self.id)
-          blob = self._blobs[blob_id]
-          map_result = req.mapper_fn(blob_id, blob, **req.kw)
-          results[blob_id] = map_result.result
+          blob = self._blobs[tile_id]
+          map_result = req.mapper_fn(tile_id, blob, **req.kw)
+          results[tile_id] = map_result.result
           
           if map_result.futures is not None:
             futures.append(map_result.futures)
@@ -229,8 +245,8 @@ class Worker(object):
     Shutdown is deferred to another thread to ensure the RPC reply
     is sent before the poll loop is killed.
     
-    :param req: 
-    :param handle:
+    :param req: `EmptyMessage`
+    :param handle: `PendingRequest`
     
     '''
     util.log_info('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_worker)

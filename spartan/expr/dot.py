@@ -84,7 +84,7 @@ class DotExpr(Expr):
     if isinstance(bv, np.ndarray):
       fn_kw = dict(numpy_data = bv)
       return av.map_to_array(mapper_fn = notarget_mapper,
-                             kw = dict(inputs=av, map_fn=_dot_numpy, fn_kw=fn_kw))
+                             kw = dict(source=av, map_fn=_dot_numpy, fn_kw=fn_kw))
     else:
       tile_hint = np.maximum(av.tile_shape(), bv.tile_shape())
       sparse=(av.sparse and bv.sparse)
@@ -94,7 +94,7 @@ class DotExpr(Expr):
       fn_kw = dict(av = av, bv = bv)
       av.foreach_tile(mapper_fn = target_mapper,
                       kw = dict(map_fn=_dot_mapper,
-                                inputs=av,
+                                source=av,
                                 target=target,
                                 fn_kw=fn_kw))
       return target

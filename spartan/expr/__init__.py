@@ -1,10 +1,15 @@
 #!/usr/bin/env python
 
 """
-Lazy expression DAGs.
+Definitions of expressions and optimizations.
 
-All expression operations are subclasses of the `Expr` class, which
-by default performs all operations lazily.
+In Spartan, operations are not performed immediately.  Instead, they are
+represented using a graph of `Expr` nodes.  Expression graphs can be
+evaluated using the `Expr.evaluate` or `Expr.force` methods.
+
+The `base` module contains the definition of `Expr`, the base class for all
+types of expressions.  It also defines subclasses for wrapping common 
+Python values: lists (`ListExpr`), dicts (`DictExpr`) and tuples ((`TupleExpr`).
 
 Operations are built up using a few high-level operations -- these all
 live in their own modules:
@@ -16,7 +21,6 @@ live in their own modules:
 * Slicing/indexing `spartan.expr.index`.   
 
 Optimizations on DAGs live in `spartan.expr.optimize`.
-
 """
 
 from base import Expr, evaluate, optimized_dag, glom, eager, lazify, force,  NotShapeable
@@ -29,7 +33,7 @@ from .reduce import reduce
 from .shuffle import shuffle
 from .write_array import from_numpy, from_file, write
 from .checkpoint import checkpoint
-from .fio import *
+from .fio import save, load, pickle, unpickle, partial_load, partial_unpickle
 from .reshape import reshape
 from .transpose import transpose
 from .dot import dot

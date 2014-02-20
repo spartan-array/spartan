@@ -6,11 +6,6 @@
 Spartan Documentation
 ===================================
 
-Spartan provides a *distributed array language* with numpy-like
-syntax and behavior.
-
-Packages:
-
 .. toctree::
    :maxdepth: 2
    
