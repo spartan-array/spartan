@@ -26,7 +26,7 @@ def benchmark_svm(ctx, timer):
   svm = SVM()
   
   t1 = datetime.now()
-  svm.train(data, labels)
+  svm.fit(data, labels, 'smo_1998')
   t2 = datetime.now()
   print 'train time:', t2 - t1
   
@@ -42,7 +42,7 @@ def benchmark_svm(ctx, timer):
   print 'predict precision:', correct * 1.0 / 10
   
   t1 = datetime.now()  
-  svm.new_train(data, labels)
+  svm.fit(data, labels, 'smo_2005')
   t2 = datetime.now()
   print 'train time:', t2 - t1
   
