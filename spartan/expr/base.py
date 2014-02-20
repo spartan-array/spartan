@@ -87,9 +87,12 @@ class EvalCache(object):
   def deregister(self, expr_id):
     self.refs[expr_id] -= 1
     if self.refs[expr_id] == 0:
-      #util.log_info('Destroying...')
-      if expr_id in self.cache: 
+      util.log_debug('Destroying... %s', expr_id)
+      if expr_id in self.cache:
+        #import objgraph
+        #objgraph.show_backrefs([self.cache[expr_id]], filename='%s-refs.png' % expr_id)
         del self.cache[expr_id]
+
       del self.refs[expr_id]
 
 class ExprTrace(object):
