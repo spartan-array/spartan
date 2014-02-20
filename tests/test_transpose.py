@@ -23,3 +23,13 @@ class TransposeTest(test_common.ClusterTest):
     Assert.all_eq(a.glom().todense(), sp.eye(107, 401).transpose().todense())
     Assert.all_eq(b.glom().todense(), sp.eye(401, 107).transpose().todense())
 
+  def test_transpose_dot(self):
+    npa1 = np.random.random((401, 97))
+    npa2 = np.random.random((401, 97))
+    result = np.dot(npa1, np.transpose(npa2))
+
+    t1 = expr.from_numpy(npa1)
+    t2 = expr.from_numpy(npa2)
+    t3 = expr.dot(t1, expr.transpose(t2))
+    Assert.all_eq(result, t3.glom())
+
