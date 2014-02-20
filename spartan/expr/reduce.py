@@ -71,15 +71,6 @@ class ReduceExpr(Expr):
 
   def label(self):
     return 'reduce(%s)' % self.op.fn.__name__
-
-  def compute_shape(self):
-    shapes = [i.shape for i in self.children.values()]
-    child_shape = collections.defaultdict(int)
-    for s in shapes:
-      for i, v in enumerate(s):
-        child_shape[i] = max(child_shape[i], v)
-    input_shape = tuple([child_shape[i] for i in range(len(child_shape))])
-    return extent.shape_for_reduction(input_shape, self.axis)
   
   def _evaluate(self, ctx, deps):
     children = deps['children']
