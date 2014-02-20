@@ -27,6 +27,11 @@ import appdirs
 from spartan import util
 
 class Flag(object):
+  '''Base object for a representing a command line flag.
+  
+  Subclasses must implement the ``set`` operation to parse
+  a flag value from a command line string.
+  '''
   def __init__(self, name, default=None, help=''):
     self.name = name
     self.val = default
@@ -48,13 +53,19 @@ class StrFlag(Flag):
     self.val = str
 
 class BoolFlag(Flag):
+  '''Boolean flag.  
+  
+  Accepts '0' or 'false' for false values, '1' or 'true' for true values. 
+  '''
   def set(self, str):
     str = str.lower()
     str = str.strip()
 
     if str == 'false' or str == '0': val = False
-    else: val = True
-    #print 'Bool %s "%s" %s' % (self.name, str, val)
+    elif str == 'true' or str == '1': val = True
+    else: 
+      assert False, 'Invalid value for boolean flag: "%s"' % str 
+
     self.val = val
 
   def _str(self):
@@ -119,10 +130,11 @@ FLAGS.add(LogLevelFlag('log_level', logging.INFO))
 FLAGS.add(IntFlag('num_workers', default=3))
 FLAGS.add(IntFlag('port_base', default=10000, help='Port master should listen on'))
 FLAGS.add(StrFlag('tile_assignment_strategy', default='round_robin', help='Decide tile to worker mapping (round_robin, random, performance)'))
-FLAGS.add(BoolFlag('optimized_stack', default=False))
 FLAGS.add(StrFlag('checkpoint_path', default='/tmp/spartan/checkpoint/', help='Path for saving checkpoint information'))
 FLAGS.add(IntFlag('default_rpc_timeout', default=60))
 
+FLAGS.add(BoolFlag('opt_keep_stack', default=False))
+FLAGS.add(BoolFlag('capture_expr_stack', default=False))
 
 # print flags in sorted order
 # from http://stackoverflow.com/questions/12268602/sort-argparse-help-alphabetically

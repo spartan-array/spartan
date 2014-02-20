@@ -10,25 +10,29 @@ from .. import blob_ctx, util
 from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from ..array import extent, tile, distarray
-from .map import MapResult
+from ..core import LocalKernelResult
+from .shuffle import target_mapper
 
-def _transpose_mapper(array, ex, _dest_shape):
-  tile = array.fetch(ex)
-  target_ex = extent.create(ex.ul[::-1], ex.lr[::-1], _dest_shape)
-  if not array.sparse:
-    yield target_ex, np.transpose(tile)
-  else:
-    yield target_ex, tile.transpose()
+class Transpose(distarray.DistArray):
+  '''Transpose the underlying array base.
 
-def _target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
-  result = list(map_fn(inputs, ex, **fn_kw))
+  Transpose does not create a copy of the base array. Instead the fetch 
+  method is overridden: the dimensions for the requested extent are 
+  reversed and the "transposed" request is sent to the underlying base array.
+  '''
 
-  futures = rpc.FutureGroup()
-  if result is not None:
-    for ex, v in result:
-      futures.append(target.update(ex, v, wait=False))
+  def __init__(self, base):
+    Assert.isinstance(base, distarray.DistArray)
+    self.base = base
+    self.shape = self.base.shape[::-1]
+    self.dtype = base.dtype
+    self.sparse = self.base.sparse
+    self.bad_tiles = []
 
-  return MapResult(None, futures)
+  def fetch(self, ex):
+    base_ex = extent.create(ex.ul[::-1], ex.lr[::-1], self.base.shape)
+    tile = self.base.fetch(base_ex)
+    return tile.transpose()
 
 @node_type
 class TransposeExpr(Expr):
@@ -40,22 +44,18 @@ class TransposeExpr(Expr):
   def _evaluate(self, ctx, deps):
     v = deps['array']
     shape = v.shape[::-1]
-    fn_kw = {'_dest_shape' : shape}
 
-    target = distarray.create(shape, dtype = v.dtype, sparse = v.sparse)
-    v.foreach_tile(mapper_fn = _target_mapper,
-                   kw = {'map_fn':_transpose_mapper, 'inputs':v,
-                         'target':target, 'fn_kw':fn_kw})
-    return target
-
+    return Transpose(v)
 
 def transpose(array, tile_hint = None):
   '''
   Transpose ``array``.
-
-  Return a TransposeExpr.
-
-  :param array: `Expr`
+  
+  Args:
+    array: `Expr` to transpose.
+    
+  Returns:
+    `TransposeExpr`: Transpose array.
   '''
 
   array = lazify(array)

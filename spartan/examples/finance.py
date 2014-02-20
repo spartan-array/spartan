@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+'''Financial application examples.'''
+
 from spartan.expr import sqrt, exp, norm_cdf, eager, log, abs, mean
 from spartan import util
 

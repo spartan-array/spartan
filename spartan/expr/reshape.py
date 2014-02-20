@@ -10,63 +10,60 @@ from .. import blob_ctx, util
 from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from ..array import extent, tile, distarray
-from .map import MapResult
+from ..core import LocalKernelResult
+from .shuffle import target_mapper
 
-def _reshape_mapper(array, ex, _dest_shape):
+class Reshape(distarray.DistArray):
+  '''Reshape the underlying array base.
 
-  ravelled_ul = extent.ravelled_pos(ex.ul, ex.array_shape)
-  ravelled_lr = extent.ravelled_pos([lr - 1 for lr in ex.lr], ex.array_shape)
+  Reshape does not create a copy of the base array. Instead the fetch
+  method is overridden:
+  1. Caculate the underlying extent containing the requested extent.
+  2. Fetch the underlying extent.
+  3. Trim the fetched tile and reshape to the requested tile.
+  '''
 
-  (target_ravelled_ul, target_ravelled_lr) = extent.find_rect(ravelled_ul, ravelled_lr, _dest_shape)
+  def __init__(self, base, shape):
+    Assert.isinstance(base, distarray.DistArray)
+    self.base = base
+    self.shape = shape
+    self.dtype = base.dtype
+    self.sparse = self.base.sparse
+    self.bad_tiles = []
 
-  target_ul = extent.unravelled_pos(target_ravelled_ul, _dest_shape)
-  target_lr = extent.unravelled_pos(target_ravelled_lr, _dest_shape)
-  target_ex = extent.create(target_ul, np.array(target_lr) + 1, _dest_shape)
-  rect_ravelled_ul = target_ravelled_ul
-  rect_ravelled_lr = target_ravelled_lr
+  def fetch(self, ex):
+    ravelled_ul = extent.ravelled_pos(ex.ul, ex.array_shape)
+    ravelled_lr = extent.ravelled_pos([lr - 1 for lr in ex.lr], ex.array_shape)
 
-  (rect_ravelled_ul, rect_ravelled_lr) = extent.find_rect(target_ravelled_ul, target_ravelled_lr, ex.array_shape)
+    (base_ravelled_ul, base_ravelled_lr) = extent.find_rect(ravelled_ul, ravelled_lr, self.base.shape)
 
-  rect_ul = extent.unravelled_pos(rect_ravelled_ul, ex.array_shape)
-  rect_lr = extent.unravelled_pos(rect_ravelled_lr, ex.array_shape)
-  rect_ex = extent.create(rect_ul, np.array(rect_lr) + 1, ex.array_shape)
+    base_ul = extent.unravelled_pos(base_ravelled_ul, self.base.shape)
+    base_lr = extent.unravelled_pos(base_ravelled_lr, self.base.shape)
+    base_ex = extent.create(base_ul, np.array(base_lr) + 1, self.base.shape)
 
-  #util.log_debug('\nshape = %s, _dest_shape = %s, target_ex.shape = %s'
-                 #'\ntarget = (%s, %s)'
-                 #'\n(%s, %s), (%s, %s), (%s, %s)',
-                 #ex.array_shape, _dest_shape, target_ex.shape,
-                 #target_ul, target_lr,
-                 #ravelled_ul, ravelled_lr,
-                 #target_ravelled_ul, target_ravelled_lr,
-                 #rect_ravelled_ul, rect_ravelled_lr)
+    (rect_ravelled_ul, rect_ravelled_lr) = extent.find_rect(base_ravelled_ul, base_ravelled_lr, self.base.shape)
 
-  if not array.sparse:
-    tile = np.ravel(array.fetch(rect_ex))
-    tile = tile[(target_ravelled_ul - rect_ravelled_ul):(target_ravelled_lr - rect_ravelled_ul) + 1]
-    yield target_ex, tile.reshape(target_ex.shape)
-  else:
-    tile = array.fetch(rect_ex)
-    new = sp.lil_matrix(target_ex.shape, dtype=array.dtype)
-    j_max = tile.shape[1]
-    for i,row in enumerate(tile.rows):
-      for col,j in enumerate(row):
-        rect_index = i*j_max + j
-        target_start = target_ravelled_ul - rect_ravelled_ul
-        target_end = target_ravelled_lr - rect_ravelled_ul
-        if rect_index >= target_start and rect_index <= target_end:
-          new_r,new_c = np.unravel_index(rect_index - target_start, target_ex.shape)
-          new[new_r,new_c] = tile[i,j]
-    yield target_ex, new
+    rect_ul = extent.unravelled_pos(rect_ravelled_ul, self.base.shape)
+    rect_lr = extent.unravelled_pos(rect_ravelled_lr, self.base.shape)
+    rect_ex = extent.create(rect_ul, np.array(rect_lr) + 1, self.base.shape)
 
-def _target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
-  result = list(map_fn(inputs, ex, **fn_kw))
-
-  futures = rpc.FutureGroup()
-  if result is not None:
-    for ex, v in result:
-      futures.append(target.update(ex, v, wait=False))
-
-  return MapResult(None, futures)
+    if not self.base.sparse:
+      tile = np.ravel(self.base.fetch(rect_ex))
+      tile = tile[(base_ravelled_ul - rect_ravelled_ul):(base_ravelled_lr - rect_ravelled_ul) + 1]
+      return tile.reshape(ex.shape)
+    else:
+      tile = self.base.fetch(rect_ex)
+      new = sp.lil_matrix(ex.shape, dtype=self.base.dtype)
+      j_max = tile.shape[1]
+      for i,row in enumerate(tile.rows):
+        for col,j in enumerate(row):
+          rect_index = i*j_max + j
+          target_start = base_ravelled_ul - rect_ravelled_ul
+          target_end = base_ravelled_lr - rect_ravelled_ul
+          if rect_index >= target_start and rect_index <= target_end:
+            new_r,new_c = np.unravel_index(rect_index - target_start, ex.shape)
+            new[new_r,new_c] = tile[i,j]
+      return new
 
 @node_type
 class ReshapeExpr(Expr):
@@ -78,13 +75,7 @@ class ReshapeExpr(Expr):
   def _evaluate(self, ctx, deps):
     v = deps['array']
     shape = deps['new_shape']
-    fn_kw = {'_dest_shape' : shape}
-
-    target = distarray.create(shape, dtype = v.dtype, sparse = v.sparse)
-    v.foreach_tile(mapper_fn = _target_mapper,
-                   kw = {'map_fn':_reshape_mapper, 'inputs':v,
-                         'target':target, 'fn_kw':fn_kw})
-    return target
+    return Reshape(v, shape)
 
 def reshape(array, new_shape, tile_hint=None):
   '''

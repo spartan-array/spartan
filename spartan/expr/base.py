@@ -1,24 +1,27 @@
-'''Lazy arrays.
-
-Expr operations are not performed immediately, but are set aside
-and built into a control flow graph, which is then compiled
-into a series of primitive array operations.
 '''
+Defines the base class of all expressions (`Expr`), as 
+well as common subclasses for collections.
+'''
+
 import collections
 import weakref
 
+import sys
 import traceback
 import numpy as np
 
 from ..node import Node, node_type
 from .. import blob_ctx, node, util
-from ..util import Assert
+from ..util import Assert, copy_docstring
 from ..array import distarray
 from ..config import FLAGS
 from ..rpc import TimeoutException
 
 class NotShapeable(Exception):
-  pass
+  '''
+  Thrown when the shape for an expression cannot be computed without 
+  first evaluating the expression. 
+  '''
 
 unique_id = iter(xrange(10000000))
 
@@ -29,10 +32,9 @@ def _map(*args, **kw):
   (Map is implemented in map.py)
   '''
   fn = kw['fn']
-  numpy_expr = kw.get('numpy_expr', None)
 
   from .map import map
-  return map(args, fn, numpy_expr)
+  return map(args, fn)
 
 def expr_like(expr, **kw):
   '''Construct a new expression like ``expr``.
@@ -40,9 +42,10 @@ def expr_like(expr, **kw):
   The new expression has the same id, but is initialized using ``kw``
   '''
   kw['expr_id'] = expr.expr_id
+  
   trace = kw.pop('trace', None)
-  if trace != None and FLAGS.optimized_stack:
-    trace.fuse_trace(expr.stack_trace)
+  if trace != None and FLAGS.opt_keep_stack:
+    trace.fuse(expr.stack_trace)
     kw['stack_trace'] = trace
   else:
     kw['stack_trace'] = expr.stack_trace
@@ -84,44 +87,72 @@ class EvalCache(object):
   def deregister(self, expr_id):
     self.refs[expr_id] -= 1
     if self.refs[expr_id] == 0:
-      #util.log_info('Destroying...')
-      if expr_id in self.cache: 
+      util.log_debug('Destroying... %s', expr_id)
+      if expr_id in self.cache:
+        #import objgraph
+        #objgraph.show_backrefs([self.cache[expr_id]], filename='%s-refs.png' % expr_id)
         del self.cache[expr_id]
+
       del self.refs[expr_id]
+
+class ExprTrace(object):
+  '''
+  Captures the stack trace for an expression.
+  
+  Lazy evaluation and optimization can result in stack traces that are very far
+  from the actual source of an error.  To combat this, expressions track their
+  original creation point, which is logged when an error occurs.
+  
+  Multiple stack traces can be tracked, as certain optimizations
+  will combine multiple expressions together.
+  '''
+  def __init__(self):
+    if FLAGS.capture_expr_stack:
+      self.stack_list = [traceback.extract_stack(sys._getframe(3))]
+    else:
+      self.stack_list = []
+
+  def format_stack(self):
+    trace = []
+    for i, st in enumerate(self.stack_list):
+      trace.append('Stack %d of %d' % (i, len(self.stack_list)))
+      trace.append('-' * 80 + '\n')
+      for (filename, lineno, fname, txt) in st:
+        trace.append('%d >>> %s:%s [%s]: %s\n' % (i, filename, lineno, fname, txt[:60]))
+      #trace.extend(st)
+    return trace
+
+  def dump(self):
+    if not FLAGS.capture_expr_stack:
+      print >>sys.stderr, 'Stack tracking for expressions is disabled.  Use --capture_expr_stack=1 to enable.'
+      return
+
+    print >>sys.stderr, 'Expr creation stack traceback.'
+    if not FLAGS.opt_keep_stack:
+      print >>sys.stderr, '    Use --opt_keep_stack=True to see expressions merged during optimization.'
+    
+    for s in self.format_stack():
+      sys.stderr.write(s)
+
+  def fuse(self, trace):
+    self.stack_list.extend(trace.stack_list)
+
 
 eval_cache = EvalCache()
 
-class ExprTrace(object):
-  def __init__(self, stack = None, level = None):
-    self.stack = []
-    self.level = 0
-    if level != None:
-      self.level = level
-
-    if stack != None:
-      self.stack = stack
-    else:
-      trace = traceback.format_stack()[:-1]
-      # Little hack to remove unittest traceback
-      #for i, s in enumerate(trace):
-      #  if s.find('unittest/case.py') != -1:
-      #    idx = i
-      #self.stack = ['-' * 80 + '\n']
-      self.stack += ['Expr Creation Traceback (most recent call last):\n']
-      self.stack += trace
-
-  def append(self, trace):
-    self.stack += trace.stack
-    if self.level < trace.level:
-      self.level = trace.level
-
-  def fuse_trace(self, trace):
-    self.level += 1
-    deli1 = ['>>>>>>' * self.level + ' Level %d fuse \n' % self.level]
-    deli2 = ['<<<<<<' * self.level + ' Level %d fuse \n' % self.level]
-    self.stack = deli1 + self.stack + trace.stack + deli2
-
 class Expr(object):
+  '''
+  Base class for all expressions.
+  
+  `Expr` objects capture user operations.
+  
+  An expression can have one or more dependencies, which must
+  be evaluated before the expression itself.
+  
+  Expressions may be evaluated (using `Expr.force`), the 
+  result of evaluating an expression is cached until the expression
+  itself is reclaimed. 
+  ''' 
   _members = ['expr_id', 'stack_trace']
 
   # should evaluation of this object be cached
@@ -157,10 +188,8 @@ class Expr(object):
 
   def dependencies(self):
     '''
-    Return a dictionary mapping from name -> dependency.
-    
-    Dependencies may either be a list or single value.
-    Dependencies of type `Expr` are recursively evaluated.
+    Returns:
+      Dictionary mapping from name to `Expr`. 
     '''
     return dict([(k, getattr(self, k)) for k in self.members])
 
@@ -169,13 +198,18 @@ class Expr(object):
     Compute the shape of this expression.
     
     If the shape is not available (data dependent), raises `NotShapeable`.
+    
+    Returns:
+      tuple: Shape of this expression.
     '''
     raise NotShapeable
 
   def visit(self, visitor):
     '''
-    Apply visitor to all children of this node, returning a new `Expr` of the same type. 
+    Apply visitor to all children of this node, returning a new `Expr` of the same type.
+     
     :param visitor: `OptimizePass`
+    
     '''
     deps = {}
     for k in self.members:
@@ -189,16 +223,15 @@ class Expr(object):
     '''
     result = 'N%s [label="%s"]\n' % (self.expr_id, self.node_type)
    
-    for name, value in self.dependencies().items():
+    for _, value in self.dependencies().items():
       if isinstance(value, Expr):
         result = result + 'N%s -> N%s\n' % (self.expr_id, value.expr_id) 
   
-    for name, value in self.dependencies().items():
+    for _, value in self.dependencies().items():
       if isinstance(value, Expr):
         result = result + value.dot()
     return result
    
-
   def __del__(self):
     eval_cache.deregister(self.expr_id)
 
@@ -219,6 +252,11 @@ class Expr(object):
     Evaluate an `Expr`.  
    
     Dependencies are evaluated prior to evaluating the expression.
+    The result of the evaluation is stored in the expression cache,
+    future calls to evaluate will return the cached value.
+    
+    Returns:
+      DistArray:
     '''
     cache = self.cache()
     if cache is not None:
@@ -235,19 +273,12 @@ class Expr(object):
         deps[k] = vs
     try:
       value = self._evaluate(ctx, deps)
-    except TimeoutException as ex:
+    except TimeoutException:
       util.log_info('%s %d need to retry', self.__class__, self.expr_id)
       return self.evaluate()
-    except Exception as e:
-      import sys
-      from ..config import FLAGS
+    except Exception:
       print >>sys.stderr, 'Error executing expression'
-
-      if not FLAGS.optimized_stack:
-        sys.stderr.write('\nTop Expr creation stack traceback.'
-                         ' (Use --optimized_stack=True for more detailed)\n')
-      for s in self.stack_trace.stack:
-        sys.stderr.write(s)
+      self.stack_trace.dump()
       raise
 
     if self.needs_cache:
@@ -259,6 +290,10 @@ class Expr(object):
   def _evaluate(self, ctx, deps):
     '''
     Evaluate this expression.
+    
+    Args:
+      ctx: `BlobCtx` for interacting with the cluster
+      deps (dict): Map from name to `DistArray` or scalar.
     '''
     raise NotImplementedError
 
@@ -307,6 +342,13 @@ class Expr(object):
     return _map(self, fn=np.negative)
 
   def reshape(self, new_shape):
+    '''
+    Return a new array with shape``new_shape``, and data from 
+    this array.
+    
+    :param new_shape: `tuple` with same total size as original shape.
+    
+    '''
     from . import builtins
     return builtins.reshape(self, new_shape)
 
@@ -319,9 +361,12 @@ class Expr(object):
 
   @property
   def shape(self):
-    '''Try to compute the shape of this DAG.
+    '''Try to compute the shape of this expression.
     
     If the value has been computed already this always succeeds.
+    
+    :rtype: `tuple`
+    
     '''
     cache = self.cache()
     if cache is not None:
@@ -332,7 +377,12 @@ class Expr(object):
     except NotShapeable:
       return evaluate(self).shape
 
+  @property
+  def size(self):
+    return np.prod(self.shape)
+  
   def force(self):
+    'Evaluate this expression (and all dependencies).'
     return self.evaluate()
 
   def optimized(self):
@@ -340,19 +390,29 @@ class Expr(object):
     Return an optimized version of this expression graph.
     
     :rtype: `Expr`
+    
     '''
     return optimized_dag(self)
 
   def glom(self):
+    '''
+    Evaluate this expression and convert the resulting 
+    distributed array into a Numpy array.
+    
+    :rtype: `np.ndarray`
+    
+    '''
     return glom(self)
 
   def __reduce__(self):
     return evaluate(self).__reduce__()
 
+
 Expr.__rsub__ = Expr.__sub__
 Expr.__radd__ = Expr.__add__
 Expr.__rmul__ = Expr.__mul__
 Expr.__rdiv__ = Expr.__div__
+
 
 @node_type
 class AsArray(Expr):
@@ -379,18 +439,19 @@ class AsArray(Expr):
 
 @node_type
 class Val(Expr):
-  '''Wrap an existing value into an expression.'''
+  '''Convert an existing value to an expression.'''
   _members = ['val']
 
   needs_cache = False
 
-
+  @copy_docstring(Expr.visit)
   def visit(self, visitor):
     return self
 
   def dependencies(self):
     return {}
 
+  @copy_docstring(Expr.visit)
   def compute_shape(self):
     return self.val.shape
 
@@ -403,10 +464,10 @@ class Val(Expr):
 
 class CollectionExpr(Expr):
   '''
-  CollectionExpr subclasses wrap normal tuples, lists and dicts with `Expr` semantics.
+  `CollectionExpr` subclasses wrap normal tuples, lists and dicts with `Expr` semantics.
   
-  visit() and evaluate() are supported; these thread the visitor through
-  child elements as expected.
+  `CollectionExpr.visit` and `CollectionExpr.evaluate` will visit or evaluate
+  all of the tuple, list or dictionary elements in this expression.
   '''
   needs_cache = False
   _members = ['vals']
@@ -486,9 +547,18 @@ def optimized_dag(node):
 
 
 def force(node):
+  '''
+  Evaluate ``node``.
+  :param node: `Expr`
+  '''
   return evaluate(node)
 
 def evaluate(node):
+  '''
+  Evaluate ``node``.
+  
+  :param node: `Expr`
+  '''
   if isinstance(node, Expr):
     return node.evaluate()
 

@@ -1,3 +1,12 @@
+'''
+The code in this module implements an SGD based matrix factorization
+of the Netflix movie ranking dataset.  
+
+The algorithm used is the same
+as that found in the Sparkler paper  
+(http://people.cs.umass.edu/~boduo/publications/2013EDBT-sparkler.pdf).
+'''
+
 import cPickle
 import random
 import scipy.sparse

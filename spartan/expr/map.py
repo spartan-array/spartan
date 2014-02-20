@@ -1,5 +1,19 @@
 #!/usr/bin/env python
 
+'''
+Implementation of the ``map`` operation.
+
+Maps encompass most of the common Numpy arithmetic operators and
+element-wise operations.  For instance ``a + b`` is translated to:
+
+::
+
+   map((a, b), lambda x, y: x + y)
+   
+Inputs to a map are *broadcast* up to have the same shape (this is
+the same behavior as Numpy broadcasting).  
+'''
+
 import collections
 
 from .. import util, blob_ctx
@@ -8,8 +22,18 @@ from ..node import Node, node_type
 from ..util import Assert
 from .base import DictExpr, Expr, as_array
 from .local import LocalCtx, make_var, LocalInput, LocalMapExpr
+from ..core import LocalKernelResult
 
 def tile_mapper(ex, children, op):
+  '''
+  Run for each tile of a `Map` operation.
+  
+  Evaluate the map function on the local tile and return a result.
+  
+  :param ex: `Extent`
+  :param children: Input arrays for this operation.
+  :param op: `LocalExpr` to evaluate.
+  '''
   ctx = blob_ctx.get()
   #util.log_info('MapTiles: %s', op)
   #util.log_info('Fetching %d inputs', len(children))
@@ -31,21 +55,23 @@ def tile_mapper(ex, children, op):
   result = op.evaluate(op_ctx)
   
   #util.log_info('Result: %s', result)
-  Assert.eq(ex.shape, result.shape, 'Bad shape -- source = %s, result = %s, op = (%s)' % (local_values, result, op))
+  Assert.eq(ex.shape, result.shape, 
+            'Bad shape -- source = %s, result = %s, op = (%s)',
+            local_values, result, op)
   
   # make a new tile and return it
   result_tile = tile.from_data(result)
-  tile_id = blob_ctx.get().create(result_tile).wait().blob_id
+  tile_id = blob_ctx.get().create(result_tile).wait().tile_id
   
-  return MapResult([(ex, tile_id)], None)
+  return LocalKernelResult(result=[(ex, tile_id)])
  
-class MapResult:
-  def __init__(self, result=None, futures=None):
-    self.result = result
-    self.futures = futures
-
 @node_type
 class MapExpr(Expr):
+  '''Represents mapping an operator over one or more inputs.
+  
+  :ivar op: A `LocalExpr` to evaluate on the input(s)
+  :ivar children: One or more `Expr` to map over.
+  '''
   _members = ['children', 'op']
 
   def compute_shape(self):
@@ -84,8 +110,14 @@ class MapExpr(Expr):
 def map(inputs, fn, numpy_expr=None, fn_kw=None):
   '''
   Evaluate ``fn`` over each tile of the input.
-  :param v: `Expr`
-  :param fn: callable taking arguments ``*inputs``
+  
+  Args:
+    inputs (list): List of `Expr`'s to map over
+    fn (function): Mapper function.  Should take a Numpy array as an input and return a new Numpy array.
+    fn_kw (dict): Optional.  Keyword arguments to pass to ``fn``.
+    
+  Returns:
+    MapExpr: An expression node representing mapping ``fn`` over ``inputs``.
   '''
   assert fn is not None
   

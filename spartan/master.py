@@ -1,3 +1,11 @@
+'''Master process definition.
+
+Spartan computations consist of a master and one or more workers.
+
+The master tracks the location of array data, manages worker health,
+and runs user operations on workers.
+'''
+
 import atexit
 import socket
 import threading
@@ -36,10 +44,11 @@ class Master(object):
       atexit.register(_dump_profile)
 
   def __del__(self):
-    '''Make sure that we shutdown the cluster when the master goes away.'''
+    # Make sure that we shutdown the cluster when the master goes away.
     self.shutdown()
 
   def shutdown(self):
+    '''Shutdown all workers and halt.'''
     if self._ctx.active is False:
       return
 
@@ -56,12 +65,21 @@ class Master(object):
     self._server.shutdown()
 
   def register(self, req, handle):
+    '''
+    RPC method.
+    
+    Register a new worker with the master.
+    
+    Args:
+      req (RegisterReq):
+      handle (PendingRequest):
+    '''
     id = len(self._workers)
     self._workers[id] = rpc.connect(req.host, req.port)
     self._available_workers.append(id)
     util.log_info('Registered %s:%s (%d/%d)', req.host, req.port, id, self.num_workers)
 
-    handle.done(core.NoneResp())
+    handle.done(core.EmptyMessage())
     
     self.init_worker_score(id, req.worker_status)
     
@@ -70,21 +88,32 @@ class Master(object):
       threading.Thread(target=self._initialize).start()
 
   def register_blob(self, req, handle):
-    if self._worker_to_blob_array.has_key(req.blob_id.worker):
-      self._worker_to_blob_array[req.blob_id.worker].append((req.blob_id, req.array))
+    '''
+    Register a tile with the master.  The master tracks a mapping from 
+    tile_id to worker_id.  
+    
+    When a worker fails, this allows the master to determine which arrays
+    must be reloaded or recomputed. 
+    
+    Args:
+      req (RegisterBlobReq):
+      handle (PendingRequest):
+    '''
+    if self._worker_to_blob_array.has_key(req.tile_id.worker):
+      self._worker_to_blob_array[req.tile_id.worker].append((req.tile_id, req.array))
     else:
-      self._worker_to_blob_array[req.blob_id.worker] = [(req.blob_id, req.array)]
+      self._worker_to_blob_array[req.tile_id.worker] = [(req.tile_id, req.array)]
       
-    handle.done(core.NoneResp())
+    handle.done(core.EmptyMessage())
   
   def get_available_workers(self, req, handle):
-    resp = core.ResultResp(result=self._available_workers)
+    resp = core.RunKernelResp(result=self._available_workers)
     handle.done(resp)
 
   def get_workers_for_reload(self, req, handle):
     tile_in_worker = [[i, 0] for i in range(self.num_workers)]
-    for blob_id in req.array.tiles.values():
-      tile_in_worker[blob_id.worker][1] += 1
+    for tile_id in req.array.tiles.values():
+      tile_in_worker[tile_id.worker][1] += 1
     
     tile_in_worker = [tile_in_worker[worker_id] for worker_id in self._available_workers]
     
@@ -93,7 +122,7 @@ class Master(object):
     for i in range(len(req.array.bad_tiles)):
       result[req.array.bad_tiles[i]] = tile_in_worker[i%len(tile_in_worker)][0]
     
-    resp = core.ResultResp(result=result)
+    resp = core.RunKernelResp(result=result)
     handle.done(resp)
       
   def init_worker_score(self, worker_id, worker_status):
@@ -120,14 +149,14 @@ class Master(object):
     self._worker_avg_score = avg_score / len(self._worker_scores)
           
   def get_worker_scores(self, req, handle):
-    resp = core.ResultResp(result=sorted(self._worker_scores.iteritems(), key=lambda x: x[1], reverse=True))
+    resp = core.RunKernelResp(result=sorted(self._worker_scores.iteritems(), key=lambda x: x[1], reverse=True))
     handle.done(resp)
                         
   def mark_failed_worker(self, worker_id):
     util.log_info('Marking worker %s as failed.', worker_id)
     self._available_workers.remove(worker_id)
-    for (blob_id, array) in self._worker_to_blob_array[worker_id]:
-      array.bad_tiles.append(array.blob_to_ex[blob_id])
+    for (tile_id, array) in self._worker_to_blob_array[worker_id]:
+      array.bad_tiles.append(array.blob_to_ex[tile_id])
                                       
   def mark_failed_workers(self):
     now = time.time()
@@ -141,6 +170,16 @@ class Master(object):
     return False
   
   def heartbeat(self, req, handle):
+    '''RPC method.
+    
+    Called by worker processes periodically.
+    
+    Args:
+      req: `WorkerStatus`
+      handle: `PendingRequest`
+      
+    Returns: `EmptyMessage`
+    '''
     #util.log_info('Receive worker %d heartbeat.', req.worker_id)
     if req.worker_id >= 0 and self._initialized:     
       self.update_worker_score(req.worker_id, req.worker_status)
@@ -151,13 +190,16 @@ class Master(object):
       self.mark_failed_workers()
     #util.log_info('available workers:%s', self._available_workers)
     
-    resp = core.NoneResp()
+    resp = core.EmptyMessage()
     handle.done(resp)
     #util.log_info('Finish worker %d heartbeat', req.worker_id)
       
   def _initialize(self):
+    '''Sends an initialization request to all workers and waits 
+    for their response.
+    '''
     util.log_info('Initializing...')
-    req = core.Initialize(peers=dict([(id, w.addr())
+    req = core.InitializeReq(peers=dict([(id, w.addr())
                                       for id, w in self._workers.iteritems()]))
 
     futures = rpc.FutureGroup()
@@ -171,6 +213,7 @@ class Master(object):
     util.log_info('done...')
 
   def wait_for_initialization(self):
+    '''Blocks until all workers are initialized.'''
     while not self._initialized:
       time.sleep(0.1)
 

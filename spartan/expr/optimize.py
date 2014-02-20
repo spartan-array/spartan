@@ -133,18 +133,17 @@ class MapMapFusion(OptimizePass):
                                pretty_fn=expr.op.pretty_fn)
     trace = ExprTrace()
     for name, child_expr in map_children.iteritems():
+      trace.fuse(child_expr.stack_trace)
       if isinstance(child_expr, MapExpr):
         for k, v in child_expr.children.iteritems():
           merge_var(children, k, v)
 
         #util.log_info('Merging: %s', child_expr.op)
         combined_op.add_dep(child_expr.op)
-        trace.append(child_expr.stack_trace)
       else:
         key = make_var()
         combined_op.add_dep(LocalInput(idx=key))
         children[key] = child_expr
-        trace.append(child_expr.stack_trace)
 
     return expr_like(expr,
                      children=DictExpr(vals=children),
@@ -175,7 +174,7 @@ class ReduceMapFusion(OptimizePass):
       for k, v in child_expr.children.iteritems():
         merge_var(new_children, k, v)
       combined_op.add_dep(child_expr.op)
-      trace.append(child_expr.stack_trace)
+      trace.fuse(child_expr.stack_trace)
 
     return expr_like(expr,
                      children=DictExpr(vals=new_children),

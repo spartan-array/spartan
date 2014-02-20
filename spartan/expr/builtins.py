@@ -18,7 +18,6 @@ from ..array import distarray, extent
 from ..array.extent import index_for_reduction, shapes_match
 from ..util import Assert
 from .base import force
-from .loop import loop
 from .map import map
 from .ndarray import ndarray
 from .optimize import disable_parakeet, not_idempotent
@@ -68,6 +67,8 @@ def _make_sparse_diagonal(tile, ex):
   
 def rand(*shape, **kw):
   '''
+  Return a random array sampled from the uniform distribution on [0, 1).
+  
   :param tile_hint: A tuple indicating the desired tile shape for this array.
   '''
   tile_hint = None
@@ -83,6 +84,11 @@ def rand(*shape, **kw):
 
 
 def randn(*shape, **kw):
+  '''
+  Return a random array sampled from the standard normal distribution.
+  
+  :param tile_hint: A tuple indicating the desired tile shape for this array.
+  '''
   tile_hint = None
   if 'tile_hint' in kw:
     tile_hint = kw['tile_hint']
@@ -97,6 +103,20 @@ def sparse_rand(shape,
                 format='lil',
                 dtype=np.float32, 
                 tile_hint=None):
+  '''Make a distributed sparse random array.
+  
+  Random values are chosen from the uniform distribution on [0, 1).
+  
+  Args:
+    density(float): Fraction of values to be filled
+    format(string): Sparse tile format (lil, coo, csr, csc).
+    dtype(np.dtype): Datatype of array.
+    tile_hint(tuple or None): Shape of array tiles.
+    
+  Returns:
+    Expr:
+  '''
+  
   for s in shape: assert isinstance(s, int)
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True),
              fn=_make_sparse_rand,
@@ -107,7 +127,13 @@ def sparse_rand(shape,
 def sparse_empty(shape,
                  dtype=np.float32,
                  tile_hint=None):
-    return ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True)
+  '''Return an empty sparse array of the given shape.
+  
+  :param shape: `tuple`.  Shape of the resulting array.
+  :param dtype: `np.dtype`
+  :param tile_hint: A tuple indicating the desired tile shape for this array.
+  '''
+  return ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True)
 
 def sparse_diagonal(shape,
                     dtype=np.float32,
@@ -160,18 +186,39 @@ def _tocoo(data):
   return data.tocoo()
 
 def tocoo(array):
+  '''
+  Convert ``array`` to use COO (coordinate) format for tiles. 
+  
+  :param array: Sparse `Expr`.
+  :rtype: A new array in COO format.
+  '''
   return map(array, fn=_tocoo)
 
 
 def zeros(shape, dtype=np.float, tile_hint=None):
+  '''
+  Create a distributed array over the given shape and dtype, filled with zeros.
+  
+  :param shape:
+  :param dtype:
+  :param tile_hint:
+  :rtype: `Expr`
+  '''
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
              fn=_make_zeros)
 
 
 def ones(shape, dtype=np.float, tile_hint=None):
+  '''
+  Create a distributed array over the given shape and dtype, filled with ones.
+  
+  :param shape:
+  :param dtype:
+  :param tile_hint:
+  :rtype: `Expr`
+  '''
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
              fn=_make_ones)
-
 
 
 def _arange_mapper(inputs, ex, dtype=None):
@@ -182,6 +229,17 @@ def _arange_mapper(inputs, ex, dtype=None):
 
 
 def arange(shape, dtype=np.float, tile_hint=None):
+  '''
+  An extended version of `np.arange`.  
+  
+  Returns a new array of the given shape and dtype. Values of the
+  array are equivalent to running: ``np.arange(np.prod(shape)).ravel(shape)``.
+  
+  :param shape:
+  :param dtype:
+  :param tile_hint:
+  :rtype: `Expr`
+  '''
   return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
                  fn=_arange_mapper,
                  kw={'dtype': dtype})
@@ -386,6 +444,14 @@ def _countnonzero_local(ex, data, axis):
   return (data > 0).sum(axis)  
 
 def count_nonzero(array, axis=None):
+  '''
+  Return the number of nonzero values in the axis of the ``array``.
+  
+  :param array: DistArray or `Expr`.
+  :param axis: the axis to count
+  :rtype: np.int64
+  
+  '''
   return reduce(array, axis,
                 dtype_fn=lambda input: np.int64,
                 local_reduce_fn=_countnonzero_local,
@@ -398,6 +464,14 @@ def _countzero_local(ex, data, axis):
   return (data == 0).sum(axis)
 
 def count_zero(array, axis=None):
+  '''
+  Return the number of zero values in the axis of the ``array``.
+  
+  :param array: DistArray or `Expr`.
+  :param axis: the axis to count
+  :rtype: np.int64
+  
+  '''
   return reduce(array, axis,
                 dtype_fn=lambda input: np.int64,
                 local_reduce_fn=_countzero_local,
@@ -426,8 +500,9 @@ def astype(x, dtype):
   
   See `numpy.ndarray.astype`.
   
-  :param x:
+  :param x: `Expr` or `DistArray`
   :param dtype:
+  
   '''
   assert x is not None
   return map(x, _astype_mapper, fn_kw={'dtype': np.dtype(dtype).str })
@@ -448,129 +523,27 @@ def ravel(v):
   "Ravel" ``v`` to a one-dimensional array of shape (size(v),).
   
   See `numpy.ndarray.ravel`.
-  :param v:
+  :param v: `Expr` or `DistArray`
   '''
   return shuffle(v, _ravel_mapper)
-
-
-def _dot_mapper(inputs, ex, av, bv):
-  # read current tile of array 'a'
-  ex_a = ex
-
-  # fetch all column tiles of b that correspond to tile a's rows, i.e.
-  # rows = ex_a.cols (should be ex_a.rows?)
-  # cols = *
-  ex_b = extent.create((ex_a.ul[1], 0),
-                       (ex_a.lr[1], bv.shape[1]),
-                       bv.shape)
-
-  time_a, a = util.timeit(lambda: av.fetch(ex_a))
-  #util.log_info('Fetched...%s in %s', ex_a, time_a)
-  time_b, b = util.timeit(lambda: bv.fetch(ex_b))
-  util.log_debug('Fetched...ax:%s in %s, bx:%s in %s', ex_a, time_a, ex_b, time_b)
-
-  #util.log_info('%s %s %s', type(a), a.shape, a.dtype)
-  #util.log_info('%s %s %s', type(b), b.shape, b.dtype)
-  # util.log_info('%s %s', bv.shape, len(bv.tiles))
-  
-  #util.log_info('%s %s', type(a), type(b))
-  
-  #if not sp.issparse(a):
-  #  a = sp.csr_matrix(a)
-  #if not sp.issparse(b):
-  #  b = sp.csr_matrix(b)
-  
-  #result = a.dot(b)
-  
-  if isinstance(a, sp.coo_matrix) and b.shape[1] == 1:
-    result = sparse.dot_coo_dense_unordered_map(a, b)
-  else:
-    result = a.dot(b)
-  
-  ul = np.asarray([ex_a.ul[0], 0])
-  lr = ul + result.shape
-  target_shape = (av.shape[0], bv.shape[1])
-  target_ex = extent.create(ul, lr, target_shape)
-
-  # util.log_info('A: %s', a.dtype)
-  # util.log_info('B: %s', b.dtype)
-  # util.log_info('R: %s', result.dtype)
-  # util.log_info('T: %s', target_ex)
-
-  # util.log_info('%s %s %s', a.shape, b.shape, result.shape)
-  # util.log_info('%s %s %s', ul, lr, target_shape)
-  yield target_ex, result
-
-
-def _dot_numpy(array, ex, numpy_data=None):
-  l = array.fetch(ex)
-  r = numpy_data
-
-  yield (ex[0].add_dim(), np.dot(l, r))
-
-def dot(a, b, tile_hint=None):
-  '''
-  Compute the dot product (matrix multiplication) of 2 arrays.
-  
-  :param a: `Expr` or `numpy.ndarray` 
-  :param b: `Expr` or `numpy.ndarray`
-  :rtype: `Expr`
-  '''
-  av = force(a)
-  bv = force(b)
-
-  if isinstance(bv, np.ndarray):
-    return shuffle(av, _dot_numpy, kw={'numpy_data': bv})
-  
-  if tile_hint is None:
-    tile_hint = np.maximum(av.tile_shape(), bv.tile_shape())
-    
-  # av, bv = distarray.broadcast([av, bv])
-  Assert.eq(a.shape[1], b.shape[0])
-  sparse = av.sparse and bv.sparse
-  target = ndarray((a.shape[0], b.shape[1]),
-                   dtype=av.dtype,
-                   tile_hint=tile_hint,
-                   reduce_fn=np.add,
-                   sparse=sparse)
-  
-  return shuffle(av, _dot_mapper, target=target, kw=dict(av=av, bv=bv))
-
-def _multiply_mapper(array, ex, bv):
-  a = array.fetch(ex)
-  b = bv.fetch(ex)
-  if sp.issparse(a):
-      yield (ex, a.multiply(b))
-  else:
-      yield (ex, a * b)
         
 def multiply(a, b):
   assert a.shape == b.shape
-  bv = force(b)
-  return shuffle(a, _multiply_mapper, kw=dict(bv=bv))
-      
-def op_map(*args, **kw):
-  fn = kw['fn']
-  return map(args, fn)
- 
-def add(a, b):
-  return op_map(a, b, fn=lambda a, b: a + b)
+  return map((a, b), fn=lambda a, b: a.multiply(b) if sp.issparse(a) else a * b)
 
-def sub(a, b):
-  return op_map(a, b, fn=lambda a, b: a - b)
+def add(a, b): return map((a, b), fn=np.add)
+
+def sub(a, b): return map((a, b), fn=np.subtract)
   
 def ln(v): return map(v, fn=np.log)
 
-
 def log(v): return map(v, fn=np.log)
-
 
 def exp(v): return map(v, fn=np.exp)
 
 def square(v): return map(v, fn=np.square)
 
 def sqrt(v): return map(v, fn=np.sqrt)
-
 
 def abs(v): return map(v, fn=np.abs)
 
