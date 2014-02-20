@@ -16,6 +16,8 @@ from spartan.util import Assert
 from .base import Expr, DictExpr
 from ..core import LocalKernelResult
 
+import collections
+
 def _reduce_mapper(ex, children, op, axis, output):
   '''Run a local reducer for a tile, and update the appropiate 
   portion of the output array.
@@ -66,6 +68,18 @@ class ReduceExpr(Expr):
     Expr.node_init(self)
     assert self.dtype_fn is not None
     assert isinstance(self.children, DictExpr)
+
+  def label(self):
+    return 'reduce(%s)' % self.op.fn.__name__
+
+  def compute_shape(self):
+    shapes = [i.shape for i in self.children.values()]
+    child_shape = collections.defaultdict(int)
+    for s in shapes:
+      for i, v in enumerate(s):
+        child_shape[i] = max(child_shape[i], v)
+    input_shape = tuple([child_shape[i] for i in range(len(child_shape))])
+    return extent.shape_for_reduction(input_shape, self.axis)
   
   def _evaluate(self, ctx, deps):
     children = deps['children']
