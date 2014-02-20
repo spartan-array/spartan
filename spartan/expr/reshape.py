@@ -13,23 +13,49 @@ from ..array import extent, tile, distarray
 from ..core import LocalKernelResult
 from .shuffle import target_mapper
 
+def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
+  ex = array.shape_array.extent_for_blob(tile_id)
+  return user_fn(ex, **kw)
+
 class Reshape(distarray.DistArray):
   '''Reshape the underlying array base.
 
-  Reshape does not create a copy of the base array. Instead the fetch
-  method is overridden:
+  Reshape does not create a copy of the base array. Instead the fetch method is
+  overridden:
   1. Caculate the underlying extent containing the requested extent.
   2. Fetch the underlying extent.
   3. Trim the fetched tile and reshape to the requested tile.
+
+  To support foreach_tile() and tile_shape() (used by dot), Reshape needs an
+  blob_id-to-extent map and extents shape. Therefore, Reshape creates a
+  distarray (shape_array), but Reshape doesn't initialize its content.
   '''
 
-  def __init__(self, base, shape):
+  def __init__(self, base, shape, tile_hint = None):
     Assert.isinstance(base, distarray.DistArray)
     self.base = base
     self.shape = shape
     self.dtype = base.dtype
     self.sparse = self.base.sparse
     self.bad_tiles = []
+    self.shape_array = distarray.create(shape, base.dtype,
+                                        tile_hint=tile_hint,
+                                        sparse=base.sparse)
+
+  def tile_shape(self):
+    return self.shape_array.tile_shape()
+
+  def foreach_tile(self, mapper_fn, kw=None):
+    ctx = blob_ctx.get()
+
+    if kw is None: kw = {}
+    kw['array'] = self
+    kw['user_fn'] = mapper_fn
+
+    return ctx.map(self.shape_array.tiles.values(),
+                   mapper_fn = _tile_mapper,
+                   reduce_fn = None,
+                   kw=kw)
 
   def fetch(self, ex):
     ravelled_ul = extent.ravelled_pos(ex.ul, ex.array_shape)
@@ -75,7 +101,7 @@ class ReshapeExpr(Expr):
   def _evaluate(self, ctx, deps):
     v = deps['array']
     shape = deps['new_shape']
-    return Reshape(v, shape)
+    return Reshape(v, shape, self.tile_hint)
 
 def reshape(array, new_shape, tile_hint=None):
   '''
