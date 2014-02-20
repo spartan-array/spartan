@@ -195,9 +195,10 @@ class DistArrayImpl(DistArray):
     self.tiles = tiles
     self.id = ID_COUNTER.next()
 
-    if _pending_destructors:
-      self.ctx.destroy_all(_pending_destructors)
-      del _pending_destructors[:]
+    if self.ctx.is_master():
+      if _pending_destructors:
+        self.ctx.destroy_all(_pending_destructors)
+        del _pending_destructors[:]
 
 
   def __reduce__(self):
@@ -210,8 +211,8 @@ class DistArrayImpl(DistArray):
     blob_ctx.  __del__ can be called at anytime, including the
     invocation of a RPC call, which leads to odd/bad behavior.
     '''
-    if self.ctx.worker_id == blob_ctx.MASTER_ID:
-      #util.log_info('Destroying table... %s', self.id)
+    if self.ctx.is_master():
+      util.log_info('Destroying table... %s', self.id)
       tiles = self.tiles.values()
       _pending_destructors.extend(tiles)
 
@@ -401,8 +402,9 @@ def create(shape,
     
   array = DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
   
-  for tile_id in tiles.values():
-    ctx.register_blob(tile_id, array)
+  # MEMORY LEAK... disable for now.
+  #for tile_id in tiles.values():
+  #  ctx.register_blob(tile_id, array)
     
   return array
 
@@ -435,9 +437,10 @@ def from_replica(X):
   #  util.log_warn("i:%d ex:%s, tile_id:%s", i, ex, tiles[ex])
     
   array = DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
-  
-  for tile_id in tiles.values():
-    ctx.register_blob(tile_id, array)
+
+  # MEMORY LEAK... disable for now.
+  #for tile_id in tiles.values():
+  #  ctx.register_blob(tile_id, array)
     
   return array
 
@@ -474,9 +477,10 @@ def from_table(extents):
   
   array = DistArrayImpl(shape=shape, dtype=dtype, tiles=extents, reducer_fn=None, sparse=sparse)
   
-  ctx = blob_ctx.get()
-  for tile_id in extents.values():
-    ctx.register_blob(tile_id, array)
+  # MEMORY LEAK... disable for now.
+  #ctx = blob_ctx.get()
+  #for tile_id in extents.values():
+  #  ctx.register_blob(tile_id, array)
   
   return array
 
