@@ -114,6 +114,47 @@ def sparse_diagonal(shape,
                     tile_hint=None):
   return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True), _make_sparse_diagonal)
 
+def diag_mapper(array, ex):
+  dst_ul = (ex.ul[0], 0)
+  dst_lr = (ex.lr[0], array.shape[0])
+  dst_shape = (array.shape[0], array.shape[0])
+  dst_ex = extent.create(dst_ul, dst_lr, dst_shape)
+
+  data = array.fetch(ex)
+  result = np.zeros((ex.lr[0] - ex.ul[0], array.shape[0]))
+  for i in range(0, ex.lr[0]-ex.ul[0]):
+    result[i, i + ex.ul[0]] = data[i]
+  yield (dst_ex, result)    
+
+def diag(array):
+  return shuffle(array, diag_mapper)
+
+def inc_mapper(array, ex):
+  data = np.ones(ex.shape)
+  data[0] = ex.ul[0]
+  yield (ex, data.cumsum())
+  
+def inc_vec(shape, dtype=np.float, tile_hint=None):
+  assert len(shape) == 1 or shape[1] == 1
+  return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint), inc_mapper)
+
+def norm_mapper(array, ex, axis, norm_value):
+  data = array.fetch(ex)
+  if axis is None:
+    data /= norm_value
+  elif axis == 1:
+    for i in range(data.shape[0]):
+      data[i,:] /= norm_value[ex.ul[0] + i]
+  elif axis == 0:
+    for i in range(data.shape[1]):
+      data[:,i] /= norm_value[ex.ul[1] + i]
+
+  yield (ex, data)
+
+def norm(array, axis=None):
+  axis_sum = sum(array, axis=axis).glom()
+  return shuffle(array, norm_mapper, kw=dict(axis=axis, norm_value=axis_sum))
+
 @disable_parakeet 
 def _tocoo(data):
   return data.tocoo()
@@ -339,19 +380,25 @@ def argmax(x, axis=None):
   return take_indices
 
 def _countnonzero_local(ex, data, axis):
-  return np.asarray(np.count_nonzero(data))
+  if axis is None:
+    return np.asarray(np.count_nonzero(data))
+  
+  return (data > 0).sum(axis)  
 
-def count_nonzero(array):
-  return reduce(array, None,
+def count_nonzero(array, axis=None):
+  return reduce(array, axis,
                 dtype_fn=lambda input: np.int64,
                 local_reduce_fn=_countnonzero_local,
                 accumulate_fn = np.add)
 
 def _countzero_local(ex, data, axis):
-  return np.asarray(np.prod(ex.shape) - np.count_nonzero(data))
+  if axis is None:
+    return np.asarray(np.prod(ex.shape) - np.count_nonzero(data))
+  
+  return (data == 0).sum(axis)
 
-def count_zero(array):
-  return reduce(array, None,
+def count_zero(array, axis=None):
+  return reduce(array, axis,
                 dtype_fn=lambda input: np.int64,
                 local_reduce_fn=_countzero_local,
                 accumulate_fn = np.add)
@@ -461,7 +508,7 @@ def _dot_numpy(array, ex, numpy_data=None):
 
   yield (ex[0].add_dim(), np.dot(l, r))
 
-def dot(a, b):
+def dot(a, b, tile_hint=None):
   '''
   Compute the dot product (matrix multiplication) of 2 arrays.
   
@@ -474,18 +521,34 @@ def dot(a, b):
 
   if isinstance(bv, np.ndarray):
     return shuffle(av, _dot_numpy, kw={'numpy_data': bv})
-
+  
+  if tile_hint is None:
+    tile_hint = np.maximum(av.tile_shape(), bv.tile_shape())
+    
   # av, bv = distarray.broadcast([av, bv])
   Assert.eq(a.shape[1], b.shape[0])
   sparse = av.sparse and bv.sparse
   target = ndarray((a.shape[0], b.shape[1]),
                    dtype=av.dtype,
-                   tile_hint=np.maximum(av.tile_shape(), bv.tile_shape()),
+                   tile_hint=tile_hint,
                    reduce_fn=np.add,
                    sparse=sparse)
   
   return shuffle(av, _dot_mapper, target=target, kw=dict(av=av, bv=bv))
-    
+
+def _multiply_mapper(array, ex, bv):
+  a = array.fetch(ex)
+  b = bv.fetch(ex)
+  if sp.issparse(a):
+      yield (ex, a.multiply(b))
+  else:
+      yield (ex, a * b)
+        
+def multiply(a, b):
+  assert a.shape == b.shape
+  bv = force(b)
+  return shuffle(a, _multiply_mapper, kw=dict(bv=bv))
+      
 def op_map(*args, **kw):
   fn = kw['fn']
   return map(args, fn)
@@ -504,6 +567,7 @@ def log(v): return map(v, fn=np.log)
 
 def exp(v): return map(v, fn=np.exp)
 
+def square(v): return map(v, fn=np.square)
 
 def sqrt(v): return map(v, fn=np.sqrt)
 

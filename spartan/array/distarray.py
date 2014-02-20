@@ -127,6 +127,9 @@ class DistArray(object):
     #util.log_info('Select: %s + %s -> %s', idx, self.shape, ex)
     return self.fetch(ex)
 
+  def __getitem__(self, idx):
+    return self.select(idx)
+    
   def glom(self):
     #util.log_info('Glomming: %s', self.shape)
     return self.select(np.index_exp[:])
