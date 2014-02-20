@@ -37,13 +37,12 @@ setup(
   url='http://github.com/rjpower/spartan',
   install_requires=[
     'appdirs',
-    'yappi',
     'numpy',
     'cython',
     'pyzmq',
     'psutil',
-    'parakeet',
-    #'sphinx_bootstrap_theme',
+    # 'yappi',
+    # 'parakeet',
   ],
   classifiers=[
     'Development Status :: 4 - Beta',
