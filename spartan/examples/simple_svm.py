@@ -1,11 +1,22 @@
 import numpy as np
 from random import randint
-from spartan import expr
+from spartan import expr, util
 import spartan
 import math
 from spartan import blob_ctx
 
 def margin_mapper(ex, alpha_data, axis, label, data):
+  '''
+  Compute the linear SVM margin for the given extent.
+
+  Args:
+    ex(Extent): Region being processed.
+    alpha_data(numpy.array): alpha vector which is the parameter optimized by SVM 
+    axis(int): Unused.
+    label(DistArray): the labels of the training data
+    data(DistArray): the data need to be doted 
+  '''
+  
   label_data = label.fetch(ex)
   data_data = data.fetch(ex)
   tmp = np.multiply(alpha_data, label_data)
@@ -13,9 +24,16 @@ def margin_mapper(ex, alpha_data, axis, label, data):
   return result
   
 class SVM:
-
+  '''
+  A simple implementation for Support Vector Machine
+  
+  Args:
+    C(float64): optional. C parameter in C-Support Vector Classification. 1 by default. 
+    tol(float64): optional. Numeric stopping criterion (WRITEME).
+    maxiter(int): optional. Stop solver after this many iterations regardless of accuracy
+  '''
+  
   def __init__(self, C=1.0, tol=1e-6, maxiter=50):
-
     self.C = C
     self.tol = tol
     self.maxiter = maxiter
@@ -25,6 +43,13 @@ class SVM:
     
   # Calculate margin of given instance
   def margin_one(self, arr):
+    '''
+    Calculate margin of given instance
+    
+    Args:
+      arr(Expr): data to be calculated
+    '''
+    
     f = self.b
 
     if self.usew_:
@@ -33,6 +58,13 @@ class SVM:
     return f      
       
   def predict_one(self, arr):
+    '''
+    Predict the label of the given instance
+    
+    Args:
+      arr(Expr): data to be predicted
+    '''
+    
     if self.margin_one(arr) > self.tol:
       return 1
     else:
@@ -40,10 +72,23 @@ class SVM:
 
   # Calculate margin of given instances
   def margins(self, data):
+    '''
+    Calculate margin of given instances
+    
+    Args:
+      data(Expr): data to be calculated
+    '''
+    
     return expr.dot(data, self.w) + self.b
 
   def predict(self, data):
-
+    '''
+    Predict the label of the given instances
+    
+    Args:
+      data(Expr): data to be predicted
+    '''
+    
     margs = self.margins(data).force()
     for i in xrange(margs.shape[0]):
       if margs[i,0] > self.tol:
@@ -54,6 +99,18 @@ class SVM:
     return margs
   
   def take_step(self, i, j, N, labels, kernel_results):
+    '''
+    Perform one optimization step. Updates model with respect to to training example i, j
+    Modifies self.E to reflect the error of new model to labels 
+    
+    Args:
+      i(int): index of the alpha to be optimized
+      j(int): index of the alpha to be optimized
+      N(int): the number of features
+      labels(Expr): the labels of the training data
+      kernel_results(Expr): the result of the kernel function on the training data
+    '''
+    
     if i == j: return 0
     
     ai = self.alpha[i,0]
@@ -117,6 +174,16 @@ class SVM:
     return 1
  
   def examine_example(self, i, N, labels, kernel_results):
+    ''' Check if the alpha_i can be optimized. It should satisfy the KKT condition.
+    If so, choose it as one parameter to be optimized.
+    
+    Args:
+      i(int): index of the alpha to be checked
+      N(int): the number of features
+      labels(Expr): the labels of the training data
+      kernel_results(Expr): the result of the kernel function on the training data
+    '''
+    
     Ei = self.E[i,0]
     ai = self.alpha[i,0]
     r = labels[i,0] * Ei
@@ -127,6 +194,7 @@ class SVM:
       active_set = active_set_mask.glom().nonzero()[0]
       #print 'actives:', active_set
       
+      # first check the jth example that maximize the |Ei - Ej|
       idxj = -1
       if active_set.shape[0] > 1:
         active_E = expr.abs(expr.lazify(self.E) - Ei)[active_set_mask-True]
@@ -134,21 +202,25 @@ class SVM:
 
         if self.take_step(idxj, i, N, labels, kernel_results): return 1
       
+      # then check the examples in active_set
       for j in active_set:
         if j != idxj and self.take_step(j, i, N, labels, kernel_results): return 1
-        
+      
+      # finally check the other examples  
       for j in xrange(N):
         if j not in active_set and self.take_step(j, i, N, labels, kernel_results): return 1
       
     return 0
           
-  def train(self, data, labels):
+  def train_smo_1998(self, data, labels):
     '''
-    SMO algorithm (1998).
+    Train an SVM model using the SMO (1998) algorithm.
    
-    :param data: points to be trained
-    :param labels: the real labels of the training data
+    Args:
+      data(Expr): points to be trained
+      labels(Expr): the correct labels of the training data
     '''
+    
     N = data.shape[0] # Number of instances
     D = data.shape[1]  # Number of features
 
@@ -168,7 +240,7 @@ class SVM:
                                        accumulate_fn=np.add, 
                                        fn_kw=dict(label=labels, data=kernel_results[:,i].force())).glom() - labels[i, 0]
     
-    print "Starting SMO"
+    util.log_info("Starting SMO")
     while (num_changed > 0 or examine_all) and (it < self.maxiter):
 
       print "Iteration", it
@@ -202,12 +274,13 @@ class SVM:
     print 'w:', self.w.glom()
   
   
-  def new_train(self, data, labels):
+  def train_smo_2005(self, data, labels):
     '''
-    SMO algorithm (2005).
+    Train an SVM model using the SMO (2005) algorithm.
    
-    :param data: points to be trained
-    :param labels: the real labels of the training data
+    Args:
+      data(Expr): points to be trained
+      labels(Expr): the correct labels of the training data
     '''
     
     N = data.shape[0] # Number of instances
@@ -343,3 +416,12 @@ class SVM:
     print 'iteration finish:', it
     print 'b:', self.b
     print 'w:', self.w.glom()
+    
+  def fit(self, data, labels, method='smo_1998'):
+    if method == 'smo_1998':
+      self.train_smo_1998(data, labels)
+    elif method == 'smo_2005':
+      self.train_smo_2005(data, labels)
+    else:
+      assert False, "Invalid training method %s" % method
+      

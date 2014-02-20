@@ -140,7 +140,15 @@ def sparse_diagonal(shape,
                     tile_hint=None):
   return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True), _make_sparse_diagonal)
 
-def diag_mapper(array, ex):
+def _diag_mapper(array, ex):
+  '''
+  Create a diagonal array section for this extent.
+  If the extent does not lie on the diagonal, a zero array is returned.
+  
+  Args:
+    array (DistArray):
+    ex (Extent): Region being processed.
+  '''
   dst_ul = (ex.ul[0], 0)
   dst_lr = (ex.lr[0], array.shape[0])
   dst_shape = (array.shape[0], array.shape[0])
@@ -153,18 +161,48 @@ def diag_mapper(array, ex):
   yield (dst_ex, result)    
 
 def diag(array):
+  '''
+  Create a diagonal array with the given data on the diagonal
+  the shape should be array.shape[0] * array.shape[0]
+  
+  Args:
+    array: the given data which need to be filled on the diagonal
+  '''
   return shuffle(array, diag_mapper)
 
-def inc_mapper(array, ex):
+def _inc_mapper(array, ex):
+  '''
+  Create a continuous increasing array section for this extent.
+  
+  Args:
+    array (DistArray):
+    ex (Extent): Region being processed.
+  '''
   data = np.ones(ex.shape)
   data[0] = ex.ul[0]
   yield (ex, data.cumsum())
   
 def inc_vec(shape, dtype=np.float, tile_hint=None):
+  '''
+  Create a continuous increasing vector (start from 0). This can be used as the index of some large array.
+  Swap some large rows can be replaced as just modify the value of this index array
+  
+  Args:
+    shape(tuple): the vector shape
+  ''' 
   assert len(shape) == 1 or shape[1] == 1
   return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint), inc_mapper)
 
-def norm_mapper(array, ex, axis, norm_value):
+def _norm_mapper(array, ex, axis, norm_value):
+  '''
+  Normalize a region of an array.
+  Returns a new, normalized region.
+  
+  Args:
+    array (DistArray):
+    ex (Extent): Region being processed.
+    axis: Either an integer or ``None``.
+  '''
   data = array.fetch(ex)
   if axis is None:
     data /= norm_value
@@ -177,7 +215,18 @@ def norm_mapper(array, ex, axis, norm_value):
 
   yield (ex, data)
 
-def norm(array, axis=None):
+def normalize(array, axis=None):
+  '''
+  Normalize the values of ``array`` over axis.
+  After normalization `sum(array, axis)` will be equal to 1.
+  
+  Args:
+    array (Expr): array need to be normalized
+    axis (int): Either an integer or ``None``.
+  
+  Returns:
+    `Expr`: Normalized array.
+  '''
   axis_sum = sum(array, axis=axis).glom()
   return shuffle(array, norm_mapper, kw=dict(axis=axis, norm_value=axis_sum))
 
