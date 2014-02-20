@@ -9,12 +9,15 @@ from .base import Expr, lazify
 
 def shuffle(v, fn, tile_hint=None, target=None, kw=None):
   '''
-  Evaluate ``fn`` over each extent of the input.
+  Evaluate ``fn`` over each extent of ``v``.
   
-  ``fn`` should take arguments: ``(v, extent, **kw)``
-  
-  :param v: `Expr` to map over.
-  :param fn: Callable with form ``(v, extent, **kw)``
+  Args:
+    v (Expr or DistArray): Source array to map over.
+    fn (function): Function from  ``(DistArray, extent, **kw)`` to list of ``(new_extent, new_data)``
+    target (Expr): Optional. If specified, the output of ``fn`` will be written into ``target``.
+    kw (dict): Optional. Keyword arguments to pass to ``fn``.    
+  Returns:
+    ShuffleExpr:
   '''
   if kw is None: kw = {}
   
@@ -31,8 +34,23 @@ def shuffle(v, fn, tile_hint=None, target=None, kw=None):
                      fn_kw=kw)
 
 
-def target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
-  result = list(map_fn(inputs, ex, **fn_kw))
+def target_mapper(ex, map_fn=None, source=None, target=None, fn_kw=None):
+  '''
+  Kernel function invoked during shuffle.
+  
+  Runs ``map_fn`` over a single tile of the source array.
+  
+  Args:
+    ex (Extent): Extent being processed.
+    map_fn (function): Function passed into `shuffle`.
+    source (DistArray): DistArray being mapped over.
+    target (DistArray): Array being written to.
+    fn_kw (dict): Keyword arguments for ``map_fn``.
+    
+  Returns:
+    LocalKernelResult: No result data (all output is written to ``target``). 
+  '''
+  result = list(map_fn(source, ex, **fn_kw))
   
   futures = rpc.FutureGroup()
   if result is not None:
@@ -41,24 +59,38 @@ def target_mapper(ex, map_fn=None, inputs=None, target=None, fn_kw=None):
       futures.append(target.update(ex, v, wait=False))
   
 #   util.log_warn('%s futures', len(futures))
-  return LocalKernelResult(None, futures)
+  return LocalKernelResult(result=[], futures=futures)
 
 
         
-def notarget_mapper(ex, array=None, map_fn=None, inputs=None, fn_kw=None):
+def notarget_mapper(ex, array=None, map_fn=None, source=None, fn_kw=None):
+  '''
+  Kernel function invoked during shuffle.
+  
+  Runs ``map_fn`` over a single tile of the source array.
+  
+  Args:
+    ex (Extent): Extent being processed.
+    map_fn (function): Function passed into `shuffle`.
+    source (DistArray): DistArray being mapped over.
+    fn_kw (dict): Keyword arguments for ``map_fn``.
+    
+  Returns:
+    LocalKernelResult: List of (new_extent, new_tile_id). 
+  '''
   #util.log_info('MapExtents: %s', map_fn)
   ctx = blob_ctx.get()
   results = []
   
-  user_result = map_fn(inputs, ex, **fn_kw)
+  user_result = map_fn(source, ex, **fn_kw)
   if user_result is not None:
     for ex, v in user_result:
       Assert.eq(ex.shape, v.shape, 'Bad shape from %s' % map_fn)
       result_tile = tile.from_data(v)
-      tile_id = blob_ctx.get().create(result_tile).wait().blob_id
+      tile_id = blob_ctx.get().create(result_tile).wait().tile_id
       results.append((ex, tile_id))
   
-  return LocalKernelResult(results, None)
+  return LocalKernelResult(result=results, futures=None)
 
 
 @node_type
@@ -79,8 +111,8 @@ class ShuffleExpr(Expr):
     
     if target is not None:
       v.foreach_tile(mapper_fn = target_mapper,
-                     kw = dict(map_fn=map_fn, inputs=v, target=target, fn_kw=fn_kw))
+                     kw = dict(map_fn=map_fn, source=v, target=target, fn_kw=fn_kw))
       return target
     else:
       return v.map_to_array(mapper_fn = notarget_mapper,
-                              kw = dict(inputs=v, map_fn=map_fn, fn_kw=fn_kw))
+                              kw = dict(source=v, map_fn=map_fn, fn_kw=fn_kw))

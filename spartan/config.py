@@ -27,6 +27,11 @@ import appdirs
 from spartan import util
 
 class Flag(object):
+  '''Base object for a representing a command line flag.
+  
+  Subclasses must implement the ``set`` operation to parse
+  a flag value from a command line string.
+  '''
   def __init__(self, name, default=None, help=''):
     self.name = name
     self.val = default
@@ -48,13 +53,19 @@ class StrFlag(Flag):
     self.val = str
 
 class BoolFlag(Flag):
+  '''Boolean flag.  
+  
+  Accepts '0' or 'false' for false values, '1' or 'true' for true values. 
+  '''
   def set(self, str):
     str = str.lower()
     str = str.strip()
 
     if str == 'false' or str == '0': val = False
-    else: val = True
-    #print 'Bool %s "%s" %s' % (self.name, str, val)
+    elif str == 'true' or str == '1': val = True
+    else: 
+      assert False, 'Invalid value for boolean flag: "%s"' % str 
+
     self.val = val
 
   def _str(self):

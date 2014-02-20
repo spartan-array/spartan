@@ -72,10 +72,12 @@ class TransposeExpr(Expr):
 def transpose(array, tile_hint = None):
   '''
   Transpose ``array``.
-
-  Return a TransposeExpr.
-
-  :param array: `Expr`
+  
+  Args:
+    array: `Expr` to transpose.
+    
+  Returns:
+    `TransposeExpr`: Transpose array.
   '''
 
   array = lazify(array)

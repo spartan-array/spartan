@@ -1,3 +1,9 @@
+'''Implementation of the reduction expression.
+
+This supports generic reduce operations such as 
+``sum``, ``argmin``, ``argmax``, ``min`` and ``max``.
+
+'''
 import numpy as np
 
 from spartan import util
@@ -50,7 +56,7 @@ def _reduce_mapper(ex, children, op, axis, output):
     
   #util.log_info('Update: %s %s', dst_extent, local_reduction)
   output.update(dst_extent, local_reduction)
-  return LocalKernelResult([], None)
+  return LocalKernelResult(result=[])
 
 @node_type
 class ReduceExpr(Expr):
@@ -108,6 +114,9 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, accumulate_fn, fn_kw=None):
   :param dtype_fn: Callable: fn(array) -> `numpy.dtype`
   :param local_reduce_fn: Callable: fn(extent, data, axis)
   :param accumulate_fn: Callable: fn(old_v, update_v) -> new_v 
+  
+  :rtype: `Expr`
+  
   '''
   if fn_kw is None: fn_kw = {}
   varname = make_var()

@@ -18,7 +18,6 @@ from ..array import distarray, extent
 from ..array.extent import index_for_reduction, shapes_match
 from ..util import Assert
 from .base import force
-from .loop import loop
 from .map import map
 from .ndarray import ndarray
 from .optimize import disable_parakeet, not_idempotent
@@ -104,6 +103,20 @@ def sparse_rand(shape,
                 format='lil',
                 dtype=np.float32, 
                 tile_hint=None):
+  '''Make a distributed sparse random array.
+  
+  Random values are chosen from the uniform distribution on [0, 1).
+  
+  Args:
+    density(float): Fraction of values to be filled
+    format(string): Sparse tile format (lil, coo, csr, csc).
+    dtype(np.dtype): Datatype of array.
+    tile_hint(tuple or None): Shape of array tiles.
+    
+  Returns:
+    Expr:
+  '''
+  
   for s in shape: assert isinstance(s, int)
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True),
              fn=_make_sparse_rand,
@@ -389,8 +402,10 @@ def _countnonzero_local(ex, data, axis):
 def count_nonzero(array):
   '''
   Return the number of nonzero values in ``array``.
+  
   :param array: DistArray or `Expr`.
   :rtype: np.int64
+  
   '''
   return reduce(array, None,
                 dtype_fn=lambda input: np.int64,
@@ -401,6 +416,12 @@ def _countzero_local(ex, data, axis):
   return np.asarray(np.prod(ex.shape) - np.count_nonzero(data))
 
 def count_zero(array):
+  '''Return the number of zero values in ``array``.
+  
+  :param array: DistArray or `Expr`.
+  :rtype: np.int64
+  
+  '''
   return reduce(array, None,
                 dtype_fn=lambda input: np.int64,
                 local_reduce_fn=_countzero_local,
@@ -431,6 +452,7 @@ def astype(x, dtype):
   
   :param x: `Expr` or `DistArray`
   :param dtype:
+  
   '''
   assert x is not None
   return map(x, _astype_mapper, fn_kw={'dtype': np.dtype(dtype).str })
