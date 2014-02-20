@@ -49,7 +49,6 @@ class Transpose(distarray.DistArray):
 
     return ctx.map(self.base.tiles.values(),
                    mapper_fn = _tile_mapper,
-                   reduce_fn = None,
                    kw=kw)
 
   def fetch(self, ex):
