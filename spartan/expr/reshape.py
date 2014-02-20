@@ -109,9 +109,10 @@ def reshape(array, new_shape, tile_hint=None):
 
   Returns a ReshapeExpr with the given shape.
 
-  :param array: `Expr`
-  :param new_shape: `tuple`
-  :param tile_hint: `tuple` or None
+  Args: 
+    array (Expr): Source array to be reshaped.
+    new_shape (tuple): Target shape.
+    tile_hint (tuple):
   '''
 
   Assert.isinstance(new_shape, tuple)
