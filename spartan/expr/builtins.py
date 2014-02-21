@@ -329,7 +329,7 @@ def _scan_mapper(array, ex, scan_fn=None, axis=None, scan_base=None):
       exts = sorted(array.tiles.keys(), key=lambda x: x.ul)
       id = exts.index(ex)
       if id > 0:
-        local_data[tuple(np.zeros(len(ex.shape)))] += scan_base[id-1]
+        local_data[tuple(np.zeros(len(ex.shape), dtype=int))] += scan_base[id-1]
 
     else:
       max_axis_shape = max([ext.shape[axis] for ext in array.tiles.keys()])  
