@@ -14,8 +14,26 @@ from ..array import extent, tile, distarray
 from ..core import LocalKernelResult
 from .shuffle import target_mapper
 
+def _ravelled_ex(ul, lr, shape):
+  ravelled_ul = extent.ravelled_pos(ul, shape)
+  ravelled_lr = extent.ravelled_pos([l - 1 for l in lr], shape)
+  return ravelled_ul, ravelled_lr
+
+def _unravelled_ex(ravelled_ul, ravelled_lr, shape):
+  ul = extent.unravelled_pos(ravelled_ul, shape)
+  lr = extent.unravelled_pos(ravelled_lr, shape)
+  return ul, lr
+
 def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
-  ex = array.shape_array.extent_for_blob(tile_id)
+  if array.shape_array == None:
+    ex = array.base.extent_for_blob(tile_id)
+    ravelled_ul, ravelled_lr = _ravelled_ex(ex.ul, ex.lr, array.base.shape)
+    unravelled_ul, unravelled_lr = _unravelled_ex(ravelled_ul,
+                                                  ravelled_lr,
+                                                  array.shape)
+    ex = extent.create(unravelled_ul, np.array(unravelled_lr) + 1, array.shape)
+  else:
+    ex = array.shape_array.extent_for_blob(tile_id)
   return user_fn(ex, **kw)
 
 class Reshape(distarray.DistArray):
@@ -41,7 +59,7 @@ class Reshape(distarray.DistArray):
     self.bad_tiles = []
     self._tile_shape = distarray.good_tile_shape(shape,
                                                  blob_ctx.get().num_workers * 4)
-    self._shape_array = None
+    self.shape_array = None
     self._check_extents()
 
   def _check_extents(self):
@@ -67,8 +85,7 @@ class Reshape(distarray.DistArray):
 
     for slc in itertools.product(*splits):
       ul, lr = zip(*slc)
-      ravelled_ul = extent.ravelled_pos(ul, self.shape)
-      ravelled_lr = extent.ravelled_pos([l - 1 for l in lr], self.shape)
+      ravelled_ul, ravelled_lr = _ravelled_ex(ul, lr, self.shape)
       rect_ul, rect_lr = extent.find_rect(ravelled_ul, ravelled_lr, self.base.shape)
       if rect_ul or ul or rect_lr != lr:
         self._same_tiles = False
@@ -84,46 +101,41 @@ class Reshape(distarray.DistArray):
     kw['array'] = self
     kw['user_fn'] = mapper_fn
 
+    print self._same_tiles
     if self._same_tiles:
       tiles = self.base.tiles.values()
     else:
-      if self._shape_array == None:
-        self._shape_array = distarray.create(self.shape, self.base.dtype,
+      if self.shape_array == None:
+        self.shape_array = distarray.create(self.shape, self.base.dtype,
                                              tile_hint=self._tile_shape,
                                              sparse=self.base.sparse)
-      tiles = self._shape_array.tiles.values()
+      tiles = self.shape_array.tiles.values()
 
     return ctx.map(tiles, mapper_fn = _tile_mapper, kw=kw)
 
   def fetch(self, ex):
-    ravelled_ul = extent.ravelled_pos(ex.ul, ex.array_shape)
-    ravelled_lr = extent.ravelled_pos([lr - 1 for lr in ex.lr], ex.array_shape)
-
-    (base_ravelled_ul, base_ravelled_lr) = extent.find_rect(ravelled_ul, ravelled_lr, self.base.shape)
-
-    base_ul = extent.unravelled_pos(base_ravelled_ul, self.base.shape)
-    base_lr = extent.unravelled_pos(base_ravelled_lr, self.base.shape)
+    ravelled_ul, ravelled_lr = _ravelled_ex(ex.ul, ex.lr, self.shape)
+    base_ravelled_ul, base_ravelled_lr = extent.find_rect(ravelled_ul,
+                                                          ravelled_lr,
+                                                          self.base.shape)
+    base_ul, base_lr = _unravelled_ex(base_ravelled_ul,
+                                      base_ravelled_lr,
+                                      self.base.shape)
     base_ex = extent.create(base_ul, np.array(base_lr) + 1, self.base.shape)
 
-    (rect_ravelled_ul, rect_ravelled_lr) = extent.find_rect(base_ravelled_ul, base_ravelled_lr, self.base.shape)
-
-    rect_ul = extent.unravelled_pos(rect_ravelled_ul, self.base.shape)
-    rect_lr = extent.unravelled_pos(rect_ravelled_lr, self.base.shape)
-    rect_ex = extent.create(rect_ul, np.array(rect_lr) + 1, self.base.shape)
-
+    tile = self.base.fetch(base_ex)
     if not self.base.sparse:
-      tile = np.ravel(self.base.fetch(rect_ex))
-      tile = tile[(base_ravelled_ul - rect_ravelled_ul):(base_ravelled_lr - rect_ravelled_ul) + 1]
+      tile = np.ravel(tile)
+      tile = tile[(base_ravelled_ul - ravelled_ul):(base_ravelled_lr - ravelled_ul) + 1]
       return tile.reshape(ex.shape)
     else:
-      tile = self.base.fetch(rect_ex)
       new = sp.lil_matrix(ex.shape, dtype=self.base.dtype)
       j_max = tile.shape[1]
       for i,row in enumerate(tile.rows):
         for col,j in enumerate(row):
           rect_index = i*j_max + j
-          target_start = base_ravelled_ul - rect_ravelled_ul
-          target_end = base_ravelled_lr - rect_ravelled_ul
+          target_start = base_ravelled_ul - ravelled_ul
+          target_end = base_ravelled_lr - ravelled_ul
           if rect_index >= target_start and rect_index <= target_end:
             new_r,new_c = np.unravel_index(rect_index - target_start, ex.shape)
             new[new_r,new_c] = tile[i,j]
