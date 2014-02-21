@@ -208,10 +208,6 @@ class DistArrayImpl(DistArray):
     
     Assert.not_null(dtype)
 
-    if self.ctx.is_master():
-      util.log_info('New array: %s, %s, %s tiles', shape, dtype, len(tiles))
-
-    #util.log_info('%s', extents)
     Assert.isinstance(tiles, dict)
 
     self.blob_to_ex = {}
@@ -225,6 +221,8 @@ class DistArrayImpl(DistArray):
     self.id = ID_COUNTER.next()
 
     if self.ctx.is_master():
+      util.log_info('New array: %s, %s, %s tiles', shape, dtype, len(tiles))
+      #util.log_info('%s', extents)
       if _pending_destructors:
         self.ctx.destroy_all(_pending_destructors)
         del _pending_destructors[:]
@@ -241,7 +239,8 @@ class DistArrayImpl(DistArray):
     invocation of a RPC call, which leads to odd/bad behavior.
     '''
     if self.ctx.is_master():
-      util.log_info('Destroying table... %s', self.id)
+      # Logging during shutdown doesn't work.
+      #util.log_debug('Destroying table... %s', self.id)
       tiles = self.tiles.values()
       _pending_destructors.extend(tiles)
 
