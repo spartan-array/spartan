@@ -66,6 +66,15 @@ class ReduceExpr(Expr):
     Expr.node_init(self)
     assert self.dtype_fn is not None
     assert isinstance(self.children, DictExpr)
+
+  def compute_shape(self):
+    shapes = [i.shape for i in self.children.values()]
+    child_shape = collections.defaultdict(int)
+    for s in shapes:
+      for i, v in enumerate(s):
+        child_shape[i] = max(child_shape[i], v)
+    input_shape = tuple([child_shape[i] for i in range(len(child_shape))])
+    return extent.shape_for_reduction(input_shape, self.axis)
   
   def _evaluate(self, ctx, deps):
     children = deps['children']

@@ -375,6 +375,7 @@ class Expr(object):
     try:
       return self.compute_shape()
     except NotShapeable:
+      util.log_debug('Not shapeable: %s', self)
       return evaluate(self).shape
 
   @property
@@ -427,6 +428,12 @@ class AsArray(Expr):
     return self
 
   def compute_shape(self):
+    if hasattr(self.val, 'shape'):
+      return self.val.shape
+
+    if np.isscalar(self.val):
+      return np.asarray(self.val).shape
+
     raise NotShapeable
 
   def _evaluate(self, ctx, deps):
