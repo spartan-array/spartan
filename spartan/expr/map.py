@@ -74,6 +74,9 @@ class MapExpr(Expr):
   '''
   _members = ['children', 'op']
 
+  def label(self):
+    return 'map(%s)' % self.op.fn.__name__
+
   def compute_shape(self):
     '''MapTiles retains the shape of inputs.
 

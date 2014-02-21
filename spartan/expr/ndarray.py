@@ -8,8 +8,11 @@ from .. import util
 class NdArrayExpr(Expr):
   _members = ['_shape', 'sparse', 'dtype', 'tile_hint', 'reduce_fn']
 
-  def __str__(self):
+  def __repr__(self):
     return 'dist_array(%s, %s)' % (self.shape, self.dtype)
+
+  def label(self):
+    return repr(self)
   
   def visit(self, visitor):
     return NdArrayExpr(_shape=visitor.visit(self.shape),

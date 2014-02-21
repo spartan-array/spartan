@@ -12,10 +12,10 @@ from .. import util, core, blob_ctx, rpc, sparse
 from ..core import LocalKernelResult
 from ..util import Assert
 from ..config import FLAGS
+from .. import master
 
 # number of elements per tile
 DEFAULT_TILE_SIZE = 100000
-
 
 def take_first(a,b):
   return a
@@ -103,7 +103,6 @@ def compute_extents(shape, tile_hint=None, num_shards=-1):
     idx += 1
   
   return result
-    
 
 def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
   '''Invoke ``user_fn`` on ``blob``, and construct tiles from the results.'''
@@ -172,6 +171,9 @@ class DistArray(object):
     #util.log_info('Select: %s + %s -> %s', idx, self.shape, ex)
     return self.fetch(ex)
 
+  def __getitem__(self, idx):
+    return self.select(idx)
+    
   def glom(self):
     #util.log_info('Glomming: %s', self.shape)
     return self.select(np.index_exp[:])
@@ -412,7 +414,7 @@ def create(shape,
                     tile.from_shape(ex.shape, dtype, tile_type=tile_type), 
                     hint=i)
   elif FLAGS.tile_assignment_strategy == 'performance':
-    worker_scores = ctx.get_worker_scores()
+    worker_scores = master.get().get_worker_scores()
     for ex, i in extents.iteritems():    
       tiles[ex] = ctx.create(
                   tile.from_shape(ex.shape, dtype, tile_type=tile_type), 
@@ -428,11 +430,7 @@ def create(shape,
   #  util.log_warn("i:%d ex:%s, tile_id:%s", i, ex, tiles[ex])
     
   array = DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
-  
-  # MEMORY LEAK... disable for now.
-  #for tile_id in tiles.values():
-  #  ctx.register_blob(tile_id, array)
-    
+  master.get().register_array(array)
   return array
 
 def from_replica(X):
@@ -459,16 +457,9 @@ def from_replica(X):
       
   for ex in tiles:
     tiles[ex] = tiles[ex].wait().tile_id
-
-  #for ex, i in extents.iteritems():
-  #  util.log_warn("i:%d ex:%s, tile_id:%s", i, ex, tiles[ex])
     
   array = DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
-
-  # MEMORY LEAK... disable for now.
-  #for tile_id in tiles.values():
-  #  ctx.register_blob(tile_id, array)
-    
+  master.get().register_array(array)
   return array
 
 def from_table(extents):
@@ -503,12 +494,7 @@ def from_table(extents):
     sparse = False
   
   array = DistArrayImpl(shape=shape, dtype=dtype, tiles=extents, reducer_fn=None, sparse=sparse)
-  
-  # MEMORY LEAK... disable for now.
-  #ctx = blob_ctx.get()
-  #for tile_id in extents.values():
-  #  ctx.register_blob(tile_id, array)
-  
+  master.get().register_array(array)
   return array
 
 class LocalWrapper(DistArray):
