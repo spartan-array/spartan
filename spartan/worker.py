@@ -54,7 +54,7 @@ class Worker(object):
     self._running = True
     self._ctx = None
     self.worker_status = core.WorkerStatus(psutil.TOTAL_PHYMEM, psutil.NUM_CPUS,
-                                           psutil.phymem_usage().percent, 
+                                           psutil.virtual_memory().percent,
                                            psutil.cpu_percent(), 
                                            time.time(),
                                            [], [])
@@ -279,7 +279,7 @@ class Worker(object):
         time.sleep(0.1)
         continue
       
-      self.worker_status.update_status(psutil.phymem_usage().percent, psutil.cpu_percent(), now)
+      self.worker_status.update_status(psutil.virtual_memory().percent, psutil.cpu_percent(), now)
       future = self._ctx.heartbeat(self.worker_status, HEARTBEAT_TIMEOUT)  
       try:
         future.wait()
