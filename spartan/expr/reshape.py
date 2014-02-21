@@ -2,6 +2,7 @@
 Reshape operation and expr.
 '''
 
+import itertools
 import numpy as np
 import scipy.sparse as sp
 from spartan import rpc
@@ -38,12 +39,43 @@ class Reshape(distarray.DistArray):
     self.dtype = base.dtype
     self.sparse = self.base.sparse
     self.bad_tiles = []
-    self.shape_array = distarray.create(shape, base.dtype,
-                                        tile_hint=tile_hint,
-                                        sparse=base.sparse)
+    self._tile_shape = distarray.good_tile_shape(shape,
+                                                 blob_ctx.get().num_workers * 4)
+    self._shape_array = None
+    self._check_extents()
+
+  def _check_extents(self):
+    ''' Check if original extents are still rectangles after reshaping.
+
+    If original extents are still rectangles after reshaping, _check_extents
+    sets _same_tiles to avoid creating a new distarray in foreach_tile().
+    '''
+
+    self._same_tiles = True
+    # Special cases, check if we just add an extra dimension.
+    if len(self.shape) > len(self.base.shape):
+      for i in range(len(self.base.shape)):
+        if self.base.shape[i] != self.shape[i]:
+          self._same_tiles = False
+          break
+      if self._same_tiles:
+        return
+
+    # For each (ul, lr) in the new metrix, _compute_split checks if they can
+    # form a retangle in the original metrix.
+    splits = distarray.compute_splits(self.shape, self._tile_shape)
+
+    for slc in itertools.product(*splits):
+      ul, lr = zip(*slc)
+      ravelled_ul = extent.ravelled_pos(ul, self.shape)
+      ravelled_lr = extent.ravelled_pos([l - 1 for l in lr], self.shape)
+      rect_ul, rect_lr = extent.find_rect(ravelled_ul, ravelled_lr, self.base.shape)
+      if rect_ul or ul or rect_lr != lr:
+        self._same_tiles = False
+        break
 
   def tile_shape(self):
-    return self.shape_array.tile_shape()
+    return self._tile_shape
 
   def foreach_tile(self, mapper_fn, kw=None):
     ctx = blob_ctx.get()
@@ -52,9 +84,16 @@ class Reshape(distarray.DistArray):
     kw['array'] = self
     kw['user_fn'] = mapper_fn
 
-    return ctx.map(self.shape_array.tiles.values(),
-                   mapper_fn = _tile_mapper,
-                   kw=kw)
+    if self._same_tiles:
+      tiles = self.base.tiles.values()
+    else:
+      if self._shape_array == None:
+        self._shape_array = distarray.create(self.shape, self.base.dtype,
+                                             tile_hint=self._tile_shape,
+                                             sparse=self.base.sparse)
+      tiles = self._shape_array.tiles.values()
+
+    return ctx.map(tiles, mapper_fn = _tile_mapper, kw=kw)
 
   def fetch(self, ex):
     ravelled_ul = extent.ravelled_pos(ex.ul, ex.array_shape)

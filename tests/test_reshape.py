@@ -102,3 +102,12 @@ class ReshapeTest(test_common.ClusterTest):
     t3 = expr.dot(t1, expr.reshape(t2, (31, 4308)))
     Assert.all_eq(result, t3.glom())
 
+    npa1 = np.random.random((357, 718))
+    npa2 = np.random.random((718, ))
+    result = np.dot(npa1, np.reshape(npa2, (718, 1)))
+
+    t1 = expr.from_numpy(npa1)
+    t2 = expr.from_numpy(npa2)
+    t3 = expr.dot(t1, expr.reshape(t2, (718, 1)))
+    Assert.all_eq(result, t3.glom())
+

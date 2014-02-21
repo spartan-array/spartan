@@ -20,49 +20,76 @@ DEFAULT_TILE_SIZE = 100000
 def take_first(a,b):
   return a
 
-def compute_splits(shape, tile_hint=None, num_shards=-1):
-  '''Split an array of shape ``shape`` into `Extent`s containing roughly `TILE_SIZE` elements.
+def good_tile_shape(shape, num_shards=-1):
+  ''' Compute a tile_shape (tile_hint) for the array.
+
+  Args:
+    shape: tuple. the array's shape.
+
+  Returns:
+    list: tile_shape for the array
+  '''
+  if num_shards != -1:
+    tile_size = np.prod(shape) / num_shards
+  else:
+    tile_size = DEFAULT_TILE_SIZE
+
+  # fill up dimensions...
+  tile_shape = [1] * len(shape)
+  idx = len(shape) - 1
+  while tile_size > 1:
+    tile_shape[idx] = max(shape[idx], tile_size)
+    tile_size /= shape[idx]
+    idx -= 1
+
+  return tile_shape
+
+def compute_splits(shape, tile_hint):
+  ''' Based on tile_hint to compute splits for each dimension of the array of shape ``shape``
+
+  Args:
+    shape: tuple. the array's shape.
+    tile_hint: tuple indicating the desired tile shape.
+
+  Returns:
+    list: splits for each dimension.
+  '''
+  splits = [None] * len(shape)
+  for dim in range(len(shape)):
+    dim_splits = []
+    step = tile_hint[dim]
+    #Assert.le(step, shape[dim])
+    for i in range(0, shape[dim], step):
+      dim_splits.append((i, min(shape[dim],  i + step)))
+    splits[dim] = dim_splits
+
+  return splits
+
+def compute_extents(shape, tile_hint=None, num_shards=-1):
+  '''Split an array of shape ``shape`` into `Extent`s. Each extent contains roughly `TILE_SIZE` elements if num_shards is -1.
  
-  :param shape: tuple
-  :param tile_hint: tuple indicating the desired tile shape 
-  :rtype: list of `Extent`
+  Args:
+    shape: tuple. the array's shape.
+    tile_hint: tuple indicating the desired tile shape.
+
+  Returns:
+    list: list of `Extent`
   '''
 
   util.log_info('Splitting %s %s %s', shape, tile_hint, num_shards)
 
-  splits = [None] * len(shape)
+  # try to make reasonable tiles
+  if len(shape) == 0:
+    return { extent.create([], [], ()) :  0 }
+
   if tile_hint is None:
-    if num_shards != -1:
-      tile_size = np.prod(shape) / num_shards
-    else:
-      tile_size = DEFAULT_TILE_SIZE
-  
-    # try to make reasonable tiles
-    if len(shape) == 0:
-      return { extent.create([], [], ()) :  0 }
-   
-    weight = 1
-    
-    # split each dimension into tiles.  the first dimension
-    # is kept contiguous if possible.
-    for dim in reversed(range(len(shape))):
-      step = max(1, tile_size / weight)
-      dim_splits = []
-      for i in range(0, shape[dim], step):
-        dim_splits.append((i, min(shape[dim], i + step)))
-        
-      splits[dim] = dim_splits
-      weight *= shape[dim]
+    tile_hint = good_tile_shape(shape, num_shards)
   else:
     Assert.eq(len(tile_hint), len(shape),
-              '#dimensions in tile hint does not match shape %s vs %s' % (tile_hint, shape))
-    for dim in range(len(shape)):
-      dim_splits = []
-      step = tile_hint[dim]
-      #Assert.le(step, shape[dim])
-      for i in range(0, shape[dim], step):
-        dim_splits.append((i, min(shape[dim],  i + step)))
-      splits[dim] = dim_splits
+              '#dimensions in tile hint does not match shape %s vs %s' %
+              (tile_hint, shape))
+
+  splits = compute_splits(shape, tile_hint)
 
   result = {}
   idx = 0
@@ -375,7 +402,7 @@ def create(shape,
   dtype = np.dtype(dtype)
   shape = tuple(shape)
 
-  extents = compute_splits(shape, tile_hint, ctx.num_workers * 4)
+  extents = compute_extents(shape, tile_hint, ctx.num_workers * 4)
   tiles = {}
   tile_type = tile.TYPE_SPARSE if sparse else tile.TYPE_DENSE
   
