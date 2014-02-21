@@ -221,15 +221,30 @@ class Expr(object):
     '''
     Return a string suitable for use with the 'dot' command.
     '''
-    result = 'N%s [label="%s"]\n' % (self.expr_id, self.node_type)
-   
-    for _, value in self.dependencies().items():
-      if isinstance(value, Expr):
-        result = result + 'N%s -> N%s\n' % (self.expr_id, value.expr_id) 
-  
-    for _, value in self.dependencies().items():
-      if isinstance(value, Expr):
-        result = result + value.dot()
+    header = 'digraph G {\n'
+    footer = '}'
+
+    seen = set()
+    rest = self._graphviz(None, seen)
+    return header + '\n'.join(rest) + footer
+
+  def label(self):
+    'Graphviz label for this node.'
+    return self.node_type
+
+  def _graphviz(self, parent, seen):
+    result = []
+    
+    if parent is not None:
+      result.append('N%s -> N%s' % (parent.expr_id, self.expr_id))
+
+    if not self in seen:
+      seen.add(self)
+      result.append('N%s [label="%s"]\n' % (self.expr_id, self.label()))
+      for _, value in self.dependencies().items():
+        if isinstance(value, Expr):
+          result.extend(value._graphviz(self, seen))
+
     return result
    
   def __del__(self):
@@ -423,6 +438,9 @@ class AsArray(Expr):
   '''
   _members = ['val']
 
+  def label(self):
+    return self.val
+
   def visit(self, visitor):
     return self
 
@@ -479,6 +497,14 @@ class CollectionExpr(Expr):
     return deps
     #return self.dependencies()
     #return deps['vals']
+
+  def _graphviz(self, parent, seen):
+    result = []
+    for _, value in self.dependencies().items():
+      if isinstance(value, Expr):
+        result.extend(value._graphviz(parent, seen))
+
+    return result
 
   def __getitem__(self, idx):
     return self.vals[idx]

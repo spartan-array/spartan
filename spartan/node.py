@@ -171,8 +171,10 @@ def node_type(klass):
   get_reverse_mro(klass)
 
   klass.__init__ = obj_init
-  klass.__repr__ = node_str
-  klass.__str__ = node_str
+  
+  if klass.__repr__ == object.__repr__: klass.__repr__ = node_str
+  if klass.__str__  == object.__repr__: klass.__str__ = node_str
+
   klass.node_items = node_iteritems
   klass.node_type = klass.__name__
   

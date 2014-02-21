@@ -73,7 +73,7 @@ class DotExpr(Expr):
   _members = ['matrix_a', 'matrix_b', 'tile_hint']
 
   def __str__(self):
-    return 'Dot[%d] %s' % (self.expr_id, self.expr)
+    return 'Dot[%s, %s]' % (self.matrix_a, self.matrix_b)
 
   def _evaluate(self, ctx, deps):
     av = deps['matrix_a']
