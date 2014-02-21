@@ -108,7 +108,7 @@ def _save_reducer(ex, tile, axis, path = None, prefix = None, iszip = None):
         fp.write(tile.data)
     fp.close()
   except Exception as e:
-    util.log_error('Save %s tile(%s, %s) failed : %s' % prefix, ex.ul, ex.lr, e)
+    util.log_error('Save %s tile(%s, %s) failed : %s', prefix, ex.ul, ex.lr, e)
     raise
 
   return np.asarray(1)

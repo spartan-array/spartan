@@ -7,20 +7,28 @@ import numpy as np
 from spartan import expr, util, eager, force
 import test_common
 
+base_line = {1:8.1, 2:9.3, 4:11.6, 8:17.6, 16:20.8, 32:22.1, 64:23.4}
+max_iter = 5
+avg_time = 0.0
 
 def millis(t1, t2):
   dt = t2 - t1
   ms = (dt.days * 24 * 60 * 60 + dt.seconds) * 1000 + dt.microseconds / 1000.0
   return ms
 
-def sparse_multiply(wts, p):  
-  for i in range(5):
+def sparse_multiply(wts, p, p_tile_hint):
+  global avg_time
+  avg_time = 0.0
+  for i in range(max_iter):
     util.log_warn('iteration %d begin!', i)
     t1 = datetime.now()
-    p = expr.dot(wts, p).force()
+    p = expr.dot(wts, p, tile_hint=p_tile_hint).force()
     t2 = datetime.now()
-    print "iteration %d sparse * dense: %s ms" % (i, millis(t1, t2))
-    
+    time_cost = millis(t1, t2)
+    print "iteration %d sparse * dense: %s ms" % (i, time_cost)
+    avg_time += time_cost
+  avg_time /= max_iter
+
   #print p.glom()
   #if scipy.sparse.issparse(r):
   #  print "sparse * sparse: %s ms" % millis(t1, t2)
@@ -138,8 +146,9 @@ def benchmark_pr(ctx, timer):
  
   #r = expr.dot(wts, p)
   #print r.glom()
-  sparse_multiply(wts, p)
+  sparse_multiply(wts, p, p_tile_hint)
   
+  print 'baseline:', base_line[ctx.num_workers], 'current benchmark:', avg_time / 1000
   #r2 = sparse_multiply(wts, q)
   #print 'r1:',r1
   #print 'r2:',r2

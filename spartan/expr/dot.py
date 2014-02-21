@@ -4,7 +4,7 @@ Dot expr.
 
 import numpy as np
 import scipy.sparse as sp
-from spartan import rpc
+from .. import sparse, rpc
 from .base import Expr, lazify
 from .. import blob_ctx, util
 from ..node import Node, node_type
