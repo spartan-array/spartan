@@ -1,6 +1,6 @@
 from .base import Expr, lazify
 from ..config import FLAGS
-from .. import util
+from .. import master, util
 from ..node import node_type
 from .fio import save
 from ..array.distarray import from_replica
@@ -22,8 +22,7 @@ class CheckpointExpr(Expr):
     if self.mode == 'disk':
       if cached_result is not None:
         util.log_info('load partial disk data')
-        ctx = blob_ctx.get()
-        extents = ctx.get_workers_for_reload(cached_result)
+        extents = master.get().get_workers_for_reload(cached_result)
         new_blobs = partial_load(extents, "%s" % self.expr_id, path = self.path, iszip = False)
         for ex, tile_id in new_blobs.iteritems():
           cached_result.tiles[ex] = tile_id

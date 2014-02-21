@@ -1,7 +1,7 @@
 from spartan.rpc import serialization
 from spartan.util import Assert
 import spartan.core
-from spartan.expr import tile_mapper
+from spartan.expr.map import tile_mapper
 import numpy as np
 import scipy.sparse as sp
 from datetime import datetime
@@ -72,7 +72,7 @@ def test_mask_array():
   cPickle_test(a)
 
 def test_message():
-  a = spartan.core.KernelReq(blobs=[spartan.core.BlobId(i,i) for i in range(100)], mapper_fn=tile_mapper, reduce_fn=lambda x, y: np.sum(x,y), kw={})
+  a = spartan.core.RunKernelReq(blobs=[spartan.core.TileId(i,i) for i in range(100)], mapper_fn=tile_mapper, kw={})
   serial_test(a)
   cPickle_test(a)
   
