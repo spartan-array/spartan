@@ -14,10 +14,11 @@ class SGDRegressor(object):
     '''
     SGDRegressor try to find out best w for y = wx.
 
-    :param x: `Expr`
-    :param y: `Expr`
-    :param iterations: Iterations to do SGD.
-    :param alpha: Learning rate for SGD
+    Args
+      x: `Expr`
+      y: `Expr`
+      iterations: An integer indicating the learning iterations for SGD.
+      alpha: An integer indicating the learning rate for SGD
     '''
     self.x = x
     self.y = y
