@@ -186,11 +186,4 @@ class HeartbeatReq(Message):
 @node_type
 class TileOpReq(Message):
   _members = ['tile_id', 'fn']
-  
-@node_type
-class RegisterBlobReq(Message):
-  _members = ['tile_id', 'array']
-  
-@node_type
-class GetWorkersForReloadReq(Message):
-  _members = ['array']
+

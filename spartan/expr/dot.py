@@ -70,10 +70,10 @@ def _dot_numpy(array, ex, numpy_data=None):
 
 @node_type
 class DotExpr(Expr):
-  _members = ['matrix_a', 'matrix_b']
+  _members = ['matrix_a', 'matrix_b', 'tile_hint']
 
   def __str__(self):
-    return 'Dot[%d] %s' % (self.expr_id, self.expr)
+    return 'Dot[%s, %s]' % (self.matrix_a, self.matrix_b)
 
   def _evaluate(self, ctx, deps):
     av = deps['matrix_a']
@@ -86,7 +86,10 @@ class DotExpr(Expr):
       return av.map_to_array(mapper_fn = notarget_mapper,
                              kw = dict(source=av, map_fn=_dot_numpy, fn_kw=fn_kw))
     else:
-      tile_hint = np.maximum(av.tile_shape(), bv.tile_shape())
+      if self.tile_hint is None:
+        tile_hint = np.maximum(av.tile_shape(), bv.tile_shape())
+      else:
+        tile_hint = self.tile_hint
       sparse=(av.sparse and bv.sparse)
       target = distarray.create((av.shape[0], bv.shape[1]), dtype=av.dtype,
                                 tile_hint=tile_hint, reducer=np.add,
@@ -99,7 +102,7 @@ class DotExpr(Expr):
                                 fn_kw=fn_kw))
       return target
 
-def dot(a, b):
+def dot(a, b, tile_hint=None):
   '''
   Compute the dot product (matrix multiplication) of 2 arrays.
 
@@ -107,5 +110,5 @@ def dot(a, b):
   :param b: `Expr` or `numpy.ndarray`
   :rtype: `Expr`
   '''
-  return DotExpr(matrix_a = a, matrix_b = b)
+  return DotExpr(matrix_a = a, matrix_b = b, tile_hint=tile_hint)
 

@@ -140,6 +140,73 @@ def sparse_diagonal(shape,
                     tile_hint=None):
   return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True), _make_sparse_diagonal)
 
+def _diag_mapper(array, ex):
+  '''
+  Create a diagonal array section for this extent.
+  If the extent does not lie on the diagonal, a zero array is returned.
+  
+  Args:
+    array (DistArray):
+    ex (Extent): Region being processed.
+  '''
+  dst_ul = (ex.ul[0], 0)
+  dst_lr = (ex.lr[0], array.shape[0])
+  dst_shape = (array.shape[0], array.shape[0])
+  dst_ex = extent.create(dst_ul, dst_lr, dst_shape)
+
+  data = array.fetch(ex)
+  result = np.zeros((ex.lr[0] - ex.ul[0], array.shape[0]))
+  for i in range(0, ex.lr[0]-ex.ul[0]):
+    result[i, i + ex.ul[0]] = data[i]
+  yield (dst_ex, result)    
+
+def diag(array):
+  '''
+  Create a diagonal array with the given data on the diagonal
+  the shape should be array.shape[0] * array.shape[0]
+  
+  Args:
+    array: the given data which need to be filled on the diagonal
+  '''
+  return shuffle(array, diag_mapper)
+
+def _norm_mapper(array, ex, axis, norm_value):
+  '''
+  Normalize a region of an array.
+  Returns a new, normalized region.
+  
+  Args:
+    array (DistArray):
+    ex (Extent): Region being processed.
+    axis: Either an integer or ``None``.
+  '''
+  data = array.fetch(ex)
+  if axis is None:
+    data /= norm_value
+  elif axis == 1:
+    for i in range(data.shape[0]):
+      data[i,:] /= norm_value[ex.ul[0] + i]
+  elif axis == 0:
+    for i in range(data.shape[1]):
+      data[:,i] /= norm_value[ex.ul[1] + i]
+
+  yield (ex, data)
+
+def normalize(array, axis=None):
+  '''
+  Normalize the values of ``array`` over axis.
+  After normalization `sum(array, axis)` will be equal to 1.
+  
+  Args:
+    array (Expr): array need to be normalized
+    axis (int): Either an integer or ``None``.
+  
+  Returns:
+    `Expr`: Normalized array.
+  '''
+  axis_sum = sum(array, axis=axis).glom()
+  return shuffle(array, norm_mapper, kw=dict(axis=axis, norm_value=axis_sum))
+
 @disable_parakeet 
 def _tocoo(data):
   return data.tocoo()
@@ -397,32 +464,41 @@ def argmax(x, axis=None):
   return take_indices
 
 def _countnonzero_local(ex, data, axis):
-  return np.asarray(np.count_nonzero(data))
+  if axis is None:
+    return np.asarray(np.count_nonzero(data))
+  
+  return (data > 0).sum(axis)  
 
-def count_nonzero(array):
+def count_nonzero(array, axis=None):
   '''
-  Return the number of nonzero values in ``array``.
+  Return the number of nonzero values in the axis of the ``array``.
   
   :param array: DistArray or `Expr`.
+  :param axis: the axis to count
   :rtype: np.int64
   
   '''
-  return reduce(array, None,
+  return reduce(array, axis,
                 dtype_fn=lambda input: np.int64,
                 local_reduce_fn=_countnonzero_local,
                 accumulate_fn = np.add)
 
 def _countzero_local(ex, data, axis):
-  return np.asarray(np.prod(ex.shape) - np.count_nonzero(data))
+  if axis is None:
+    return np.asarray(np.prod(ex.shape) - np.count_nonzero(data))
+  
+  return (data == 0).sum(axis)
 
-def count_zero(array):
-  '''Return the number of zero values in ``array``.
+def count_zero(array, axis=None):
+  '''
+  Return the number of zero values in the axis of the ``array``.
   
   :param array: DistArray or `Expr`.
+  :param axis: the axis to count
   :rtype: np.int64
   
   '''
-  return reduce(array, None,
+  return reduce(array, axis,
                 dtype_fn=lambda input: np.int64,
                 local_reduce_fn=_countzero_local,
                 accumulate_fn = np.add)
@@ -476,7 +552,10 @@ def ravel(v):
   :param v: `Expr` or `DistArray`
   '''
   return shuffle(v, _ravel_mapper)
-
+        
+def multiply(a, b):
+  assert a.shape == b.shape
+  return map((a, b), fn=lambda a, b: a.multiply(b) if sp.issparse(a) else a * b)
 
 def add(a, b): return map((a, b), fn=np.add)
 
@@ -487,6 +566,8 @@ def ln(v): return map(v, fn=np.log)
 def log(v): return map(v, fn=np.log)
 
 def exp(v): return map(v, fn=np.exp)
+
+def square(v): return map(v, fn=np.square)
 
 def sqrt(v): return map(v, fn=np.sqrt)
 
