@@ -170,29 +170,6 @@ def diag(array):
   '''
   return shuffle(array, diag_mapper)
 
-def _inc_mapper(array, ex):
-  '''
-  Create a continuous increasing array section for this extent.
-  
-  Args:
-    array (DistArray):
-    ex (Extent): Region being processed.
-  '''
-  data = np.ones(ex.shape)
-  data[0] = ex.ul[0]
-  yield (ex, data.cumsum())
-  
-def inc_vec(shape, dtype=np.float, tile_hint=None):
-  '''
-  Create a continuous increasing vector (start from 0). This can be used as the index of some large array.
-  Swap some large rows can be replaced as just modify the value of this index array
-  
-  Args:
-    shape(tuple): the vector shape
-  ''' 
-  assert len(shape) == 1 or shape[1] == 1
-  return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint), inc_mapper)
-
 def _norm_mapper(array, ex, axis, norm_value):
   '''
   Normalize a region of an array.
