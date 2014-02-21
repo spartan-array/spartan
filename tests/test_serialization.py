@@ -11,7 +11,7 @@ import pickle
 import cStringIO
 from spartan import cloudpickle
 
-ARRAY_SIZE=(10000,10000)
+ARRAY_SIZE=(10000,1000)
 
 def millis(t1, t2):
     dt = t2 - t1
