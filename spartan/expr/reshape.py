@@ -26,6 +26,8 @@ def _unravelled_ex(ravelled_ul, ravelled_lr, shape):
 
 def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
   if array.shape_array == None:
+    # Maps over the original array, translating the region to reflect the
+    # reshape operation.
     ex = array.base.extent_for_blob(tile_id)
     ravelled_ul, ravelled_lr = _ravelled_ex(ex.ul, ex.lr, array.base.shape)
     unravelled_ul, unravelled_lr = _unravelled_ex(ravelled_ul,
@@ -79,8 +81,8 @@ class Reshape(distarray.DistArray):
       if self._same_tiles:
         return
 
-    # For each (ul, lr) in the new metrix, _compute_split checks if they can
-    # form a retangle in the original metrix.
+    # For each (ul, lr) in the new matrix, _compute_split checks if they can
+    # form a retangle in the original matrix.
     splits = distarray.compute_splits(self.shape, self._tile_shape)
 
     for slc in itertools.product(*splits):
