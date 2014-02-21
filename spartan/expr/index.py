@@ -35,17 +35,31 @@ class IndexExpr(Expr):
     assert not isinstance(self.idx, ListExpr)
     assert not isinstance(self.idx, TupleExpr)
 
+  def label(self):
+    return 'slice(%s)' % self.idx
+
+  def compute_shape(self):
+    if isinstance(self.idx, (int, slice, tuple)):
+      src_shape = self.src.compute_shape()
+      ex = extent.from_shape(src_shape)
+      slice_ex = extent.compute_slice(ex, self.idx)
+      return slice_ex.shape
+    else:
+      raise base.NotShapeable
+
   def _evaluate(self, ctx, deps):
+    src = deps['src']
     idx = deps['idx']
+
     assert not isinstance(idx, list) 
-    util.log_info('Indexing: %s', idx)
+    util.log_debug('Evaluating index: %s', idx)
     
     if isinstance(idx, tuple) or\
        isinstance(idx, slice) or\
        np.isscalar(idx):
-      return eval_slice(ctx, deps['src'], deps['idx'])
+      return eval_slice(ctx, src, idx)
     else:
-      return eval_index(ctx, deps['src'], deps['idx'])
+      return eval_index(ctx, src, idx)
 
 def _int_index_mapper(ex, src, idx, dst):
   '''Kernel function for indexing via an integer array.

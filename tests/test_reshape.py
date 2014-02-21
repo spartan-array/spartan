@@ -92,3 +92,31 @@ class ReshapeTest(test_common.ClusterTest):
     Assert.all_eq(a.glom().todense(), sp.eye(257, 457).tolil().reshape((457, 257)).todense())
     Assert.all_eq(b.glom().todense(), sp.eye(457, 257).tolil().reshape((257, 457)).todense())
 
+  def test_reshape_dot(self):
+    npa1 = np.random.random((357, 93))
+    npa2 = np.random.random((31, 357))
+    result = np.dot(np.reshape(npa1, (1071, 31)), npa2)
+
+    t1 = expr.from_numpy(npa1)
+    t2 = expr.from_numpy(npa2)
+    t3 = expr.dot(expr.reshape(t1, (1071, 31)), t2)
+    Assert.all_eq(result, t3.glom())
+
+    npa1 = np.random.random((357, 718))
+    npa2 = np.random.random((718, ))
+    result = np.dot(npa1, np.reshape(npa2, (718, 1)))
+
+    t1 = expr.from_numpy(npa1)
+    t2 = expr.from_numpy(npa2)
+    t3 = expr.dot(t1, expr.reshape(t2, (718, 1)))
+    Assert.all_eq(result, t3.glom())
+
+    npa1 = np.random.random((718, ))
+    npa2 = np.random.random((1, 357))
+    result = np.dot(np.reshape(npa1, (718, 1)), npa2)
+
+    t1 = expr.from_numpy(npa1)
+    t2 = expr.from_numpy(npa2)
+    t3 = expr.dot(expr.reshape(t1, (718, 1)), t2)
+    Assert.all_eq(result, t3.glom())
+

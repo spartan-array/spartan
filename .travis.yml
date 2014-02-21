@@ -5,10 +5,11 @@ virtualenv:
   system_site_packages: true
 before_install:
    - sudo apt-get update -qq
-   - sudo apt-get install python-numpy python-scipy
+   - sudo apt-get install python-numpy python-scipy libzmq3-dev python-sklearn
 install: 
+  - LANG=C pip install pyzmq
   - LANG=C pip install dsltools
   - LANG=C pip install cython
+  - LANG=C pip install parakeet
   - LANG=C python setup.py develop
-  - LANG=C pip install scikit-learn
 script: nosetests -v --logging-level=INFO --logging-clear-handlers --logging-format='%(filename)s:%(lineno)s [%(funcName)s] %(message)s'
