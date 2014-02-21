@@ -3,23 +3,25 @@ import spartan
 from spartan import expr
 from spartan.examples import sgd
 
-class LinearRegression(sgd.SGDRegressor):
+class LogisticRegression(sgd.SGDRegressor):
   def __init__(self, x, y, iterations, alpha = 1e-6):
-    super(LinearRegression, self).__init__(x, y, iterations, alpha)
+    super(LogisticRegression, self).__init__(x, y, iterations, alpha)
 
   def update(self):
     '''
     gradient_update = (h(w) - y) * x
-    h(w) = x * w
+    h(w) = 1 / (1 + e^(-(x*w)))
     '''
-    yp = expr.dot(self.x, self.w)
+    g = expr.exp(expr.dot(self.x, self.w))
+    yp = g / (g + np.asarray(1))
     return self.x * (yp - self.y)
 
-def linear_regression(x, y, iterations):
-  lreg = LinearRegression(x, y, iterations)
-  return lreg.train()
+def logistic_regression(x, y, iterations):
+  logreg = LogisticRegression(x, y, iterations)
+  return logreg.train()
 
 def run(N_EXAMPLES, N_DIM, iterations):
   x = expr.eager(expr.rand(N_EXAMPLES, N_DIM, tile_hint=(N_EXAMPLES / 10, 10)))
   y = expr.eager(expr.rand(N_EXAMPLES, 1, tile_hint=(N_EXAMPLES / 10, 1)))
-  linear_regression(x, y, iterations)
+  logistic_regression(x, y, iterations)
+
