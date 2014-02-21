@@ -27,7 +27,7 @@ def serial_dump(obj):
   new_obj = serialization.read(f)
   t2 = datetime.now()
   #Assert.all_eq(obj, new_obj)
-  print "cPickle_dump: %s ms" % millis(t1, t2)
+  print "serial_dump: %s ms" % millis(t1, t2)
   
 def cPickle_dump(obj):
   t1 = datetime.now()
@@ -42,7 +42,7 @@ def cPickle_dump(obj):
   new_obj = cPickle.load(f)
   t2 = datetime.now()
   #Assert.all_eq(obj, new_obj)
-  print "cPickle_test: %s ms" % millis(t1, t2)
+  print "cPickle_dump: %s ms" % millis(t1, t2)
 
 def test_dense_array():
   a = np.random.rand(*ARRAY_SIZE)
