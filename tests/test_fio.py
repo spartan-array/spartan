@@ -4,6 +4,7 @@ import test_common
 import numpy as np
 from scipy import sparse as sp
 import os
+from spartan.config import FLAGS
 
 
 class TestFIO(test_common.ClusterTest):
@@ -11,7 +12,7 @@ class TestFIO(test_common.ClusterTest):
   test_dir2 = None
   def create_path(self):
     if self.test_dir == None:
-      if os.path.exists('/hdfs'):
+      if len(FLAGS.hosts) > 1:
         self.test_dir = '/hdfs'
       else:
         self.test_dir = '/tmp'
