@@ -1,47 +1,94 @@
-from spartan import expr, blob_ctx
-from spartan.rpc import common, serialization
+from spartan.rpc import serialization
 from spartan.util import Assert
+import spartan.core
+from spartan.expr.map import tile_mapper
 import numpy as np
 import scipy.sparse as sp
-import test_common
+from datetime import datetime
+from cPickle import PickleError
+import cPickle
+import pickle
+import cStringIO
+from spartan import cloudpickle
 
-ARRAY_SIZE=(10,10)
+ARRAY_SIZE=(10000,10000)
 
-class TestSerialization(test_common.ClusterTest):
-  def test_dense_array(self):
-    a = np.ones(ARRAY_SIZE)
-    buf = common.serialize(a)
-    f = serialization.Reader(buf)
-    b = common.read(f)
-    Assert.all_eq(a, b)
+def millis(t1, t2):
+    dt = t2 - t1
+    ms = (dt.days * 24 * 60 * 60 + dt.seconds) * 1000 + dt.microseconds / 1000.0
+    return ms
   
-  def test_noncontiguous_array(self):
-    t = np.ones(ARRAY_SIZE)
-    a = t[3:7, 3:7]
-    buf = common.serialize(a)
-    f = serialization.Reader(buf)
-    b = common.read(f)
-    Assert.all_eq(a, b)
-     
-  def test_scalar(self):
-    a = np.asarray(10).reshape(())
-    buf = common.serialize(a)
-    f = serialization.Reader(buf)
-    b = common.read(f)
-    Assert.all_eq(a, b)
+def serial_test(obj):
+  t1 = datetime.now()
+  w = serialization.Writer()
+  serialization.write(obj, w)
   
-  def test_sparse(self):
-    a = sp.coo_matrix(ARRAY_SIZE, dtype=np.int32)
-    buf = common.serialize(a)
-    f = serialization.Reader(buf)
-    b = common.read(f)
-    Assert.all_eq(a.todense(), b.todense())
+  f = serialization.Reader(w.getvalue())
+  new_obj = serialization.read(f)
+  t2 = datetime.now()
+  #Assert.all_eq(obj, new_obj)
+  print "serial_test: %s ms" % millis(t1, t2)
+  
+def cPickle_test(obj):
+  t1 = datetime.now()
+  w = cStringIO.StringIO()
+  try:
+    buf = cPickle.dumps(obj, -1)
+    w.write(buf)
+  except (pickle.PicklingError, PickleError, TypeError):
+    cloudpickle.dump(obj, w, protocol=-1)
+
+  f = cStringIO.StringIO(w.getvalue())
+  new_obj = cPickle.load(f)
+  t2 = datetime.now()
+  #Assert.all_eq(obj, new_obj)
+  print "cPickle_test: %s ms" % millis(t1, t2)
+
+def test_dense_array():
+  a = np.random.rand(*ARRAY_SIZE)
+  serial_test(a)
+  cPickle_test(a)
+
+def test_noncontiguous_array():
+  t = np.random.rand(*ARRAY_SIZE)
+  a = t[2000:8000, 2000:8000]
+  serial_test(a)
+  cPickle_test(a)
+   
+def test_scalar():
+  a = np.asarray(10).reshape(())
+  serial_test(a)
+  cPickle_test(a)
+
+def test_sparse():
+  a = sp.lil_matrix(ARRAY_SIZE, dtype=np.int32)
+  serial_test(a)
+  cPickle_test(a)
+  
+def test_mask_array():
+  a = np.ma.masked_all(ARRAY_SIZE, np.int32)
+  a[5,5] = 10
+  serial_test(a)
+  cPickle_test(a)
+
+def test_message():
+  a = spartan.core.RunKernelReq(blobs=[spartan.core.TileId(i,i) for i in range(100)], mapper_fn=tile_mapper, kw={})
+  serial_test(a)
+  cPickle_test(a)
+  
+def foo(x):
+  return x * x
+
+def test_function():
+  a = lambda x, y: foo(x) + foo(y)
+  serial_test(a)
+  cPickle_test(a)
+  
+def test_all():
+  fns = [test_dense_array, test_noncontiguous_array, test_scalar, test_sparse, 
+         test_mask_array, test_message, test_function]
+  for fn in fns:
+    print fn.func_name
+    fn()
     
-  def test_mask_array(self):
-    a = np.ma.masked_all(ARRAY_SIZE, np.int32)
-    a[5,5] = 10
-    buf = common.serialize(a)
-    f = serialization.Reader(buf)
-    b = common.read(f)
-    Assert.all_eq(a, b)
-    Assert.isinstance(b, np.ma.MaskedArray)
+test_all()

@@ -88,7 +88,7 @@ class BlobCtx(object):
       return None
 
     if targets is None:
-      available_workers = self._send_to_worker(MASTER_ID, 'get_available_workers', core.EmptyMessage()).result
+      available_workers = self.local_worker.get_available_workers()
       targets = [self.workers[worker_id] for worker_id in available_workers]
       
     futures = rpc.forall(targets, method, req, timeout)
@@ -174,17 +174,6 @@ class BlobCtx(object):
     '''
     assert not self.is_master()
     return core.TileId(worker=self.worker_id, id=ID_COUNTER.next())
-
-  def register_blob(self, tile_id, array):
-    req = core.RegisterBlobReq(tile_id=tile_id, array=array)
-    return self._send_to_worker(MASTER_ID, 'register_blob', req, wait=False)
-  
-  def get_workers_for_reload(self, array):
-    req = core.GetWorkersForReloadReq(array=array)
-    return self._send_to_worker(MASTER_ID, 'get_workers_for_reload', req).result
-  
-  def get_worker_scores(self):
-    return self._send_to_worker(MASTER_ID, 'get_worker_scores', core.EmptyMessage()).result
   
   def heartbeat(self, worker_status, timeout=None):
     '''

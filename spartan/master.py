@@ -9,16 +9,20 @@ and runs user operations on workers.
 import atexit
 import socket
 import threading
+import weakref
 
 import time
 from spartan import util, rpc, core, blob_ctx
 from spartan.config import FLAGS
 
+MASTER = None
 
 def _dump_profile():
   import yappi
   yappi.get_func_stats().save('master_prof.out', type='pstat')
 
+def get():
+  return MASTER
 
 class Master(object):
   def __init__(self, port, num_workers):
@@ -36,13 +40,16 @@ class Master(object):
     self._worker_avg_score = 0
     self._available_workers = []
     
-    self._worker_to_blob_array = {}
+    self._arrays = weakref.WeakSet()
     
     if FLAGS.profile_master:
       import yappi
       yappi.start()
       atexit.register(_dump_profile)
 
+    global MASTER
+    MASTER = self
+    
   def __del__(self):
     # Make sure that we shutdown the cluster when the master goes away.
     self.shutdown()
@@ -86,44 +93,26 @@ class Master(object):
     if len(self._workers) == self.num_workers:
       self.update_avg_score()
       threading.Thread(target=self._initialize).start()
-
-  def register_blob(self, req, handle):
-    '''
-    Register a tile with the master.  The master tracks a mapping from 
-    tile_id to worker_id.  
-    
-    When a worker fails, this allows the master to determine which arrays
-    must be reloaded or recomputed. 
-    
-    Args:
-      req (RegisterBlobReq):
-      handle (PendingRequest):
-    '''
-    if self._worker_to_blob_array.has_key(req.tile_id.worker):
-      self._worker_to_blob_array[req.tile_id.worker].append((req.tile_id, req.array))
-    else:
-      self._worker_to_blob_array[req.tile_id.worker] = [(req.tile_id, req.array)]
-      
-    handle.done(core.EmptyMessage())
   
-  def get_available_workers(self, req, handle):
-    resp = core.RunKernelResp(result=self._available_workers)
-    handle.done(resp)
+  def register_array(self, array):
+    self._arrays.add(array)
+    
+  def get_available_workers(self):
+    return self._available_workers
 
-  def get_workers_for_reload(self, req, handle):
+  def get_workers_for_reload(self, array):
     tile_in_worker = [[i, 0] for i in range(self.num_workers)]
-    for tile_id in req.array.tiles.values():
+    for tile_id in array.tiles.values():
       tile_in_worker[tile_id.worker][1] += 1
     
     tile_in_worker = [tile_in_worker[worker_id] for worker_id in self._available_workers]
     
     tile_in_worker.sort(key=lambda x : x[1])
     result = {}
-    for i in range(len(req.array.bad_tiles)):
-      result[req.array.bad_tiles[i]] = tile_in_worker[i%len(tile_in_worker)][0]
+    for i in range(len(array.bad_tiles)):
+      result[array.bad_tiles[i]] = tile_in_worker[i%len(tile_in_worker)][0]
     
-    resp = core.RunKernelResp(result=result)
-    handle.done(resp)
+    return result
       
   def init_worker_score(self, worker_id, worker_status):
     self._worker_statuses[worker_id] = worker_status
@@ -148,15 +137,16 @@ class Master(object):
       avg_score += score
     self._worker_avg_score = avg_score / len(self._worker_scores)
           
-  def get_worker_scores(self, req, handle):
-    resp = core.RunKernelResp(result=sorted(self._worker_scores.iteritems(), key=lambda x: x[1], reverse=True))
-    handle.done(resp)
+  def get_worker_scores(self):
+    return sorted(self._worker_scores.iteritems(), key=lambda x: x[1], reverse=True)
                         
   def mark_failed_worker(self, worker_id):
     util.log_info('Marking worker %s as failed.', worker_id)
     self._available_workers.remove(worker_id)
-    for (tile_id, array) in self._worker_to_blob_array[worker_id]:
-      array.bad_tiles.append(array.blob_to_ex[tile_id])
+    for array in self._arrays:
+      for ex, tile_id in array.tiles.iteritems():
+        if tile_id.worker == worker_id:
+          array.bad_tiles.append(ex)
                                       
   def mark_failed_workers(self):
     now = time.time()

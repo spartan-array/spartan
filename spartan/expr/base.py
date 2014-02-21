@@ -269,7 +269,7 @@ class Expr(object):
       if isinstance(vs, Expr):
         deps[k] = vs.evaluate()
       else:
-        assert not isinstance(vs, (dict, list)), vs
+        #assert not isinstance(vs, (dict, list)), vs
         deps[k] = vs
     try:
       value = self._evaluate(ctx, deps)
