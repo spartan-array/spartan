@@ -7,7 +7,7 @@ import numpy as np
 import scipy.sparse as sp
 from spartan import rpc
 from .base import Expr, lazify
-from .. import blob_ctx, util
+from .. import master, blob_ctx, util
 from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from ..array import extent, tile, distarray
@@ -58,7 +58,7 @@ class Reshape(distarray.DistArray):
     self.sparse = self.base.sparse
     self.bad_tiles = []
     self._tile_shape = distarray.good_tile_shape(shape,
-                                                 blob_ctx.get().num_workers * 4)
+                                                 master.get().num_workers * 4)
     self.shape_array = None
     self._check_extents()
 
@@ -95,8 +95,6 @@ class Reshape(distarray.DistArray):
     return self._tile_shape
 
   def foreach_tile(self, mapper_fn, kw=None):
-    ctx = blob_ctx.get()
-
     if kw is None: kw = {}
     kw['array'] = self
     kw['user_fn'] = mapper_fn
@@ -111,7 +109,7 @@ class Reshape(distarray.DistArray):
                                              sparse=self.base.sparse)
       tiles = self.shape_array.tiles.values()
 
-    return ctx.map(tiles, mapper_fn = _tile_mapper, kw=kw)
+    return blob_ctx.get().map(tiles, mapper_fn = _tile_mapper, kw=kw)
 
   def fetch(self, ex):
     ravelled_ul, ravelled_lr = _ravelled_ex(ex.ul, ex.lr, self.shape)
