@@ -6,13 +6,13 @@ class SGDRegressor(object):
   '''Stochastic gradient descent algorithm
 
   SGDRegressor uses stochastic gradient descent algorithm to approach
-  best W(parameters) for regressions.
+  the best W(parameters) for regressions.
 
   Formula : W = W - alpha * gradient_update
   '''
   def __init__(self, x, y, iterations, alpha = 1e-6):
     '''
-    SGDRegressor try to find out best w for y = wx.
+    SGDRegressor try to approach the best w for y = wx.
 
     Args
       x: `Expr`
