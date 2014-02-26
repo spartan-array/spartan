@@ -4,10 +4,18 @@ import test_common
 import numpy as np
 from datetime import datetime
 
+def millis(t1, t2):
+  dt = t2 - t1
+  ms = (dt.days * 24 * 60 * 60 + dt.seconds) * 1000 + dt.microseconds / 1000.0
+  return ms
+
 #@test_common.with_ctx
 #def test_pr(ctx):
 def benchmark_svm(ctx, timer):
-  N = 50
+  
+  print "#worker:", ctx.num_workers
+  
+  N = 50 * ctx.num_workers
   D = 2
   
   # create data
@@ -23,39 +31,26 @@ def benchmark_svm(ctx, timer):
       
   data = expr.lazify(data)
       
-  svm = SVM()
+  svm = SVM(maxiter=30)
   
-  t1 = datetime.now()
-  svm.fit(data, labels, 'smo_1998')
-  t2 = datetime.now()
-  print 'train time:', t2 - t1
+  #test_method = ['smo_2005', 'smo_1998']
+  test_method = ['smo_2005']
+  for method in test_method:
+    t1 = datetime.now()  
+    svm.fit(data, labels, method)
+    t2 = datetime.now()
+    print method, 'train time: %s ms' % millis(t1,t2)
   
-  correct = 0
-  for i in range(10):
-    new_data = expr.randn(1, D, dtype=np.float64)
-    new_label = svm.predict_one(new_data)
-    print 'point %s, predict %s' % (new_data.glom(), new_label)
-    
-    new_data = new_data.force()
-    if new_data[0,0] >= new_data[0,1] and new_label == 1.0 or new_data[0,0] < new_data[0,1] and new_label == -1.0:
-      correct += 1
-  print 'predict precision:', correct * 1.0 / 10
-  
-  t1 = datetime.now()  
-  svm.fit(data, labels, 'smo_2005')
-  t2 = datetime.now()
-  print 'train time:', t2 - t1
-  
-  correct = 0
-  for i in range(10):
-    new_data = expr.randn(1, D, dtype=np.float64)
-    new_label = svm.predict_one(new_data)
-    print 'point %s, predict %s' % (new_data.glom(), new_label)
-    
-    new_data = new_data.force()
-    if new_data[0,0] >= new_data[0,1] and new_label == 1.0 or new_data[0,0] < new_data[0,1] and new_label == -1.0:
-      correct += 1
-  print 'predict precision:', correct * 1.0 / 10
+    correct = 0
+    for i in range(10):
+      new_data = expr.randn(1, D, dtype=np.float64, tile_hint=[1, D])
+      new_label = svm.predict_one(new_data)
+      print 'point %s, predict %s' % (new_data.glom(), new_label)
+      
+      new_data = new_data.glom()
+      if new_data[0,0] >= new_data[0,1] and new_label == 1.0 or new_data[0,0] < new_data[0,1] and new_label == -1.0:
+        correct += 1
+    print 'predict precision:', correct * 1.0 / 10
       
 if __name__ == '__main__':
   test_common.run(__file__)
