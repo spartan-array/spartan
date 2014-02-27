@@ -226,24 +226,24 @@ class SVM:
 
     self.b = 0.0
     self.alpha = expr.zeros((N,1), dtype=np.float64, tile_hint=[N/self.ctx.num_workers, 1]).force()
-    kernel_results = expr.dot(data, expr.transpose(data), tile_hint=[N/self.ctx.num_workers, N])   # linear model 
     
-    it = 0
-    num_changed = 0
-    examine_all = True
+    # linear kernel
+    kernel_results = expr.dot(data, expr.transpose(data), tile_hint=[N/self.ctx.num_workers, N])   
     
     labels = expr.force(labels)
     self.E = expr.zeros((N,1), dtype=np.float64, tile_hint=[N/self.ctx.num_workers, 1]).force()
     for i in xrange(N):
       self.E[i, 0] = self.b + expr.reduce(self.alpha, axis=None, dtype_fn=lambda input: input.dtype,
-                                       local_reduce_fn=margin_mapper,
-                                       accumulate_fn=np.add, 
-                                       fn_kw=dict(label=labels, data=kernel_results[:,i].force())).glom() - labels[i, 0]
+                                          local_reduce_fn=margin_mapper,
+                                          accumulate_fn=np.add, 
+                                          fn_kw=dict(label=labels, data=kernel_results[:,i].force())).glom() - labels[i, 0]
     
     util.log_info("Starting SMO")
+    it = 0
+    num_changed = 0
+    examine_all = True
     while (num_changed > 0 or examine_all) and (it < self.maxiter):
-
-      print "Iteration", it
+      util.log_info("Iteration:%d", it)
 
       num_changed = 0
       
@@ -252,15 +252,13 @@ class SVM:
           num_changed += self.examine_example(i, N, labels, kernel_results)
       else:
         for i in xrange(N):
-          if self.alpha[i] > 0 and self.alpha[i] < self.C:
+          if self.alpha[i, 0] > 0 and self.alpha[i, 0] < self.C:
             num_changed += self.examine_example(i, N, labels, kernel_results)
 
       it += 1
 
-      if examine_all:
-        examine_all = False
-      elif num_changed == 0:
-        examine_all = True
+      if examine_all: examine_all = False
+      elif num_changed == 0: examine_all = True
     
     self.w = expr.zeros((D, 1), dtype=np.float64).force()
     for i in xrange(D): 
@@ -288,14 +286,18 @@ class SVM:
 
     self.b = 0.0
     alpha = expr.zeros((N,1), dtype=np.float64, tile_hint=[N/self.ctx.num_workers, 1]).force()
+    
+    # linear kernel
+    kernel_results = expr.dot(data, expr.transpose(data), tile_hint=[N/self.ctx.num_workers, N])
     gradient = expr.ones((N, 1), dtype=np.float64, tile_hint=[N/self.ctx.num_workers, 1]) * -1.0
-    kernel_results = expr.dot(data, expr.transpose(data), tile_hint=[N/self.ctx.num_workers, N])   # linear model 
+    
     expr_labels = expr.lazify(labels)
     
+    util.log_info("Starting SMO")
     pv1 = pv2 = -1
     it = 0
     while it < self.maxiter:
-      print "Iteration", it
+      util.log_info("Iteration:%d", it)
       
       minObj = 1e100
       
@@ -303,22 +305,22 @@ class SVM:
       G = expr.multiply(labels, gradient) * -1.0
 
       v1_mask = ((expr_labels > self.tol) * (expr_alpha < self.C) + (expr_labels < -self.tol) * (expr_alpha > self.tol))
-      v1 = np.argmax(G[v1_mask-True].glom())
+      v1 = expr.argmax(G[v1_mask-True]).glom().item()
       maxG = G[v1,0].glom()
       print 'maxv1:', v1, 'maxG:', maxG
 
       v2_mask = ((expr_labels > self.tol) * (expr_alpha > self.tol) + (expr_labels < -self.tol) * (expr_alpha < self.C))     
-      min_v2 = np.argmin(G[v2_mask-True].glom())
+      min_v2 = expr.argmin(G[v2_mask-True]).glom().item()
       minG = G[min_v2,0].glom()
-      print 'minv2:', min_v2, 'minG:', minG
+      #print 'minv2:', min_v2, 'minG:', minG
       
       set_v2 = v2_mask.glom().nonzero()[0]
       #print 'actives:', set_v2.shape[0]
       v2 = -1
       for v in set_v2:
         b = maxG - G[v,0].glom()
-        if b > 0:
-          na = (kernel_results[v1,v1] + kernel_results[v,v] - 2*kernel_results[v1,v]).glom()
+        if b > self.tol:
+          na = (kernel_results[v1,v1] + kernel_results[v,v] - 2*kernel_results[v1,v]).glom()[0][0]
           if na < self.tol: na = 1e12
           
           obj = -(b*b)/na
@@ -343,7 +345,9 @@ class SVM:
       
       # Calculate new alpha values, to reduce the objective function...
       b = y2*expr.glom(gradient[v2,0]) - y1*expr.glom(gradient[v1,0])
-
+      if y1 != y2:
+        a += 4 * kernel_results[v1,v2].glom()
+      
       newA1 = oldA1 + y1*b/a
       newA2 = oldA2 - y2*b/a   
 
