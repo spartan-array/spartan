@@ -64,6 +64,7 @@ setup(
     Extension('spartan.core', ['spartan/core' + suffix]),
     Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core' + suffix]),
     Extension('spartan.rpc.serialization', ['spartan/rpc/serialization' + suffix]),
+    Extension('spartan.examples.sklearn.util.graph_shortest_path', ['spartan/examples/sklearn/util/graph_shortest_path' + suffix]),
     Extension('spartan.sparse', 
               ['spartan/sparse' + suffix], 
               language='c++', 
