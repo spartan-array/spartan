@@ -27,7 +27,7 @@ ITYPE = np.int32
 ctypedef np.int32_t ITYPE_t
 
 
-def graph_shortest_path(dist_matrix, directed=True, method='auto'):
+def graph_shortest_path(dist_matrix, row_beg=None, row_end=None, directed=True):
     """
     Perform a shortest-path graph search on a positive directed or
     undirected graph.
@@ -44,118 +44,33 @@ def graph_shortest_path(dist_matrix, directed=True, method='auto'):
         progress from a point to its neighbors, not the other way around.
         if False, then find the shortest path on an undirected graph: the
         algorithm can progress from a point to its neighbors and vice versa.
-    method : string ['auto'|'FW'|'D']
-        method to use.  Options are
-        'auto' : attempt to choose the best method for the current problem
-        'FW' : Floyd-Warshall algorithm.  O[N^3]
-        'D' : Dijkstra's algorithm with Fibonacci stacks.  O[(k+log(N))N^2]
-
     Returns
     -------
     G : np.ndarray, float, shape = [N,N]
         G[i,j] gives the shortest distance from point i to point j
         along the graph.
-
-    Notes
-    -----
-    As currently implemented, Dijkstra's algorithm does not work for
-    graphs with direction-dependent distances when directed == False.
-    i.e., if dist_matrix[i,j] and dist_matrix[j,i] are not equal and
-    both are nonzero, method='D' will not necessarily yield the correct
-    result.
-
-    Also, these routines have not been tested for graphs with negative
-    distances.  Negative distances can lead to infinite cycles that must
-    be handled by specialized algorithms.
     """
     if not isspmatrix_csr(dist_matrix):
         dist_matrix = csr_matrix(dist_matrix)
+    
+    if row_beg is None:
+      row_beg = 0
+    if row_end is None:
+      row_end = dist_matrix.shape[0]
 
     N = dist_matrix.shape[0]
     Nk = len(dist_matrix.data)
 
-    if method == 'auto':
-        if Nk < N * N / 4:
-            method = 'D'
-        else:
-            method = 'FW'
-
-    if method == 'FW':
-        graph = np.asarray(dist_matrix.toarray(), dtype=DTYPE, order='C')
-        floyd_warshall(graph, directed)
-    elif method == 'D':
-        graph = np.zeros((N, N), dtype=DTYPE, order='C')
-        dijkstra(dist_matrix, graph, directed)
-    else:
-        raise ValueError("unrecognized method '%s'" % method)
-
-    return graph
-
-
-@cython.boundscheck(False)
-cdef np.ndarray floyd_warshall(np.ndarray[DTYPE_t, ndim=2, mode='c'] graph,
-                              int directed=0):
-    """
-    FloydWarshall algorithm
-
-    Parameters
-    ----------
-    graph : ndarray
-        on input, graph is the matrix of distances betweeen connected points.
-        unconnected points have distance=0
-        on exit, graph is overwritten with the output
-    directed : bool, default = False
-        if True, then the algorithm will only traverse from a point to
-        its neighbors when finding the shortest path.
-        if False, then the algorithm will traverse all paths in both
-        directions.
-
-    Returns
-    -------
-    graph : ndarray
-        the matrix of shortest paths between points.
-        If no path exists, the path length is zero
-    """
-    cdef int N = graph.shape[0]
-    assert graph.shape[1] == N
-
-    cdef unsigned int i, j, k, m
-
-    cdef DTYPE_t infinity = np.inf
-    cdef DTYPE_t sum_ijk
-
-    #initialize all distances to infinity
-    graph[np.where(graph == 0)] = infinity
-
-    #graph[i,i] should be zero
-    graph.flat[::N + 1] = 0
-
-    # for a non-directed graph, we need to symmetrize the distances
-    if not directed:
-        for i from 0 <= i < N:
-            for j from i + 1 <= j < N:
-                if graph[j, i] <= graph[i, j]:
-                    graph[i, j] = graph[j, i]
-                else:
-                    graph[j, i] = graph[i, j]
-
-    #now perform the Floyd-Warshall algorithm
-    for k from 0 <= k < N:
-        for i from 0 <= i < N:
-            if graph[i, k] == infinity:
-                continue
-            for j from 0 <= j < N:
-                sum_ijk = graph[i, k] + graph[k, j]
-                if sum_ijk < graph[i, j]:
-                    graph[i, j] = sum_ijk
-
-    graph[np.where(np.isinf(graph))] = 0
+    graph = np.zeros((N, N), dtype=DTYPE, order='C')
+    dijkstra(dist_matrix, row_beg, row_end, graph, directed)
 
     return graph
 
 
 @cython.boundscheck(False)
 cdef np.ndarray dijkstra(dist_matrix,
+                         int row_beg,
+                         int row_end,
                          np.ndarray[DTYPE_t, ndim=2] graph,
                          int directed=0):
     """
@@ -210,7 +125,7 @@ cdef np.ndarray dijkstra(dist_matrix,
     heap.min_node = NULL
 
     if directed:
-        for i from 0 <= i < N:
+        for i from row_beg <= i < row_end:
             dijkstra_directed_one_row(i, neighbors, distances, indptr,
                                       graph, &heap, nodes)
     else:
@@ -225,7 +140,7 @@ cdef np.ndarray dijkstra(dist_matrix,
         indptr2 = np.asarray(dist_matrix_T.indptr,
                              dtype=ITYPE, order='C')
 
-        for i from 0 <= i < N:
+        for i from row_beg <= i < row_end:
             dijkstra_one_row(i, neighbors, distances, indptr,
                              neighbors2, distances2, indptr2,
                              graph, &heap, nodes)
