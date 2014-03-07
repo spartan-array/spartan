@@ -7,11 +7,18 @@ from spartan.util import divup
 import time
 from spartan.examples.sklearn.cluster import KMeans
 from benchmark_pagerank import make_weights
+import os
+
+def _skip_if_travis():
+  from nose.plugins.skip import SkipTest
+  if os.environ.get('TRAVIS', None):
+    raise unittest.SkipTest()
+
 
 class TestPerformance(test_common.ClusterTest):
   ''' Test the performance of some applications make sure the changes don't slow down spartan'''
   
-  #base line for some applications.
+  #base line for some applications. The base line cames from the test on 4 machines.
   _base_line = {
                 "linear_reg" : 13, 
                 "matrix_mult" : 14,
@@ -40,6 +47,7 @@ class TestPerformance(test_common.ClusterTest):
     util.Assert.le(factor, self.FACTOR_THRESHOLD)
 
   def test_linear_reg(self):
+    _skip_if_travis()
     N_EXAMPLES =  10 * 1000 * 1000 * self.ctx.num_workers
     N_DIM = 10
     x = expr.rand(N_EXAMPLES, N_DIM, 
@@ -65,6 +73,7 @@ class TestPerformance(test_common.ClusterTest):
     self._verify_cost("linear_reg", cost)
 
   def test_matrix_mult(self):
+    _skip_if_travis()
     N_POINTS = 2000
     x = expr.rand(N_POINTS, N_POINTS, tile_hint=(N_POINTS, N_POINTS/ self.ctx.num_workers)).astype(np.float32)
     y = expr.rand(N_POINTS, N_POINTS, tile_hint=(N_POINTS / self.ctx.num_workers, N_POINTS)).astype(np.float32)
@@ -82,6 +91,7 @@ class TestPerformance(test_common.ClusterTest):
     self._verify_cost("matrix_mult", cost)
 
   def test_kmeans(self):
+    _skip_if_travis()
     N_PTS = 1000 * 1000 * self.ctx.num_workers
     ITER = 5
     N_DIM = 10
@@ -97,6 +107,7 @@ class TestPerformance(test_common.ClusterTest):
     self._verify_cost("kmeans", cost)
 
   def test_pagerank(self):
+    _skip_if_travis()
     OUTLINKS_PER_PAGE = 10
     PAGES_PER_WORKER = 1000000
     num_pages = PAGES_PER_WORKER * self.ctx.num_workers
