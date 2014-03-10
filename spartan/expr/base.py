@@ -368,8 +368,13 @@ class Expr(object):
     return builtins.reshape(self, new_shape)
 
   def __getitem__(self, idx):
-    from .index import IndexExpr
-    return IndexExpr(src=self, idx=idx)
+    from .slice import SliceExpr
+    from .filter import FilterExpr
+
+    if isinstance(idx, (int, tuple, slice)):
+      return SliceExpr(src=self, idx=idx)
+    else:
+      return FilterExpr(src=self, idx=idx)
 
   def __setitem__(self, k, val):
     raise Exception, 'Expressions are read-only.'

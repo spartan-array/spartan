@@ -2,20 +2,23 @@
 
 '''
 Optimizations over an expression graph.
-'''
-import tempfile
 
-import numpy as np
-from spartan.array.distarray import broadcast
+Optimization passes take as input an expression graph, and return a
+(hopefully) simpler, equivalent graph.  This module defines the
+pass infrastructure, the fusion passes and an optimization pass to
+lower code to Parakeet.
+'''
+
 from spartan.config import FLAGS, BoolFlag
 from spartan.expr import local
-from spartan.expr.index import IndexExpr
+from spartan.expr.filter import FilterExpr
+from spartan.expr.slice import SliceExpr
 from spartan.expr.local import make_var, LocalInput, ParakeetExpr
 from spartan.expr.reduce import ReduceExpr, LocalReduceExpr
 from spartan.util import Assert
 
 from .. import util
-from .base import Expr, Val, ListExpr, AsArray, DictExpr, lazify, expr_like, ExprTrace
+from .base import Expr, Val, AsArray, DictExpr, lazify, expr_like, ExprTrace
 from .map import MapExpr, LocalMapExpr
 from .ndarray import NdArrayExpr
 from .shuffle import ShuffleExpr
@@ -78,12 +81,13 @@ class OptimizePass(object):
 
 
 def fusable(v):
-  return isinstance(v, (MapExpr, 
-                        ReduceExpr, 
-                        ShuffleExpr, 
-                        NdArrayExpr, 
-                        IndexExpr,
-                        Val, 
+  return isinstance(v, (MapExpr,
+                        ReduceExpr,
+                        ShuffleExpr,
+                        NdArrayExpr,
+                        SliceExpr,
+                        FilterExpr,
+                        Val,
                         AsArray,
                         WriteArrayExpr))
 
@@ -121,7 +125,7 @@ class MapMapFusion(OptimizePass):
         all_maps = False
         break
 
-    if (not all_maps 
+    if (not all_maps
         or isinstance(expr.op, local.ParakeetExpr)
         or expr.op.fn in _not_idempotent):
       return expr.visit(self)
@@ -185,6 +189,13 @@ class ReduceMapFusion(OptimizePass):
                      trace=trace)
 
 
+class SliceMapFusion(OptimizePass):
+  name = 'slice_map_fusion'
+  after = [MapMapFusion]
+
+  def visit_SliceExpr(self, expr):
+    pass
+
 class CollapsedCachedExpressions(OptimizePass):
   '''Replace expressions which have already been evaluated
   with a simple value expression.
@@ -205,28 +216,9 @@ class CollapsedCachedExpressions(OptimizePass):
     else:
       return expr.visit(self)
 
-def _codegen(op):
-  if isinstance(op, local.FnCallExpr):
-    if util.is_lambda(op.fn) and not op.pretty_fn:
-      raise local.CodegenException('Cannot codegen through a lambda expression: %s' % op.fn)
 
-    if op.fn in _parakeet_blacklist:
-      raise local.CodegenException('Blacklisted %s', op.fn)
-
-    name = op.fn_name()
-
-    arg_str = ','.join([_codegen(v) for v in op.deps])
-    kw_str = ','.join(['%s=%s' % (k, repr(v)) for k, v in op.kw.iteritems()])
-    if arg_str:
-      kw_str = ',' + kw_str
-
-    return '%s(%s %s)' % (name, arg_str, kw_str)
-  elif isinstance(op, local.LocalInput):
-    return op.idx
-  else:
-    raise local.CodegenException('Cannot codegen for %s' % type(op))
-
-def find_modules(op):
+def _find_modules(op):
+  '''Find any modules referenced by the given `LocalOp` or its dependencies'''
   modules = set()
   if isinstance(op, local.FnCallExpr):
     if hasattr(op.fn, '__module__'):
@@ -236,13 +228,35 @@ def find_modules(op):
 
 
   for d in op.deps:
-    modules.union(find_modules(d))
+    modules.union(_find_modules(d))
 
   return modules
 
 
-def codegen(op):
+def _parakeet_codegen(op):
   '''Given a local operation, generate an equivalent parakeet function definition.'''
+
+  def _codegen(op):
+    if isinstance(op, local.FnCallExpr):
+      if util.is_lambda(op.fn) and not op.pretty_fn:
+        raise local.CodegenException('Cannot codegen through a lambda expression: %s' % op.fn)
+
+      if op.fn in _parakeet_blacklist:
+        raise local.CodegenException('Blacklisted %s', op.fn)
+
+      name = op.fn_name()
+
+      arg_str = ','.join([_codegen(v) for v in op.deps])
+      kw_str = ','.join(['%s=%s' % (k, repr(v)) for k, v in op.kw.iteritems()])
+      if arg_str:
+        kw_str = ',' + kw_str
+
+      return '%s(%s %s)' % (name, arg_str, kw_str)
+    elif isinstance(op, local.LocalInput):
+      return op.idx
+    else:
+      raise local.CodegenException('Cannot codegen for %s' % type(op))
+
   if isinstance(op, ParakeetExpr):
     return op.source
 
@@ -256,7 +270,7 @@ def codegen(op):
     'from spartan import util',
   ]
 
-  for mod in find_modules(op):
+  for mod in _find_modules(op):
     module_prelude.append('import %s' % mod)
 
   fn_prelude = '''
@@ -275,6 +289,7 @@ def codegen(op):
   local.compile_parakeet_source(fn)
   return fn
 
+
 class ParakeetGeneration(OptimizePass):
   '''
   Replace local map/reduce operations with an equivalent
@@ -290,14 +305,17 @@ class ParakeetGeneration(OptimizePass):
       return expr.visit(self)
 
     try:
-      source = codegen(expr.op)
+      source = _parakeet_codegen(expr.op)
       return expr_like(expr,
                        op=local.ParakeetExpr(source=source,  deps=expr.op.deps),
                        children=expr.children)
     except local.CodegenException:
       util.log_info('Failed to convert to parakeet.')
       return expr.visit(self)
-    
+
+#   Parakeet doesn't support taking the current Extent object as
+#   an argument, which prevents enabling it for reductions.
+#
 #   def visit_ReduceExpr(self, expr):
 #     # if we've already converted this to parakeet, stop now
 #     if isinstance(expr.op, local.ParakeetExpr):
