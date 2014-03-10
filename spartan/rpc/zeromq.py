@@ -11,10 +11,11 @@ import fcntl
 import time
 import zmq
 from .common import Group, SocketBase
+from . import rlock
 from spartan import util
 
 POLLER = None
-POLLER_LOCK = threading.Lock()
+POLLER_LOCK = rlock.FastRLock()
 PROFILER = None
 
 def poller():
@@ -47,7 +48,7 @@ class Socket(SocketBase):
     self._zmq = ctx.socket(sock_type)
     self.addr = hostport
     self._out = collections.deque()
-    self._lock = threading.RLock()
+    self._lock = rlock.FastRLock()
 
     self._status = CLOSED
   def __repr__(self):
@@ -238,18 +239,22 @@ class ZMQPoller(threading.Thread):
     self._running = True
     _poll = self._poller.poll
     _poll_time = 1
-    MAX_TIMEOUT = 100
+    MAX_TIMEOUT = 10
 
     while self._running:
-      if self.profiler: self.profiler.disable()
+      #if self.profiler: self.profiler.disable()
       socks = dict(_poll(_poll_time))
+      if self.profiler:
+        self.profiler.enable()
 
       if len(socks) == 0:
         _poll_time = min(_poll_time * 2, MAX_TIMEOUT)
       else:
         _poll_time = 1
 
-      if self.profiler: self.profiler.enable()
+      #if self.profiler: 
+      #  self.profiler.enable()
+
       #util.log_info('%s', self._sockets)
       for fd, event in socks.iteritems():
         if fd == self._pipe[0]:
@@ -316,7 +321,7 @@ class ZMQPoller(threading.Thread):
 
     # wait until we get added
     while not socket.zmq() in self._sockets:
-      time.sleep(0.01)
+      time.sleep(0.0001)
 
   def queue_close(self, socket):
     'Execute socket.handle_close() from within the polling thread.'
