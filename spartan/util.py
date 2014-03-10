@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import atexit
 
 import cStringIO
 import collections
@@ -13,8 +14,12 @@ import sys
 import threading
 import time
 import traceback
-
 import numpy as np
+
+from spartan.config import FLAGS, BoolFlag
+
+
+FLAGS.add(BoolFlag('dump_timers', default=False))
 
 HOSTNAME = socket.gethostname()
 PID = os.getpid()
@@ -61,6 +66,42 @@ def findCaller(obj):
   return co.co_filename, f.f_lineno, co.co_name
 
 
+class TimeHelper(object):
+  def __init__(self, timer, name):
+    self.timer = timer
+    self.name = name
+
+  def __enter__(self):
+    self.start = time.time()
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    end = time.time()
+    self.timer.add(self.name, end - self.start)
+
+
+class Timer(object):
+  def __init__(self):
+    self._times = collections.defaultdict(float)
+    self._counts = collections.defaultdict(int)
+
+  def add(self, name, t):
+    self._counts[name] += 1
+    self._times[name] += t
+
+  def dump(self):
+    for name, elapsed in self._times.iteritems():
+      print os.getpid(), name, self._counts[name], elapsed
+
+  def __getattr__(self, key):
+    return TimeHelper(self, key)
+
+TIMER = Timer()
+def _dump_timer():
+  if FLAGS.dump_timers:
+    TIMER.dump()
+
+
+atexit.register(_dump_timer)
 
 class FileWatchdog(threading.Thread):
   """Watchdog for a file (typically `sys.stdin` or `sys.stdout`).

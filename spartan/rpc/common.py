@@ -18,7 +18,7 @@ import types
 import weakref
 from .. import cloudpickle, util, core
 from ..node import Node, node_type
-from . import serialization
+from . import serialization, rlock
 
 
 CLIENT_PENDING = weakref.WeakKeyDictionary()
@@ -72,40 +72,21 @@ def capture_exception(exc_info=None):
 class Group(tuple):
   pass
 
+serialize_total = 0
 def serialize_to(obj, writer):
-  serialization.write(obj, writer)
-  #writer.write(serialize(obj))
+  with util.TIMER.rpc_serialize:
+    serialization.write(obj, writer)
 
 def serialize(obj):
-  #w = cStringIO.StringIO()
-  w = serialization.Writer()
-  serialization.write(obj, w)
-  return w.getvalue()
+  with util.TIMER.serialize:
+    w = serialization.Writer()
+    serialization.write(obj, w)
+    data = w.getvalue()
+    return data
   
-  #util.log_info('Pickling: %s', obj)  
-  #try:
-  #  return cPickle.dumps(obj, -1)
-  #except (pickle.PicklingError, PickleError, TypeError):
-  #  #print >>sys.stderr, 'Failed to cPickle: %s' % obj
-  #  return cloudpickle.dumps(obj, -1)
-    
 def read(f):
-  return serialization.read(f)
-  #return cPickle.load(f)
-# 
-#   st = time.time()
-#   start_pos = f.tell()
-#   result = cPickle.load(f)
-#   ed = time.time()
-#   end_pos = f.tell()
-#   
-#   if ed - st > 0.1:
-#     util.log_warn('Slow to load! %s' % result)
-#     with open('./slow-pickle.%d' % os.getpid(), 'w') as pickle_out:
-#       f.seek(start_pos)
-#       pickle_out.write(f.read(end_pos - start_pos))
-#     
-#   return result
+  with util.TIMER.rpc_read:
+    return serialization.read(f)
 
 class PendingRequest(object):
   '''An outstanding RPC request on the server.
@@ -355,7 +336,7 @@ class Client(object):
     self._socket.register_handler(self.handle_read)
     self._socket.connect()
     self._futures = {}
-    self._lock = threading.Lock()
+    self._lock = rlock.FastRLock()
     self._rpc_id = xrange(10000000).__iter__()
 
   def __reduce__(self, *args, **kwargs):

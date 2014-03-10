@@ -289,6 +289,8 @@ class Worker(object):
 
       last_heartbeat = time.time()
 
+    util.log_info('Worker shutdown.  Exiting.')
+
 
 def _start_worker(master, local_id):
   '''
@@ -309,6 +311,9 @@ def _start_worker(master, local_id):
   master = rpc.connect(*master)
   worker = Worker(master)
   worker.wait_for_shutdown()
+
+  if FLAGS.dump_timers:
+    util.TIMER.dump()
 
 if __name__ == '__main__':
   sys.path.append('./tests')

@@ -24,8 +24,6 @@ import sys
 
 import appdirs
 
-from spartan import util
-
 class Flag(object):
   '''Base object for a representing a command line flag.
   
@@ -155,6 +153,7 @@ def parse(argv):
   import spartan.expr.optimize
   import spartan.cluster
   import spartan.worker
+  import spartan.util
 
   if FLAGS._parsed:
     return
@@ -216,7 +215,5 @@ def parse(argv):
     for name, flag in sorted(FLAGS):
       print '  >> ', name, '\t', flag.val
 
-
-  util.log_debug('Hostlist: %s', FLAGS.hosts)
   return rest
 
