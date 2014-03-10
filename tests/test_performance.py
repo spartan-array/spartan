@@ -8,6 +8,7 @@ import time
 from spartan.examples.sklearn.cluster import KMeans
 from benchmark_pagerank import make_weights
 import os
+import unittest
 
 def _skip_if_travis():
   from nose.plugins.skip import SkipTest
