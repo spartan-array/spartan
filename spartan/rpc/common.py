@@ -160,7 +160,7 @@ class Future(object):
     self.have_result = False
     self.result = None
     self.finished_fn = None
-    self._cv = threading.Condition()
+    self._cv = threading.Condition(lock=rlock.FastRLock())
     self._start = time.time()
     self._finish = time.time() + 1000000
     if timeout is None:
