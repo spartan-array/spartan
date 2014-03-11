@@ -5,18 +5,16 @@ This supports generic reduce operations such as
 
 '''
 import numpy as np
+import collections
 
-from spartan import util
-from spartan.array import extent, distarray
-from spartan.expr import local
-from spartan.expr.local import make_var, LocalReduceExpr, LocalInput, LocalCtx
-from spartan.node import Node, node_type
-from spartan.util import Assert
-
+from ..array import extent, distarray
+from ..expr.local import make_var, LocalReduceExpr, LocalInput, LocalCtx
+from ..node import node_type
+from ..util import Assert
+from . import broadcast
 from .base import Expr, DictExpr
 from ..core import LocalKernelResult
 
-import collections
 
 def _reduce_mapper(ex, children, op, axis, output):
   '''Run a local reducer for a tile, and update the appropiate 
@@ -89,7 +87,7 @@ class ReduceExpr(Expr):
 
     keys = children.keys()
     vals = children.values()
-    vals = distarray.broadcast(vals)
+    vals = broadcast.broadcast(vals)
     largest = distarray.largest_value(vals)
     children = dict(zip(keys, vals))
 

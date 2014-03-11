@@ -24,6 +24,8 @@ from .base import DictExpr, Expr, as_array
 from .local import LocalCtx, make_var, LocalInput, LocalMapExpr
 from ..core import LocalKernelResult
 
+from . import broadcast
+
 def tile_mapper(ex, children, op):
   '''
   Run for each tile of a `Map` operation.
@@ -97,7 +99,7 @@ class MapExpr(Expr):
 
     keys = children.keys()
     vals = children.values()
-    vals = distarray.broadcast(vals)
+    vals = broadcast.broadcast(vals)
     largest = distarray.largest_value(vals)
 
     children = dict(zip(keys, vals))

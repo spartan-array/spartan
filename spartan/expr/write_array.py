@@ -10,12 +10,12 @@ in place, and therefore should be used with care.
 
 import numpy as np
 import scipy.sparse as sp
-from spartan import rpc
-from spartan.array import tile, distarray, extent
 
-from .. import util
+from spartan import rpc
+from spartan.array import distarray, extent
+from .slice import Slice
 from ..core import LocalKernelResult
-from ..node import Node, node_type
+from ..node import node_type
 from ..util import Assert
 from .base import Expr
 from .ndarray import ndarray
@@ -55,7 +55,7 @@ class WriteArrayExpr(Expr):
       else:
         array.update(sregion, data[dst_slices])
     elif isinstance(data, distarray.DistArray):
-      dst_slice = distarray.Slice(data, dst_slices)
+      dst_slice = Slice(data, dst_slices)
       Assert.eq(sregion.shape, dst_slice.shape)
       array.foreach_tile(mapper_fn = _write_mapper,
                          kw = {'source':array, 'sregion':sregion,

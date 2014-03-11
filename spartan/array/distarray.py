@@ -138,6 +138,14 @@ class DistArray(object):
   def foreach_tile(self, mapper_fn, kw):
     raise NotImplementedError
 
+  def real_size(self):
+    '''The actual number of elements contained by this array.
+
+    Broadcast objects "pretend" to have a larger size than they actually do.
+    For mapping across data, we want to ignore this.
+    '''
+    return np.prod(self.shape)
+
   def __repr__(self):
     return '%s(id=%s, shape=%s, dtype=%s)' % (self.__class__.__name__, id(self), self.shape, self.dtype)
   
@@ -570,191 +578,11 @@ def best_locality(array, ex):
   return s_counts[-1][0]
   
 
-
-def _slice_mapper(ex, **kw):
-  '''
-  Run when mapping over a slice.
-  Computes the intersection of the current tile and a global slice.
-  If the slice is non-zero, then run the user mapper function.
-  Otherwise, do nothing.
-  
-  :param ex:
-  :param tile: 
-  :param mapper_fn: User mapper function.
-  :param slice: `TileExtent` representing the slice of the input array.
-  '''
-
-  mapper_fn = kw['_slice_fn']
-  slice_extent = kw['_slice_extent']
-
-  fn_kw = kw['fn_kw']
-  if fn_kw is None: fn_kw = {}
-
-  intersection = extent.intersection(slice_extent, ex)
-  if intersection is None:
-    return LocalKernelResult(result=[])
-
-  offset = extent.offset_from(slice_extent, intersection)
-  offset.array_shape = slice_extent.shape
-
-  subslice = extent.offset_slice(ex, intersection)
-
-  result = mapper_fn(offset, **fn_kw)
-  #util.log_info('Slice mapper[%s] %s %s -> %s', mapper_fn, offset, subslice, result)
-  return result
-
-class Slice(DistArray):
-  '''
-  Represents a Numpy multi-dimensional slice on a base `DistArray`.
-  
-  Slices in Spartan do not result in a copy.  A `Slice` object is
-  returned instead.  Slice objects support mapping (``foreach_tile``)
-  and fetch operations.
-  '''
-  def __init__(self, darray, idx):
-    if not isinstance(idx, extent.TileExtent):
-      idx = extent.from_slice(idx, darray.shape)
-    util.log_info('New slice: %s', idx)
-    
-    Assert.isinstance(darray, DistArray)
-    self.darray = darray
-    self.slice = idx
-    self.shape = self.slice.shape
-    intersections = [extent.intersection(self.slice, ex) for ex in self.darray.tiles]
-    intersections = [ex for ex in intersections if ex is not None]
-    offsets = [extent.offset_from(self.slice, ex) for ex in intersections]
-    self.tiles = offsets
-    self.dtype = darray.dtype
-  
-  @property
-  def bad_tiles(self):
-    bad_intersections = [extent.intersection(self.slice, ex) for ex in self.darray.bad_tiles]
-    return [ex for ex in bad_intersections if ex is not None]
-    
-  def foreach_tile(self, mapper_fn, kw):
-    return self.darray.foreach_tile(mapper_fn = _slice_mapper,
-                                    kw={'fn_kw' : kw,
-                                        '_slice_extent' : self.slice,
-                                        '_slice_fn' : mapper_fn })
-
-  def fetch(self, idx):
-    offset = extent.compute_slice(self.slice, idx.to_slice())
-    return self.darray.fetch(offset)
-
-
-
-def broadcast_mapper(ex, tile, mapper_fn=None, bcast_obj=None):
-  raise NotImplementedError
-
-class Broadcast(DistArray):
-  '''Mimics the behavior of Numpy broadcasting.
-  
-  Takes an input of shape (x, y) and a desired output shape (x, y, z),
-  the broadcast object reports shape=(x,y,z) and overrides __getitem__
-  to return the appropriate values.
-  '''
-  def __init__(self, base, shape):
-    Assert.isinstance(base, (np.ndarray, DistArray))
-    Assert.isinstance(shape, tuple)
-    self.base = base
-    self.shape = shape
-    self.dtype = base.dtype
-    self.bad_tiles = []
-
-    
-  def __repr__(self):
-    return 'Broadcast(%s -> %s)' % (self.base, self.shape)
- 
-  def fetch(self, ex):
-    # make a template to pass to numpy broadcasting
-    template = np.ndarray(ex.shape, dtype=self.base.dtype)
-   
-    # convert the extent to the base form
-
-    # first drop extra dimensions
-    while len(ex.shape) > len(self.base.shape):
-      ex = extent.drop_axis(ex, 0)
-      
-    # fold down expanded dimensions
-    ul = []
-    lr = []
-    for i in xrange(len(self.base.shape)):
-      size = self.base.shape[i]
-      if size == 1:
-        ul.append(0)
-        lr.append(1)
-      else:
-        ul.append(ex.ul[i])
-        lr.append(ex.lr[i])
-  
-    ex = extent.create(ul, lr, self.base.shape) 
-    fetched = self.base.fetch(ex)
-    
-    _, bcast = np.broadcast_arrays(template, fetched)
-    
-    util.log_debug('bcast: %s %s', fetched.shape, template.shape)
-    return bcast 
-
-
-def broadcast(args):
-  '''Convert the list of arrays in ``args`` to have the same shape.
-  
-  Extra dimensions are added as necessary, and dimensions of size
-  1 are repeated to match the size of other arrays.
-  
-  :param args: List of `DistArray`
-  '''
-  
-  if len(args) == 1:
-    return args
-
-  orig_shapes = [list(x.shape) for x in args]
-  dims = [len(shape) for shape in orig_shapes]
-  max_dim = max(dims)
-  new_shapes = []
-  
-  # prepend filler dimensions for smaller arrays
-  for i in range(len(orig_shapes)):
-    diff = max_dim - len(orig_shapes[i])
-    new_shapes.append([1] * diff + orig_shapes[i])
- 
-  # check shapes are valid
-  # for each axis, all arrays should either share the 
-  # same size, or have size == 1
-  for axis in range(max_dim):
-    axis_shape = set(shp[axis] for shp in new_shapes)
-   
-    assert len(axis_shape) <= 2, 'Mismatched shapes for broadcast: %s' % orig_shapes
-    if len(axis_shape) == 2:
-      assert 1 in axis_shape, 'Mismatched shapes for broadcast: %s' % orig_shapes
-  
-    # now lift the inputs with size(axis) == 1 
-    # to have the maximum size for the axis 
-    max_size = max(shp[axis] for shp in new_shapes)
-    for shp in new_shapes:
-      shp[axis] = max_size
-    
-  # wrap arguments with missing dims in a Broadcast object.
-  results = []
-  for i in range(len(args)):
-    if new_shapes[i] == orig_shapes[i]:
-      results.append(args[i])
-    else:
-      results.append(Broadcast(args[i], tuple(new_shapes[i])))
-    
-  #util.log_debug('Broadcast result: %s', results)
-  return results
-
-def _size(v):
-  if isinstance(v, Broadcast):
-    return (0, np.prod(v.base.shape)) 
-  return (1, np.prod(v.shape))
-
 def largest_value(vals):
   '''
   Return the largest array (using the underlying size for Broadcast objects).
   
   :param vals: List of `DistArray`. 
   '''
-  return max(vals, key=_size)
+  return max(vals, key=lambda v: v.real_size())
 
