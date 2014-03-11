@@ -212,7 +212,7 @@ class ZMQPoller(threading.Thread):
     threading.Thread.__init__(self, name='zmq.PollingThread', target=self._run)
 
     self._poller = zmq.Poller()
-    self._lock = threading.RLock()
+    self._lock = rlock.FastRLock()
 
     self._pipe = os.pipe()
     fcntl.fcntl(self._pipe[0], fcntl.F_SETFL, os.O_NONBLOCK)
