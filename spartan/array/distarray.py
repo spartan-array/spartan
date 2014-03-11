@@ -511,8 +511,8 @@ class LocalWrapper(DistArray):
   def __init__(self, data):
     self._data = np.asarray(data)
     self.bad_tiles = []
-    #assert not isinstance(data, core.TileId)
     Assert.isinstance(data, (np.ndarray, int, float))
+    #assert not isinstance(data, core.TileId)
     #print 'Wrapping: %s %s (%s)' % (data, type(data), np.isscalar(data))
     #print 'DATA: %s' % type(self._data)
 

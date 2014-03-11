@@ -1,10 +1,11 @@
 import unittest
 import sys
+
 import test_common
 from spartan import expr, util
 from spartan.expr import eager
-from spartan.expr.optimize import optimize
 from spartan.examples import finance
+
 
 maturity = 10.0
 rate = 0.005
@@ -42,6 +43,7 @@ class TestFinance(test_common.ClusterTest):
     ask = expr.randn(100)
     res = finance.predict_price(bid, ask, 5).optimized()
     #print res
+    #print res.optimized()
     print res.glom()
 
 if __name__ == '__main__':
