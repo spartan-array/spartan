@@ -255,20 +255,27 @@ def merge(old_tile, subslice, update, reducer):
     #util.log_info('%s %s', old_tile.mask, new_tile.mask)
     #util.log_info('REPLACE: %s', replaced)
     #util.log_info('UPDATE: %s', updated) 
-    replaced = ~old_tile.mask[subslice]
-    updated = old_tile.mask[subslice]
-    
-    old_region = old_tile.data[subslice]  
-    if np.any(replaced):  
-      old_region[replaced] = update[replaced]
-    
-    if np.any(updated):
+    if old_tile.data.shape == update.shape:
       if reducer is not None:
-        old_region[updated] = reducer(old_region[updated], update[updated]) 
+        old_tile.data = reducer(old_tile.data, update)
       else:
-        old_region[updated] = update[updated] 
+        old_tile.data = update
+      old_tile.mask = True
+    else:
+      replaced = ~old_tile.mask[subslice]
+      updated = old_tile.mask[subslice]
     
-    old_tile.mask[subslice] = True
+      old_region = old_tile.data[subslice]  
+      if np.any(replaced):  
+        old_region[replaced] = update[replaced]
+    
+      if np.any(updated):
+        if reducer is not None:
+          old_region[updated] = reducer(old_region[updated], update[updated]) 
+        else:
+          old_region[updated] = update[updated] 
+    
+      old_tile.mask[subslice] = True
   else:
     if old_tile.data is not None and old_tile.data.format == 'coo':
       old_tile.data = old_tile.data.tolil() 

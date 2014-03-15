@@ -12,7 +12,7 @@ class TestFIO(test_common.ClusterTest):
   test_dir2 = None
   def create_path(self):
     if self.test_dir == None:
-      if len(FLAGS.hosts) > 1:
+      if len(FLAGS.hosts) > 1 and FLAGS.cluster:
         self.test_dir = '/hdfs'
       else:
         self.test_dir = '/tmp'
