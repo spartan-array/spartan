@@ -1,5 +1,5 @@
 from spartan.rpc import serialization
-from spartan.rpc.serializationIOStream import Writer, Reader
+from spartan.rpc.serialization_buffer import Writer, Reader
 from spartan.util import Assert
 import spartan.core
 from spartan.expr.map import tile_mapper

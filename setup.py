@@ -63,8 +63,8 @@ setup(
   ext_modules = [
     Extension('spartan.core', ['spartan/core' + suffix]),
     Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core' + suffix]),
-    Extension('spartan.rpc.serializationIOStream', 
-              ['spartan/rpc/serializationIOStream' + suffix]),
+    Extension('spartan.rpc.serialization_buffer', 
+              ['spartan/rpc/serialization_buffer' + suffix]),
     Extension('spartan.cloudpickle', ['spartan/cloudpickle' + suffix]),
     Extension('spartan.rpc.serialization', 
               ['spartan/rpc/serialization' + suffix],

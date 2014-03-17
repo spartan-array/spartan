@@ -20,20 +20,12 @@ class TestPerformance(test_common.ClusterTest):
   ''' Test the performance of some applications make sure the changes don't slow down spartan'''
   
   #base line for some applications. The base line cames from the test on 4 machines.
-  if np.__version__ < 1.8:
-    _base_line = {
-                  "linear_reg" : 13, 
-                  "matrix_mult" : 14,
-                  "kmeans" : 16.7,
-                  "pagerank" : 13
-                  }
-  else:
-    _base_line = {
-                  "linear_reg" : 11.151302, 
-                  "matrix_mult" : 48.666200,
-                  "kmeans" : 13.656453,
-                  "pagerank" : 11.884968
-                  }
+  _base_line = {
+                "linear_reg" : 13, 
+                "matrix_mult" : 14,
+                "kmeans" : 16.7,
+                "pagerank" : 13
+               }
   
   #Once the factor is greater the threshold, we treat the test fails.
   FACTOR_THRESHOLD = 1.5

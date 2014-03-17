@@ -8,7 +8,7 @@ from spartan.core import Message
 from spartan import cloudpickle
 
 from cpython cimport string
-from libcpp.unordered_set cimport unordered_set
+from unordered_set cimport unordered_set
 
 ctypedef unsigned char byte
 

@@ -254,7 +254,10 @@ def merge(old_tile, subslice, update, reducer):
 
     #util.log_info('%s %s', old_tile.mask, new_tile.mask)
     #util.log_info('REPLACE: %s', replaced)
-    #util.log_info('UPDATE: %s', updated) 
+    #util.log_info('UPDATE: %s', updated)
+    
+    # If the update shape is the same as the tile, 
+    # then avoid doing a (possibly expensive) slice update. 
     if old_tile.data.shape == update.shape:
       if reducer is not None:
         old_tile.data = reducer(old_tile.data, update)

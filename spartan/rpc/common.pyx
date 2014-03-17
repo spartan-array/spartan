@@ -18,7 +18,7 @@ import types
 import weakref
 from .. import cloudpickle, util, core
 from ..node import Node, node_type
-from . import serialization, serializationIOStream, rlock
+from . import serialization, serialization_buffer, rlock
 from ..util import TIMER
 cimport zeromq
 from zeromq cimport Socket, ServerSocket, StubSocket
@@ -75,7 +75,7 @@ def serialize_to(obj, writer):
 def serialize(obj):
   with util.TIMER.serialize:
     """
-    w = serializationIOStream.Writer()
+    w = serialization_buffer.Writer()
     serialization.write(obj, w)
     return w.getvalue()
     """
@@ -125,7 +125,7 @@ cdef class PendingRequest:
     
     #util.log_info('Finished %s, %s', self.socket.addr, self.rpc_id)
     #w = cStringIO.StringIO()
-    w = serializationIOStream.Writer()
+    w = serialization_buffer.Writer()
     cPickle.dump(header, w, -1)
     serialize_to(result, w)
     self.socket.send(w.getvalue())
@@ -314,7 +314,7 @@ cdef class Server:
 
     data = socket.recv()
     #reader = cStringIO.StringIO(data)
-    reader = serializationIOStream.Reader(data)
+    reader = serialization_buffer.Reader(data)
     header = cPickle.load(reader)
 
     #util.log_info('Call[%s] %s %s', header['method'], self._socket.addr, header['rpc_id'])
@@ -378,7 +378,7 @@ cdef class Client:
       header = { 'method' : method, 'rpc_id' : rpc_id }
 
       #w = cStringIO.StringIO()
-      w = serializationIOStream.Writer()
+      w = serialization_buffer.Writer()
 
       
       if isinstance(request, PickledData):
@@ -409,7 +409,7 @@ cdef class Client:
   cpdef handle_read(self, Socket socket):
     data = socket.recv()
     #reader = cStringIO.StringIO(data)
-    reader = serializationIOStream.Reader(data)
+    reader = serialization_buffer.Reader(data)
     header = cPickle.load(reader)
     resp = read(reader)
     #resp = cPickle.load(reader)
