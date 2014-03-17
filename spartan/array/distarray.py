@@ -38,7 +38,7 @@ def good_tile_shape(shape, num_shards=-1):
   tile_shape = [1] * len(shape)
   idx = len(shape) - 1
   while tile_size > 1:
-    tile_shape[idx] = max(shape[idx], tile_size)
+    tile_shape[idx] = min(shape[idx], tile_size)
     tile_size /= shape[idx]
     idx -= 1
 
