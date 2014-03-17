@@ -101,7 +101,6 @@ class Reshape(distarray.DistArray):
     kw['array'] = self
     kw['user_fn'] = mapper_fn
 
-    print self._same_tiles
     if self._same_tiles:
       tiles = self.base.tiles.values()
     else:
@@ -126,9 +125,10 @@ class Reshape(distarray.DistArray):
     tile = self.base.fetch(base_ex)
     if not self.base.sparse:
       tile = np.ravel(tile)
-      tile = tile[(base_ravelled_ul - ravelled_ul):(base_ravelled_lr - ravelled_ul) + 1]
+      tile = tile[(ravelled_ul - base_ravelled_ul):(ravelled_lr - base_ravelled_ul) + 1]
       return tile.reshape(ex.shape)
     else:
+      tile = tile.tolil()
       new = sp.lil_matrix(ex.shape, dtype=self.base.dtype)
       j_max = tile.shape[1]
       for i,row in enumerate(tile.rows):
