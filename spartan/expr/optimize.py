@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+
 '''
 Optimizations over an expression graph.
 
@@ -9,13 +10,13 @@ pass infrastructure, the fusion passes and an optimization pass to
 lower code to Parakeet.
 '''
 
-from spartan.config import FLAGS, BoolFlag
-from spartan.expr import local
-from spartan.expr.filter import FilterExpr
-from spartan.expr.slice import SliceExpr
-from spartan.expr.local import make_var, LocalInput, ParakeetExpr
-from spartan.expr.reduce import ReduceExpr, LocalReduceExpr
-from spartan.util import Assert
+from ..config import FLAGS, BoolFlag
+from . import local
+from .filter import FilterExpr
+from .slice import SliceExpr
+from .local import make_var, LocalInput, ParakeetExpr
+from .reduce import ReduceExpr, LocalReduceExpr
+from ..util import Assert
 
 from .. import util
 from .base import Expr, Val, AsArray, DictExpr, lazify, expr_like, ExprTrace
@@ -334,6 +335,47 @@ class ParakeetGeneration(OptimizePass):
 #       return expr.visit(self)
 
 
+class RotateSlice(OptimizePass):
+  '''
+  This pass rotates slice operations to the bottom of the expression graph.
+
+  By moving slices down, we open up opportunities for performing more
+  fusion operations.
+
+  The actual operation performed is:
+
+  (a + b)[slice] -> broadcast(a, shape)[slice] + broadcast(b, shape)[slice]
+  '''
+  name = 'rotate_slice'
+
+  def visit_SliceExpr(self, slice_expr):
+    'Rotate this slice with a child map expression.'
+    map_expr = slice_expr.src
+
+    if not isinstance(map_expr, MapExpr):
+      return slice_expr.visit(self)
+
+    try:
+      map_shape = map_expr.compute_shape()
+    except base.NotShapeable:
+      return slice_expr.visit(self)
+
+    Assert.iterable(map_expr.children)
+    map_children = self.visit(map_expr.children)
+
+    children = {}
+    for name, child_expr in map_children.iteritems():
+      children[name] = SliceExpr(src=child_expr,
+                                 idx=slice_expr.idx,
+                                 broadcast_to=map_shape)
+
+    return expr_like(map_expr,
+                     op=map_expr.op,
+                     children=DictExpr(vals=children),
+                     trace=map_expr.stack_trace)
+
+
+
 def apply_pass(klass, dag):
   if not getattr(FLAGS, 'opt_' + klass.name):
     util.log_debug('Pass %s disabled', klass.name)
@@ -374,6 +416,8 @@ def add_optimization(klass, default):
 add_optimization(MapMapFusion, True)
 add_optimization(ReduceMapFusion, True)
 add_optimization(CollapsedCachedExpressions, True)
+add_optimization(RotateSlice, False)
+
 if parakeet is not None:
   add_optimization(ParakeetGeneration, True)
 
