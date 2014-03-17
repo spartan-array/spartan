@@ -14,8 +14,8 @@ from ..core import LocalKernelResult
 from .shuffle import target_mapper
 
 def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
-  ex = array.base.extent_for_blob(tile_id)
-  ex = extent.create(ex.ul[::-1], ex.lr[::-1], array.shape)
+  base_ex = array.base.extent_for_blob(tile_id)
+  ex = extent.create(base_ex.ul[::-1], base_ex.lr[::-1], array.shape)
   return user_fn(ex, **kw)
 
 class Transpose(distarray.DistArray):
@@ -54,8 +54,8 @@ class Transpose(distarray.DistArray):
 
   def fetch(self, ex):
     base_ex = extent.create(ex.ul[::-1], ex.lr[::-1], self.base.shape)
-    tile = self.base.fetch(base_ex)
-    return tile.transpose()
+    base_tile = self.base.fetch(base_ex)
+    return base_tile.transpose()
 
 @node_type
 class TransposeExpr(Expr):
