@@ -24,6 +24,37 @@ cimport zeromq
 from zeromq cimport Socket, ServerSocket, StubSocket
 from rlock cimport FastRLock
 
+#cdef extern from "time.h":
+#  cdef struct timespec:
+#    long int tv_sec
+#    long int tv_nsec
+
+#  int clock_gettime(int timerid, timespec *value)
+ 
+cdef extern from "pthread.h":
+  ctypedef struct pthread_mutex_t:
+    pass
+  
+  ctypedef struct pthread_cond_t:
+    pass
+  
+  int pthread_mutex_init(pthread_mutex_t *, void *)
+  int pthread_mutex_destroy(pthread_mutex_t *)
+  int pthread_mutex_lock(pthread_mutex_t *) nogil
+  int pthread_mutex_unlock(pthread_mutex_t *) nogil
+  
+  int pthread_cond_init(pthread_cond_t *, void *)
+  int pthread_cond_destroy(pthread_cond_t *)
+  int pthread_cond_signal(pthread_cond_t *) nogil
+  int pthread_cond_wait(pthread_cond_t *, pthread_mutex_t *) nogil
+
+  #int pthread_cond_timedwait(pthread_cond_t *, pthread_mutex_t *, const timespec *) nogil
+
+#CLOCK_REALTIME = 0
+#CLOCK_MONOTONIC = 1
+#DEF CLOCK_REALTIME = 0
+#DEF CLOCK_MONOTONIC = 1    
+
 CLIENT_PENDING = weakref.WeakKeyDictionary()
 SERVER_PENDING = weakref.WeakKeyDictionary()
 
@@ -158,6 +189,35 @@ class RemoteException(Exception):
   def __str__(self):
     return repr(self)
 
+cdef class Condition:
+  cdef pthread_mutex_t mutex
+  cdef pthread_cond_t cond
+  #cdef timespec now
+ 
+  def __init__(self):
+    pthread_mutex_init(&self.mutex, NULL)
+    pthread_cond_init(&self.cond, NULL)
+      
+  def acquire(self):
+    with nogil:
+      pthread_mutex_lock(&self.mutex)
+    
+  def release(self):
+    pthread_mutex_unlock(&self.mutex)
+    
+  def wait(self, timeout=1):
+    #clock_gettime(CLOCK_REALTIME, &self.now)
+    #self.now.tv_sec += timeout
+    with nogil:
+      #pthread_cond_timedwait(&self.cond, &self.mutex, &self.now)
+      pthread_cond_wait(&self.cond, &self.mutex)
+        
+  def notify(self):
+    pthread_cond_signal(&self.cond)
+      
+  def __del__(self):
+    pthread_mutex_destroy(&self.mutex)
+    pthread_cond_destroy(&self.cond)
 
 cdef class Future:
   cdef object addr
@@ -177,7 +237,8 @@ cdef class Future:
       self.have_result = False
       self.result = None
       self.finished_fn = None
-      self._cv = threading.Condition(lock=rlock.FastRLock())
+      #self._cv = threading.Condition(lock=rlock.FastRLock())
+      self._cv = Condition()
       self._start = time.time()
       self._finish = time.time() + 1000000
       if timeout is None:
