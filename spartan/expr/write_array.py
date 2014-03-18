@@ -373,6 +373,7 @@ def from_file(fn, file_type = 'numpy', sparse = True, tile_hint = None):
 
   if file_type == 'numpy':
     if sparse:
+      raise NotImplementedError("Only support dense npy now.")
     else:
       npa = np.load(fn)
       if fn.endswith("npz"):
@@ -386,7 +387,7 @@ def from_file(fn, file_type = 'numpy', sparse = True, tile_hint = None):
     if sp.issparse(npa) and npa.dtype == np.float64:
       npa = npa.astype(np.float32)
   else:
-    raise NotImplementedError("Only support npy/npz now. Got %s" % file_type)
+    raise NotImplementedError("Only support npy and mm now. Got %s" % file_type)
 
   return from_numpy(npa, tile_hint)
 

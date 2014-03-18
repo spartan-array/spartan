@@ -224,18 +224,22 @@ def csr_update(data, update, slices):
   It's faster but can't support slicing with step is not 1. This should be 
   enough for Spartan.
   '''
-  upper_slice = [slice(0, slices[0].start), (0, data.shape[1])]
-  midleft_slice = [slice(slices[0].start, slices[0].stop), (0, slices[1].start)]
-  midright_slice = [slice(slices[0].start, slices[0].stop), slice(slices[1].end, data.shape[1])]
-  lower_slice = [slice(slices[0].stop, data.shape[0]), (0, data.shape[1])]
+  upper_slice = (__builtins__.slice(0, slices[0].start),
+                 __builtins__.slice(0, data.shape[1]))
+  midleft_slice = (__builtins__.slice(slices[0].start, slices[0].stop),
+                   __builtins__.slice(0, slices[1].start))
+  midright_slice = (__builtins__.slice(slices[0].start, slices[0].stop),
+                    __builtins__.slice(slices[1].stop, data.shape[1]))
+  lower_slice = (__builtins__.slice(slices[0].stop, data.shape[0]),
+                 __builtins__.slice(0, data.shape[1]))
   
   if slices[1].start > 0:
     update = scipy.sparse.hstack((data[midleft_slice], update), dtype = update.dtype)
-  if slices[1].end < data.shape[1]:
+  if slices[1].stop < data.shape[1]:
     update = scipy.sparse.hstack((update, data[midright_slice]), dtype = update.dtype)
   if slices[0].start > 0:
     update = scipy.sparse.vstack((data[upper_slice], update), dtype = update.dtype)
-  if slices[0].end < data.shape[0]:
+  if slices[0].stop < data.shape[0]:
     update = scipy.sparse.vstack((update, data[lower_slice]), dtype = update.dtype)
 
   return update
@@ -277,7 +281,7 @@ def multiple_slice_coo(X not None, list slices):
         if src_slice[0].start > rows[-1]:
             break
 
-        end_idx = numpy.searchsorted(rows[idx:], src_slice[0].stop) + idx
+        end_idx = numpy.searchsorted(rows[idx:], src_slice[1].stop) + idx
         #print src_slice[0], rows[idx], rows[end_idx-1]
         results.append((tile_id, dst_slice, scipy.sparse.coo_matrix((data[idx:end_idx], (rows[idx:end_idx]-src_slice[0].start, cols[idx:end_idx])),
                                             shape=tuple([slice.stop-slice.start for slice in src_slice]))))
