@@ -15,11 +15,10 @@ from spartan import rpc
 from spartan.array import distarray, extent
 from .slice import Slice
 from ..core import LocalKernelResult
-from ..node import node_type
 from ..util import Assert
 from .base import Expr
 from .ndarray import ndarray
-
+from traits.api import PythonValue
 
 def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
   intersection = extent.intersection(ex, sregion)
@@ -35,9 +34,11 @@ def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
   return LocalKernelResult(result=None, futures=futures)
 
 
-@node_type
 class WriteArrayExpr(Expr):
-  _members = ['array', 'src_slices', 'data', 'dst_slices']
+  array = PythonValue(None, desc="DistArray or Expr") 
+  src_slices = PythonValue(None, desc="Slices or a tuple of slices") 
+  data = PythonValue(None, desc="np.ndarray or Expr") 
+  dst_slices = PythonValue(None, desc="Slices or a tuple of slices") 
 
   def __str__(self):
     return 'WriteArrayExpr[%d] %s %s %s' % (self.expr_id, self.array, self.data)

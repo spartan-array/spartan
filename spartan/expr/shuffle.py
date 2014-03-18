@@ -3,9 +3,11 @@ from spartan import rpc
 from .. import blob_ctx, util
 from ..array import distarray, tile
 from ..core import LocalKernelResult
-from ..node import Node, node_type
+from ..node import Node
 from ..util import is_iterable, Assert
 from .base import Expr, lazify
+from traits.api import Instance, Function, PythonValue, HasTraits
+from .base import DictExpr
 
 def shuffle(v, fn, tile_hint=None, target=None, kw=None):
   '''
@@ -93,10 +95,13 @@ def notarget_mapper(ex, array=None, map_fn=None, source=None, fn_kw=None):
   return LocalKernelResult(result=results, futures=None)
 
 
-@node_type
 class ShuffleExpr(Expr):
-  _members = ['array', 'map_fn', 'target', 'tile_hint', 'fn_kw']
-
+  array = PythonValue(None, desc="DistArray or Expr")
+  map_fn = Function 
+  target = PythonValue(None, desc="DistArray or Expr") 
+  tile_hint = PythonValue(None, desc="Tuple or None")
+  fn_kw = Instance(DictExpr) 
+  
   def __str__(self):
     return 'shuffle[%d](%s, %s)' % (self.expr_id, self.map_fn, self.array)
 

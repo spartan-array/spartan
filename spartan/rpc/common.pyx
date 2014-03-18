@@ -17,7 +17,9 @@ import traceback
 import types
 import weakref
 from .. import cloudpickle, util, core
-from ..node import Node, node_type
+from ..node import Node
+from . import serialization, rlock
+from traits.api import PythonValue
 from . import serialization, serialization_buffer, rlock
 from ..util import TIMER
 cimport zeromq
@@ -47,7 +49,6 @@ cdef extern from "pthread.h":
   int pthread_cond_destroy(pthread_cond_t *)
   int pthread_cond_signal(pthread_cond_t *) nogil
   int pthread_cond_wait(pthread_cond_t *, pthread_mutex_t *) nogil
-
   #int pthread_cond_timedwait(pthread_cond_t *, pthread_mutex_t *, const timespec *) nogil
 
 #CLOCK_REALTIME = 0
@@ -70,17 +71,15 @@ cpdef set_default_timeout(unsigned long seconds):
   util.log_info('Set default timeout to %s seconds.', DEFAULT_TIMEOUT)
 
 
-@node_type
-class RPCException(object):
-  _members = ['py_exc']
+class RPCException(Node):
+  py_exc = PythonValue
 
-@node_type
-class PickledData(object):
+class PickledData(Node):
   '''
   Helper class: indicates that this message has already been pickled,
   and should be sent as is, rather than being re-pickled.
   '''
-  _members = ['data']
+  data = PythonValue
 
 
 def capture_exception(exc_info=None):

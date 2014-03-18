@@ -1,12 +1,16 @@
 from .base import Expr
-from ..node import Node, node_type
+from ..node import Node
 from spartan.array import tile, distarray
 import numpy as np
 from .. import util
+from traits.api import Tuple, Bool, PythonValue, HasTraits
 
-@node_type
 class NdArrayExpr(Expr):
-  _members = ['_shape', 'sparse', 'dtype', 'tile_hint', 'reduce_fn']
+  _shape = Tuple 
+  sparse = Bool 
+  dtype = PythonValue(None, desc="np.type or type")
+  tile_hint = PythonValue(None, desc="Tuple or None")
+  reduce_fn = PythonValue(None, desc="Function or None")
 
   def __repr__(self):
     return 'dist_array(%s, %s)' % (self.shape, self.dtype)

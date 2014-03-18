@@ -1,12 +1,16 @@
 from .base import Expr
 import numpy as np
-from spartan.node import Node, node_type
+from spartan.node import Node
+from traits.api import Instance, Dict, Function, PythonValue, HasTraits
 
 
-@node_type
 class OuterProductExpr(Expr):
-  _members = ['children', 'map_fn', 'map_fn_kw', 'reduce_fn', 'reduce_fn_kw']
-  
+  chidlren = Instance(Expr) 
+  map_fn = Function 
+  map_fn_kw = PythonValue 
+  reduce_fn = PythonValue 
+  reduce_fn_kw = PythonValue 
+
 def outer_product(a, b, map_fn, reduce_fn):
   '''
   Outer (cartesian) product over the tiles of ``a`` and ``b``.
@@ -20,6 +24,5 @@ def outer_product(a, b, map_fn, reduce_fn):
   return OuterProductExpr(a, b, map_fn, reduce_fn)
 
 def outer(a, b):
-  
   return OuterProductExpr(a, b, map_fn=np.dot, 
                           reduce_fn=np.add)

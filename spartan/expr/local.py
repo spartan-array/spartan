@@ -13,7 +13,8 @@ import imp
 
 from spartan import util
 from spartan.util import Assert
-from spartan.node import Node, node_type
+from spartan.node import Node
+from traits.api import Str, List, Function, PythonValue
 
 var_id = iter(xrange(1000000))
 
@@ -23,19 +24,12 @@ def make_var():
   '''Return a new unique key for use as a variable name'''
   return 'k%d' % var_id.next()
 
+class LocalCtx(Node):
+  inputs = PythonValue
 
-@node_type
-class LocalCtx(object):
-  _members = ['inputs']
-
-
-@node_type
-class LocalExpr(object):
+class LocalExpr(Node):
   '''Represents an internal operation to be performed in the context of a tile.'''
-  _members = ['deps']
-
-  def node_init(self):
-    if self.deps is None: self.deps = []
+  deps = List() 
 
   def add_dep(self, v):
     self.deps.append(v)
@@ -44,16 +38,12 @@ class LocalExpr(object):
     return util.flatten([v.input_names() for v in self.deps], unique=True)
 
 
-@node_type
 class LocalInput(LocalExpr):
   '''An externally supplied input.'''
-  _members = ['idx']
+  idx = Str() 
 
   def __str__(self):
     return 'V(%s)' % self.idx
-
-  def node_init(self):
-    Assert.isinstance(self.idx, str)
 
   def evaluate(self, ctx):
     return ctx.inputs[self.idx]
@@ -62,7 +52,6 @@ class LocalInput(LocalExpr):
     return [self.idx]
 
 
-@node_type
 class FnCallExpr(LocalExpr):
   '''Evaluate a function call.
   
@@ -72,9 +61,12 @@ class FnCallExpr(LocalExpr):
   Constants (axis of a reduction, datatype, etc), can be supplied via the ``kw``
   argument.
   '''
-  _members = ['kw', 'fn', 'pretty_fn']
+  kw = PythonValue
+  fn = PythonValue
+  pretty_fn = PythonValue
 
-  def node_init(self):
+  def __init__(self, *args, **kw):
+    super(FnCallExpr, self).__init__(*args, **kw)
     if self.kw is None: self.kw = {}
     assert self.fn is not None
 
@@ -99,11 +91,9 @@ class FnCallExpr(LocalExpr):
 # The local operation of map and reduce expressions is practically
 # identical.  Reductions take an axis and extent argument in
 # addition to the normal function call arguments.
-@node_type
 class LocalMapExpr(FnCallExpr):
   _op_type = 'map'
 
-@node_type
 class LocalReduceExpr(FnCallExpr):
   _op_type = 'reduce'
 
@@ -138,9 +128,9 @@ def compile_parakeet_source(src):
   return module._jit_fn
 
 
-@node_type
 class ParakeetExpr(LocalExpr):
-  _members = ['deps', 'source']
+  deps = PythonValue
+  source = PythonValue
 
   def evaluate(self, ctx):
     names = self.input_names()
