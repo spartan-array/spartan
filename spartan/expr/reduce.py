@@ -58,12 +58,13 @@ def _reduce_mapper(ex, children, op, axis, output):
   return LocalKernelResult(result=[])
 
 class ReduceExpr(Expr):
-  #_members = ['children', 'axis', 'dtype_fn', 'op', 'accumulate_fn']
+  #_members = ['children', 'axis', 'dtype_fn', 'op', 'accumulate_fn', 'tile_hint']
   children = Instance(DictExpr) 
   axis = PythonValue(None, desc="Integer or None")
   dtype_fn = Function
   op = Instance(LocalExpr) 
   accumulate_fn = PythonValue(None, desc="Function or ReduceExpr")
+  tile_hint = PythonValue(None, desc="Tuple or None")
 
   def __init__(self, *args, **kw):
     super(ReduceExpr, self).__init__(*args, **kw)
@@ -102,7 +103,7 @@ class ReduceExpr(Expr):
     shape = extent.shape_for_reduction(vals[0].shape, axis)
     
     output_array = distarray.create(shape, dtype,
-                                    reducer=tile_accum)
+                                    reducer=tile_accum, tile_hint=self.tile_hint)
 
   # util.log_info('Reducing into array %s', output_array)
     largest.foreach_tile(_reduce_mapper, kw={'children' : children,
@@ -113,7 +114,7 @@ class ReduceExpr(Expr):
     return output_array
 
  
-def reduce(v, axis, dtype_fn, local_reduce_fn, accumulate_fn, fn_kw=None):
+def reduce(v, axis, dtype_fn, local_reduce_fn, accumulate_fn, fn_kw=None, tile_hint=None):
   '''
   Reduce ``v`` over axis ``axis``.
   
@@ -150,5 +151,6 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, accumulate_fn, fn_kw=None):
                     axis=axis,
                     dtype_fn=dtype_fn,
                     op=reduce_op,
-                    accumulate_fn=accumulate_fn)
+                    accumulate_fn=accumulate_fn,
+                    tile_hint=tile_hint)
 

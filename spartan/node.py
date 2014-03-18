@@ -48,13 +48,12 @@ def get_members(klass):
 class Node(HasTraits):
   def __init__(self, *args, **kw):
     super(Node, self).__init__(*args, **kw)
-    self.members = get_members(self.__class__)
+    #self.members = get_members(self.__class__)
 
-  """
   @property
   def members(self):
     return get_members(self.__class__)
-  """
+  
   @property
   def node_type(self):
     return self.__class__.__name__

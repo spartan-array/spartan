@@ -114,7 +114,7 @@ def stencil(images, filters, stride=1):
    
   target = ndarray((n_img, n_filt, w, h),
                    dtype=images.dtype,
-                   reduce_fn=np.sum,
+                   reduce_fn=np.add,
                    tile_hint=tile_hint)
   
   return shuffle(images,

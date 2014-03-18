@@ -1,6 +1,7 @@
 import numpy as np
 import spartan
 from spartan import expr
+from spartan import util
 
 class SGDRegressor(object):
   '''Stochastic gradient descent algorithm
@@ -36,7 +37,7 @@ class SGDRegressor(object):
 
     for i in range(self.iterations):
       diff = self.update()
-      grad = expr.sum(diff, axis=0).glom().reshape((self.N_DIM, 1))
+      grad = expr.sum(diff, axis=0, tile_hint=[self.N_DIM]).glom().reshape((self.N_DIM, 1))
       self.w = self.w - grad * self.alpha
     return self.w
 

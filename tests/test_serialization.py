@@ -1,4 +1,5 @@
 from spartan.rpc import serialization
+from spartan.rpc.serialization_buffer import Writer, Reader
 from spartan.util import Assert
 import spartan.core
 from spartan.expr.map import tile_mapper
@@ -20,10 +21,10 @@ def millis(t1, t2):
   
 def serial_dump(obj):
   t1 = datetime.now()
-  w = serialization.Writer()
+  w = Writer()
   serialization.write(obj, w)
   
-  f = serialization.Reader(w.getvalue())
+  f = Reader(w.getvalue())
   new_obj = serialization.read(f)
   t2 = datetime.now()
   #Assert.all_eq(obj, new_obj)
