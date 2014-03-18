@@ -4,209 +4,72 @@ from struct import unpack, pack
 import numpy as np
 import dis, marshal, types
 
-from ..core import Message
-from .. import cloudpickle
-import time
-from spartan import util
+from spartan.core import Message
+from spartan import cloudpickle
 
-from libc.string cimport memcpy
-
-cimport numpy as N
-import numpy as N
-
-from cpython cimport buffer
 from cpython cimport string
-
-from cython.view cimport memoryview
+from unordered_set cimport unordered_set
 
 ctypedef unsigned char byte
 
-cdef list GLOBAL_OPS = [chr(dis.opname.index('STORE_GLOBAL')),
-                        chr(dis.opname.index('DELETE_GLOBAL')),
-                        chr(dis.opname.index('LOAD_GLOBAL'))]
+cdef unordered_set[byte] GLOBAL_OPS 
+GLOBAL_OPS.insert(dis.opname.index('STORE_GLOBAL'))
+GLOBAL_OPS.insert(dis.opname.index('DELETE_GLOBAL'))
+GLOBAL_OPS.insert(dis.opname.index('LOAD_GLOBAL'))
+#cdef list GLOBAL_OPS = [dis.opname.index('STORE_GLOBAL'),
+#                        dis.opname.index('DELETE_GLOBAL'),
+#                        dis.opname.index('LOAD_GLOBAL')]
+ 
+cdef byte HAVE_ARGUMENT = dis.HAVE_ARGUMENT
+cdef byte EXTENDED_ARG = dis.EXTENDED_ARG
 
-cdef bytes HAVE_ARGUMENT = chr(dis.HAVE_ARGUMENT)
-cdef bytes EXTENDED_ARG = chr(dis.EXTENDED_ARG)
+#cdef list GLOBAL_OPS = [chr(dis.opname.index('STORE_GLOBAL')),
+#                        chr(dis.opname.index('DELETE_GLOBAL')),
+#                        chr(dis.opname.index('LOAD_GLOBAL'))]
+
+#cdef bytes HAVE_ARGUMENT = chr(dis.HAVE_ARGUMENT)
+#cdef bytes EXTENDED_ARG = chr(dis.EXTENDED_ARG)
 
 cdef extern from "Python.h":
   object PyCell_New(object value)
-  object PyMemoryView_FromBuffer(Py_buffer *)
-  object PyMemoryView_FromObject(object)
-  object PyBuffer_FromMemory(void*, Py_ssize_t)
-  object PyBuffer_FromReadWriteMemory(void*, Py_ssize_t)
-  void PyBuffer_Release(Py_buffer*)
 
-cdef Py_buffer get_buffer(object o):
-  cdef Py_buffer b
-  if buffer.PyObject_GetBuffer(o, &b, buffer.PyBUF_SIMPLE) != 0:
-    raise Exception, 'Failed to get buffer.'
-  b.readonly = 0
-  return b
-
-
-cdef class Buffer:
-  cdef byte* base
-  cdef int len
-  cdef Py_buffer buffer
-  #cdef object buf_array
-
-  def __init__(self, v):
-    if isinstance(v, int):
-      v = N.ndarray(v, dtype=N.uint8)
-
-    #self.buf_array = v
-    self.buffer = get_buffer(v)
-    self.base = <byte*>self.buffer.buf
-    self.len = self.buffer.len
-
-  def __dealloc__(self):
-    PyBuffer_Release(&self.buffer)
-
-  #cdef byte[:] view(self):
-  #  return self.buf_array
-
-  def __len__(self):
-    return self.len
-
-  cdef byte* data(self):
-    return self.base
-
-  cdef int size(self):
-    return self.len
-
-cdef class Writer:
-  cdef int pos
-  cdef Buffer buffer
-
-  def __init__(self, int default_size=1000):
-    self.reserve(default_size)
-    self.pos = 0
-
-  cdef reserve(self, int num):
-    if self.buffer is None or self.buffer.size() - self.pos < num:
-      new_len = 2 * (num + self.pos)
-      new_buffer = Buffer(new_len)
-      if self.buffer is not None:
-        memcpy(new_buffer.data(), self.buffer.data(), self.pos)
-      self.buffer = new_buffer
-
-  #cpdef object getvalue(self):
-  #  return self.buffer.view()[:self.pos]
-  
-  cpdef object getvalue(self):
-    return self.buffer.data()[0:self.pos]
-  
-  cpdef int write(self, v):
-    cdef Py_buffer data = get_buffer(v)
-    self.write_bytes(< byte *> data.buf, data.len)
-    PyBuffer_Release(&data)
-    return self.pos
-
-  cdef void write_bytes(self, byte * ptr, int len):
-    self.reserve(len)
-    memcpy(self.buffer.data() + self.pos, ptr, len)
-    self.pos += len
-
-  cdef void write_str(self, str v):
-    self.write_int(len(v))
-    self.write_bytes(v, len(v))
-
-  cdef void write_int(self, int v):
-    self.write_bytes(< byte *> & v, 4)
-
-  cdef void write_array(self, N.ndarray v):
-    self.write_bytes(v.dtype, 4)
-    self.write_bytes(<byte*> N.PyArray_DATA(v), N.PyArray_NBYTES(v))
-
-  cpdef int tell(self):
-    return self.pos
-
-  cpdef seek(self, int pos):
-    self.pos = pos
-
-
-cdef class Reader:
-  cdef Buffer buffer
-  cdef int pos
-  def __init__(self, object v):
-    self.buffer = Buffer(v)
-    self.pos = 0
-
-  cpdef str read(self, len):
-    cdef count = min(self.buffer.size() - self.pos, len)
-    cdef str v = string.PyString_FromStringAndSize(<char*>self.buffer.base + self.pos, count)
-    self.pos += count
-    return v
-
-  cpdef int readinto(self, out):
-    cdef Py_buffer b = get_buffer(out)
-    cdef int count = min(self.buffer.size() - self.pos, b.len)
-    memcpy(b.buf, self.buffer.data() + self.pos, count)
-    self.pos += count
-    return self.pos
-
-  cpdef str readline(self):
-    cdef byte* v = self.buffer.data() + self.pos
-    cdef int end = self.buffer.size() - self.pos
-    cdef i = 0
-    while i < end:
-      if v[i] == '\n':
-        break
-      i += 1
-
-    if i < end:
-      self.pos += i + 1
-      return string.PyString_FromStringAndSize(<char*>v, i + 1)
-    else:
-      self.pos = end
-      return string.PyString_FromString('')
-
-  cpdef int tell(self):
-    return self.pos
-
-  cpdef seek(self, int pos):
-    self.pos = pos
-
-cpdef write(obj, f):
-  _write(obj, f)
-
-cpdef write_str(s, f):
+cdef void write_str(str s, f):
   write_int(len(s), f)
   f.write(s)
 
-cpdef write_int(i, f):
+cdef void write_int(int i, f):
   f.write(pack('i', i))
 
-cpdef read_str(f):
-  l = read_int(f)
+cdef str read_str(f):
+  cdef int l = read_int(f)
   return f.read(l)
 
-cpdef read_int(f):
-  b = f.read(4)
-  return unpack('i', b)[0]
+cdef int read_int(f):
+  return unpack('i', f.read(4))[0]
 
-cpdef extract_code_globals(co):
+cdef set extract_code_globals(co):
   """
   Find all globals names read or written to code block co
   """
-  cdef bytes code = co.co_code
+  cdef char* code = string.PyString_AsString(co.co_code)
+  #cdef bytes code = co.co_code
   cdef tuple names = co.co_names
   cdef set out_names = set()
   
-  cdef int n = len(code), i = 0
+  cdef int n = len(co.co_code), i = 0
   cdef long oparg, extended_arg = 0
-  cdef bytes op
+  cdef byte op
   while i < n:
-    op = code[i]
+    op = <byte>code[i]
   
-    i = i+1
+    i += 1
     if op >= HAVE_ARGUMENT:
-      oparg = ord(code[i]) + ord(code[i+1])*256 + extended_arg
+      oparg = code[i] + code[i+1]*256 + extended_arg
       extended_arg = 0
-      i = i+2
+      i += 2
       if op == EXTENDED_ARG:
         extended_arg = oparg*65536L
-      if op in GLOBAL_OPS:
+      if GLOBAL_OPS.find(op) != GLOBAL_OPS.end():
         out_names.add(names[oparg])
   
   # see if nested function have any global refs
@@ -219,113 +82,147 @@ cpdef extract_code_globals(co):
 
 cpdef write_function(fn, f):
   cdef list closure_values = []
-  if fn.func_closure is not None:
-    closure_values = [v.cell_contents for v in fn.func_closure]
-    
-  cdef set func_global_refs = extract_code_globals(fn.func_code)
-                    
   cdef dict f_globals = {}
-  for var in func_global_refs:
-    #Some names, such as class functions are not global - we don't need them
-    if fn.func_globals.has_key(var):
-      f_globals[var] = fn.func_globals[var]
+  cdef bytes var
+  cdef int pos = f.tell()
+  try:
+    f.write('F')
 
-  _write((marshal.dumps(fn.func_code), f_globals, fn.func_name, fn.func_defaults, closure_values), f)
+    if fn.func_closure is not None:
+      closure_values = [v.cell_contents for v in fn.func_closure]
+   
+    for var in extract_code_globals(fn.func_code):
+      #Some names, such as class functions are not global - we don't need them
+      val = fn.func_globals.get(var)
+      if val is not None:
+        f_globals[var] = val
+  
+    write_tuple((marshal.dumps(fn.func_code), f_globals, fn.func_name, fn.func_defaults, closure_values), f) 
+  
+  except Exception:
+    f.seek(pos)
+    f.write('P')
+    cloudpickle.dump(fn, f, protocol= -1)
+
+cpdef write_dict(dict d, f):
+  f.write('D')
+  write_int(len(d), f)
+  for k, v in d.iteritems():
+    write(k, f)
+    write(v, f)
+      
+cpdef write_list(list l, f):
+  f.write('L')
+  write_int(len(l), f)
+  for elem in l:
+    write(elem, f)    
+
+cpdef write_tuple(tuple t, f):
+  f.write('T')
+  write_int(len(t), f)
+  for elem in t:
+    write(elem, f)    
+
+cpdef write_msg(m, f):
+  f.write('M')
+  write_str(cPickle.dumps(m.__class__), f)
+  write_dict(m.__dict__, f)
+
+cpdef write_numpy(n, f):
+  if not np.ma.isMaskedArray(n):
+    # sparse arrays will fail the np.ndarray check and are handled by cPickle
+    f.write('N')
+    if not n.flags['C_CONTIGUOUS']:
+      n = np.ascontiguousarray(n)
+    cPickle.dump(n.dtype, f, protocol= -1)
+    cPickle.dump(n.shape, f, protocol= -1)
+    cPickle.dump(n.strides, f, protocol= -1)
+    write_int(n.nbytes, f)
+    f.write(n)
+  else:
+    f.write('P')
+    cPickle.dump(n, f, protocol= -1)
+    
+cpdef write_pickle(p, f):
+  f.write('P')
+  try:
+    #print 'Using cpickle for ', obj
+    v = cPickle.dumps(p, -1)
+    f.write(v)
+  except (TypeError, cPickle.PicklingError, cPickle.PickleError):
+    # print 'Using cloudpickle for ', obj
+    cloudpickle.dump(p, f, protocol= -1)
+
+cdef dict type_to_writer = {types.DictType : write_dict,
+                            types.ListType : write_list,
+                            types.TupleType : write_tuple,
+                            types.FunctionType : write_function,
+                            types.NoneType : lambda obj, f: f.write('E'),
+                            np.core.numerictypes.ndarray : write_numpy,
+                           }
+cpdef write(obj, f):
+  t = type(obj)
+  write_fn = type_to_writer.get(t)
+  if write_fn == None:
+    if t.__base__ == Message:
+      write_msg(obj, f)
+    else:
+      write_pickle(obj, f)  
+  else:
+    write_fn(obj, f)
+
+cdef dict type_to_reader = {'D' : read_dict,
+                            'L' : read_list,
+                            'T' : read_tuple,
+                            'F' : read_function,
+                            'E' : lambda f: None,
+                            'N' : read_numpy,
+                            'M' : read_msg,
+                            'P' : cPickle.load,
+                           }
 
 cpdef read_function(f):
-  code_str, globals, name, defaults, closure_values = read(f)
+  f.read(1)
+  code_str, globals, name, defaults, closure_values = read_tuple(f)
   
   globals['__builtins__'] = __builtins__
   closure = tuple([PyCell_New(v) for v in closure_values])
   
   return types.FunctionType(marshal.loads(code_str), globals, name, defaults, closure)
 
-cpdef _write(obj, f):
-  if obj is None:
-    f.write('E')
-  elif isinstance(obj, np.ndarray) and not np.ma.isMaskedArray(obj):
-    # sparse arrays will fail the np.ndarray check and are handled by cPickle
-    f.write('N')
-    if not obj.flags['C_CONTIGUOUS']:
-      obj = np.ascontiguousarray(obj)
-    cPickle.dump(obj.dtype, f, protocol= -1)
-    cPickle.dump(obj.shape, f, protocol= -1)
-    cPickle.dump(obj.strides, f, protocol= -1)
-    write_int(obj.nbytes, f)
-    f.write(obj)
-    #write_str(buffer(obj), f)
-  elif isinstance(obj, Message):
-    f.write('M')
-    write_str(cPickle.dumps(obj.__class__), f)
-    _write(obj.__dict__, f)
-  elif isinstance(obj, tuple):
-    f.write('T')
-    write_int(len(obj), f)
-    for elem in obj:
-      _write(elem, f)
-  elif isinstance(obj, list):
-    f.write('L')
-    write_int(len(obj), f)
-    for elem in obj:
-      _write(elem, f)
-  elif isinstance(obj, dict):
-    f.write('D')
-    write_int(len(obj), f)
-    for k, v in obj.iteritems():
-      _write(k, f)
-      _write(v, f)
-  elif type(obj) == types.FunctionType:
-    pos = f.tell()
-    try:
-      f.write('F')
-      write_function(obj, f)
-    except Exception:
-      f.seek(pos)
-      f.write('P')
-      cloudpickle.dump(obj, f, protocol= -1)
-  else:
-    f.write('P')
-    try:
-      # print 'Using cpickle for ', obj
-      v = cPickle.dumps(obj, -1)
-      f.write(v)
-    except (TypeError, cPickle.PicklingError, cPickle.PickleError):
-      # print 'Using cloudpickle for ', obj
-      cloudpickle.dump(obj, f, protocol= -1)
+cpdef read_numpy(f):
+  dtype = cPickle.load(f)
+  shape = cPickle.load(f)
+  strides = cPickle.load(f)
+  b = read_str(f)
+  return np.ndarray(shape, buffer=b, strides=strides, dtype=dtype)
+
+cpdef read_msg(f):
+  klass = cPickle.loads(read_str(f))
+  f.read(1)
+  args = read_dict(f)
+  return klass(**args)
+
+cpdef read_tuple(f):
+  cdef int sz = read_int(f)
+  return tuple([read(f) for i in range(sz)])
+
+cpdef read_list(f):
+  cdef int sz = read_int(f)
+  return [read(f) for i in range(sz)]
+
+cpdef read_dict(f):
+  cdef int i, sz = read_int(f)
+  cdef dict d = {}
+  for i in range(sz):
+    k = read(f)
+    d[k] = read(f)
+  return d
 
 cpdef read(f):
   datatype = f.read(1)
-  if datatype == 'E':
-    return None
-  elif datatype == 'N':
-    dtype = cPickle.load(f)
-    shape = cPickle.load(f)
-    strides = cPickle.load(f)
-    b = read_str(f)
-    array = np.ndarray(shape, buffer=b, strides=strides, dtype=dtype)
-    return array
-  elif datatype == 'M':
-    klass = cPickle.loads(read_str(f))
-    args = read(f)
-    return klass(**args)
-  elif datatype == 'T':
-    sz = read_int(f)
-    return tuple([read(f) for i in range(sz)])
-  elif datatype == 'L':
-    sz = read_int(f)
-    return [read(f) for i in range(sz)]
-  elif datatype == 'D':
-    sz = read_int(f)
-    lst = []
-    for i in range(sz):
-      k = read(f)
-      v = read(f)
-      lst.append((k, v))
-    return dict(lst)
-  elif datatype == 'F':
-    return read_function(f)
-  elif datatype == 'P':
-    res = cPickle.load(f)
-    return res
+  reader = type_to_reader.get(datatype)
+  if reader == None:
+    raise KeyError, 'Unknown datatype: "%s"' % datatype
+  return reader(f)
 
-  raise KeyError, 'Unknown datatype: "%s"' % datatype

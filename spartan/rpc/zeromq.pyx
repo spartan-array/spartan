@@ -10,16 +10,22 @@ import sys
 import fcntl
 import time
 import zmq
-from .common import Group, SocketBase
 from . import rlock
 from spartan import util
+from rlock cimport FastRLock
 
 POLLER = None
 POLLER_LOCK = rlock.FastRLock()
 PROFILER = None
 
+class Group(tuple):
+  pass
+
 def poller():
   global POLLER
+  if POLLER is not None:
+    return POLLER
+
   with POLLER_LOCK:
     if POLLER is None:
       util.log_debug('Started poller.. %s %s', os.getpid(), __file__)
@@ -36,21 +42,20 @@ CLOSED = 0
 CONNECTING = 1
 CONNECTED = 2
 
-class Socket(SocketBase):
-  __slots__ = ['_zmq', '_hostport', '_out', '_in', 'addr', '_status', '_lock']
 
+cdef class Socket:
+  #__slots__ = ['_zmq', '_hostport', '_out', '_in', 'addr', '_status', '_lock']
   def __init__(self, ctx, sock_type, hostport):
     socket_count[os.getpid()] += 1
-    #util.log_info('New socket... %s.%s -> %s [%s]',
-    #              socket.gethostname(), os.getpid(),  hostport, socket_count[os.getpid()])
-    #s = ''.join(traceback.format_stack())
-    #print >>sys.stderr, s
     self._zmq = ctx.socket(sock_type)
     self.addr = hostport
     self._out = collections.deque()
     self._lock = rlock.FastRLock()
-
     self._status = CLOSED
+
+  def register_handler(self, handler):
+    self._handler = handler
+
   def __repr__(self):
     return 'Socket(%s)' % ((self.addr,))
 
@@ -123,19 +128,19 @@ class Socket(SocketBase):
 
       poller().modify(self, zmq.POLLIN)
 
-  def handle_read(self, socket):
+  cpdef handle_read(self, Socket socket):
     self._handler(socket)
 
 
-class ServerSocket(Socket):
+cdef class ServerSocket(Socket):
   def __init__(self, ctx, sock_type, hostport):
     Socket.__init__(self, ctx, sock_type, hostport)
-    self._listen = False
+    self._listen = 0 
     self.addr = hostport
     self.bind()
   
   def listen(self):
-    self._listen = True
+    self._listen = 1 
 
   def send(self, msg):
     '''Send ``msg`` to a remote client.
@@ -162,8 +167,8 @@ class ServerSocket(Socket):
 
     poller().add(self, zmq.POLLIN)
 
-  def handle_read(self, socket):
-    if self._listen == False:
+  cpdef handle_read(self, Socket socket):
+    if self._listen == 0:
       #ignore the message if it's not been started.
       return
 
@@ -176,9 +181,8 @@ class ServerSocket(Socket):
     return self._zmq
 
 
-class StubSocket(SocketBase):
+cdef class StubSocket:
   '''Handles a single read from a client'''
-
   def __init__(self, source, socket, data):
     self._out = collections.deque()
     self.source = source
@@ -236,10 +240,10 @@ class ZMQPoller(threading.Thread):
     self.profiler = None
 
   def _run(self):
+    cdef unsigned long _poll_time = 1
+    cdef unsigned long MAX_TIMEOUT = 10
     self._running = True
     _poll = self._poller.poll
-    _poll_time = 1
-    MAX_TIMEOUT = 10
 
     while self._running:
       #if self.profiler: self.profiler.disable()

@@ -18,8 +18,42 @@ import types
 import weakref
 from .. import cloudpickle, util, core
 from ..node import Node, node_type
-from . import serialization, rlock
+from . import serialization, serialization_buffer, rlock
+from ..util import TIMER
+cimport zeromq
+from zeromq cimport Socket, ServerSocket, StubSocket
+from rlock cimport FastRLock
 
+#cdef extern from "time.h":
+#  cdef struct timespec:
+#    long int tv_sec
+#    long int tv_nsec
+
+#  int clock_gettime(int timerid, timespec *value)
+ 
+cdef extern from "pthread.h":
+  ctypedef struct pthread_mutex_t:
+    pass
+  
+  ctypedef struct pthread_cond_t:
+    pass
+  
+  int pthread_mutex_init(pthread_mutex_t *, void *)
+  int pthread_mutex_destroy(pthread_mutex_t *)
+  int pthread_mutex_lock(pthread_mutex_t *) nogil
+  int pthread_mutex_unlock(pthread_mutex_t *) nogil
+  
+  int pthread_cond_init(pthread_cond_t *, void *)
+  int pthread_cond_destroy(pthread_cond_t *)
+  int pthread_cond_signal(pthread_cond_t *) nogil
+  int pthread_cond_wait(pthread_cond_t *, pthread_mutex_t *) nogil
+
+  #int pthread_cond_timedwait(pthread_cond_t *, pthread_mutex_t *, const timespec *) nogil
+
+#CLOCK_REALTIME = 0
+#CLOCK_MONOTONIC = 1
+#DEF CLOCK_REALTIME = 0
+#DEF CLOCK_MONOTONIC = 1    
 
 CLIENT_PENDING = weakref.WeakKeyDictionary()
 SERVER_PENDING = weakref.WeakKeyDictionary()
@@ -27,10 +61,10 @@ SERVER_PENDING = weakref.WeakKeyDictionary()
 NO_RESULT = object()
 
 #DEFAULT_TIMEOUT = 1200
-DEFAULT_TIMEOUT = 60
-WARN_THRESHOLD = 10
+cdef unsigned long DEFAULT_TIMEOUT = 60
+cdef unsigned long  WARN_THRESHOLD = 10
 
-def set_default_timeout(seconds):
+cpdef set_default_timeout(unsigned long seconds):
   global DEFAULT_TIMEOUT
   DEFAULT_TIMEOUT = seconds
   util.log_info('Set default timeout to %s seconds.', DEFAULT_TIMEOUT)
@@ -48,19 +82,6 @@ class PickledData(object):
   '''
   _members = ['data']
 
-class SocketBase(object):
-  def send(self, blob): assert False
-  def recv(self): assert False
-  def flush(self): assert False
-  def close(self): assert False
-
-  def register_handler(self, handler):
-    'A handler() is called in response to read requests.'
-    self._handler = handler
-
-  # client
-  def connect(self): assert False
-
 
 def capture_exception(exc_info=None):
   if exc_info is None:
@@ -68,40 +89,56 @@ def capture_exception(exc_info=None):
   tb = traceback.format_exception(*exc_info)
   return RPCException(py_exc=''.join(tb).replace('\n', '\n:: '))
 
-
-class Group(tuple):
-  pass
-
-serialize_total = 0
 def serialize_to(obj, writer):
   with util.TIMER.rpc_serialize:
+    
+    #writer.write(serialize(obj))
+    pos = writer.tell()
+    try:
+      cPickle.dump(obj, writer, -1)
+    except (pickle.PicklingError, PickleError, TypeError):
+      writer.seek(pos)
+      cloudpickle.dump(obj, writer, -1)
+    """ 
     serialization.write(obj, writer)
-
+    """
+    
 def serialize(obj):
   with util.TIMER.serialize:
-    w = serialization.Writer()
+    """
+    w = serialization_buffer.Writer()
     serialization.write(obj, w)
-    data = w.getvalue()
-    return data
-  
+    return w.getvalue()
+    """
+    try:
+      return cPickle.dumps(obj, -1)
+    except (pickle.PicklingError, PickleError, TypeError):
+      return cloudpickle.dumps(obj, -1)
+    
 def read(f):
   with util.TIMER.rpc_read:
-    return serialization.read(f)
+    #return serialization.read(f)
+    return cPickle.load(f)
 
-class PendingRequest(object):
+cdef class PendingRequest:
   '''An outstanding RPC request on the server.
 
   Call done(result) when finished to send result back to client.
   '''
+  cdef StubSocket socket
+  cdef long rpc_id
+  cdef long created
+  cdef object finished
+  cdef object result
+
   def __init__(self, socket, rpc_id):
     self.socket = socket
     self.rpc_id = rpc_id
     self.created = time.time()
     self.finished = False
     self.result = NO_RESULT
-
-    SERVER_PENDING[self] = 1
-
+    #SERVER_PENDING[self] = 1 
+  
   def wait(self):
     while self.result is NO_RESULT:
       time.sleep(0.01)
@@ -119,7 +156,7 @@ class PendingRequest(object):
     
     #util.log_info('Finished %s, %s', self.socket.addr, self.rpc_id)
     #w = cStringIO.StringIO()
-    w = serialization.Writer()
+    w = serialization_buffer.Writer()
     cPickle.dump(header, w, -1)
     serialize_to(result, w)
     self.socket.send(w.getvalue())
@@ -152,21 +189,62 @@ class RemoteException(Exception):
   def __str__(self):
     return repr(self)
 
+cdef class Condition:
+  cdef pthread_mutex_t mutex
+  cdef pthread_cond_t cond
+  #cdef timespec now
+ 
+  def __init__(self):
+    pthread_mutex_init(&self.mutex, NULL)
+    pthread_cond_init(&self.cond, NULL)
+      
+  def acquire(self):
+    with nogil:
+      pthread_mutex_lock(&self.mutex)
+    
+  def release(self):
+    pthread_mutex_unlock(&self.mutex)
+    
+  def wait(self, timeout=1):
+    #clock_gettime(CLOCK_REALTIME, &self.now)
+    #self.now.tv_sec += timeout
+    with nogil:
+      #pthread_cond_timedwait(&self.cond, &self.mutex, &self.now)
+      pthread_cond_wait(&self.cond, &self.mutex)
+        
+  def notify(self):
+    pthread_cond_signal(&self.cond)
+      
+  def __del__(self):
+    pthread_mutex_destroy(&self.mutex)
+    pthread_cond_destroy(&self.cond)
 
-class Future(object):
+cdef class Future:
+  cdef object addr
+  cdef long rpc_id
+  cdef object have_result
+  cdef object result
+  cdef object finished_fn
+  cdef object _cv
+  cdef long _start
+  cdef long _finish
+  cdef long _deadline
+
   def __init__(self, addr, rpc_id, timeout=None):
-    self.addr = addr
-    self.rpc_id = rpc_id
-    self.have_result = False
-    self.result = None
-    self.finished_fn = None
-    self._cv = threading.Condition(lock=rlock.FastRLock())
-    self._start = time.time()
-    self._finish = time.time() + 1000000
-    if timeout is None:
-      timeout = DEFAULT_TIMEOUT
-    self._deadline = time.time() + timeout
-    CLIENT_PENDING[self] = 1
+    with util.TIMER.future_init:
+      self.addr = addr
+      self.rpc_id = rpc_id
+      self.have_result = False
+      self.result = None
+      self.finished_fn = None
+      #self._cv = threading.Condition(lock=rlock.FastRLock())
+      self._cv = Condition()
+      self._start = time.time()
+      self._finish = time.time() + 1000000
+      if timeout is None:
+        timeout = DEFAULT_TIMEOUT
+      self._deadline = time.time() + timeout
+    #CLIENT_PENDING[self] = 1
 
   def done(self, result=None):
     #util.log_info('Result... %s %s', self.addr, self.rpc_id)
@@ -234,7 +312,7 @@ class FnFuture(object):
 
 class FutureGroup(list):
   def wait(self):
-    results = []
+    cdef list results = []
     for f in self:
       #util.log_info('Waiting for %s', f)
       results.append(f.wait())
@@ -244,7 +322,12 @@ def wait_for_all(futures):
   return [f.wait() for f in futures]
 
 
-class Server(object):
+cdef class Server:
+  cdef Socket _socket
+  cdef dict _methods
+  cdef object _timers
+  cdef object _running
+
   def __init__(self, socket):
     self._socket = socket
     self._socket.register_handler(self.handle_read)
@@ -270,7 +353,7 @@ class Server(object):
   def serve(self):
     self.serve_nonblock()
     while self._running:
-      time.sleep(0.1)
+      time.sleep(0.01)
 
   def serve_nonblock(self):
 #    util.log_info('Running.')
@@ -287,12 +370,12 @@ class Server(object):
   def register_method(self, name, fn):
     self._methods[name] = fn
 
-  def handle_read(self, socket):
+  cpdef handle_read(self, StubSocket socket):
     #util.log_info('Reading...')
 
     data = socket.recv()
     #reader = cStringIO.StringIO(data)
-    reader = serialization.Reader(data)
+    reader = serialization_buffer.Reader(data)
     header = cPickle.load(reader)
 
     #util.log_info('Call[%s] %s %s', header['method'], self._socket.addr, header['rpc_id'])
@@ -317,10 +400,13 @@ class Server(object):
     util.log_debug('Server going down...')
     self._running = 0
     self._socket.close()
-    del self._socket
+    #del self._socket
 
 
-class ProxyMethod(object):
+cdef class ProxyMethod:
+  cdef Client client
+  cdef object method
+
   def __init__(self, client, method):
     self.client = client
     self.method = method
@@ -330,7 +416,12 @@ class ProxyMethod(object):
 #      util.log_info('%s::\n %s; \n\n\n %s', self.method, ''.join(traceback.format_stack()), request)
     return self.client.send(self.method, request, timeout)
 
-class Client(object):
+cdef class Client:
+  cdef Socket _socket
+  cdef dict _futures
+  cdef FastRLock _lock
+  cdef object _rpc_id
+  
   def __init__(self, socket):
     self._socket = socket
     self._socket.register_handler(self.handle_read)
@@ -348,14 +439,19 @@ class Client(object):
       header = { 'method' : method, 'rpc_id' : rpc_id }
 
       #w = cStringIO.StringIO()
-      w = serialization.Writer()
-      cPickle.dump(header, w, -1)
+      w = serialization_buffer.Writer()
+
+      
       if isinstance(request, PickledData):
-        w.write(request.data)
+        with util.TIMER.send_serialize:
+          cPickle.dump(header, w, -1)
+          w.write(request.data)
       else:
+        cPickle.dump(header, w, -1)
         serialize_to(request, w)
 
       data = w.getvalue()
+      
       f = Future(self.addr(), rpc_id, timeout)
       self._futures[rpc_id] = f
       #util.log_info('Send %s, %s', self.addr(), rpc_id)
@@ -371,10 +467,10 @@ class Client(object):
   def __getattr__(self, method_name):
     return ProxyMethod(self, method_name)
 
-  def handle_read(self, socket):
+  cpdef handle_read(self, Socket socket):
     data = socket.recv()
     #reader = cStringIO.StringIO(data)
-    reader = serialization.Reader(data)
+    reader = serialization_buffer.Reader(data)
     header = cPickle.load(reader)
     resp = read(reader)
     #resp = cPickle.load(reader)
@@ -391,10 +487,13 @@ def forall(clients, method, request, timeout=None):
 
   Returns a future wrapping all of the requests.
   '''
-  futures = []
-  pickled = PickledData(data=serialize(request))
-  for c in clients:
-    futures.append(getattr(c, method)(pickled, timeout=timeout))
+  cdef list futures = []
+  
+  with TIMER.serial_body:
+    pickled = PickledData(data=serialize(request))
+  
+  with TIMER.master_loop:
+    for c in clients:
+      futures.append(getattr(c, method)(pickled, timeout=timeout))
 
   return FutureGroup(futures)
-
