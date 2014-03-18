@@ -217,6 +217,30 @@ def slice_coo(X not None, tuple slices):
     return scipy.sparse.coo_matrix((data[idx_begin:idx_end], (rows[idx_begin:idx_end]-row_begin, cols[idx_begin:idx_end])), shape=tuple([slice.stop-slice.start for slice in slices]))
 
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
+def csr_update(data, update, slices):
+  '''
+  csr_matrix can't support fancing indexing like data[slices] = update.
+  This API uses hstack and vstack to implement to simulate fancing indexing. 
+  It's faster but can't support slicing with step is not 1. This should be 
+  enough for Spartan.
+  '''
+  upper_slice = [slice(0, slices[0].start), (0, data.shape[1])]
+  midleft_slice = [slice(slices[0].start, slices[0].stop), (0, slices[1].start)]
+  midright_slice = [slice(slices[0].start, slices[0].stop), slice(slices[1].end, data.shape[1])]
+  lower_slice = [slice(slices[0].stop, data.shape[0]), (0, data.shape[1])]
+  
+  if slices[1].start > 0:
+    update = scipy.sparse.hstack((data[midleft_slice], update), dtype = update.dtype)
+  if slices[1].end < data.shape[1]:
+    update = scipy.sparse.hstack((update, data[midright_slice]), dtype = update.dtype)
+  if slices[0].start > 0:
+    update = scipy.sparse.vstack((data[upper_slice], update), dtype = update.dtype)
+  if slices[0].end < data.shape[0]:
+    update = scipy.sparse.vstack((update, data[lower_slice]), dtype = update.dtype)
+
+  return update
+
+@cython.boundscheck(False) # turn of bounds-checking for entire function   
 def multiple_slice(X not None, list slices):
     if len(slices) == 0:
         return []
