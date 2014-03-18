@@ -8,7 +8,6 @@ from .. import blob_ctx
 from traits.api import Bool, Str, Instance, PythonValue, HasTraits
 
 class CheckpointExpr(Expr):
-  #_members = ['children', 'path', 'mode', 'ready']
   children = Instance(Expr) 
   path = Str 
   mode = Str

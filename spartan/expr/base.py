@@ -154,7 +154,6 @@ class Expr(Node):
   result of evaluating an expression is cached until the expression
   itself is reclaimed. 
   ''' 
-  #_members = ['expr_id', 'stack_trace']
   expr_id = PythonValue(None, desc="Integer or None")
   stack_trace = Instance(ExprTrace) 
 
@@ -445,7 +444,6 @@ class AsArray(Expr):
   This should be wrapped around most user-inputs that may be
   used in an array context, e.g. (``1 + x => map((as_array(1), as_array(x)), +)``)
   '''
-  #_members = ['val']
   val = PythonValue
 
   def label(self):
@@ -473,7 +471,6 @@ class AsArray(Expr):
 
 class Val(Expr):
   '''Convert an existing value to an expression.'''
-  #_members = ['val']
   val = PythonValue
 
   needs_cache = False
@@ -504,7 +501,6 @@ class CollectionExpr(Expr):
   all of the tuple, list or dictionary elements in this expression.
   '''
   needs_cache = False
-  #_members = ['vals']
   vals = Dict 
 
   def __str__(self):

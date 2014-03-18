@@ -14,7 +14,7 @@ import imp
 from spartan import util
 from spartan.util import Assert
 from spartan.node import Node
-from traits.api import PythonValue
+from traits.api import Str, List, Function, PythonValue
 
 var_id = iter(xrange(1000000))
 
@@ -24,19 +24,12 @@ def make_var():
   '''Return a new unique key for use as a variable name'''
   return 'k%d' % var_id.next()
 
-
 class LocalCtx(Node):
-  #_members = ['inputs']
   inputs = PythonValue
 
 class LocalExpr(Node):
   '''Represents an internal operation to be performed in the context of a tile.'''
-  #_members = ['deps']
-  deps = PythonValue
-
-  def __init__(self, *args, **kw):
-    super(LocalExpr, self).__init__(*args, **kw)
-    if self.deps is None: self.deps = []
+  deps = List() 
 
   def add_dep(self, v):
     self.deps.append(v)
@@ -47,15 +40,10 @@ class LocalExpr(Node):
 
 class LocalInput(LocalExpr):
   '''An externally supplied input.'''
-  #_members = ['idx']
-  idx = PythonValue
+  idx = Str() 
 
   def __str__(self):
     return 'V(%s)' % self.idx
-
-  def __init__(self, *args, **kw):
-    super(LocalInput, self).__init__(*args, **kw)
-    Assert.isinstance(self.idx, str)
 
   def evaluate(self, ctx):
     return ctx.inputs[self.idx]
@@ -73,7 +61,6 @@ class FnCallExpr(LocalExpr):
   Constants (axis of a reduction, datatype, etc), can be supplied via the ``kw``
   argument.
   '''
-  #_members = ['kw', 'fn', 'pretty_fn']
   kw = PythonValue
   fn = PythonValue
   pretty_fn = PythonValue
@@ -142,7 +129,6 @@ def compile_parakeet_source(src):
 
 
 class ParakeetExpr(LocalExpr):
-  #_members = ['deps', 'source']
   deps = PythonValue
   source = PythonValue
 

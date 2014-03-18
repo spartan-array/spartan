@@ -80,7 +80,6 @@ class SliceExpr(base.Expr):
     idx: `tuple` (for slicing) or `Expr` (for bool/integer indexing)
     broadcast_to: shape to broadcast to before slicing
   '''
-  #_members = ['src', 'idx', 'broadcast_to']
   src = Instance(base.Expr) 
   idx = PythonValue(None, desc="Tuple or Expr") 
   broadcast_to = PythonValue 

@@ -124,7 +124,6 @@ def _compute_strata(V):
   return strata
 
 class NetflixSGD(expr.Expr):
-  #_members = ['V', 'M', 'U']
   V = PythonValue
   M = PythonValue
   U = PythonValue

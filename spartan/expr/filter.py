@@ -20,7 +20,6 @@ class FilterExpr(Expr):
     src: `Expr` to index into
     idx: `tuple` (for slicing) or `Expr` (for bool/integer indexing) 
   '''
-  #_members = ['src', 'idx']
   src = Instance(Expr) 
   idx = PythonValue(None, desc="Tuple or Expr")
 

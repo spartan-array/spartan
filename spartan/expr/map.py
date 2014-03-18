@@ -72,7 +72,6 @@ class MapExpr(Expr):
   :ivar op: A `LocalExpr` to evaluate on the input(s)
   :ivar children: One or more `Expr` to map over.
   '''
-  #_members = ['children', 'op']
   children = Instance(DictExpr) 
   op = Instance(LocalExpr) 
 

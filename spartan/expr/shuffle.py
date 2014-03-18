@@ -96,7 +96,6 @@ def notarget_mapper(ex, array=None, map_fn=None, source=None, fn_kw=None):
 
 
 class ShuffleExpr(Expr):
-  #_members = ['array', 'map_fn', 'target', 'tile_hint', 'fn_kw']
   array = PythonValue(None, desc="DistArray or Expr")
   map_fn = Function 
   target = PythonValue(None, desc="DistArray or Expr") 

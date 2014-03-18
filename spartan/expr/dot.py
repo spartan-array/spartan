@@ -69,7 +69,6 @@ def _dot_numpy(array, ex, numpy_data=None):
   yield (ex[0].add_dim(), np.dot(l, r))
 
 class DotExpr(Expr):
-  #_members = ['matrix_a', 'matrix_b', 'tile_hint']
   matrix_a = PythonValue(None, desc="np.ndarray or Expr")
   matrix_b = PythonValue(None, desc="np.ndarray or Expr")
   tile_hint = PythonValue(None, desc="Tuple or None")

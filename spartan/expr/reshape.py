@@ -142,7 +142,6 @@ class Reshape(distarray.DistArray):
       return new
 
 class ReshapeExpr(Expr):
-  #_members = ['array', 'new_shape', 'tile_hint']
   array = Instance(Expr) 
   new_shape = Tuple 
   tile_hint = PythonValue(None, desc="None or Tuple")

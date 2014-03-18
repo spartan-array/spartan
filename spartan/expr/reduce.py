@@ -58,7 +58,6 @@ def _reduce_mapper(ex, children, op, axis, output):
   return LocalKernelResult(result=[])
 
 class ReduceExpr(Expr):
-  #_members = ['children', 'axis', 'dtype_fn', 'op', 'accumulate_fn', 'tile_hint']
   children = Instance(DictExpr) 
   axis = PythonValue(None, desc="Integer or None")
   dtype_fn = Function

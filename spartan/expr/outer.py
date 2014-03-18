@@ -5,9 +5,8 @@ from traits.api import Instance, Dict, Function, PythonValue, HasTraits
 
 
 class OuterProductExpr(Expr):
-  #_members = ['children', 'map_fn', 'map_fn_kw', 'reduce_fn', 'reduce_fn_kw']
   chidlren = Instance(Expr) 
-  map_fn = PythonValue 
+  map_fn = Function 
   map_fn_kw = PythonValue 
   reduce_fn = PythonValue 
   reduce_fn_kw = PythonValue 

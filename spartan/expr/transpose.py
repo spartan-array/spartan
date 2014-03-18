@@ -58,7 +58,6 @@ class Transpose(distarray.DistArray):
     return base_tile.transpose()
 
 class TransposeExpr(Expr):
-  #_members = ['array', 'tile_hint']
   array = Instance(Expr) 
   tile_hint = PythonValue(None, desc="Tuple or None") 
 

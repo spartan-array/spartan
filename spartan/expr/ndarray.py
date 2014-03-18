@@ -6,7 +6,6 @@ from .. import util
 from traits.api import Tuple, Bool, PythonValue, HasTraits
 
 class NdArrayExpr(Expr):
-  #_members = ['_shape', 'sparse', 'dtype', 'tile_hint', 'reduce_fn']
   _shape = Tuple 
   sparse = Bool 
   dtype = PythonValue(None, desc="np.type or type")

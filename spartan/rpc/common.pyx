@@ -72,7 +72,6 @@ cpdef set_default_timeout(unsigned long seconds):
 
 
 class RPCException(Node):
-  #_members = ['py_exc']
   py_exc = PythonValue
 
 class PickledData(Node):
@@ -80,7 +79,6 @@ class PickledData(Node):
   Helper class: indicates that this message has already been pickled,
   and should be sent as is, rather than being re-pickled.
   '''
-  #_members = ['data']
   data = PythonValue
 
 

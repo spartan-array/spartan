@@ -4,8 +4,7 @@ Provides pretty printing, equality testing, hashing and keyword initialization.
 '''  
 from traits.api import HasTraits
 from traits.traits import CTrait
-
-member_caches = {}
+from spartan import util
 
 def node_str(node):
   member_strings = []
@@ -31,24 +30,18 @@ def node_iteritems(node):
     yield (k, getattr(node, k, None))
 
 
+@util.memoize
 def get_members(klass):
-  global member_caches
-  if klass in member_caches:
-    return member_caches[klass]
-  
   members = []
   for k, v in klass.__dict__["__base_traits__"].iteritems():
     if isinstance(v, CTrait) and k != "trait_added" and k != "trait_modified":
       members.append(k)
-  
-  member_caches[klass] = members
   return members
 
 
 class Node(HasTraits):
   def __init__(self, *args, **kw):
     super(Node, self).__init__(*args, **kw)
-    #self.members = get_members(self.__class__)
 
   @property
   def members(self):
@@ -57,9 +50,9 @@ class Node(HasTraits):
   @property
   def node_type(self):
     return self.__class__.__name__
-
-  def __str__(self):
-    return node_str(self)
   
-  def __repr__(self):
+  def pretty(self):
     return node_str(self)
+
+Node.__str__ = Node.pretty
+Node.__repr__ = Node.pretty
