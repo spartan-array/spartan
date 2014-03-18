@@ -216,11 +216,12 @@ def merge(old_tile, subslice, update, reducer):
 
   assert not isinstance(update, np.ma.MaskedArray)
  
+  # update(sparse) to old_tile(sparse or dense)
   if scipy.sparse.issparse(update):
     if old_tile.type == TYPE_DENSE:
       #util.log_debug('Update sparse to dense')
       update_coo = update.tocoo()
-      sparse.sparse_to_dense_update(old_tile.data, old_tile.mask, update_coo.row, update_coo.col, update_coo.data, 
+      sparse.sparse_to_dense_update(old_tile.data, old_tile.mask, update_coo.row, update_coo.col, update_coo.data,
                                         sparse.REDUCE_ADD)
       #util.log_info('Update %s', update)
       #util.log_info('Update COO %s', update_coo) 
@@ -238,13 +239,15 @@ def merge(old_tile, subslice, update, reducer):
           old_tile.data = update
       else:
         if reducer is not None:  
+          old_tile.data = old_tile.data.tocsr()
+          update = reducer(old_tile.data[subslice], update.tocsr()).tocsr()
           old_tile.data[subslice] = reducer(old_tile.data[subslice], update)
         else:
-          old_tile.data = old_tile.data.tolil()
-          update = update.tolil()
-          old_tile.data[subslice] = update
+          old_tile.data = sparse.csr_update(old_tile.data.tocsr(),
+                                            update.tocsr(), subslice)
     return old_tile
     
+  # update(dense) to old_tile(sparse or dense)
   if old_tile.type == TYPE_DENSE:
     # initialize:
     # old_data[subslice] = data
@@ -270,7 +273,7 @@ def merge(old_tile, subslice, update, reducer):
     
     old_tile.mask[subslice] = True
   else:
-    if old_tile.data is not None and old_tile.data.format == 'coo':
+    if old_tile.data is not None: #and old_tile.data.format == 'coo':
       old_tile.data = old_tile.data.tolil() 
     #util.log_info('Update dense to sparse')
     # TODO (SPARSE UPDATE)!!!

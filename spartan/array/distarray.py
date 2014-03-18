@@ -332,6 +332,7 @@ class DistArrayImpl(DistArray):
       tgt.mask = 0
     elif output_type == SPARSE:
       tgt = scipy.sparse.lil_matrix(region.shape, dtype=self.dtype)
+      #tgt = scipy.sparse.csr_matrix(region.shape, dtype=self.dtype)
     else:
       tgt = np.ndarray(region.shape, dtype=self.dtype)
     
@@ -340,7 +341,11 @@ class DistArrayImpl(DistArray):
       #util.log_info('ex:%s region:%s intersection:%s dst_slice:%s result:%s', ex, region, intersection, dst_slice, result)
       #util.log_info('tgt.shape:%s result.shape:%s tgt.type:%s result.type:%s', tgt[dst_slice].shape, result.shape, type(tgt), type(result))
       if np.all(result.shape):
-        tgt[dst_slice] = result
+        if output_type == SPARSE:
+          tgt = sparse.csr_update(tgt.tocsr(), result.tocsr(), dst_slice)
+        else:
+          tgt[dst_slice] = result
+
 
     return tgt
     #return tile.data[]
@@ -511,8 +516,8 @@ class LocalWrapper(DistArray):
   def __init__(self, data):
     self._data = np.asarray(data)
     self.bad_tiles = []
-    Assert.isinstance(data, (np.ndarray, int, float))
     #assert not isinstance(data, core.TileId)
+    Assert.isinstance(data, (np.ndarray, int, float))
     #print 'Wrapping: %s %s (%s)' % (data, type(data), np.isscalar(data))
     #print 'DATA: %s' % type(self._data)
 

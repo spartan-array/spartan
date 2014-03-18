@@ -10,6 +10,10 @@ in place, and therefore should be used with care.
 
 import numpy as np
 import scipy.sparse as sp
+import os
+import math
+import ast
+import struct
 
 from spartan import rpc
 from spartan.array import distarray, extent
@@ -19,6 +23,7 @@ from ..node import node_type
 from ..util import Assert
 from .base import Expr
 from .ndarray import ndarray
+from .shuffle import shuffle
 
 
 def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
@@ -33,7 +38,6 @@ def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
     futures.append(source.update(intersection, v, wait=False))
 
   return LocalKernelResult(result=None, futures=futures)
-
 
 @node_type
 class WriteArrayExpr(Expr):
@@ -65,7 +69,6 @@ class WriteArrayExpr(Expr):
 
     return array
 
-
 def write(array, src_slices, data, dst_slices):
   '''
   array[src_slices] = data[dst_slices]
@@ -80,42 +83,331 @@ def write(array, src_slices, data, dst_slices):
   return WriteArrayExpr(array = array, src_slices = src_slices,
                         data = data, dst_slices = dst_slices)
 
-# TODO: Many applications use matlab format. Maybe we should support it.
-def from_file(fn, file_type = 'numpy'):
+def _local_load_reducer(old, new):
+  return new + old
+
+#def _local_read_dense_mm(ex, fn, data_begin, data_size):
+
+def _local_read_sparse_mm(array, ex, fn, data_begin):
+  '''
+  1. Noted that Matrix Market format doesn't require (row, col) to be sorted.
+     If the file is sorted (by either row or col), each worker will return
+     only a part of the array. If the file is unsorted, each worker may
+     return a very big and sparser sub-array of the original array. In the
+     worst case, the sub-array can be as large as the original array but
+     sparser.
+  2. We can't know how many lines without reading the whole file. So we simply
+     decide the region this worker should read based on the file size.
+  '''
+  data_size = os.path.getsize(fn) - data_begin
+  array_size = np.product(array.shape)
+  begin = extent.ravelled_pos(ex.ul, array.shape)
+  begin = math.ceil(((begin * 1.0) / array_size) * data_size) + data_begin
+  end = extent.ravelled_pos([(i - 1) for i in ex.lr], array.shape)
+  end = math.floor(((end * 1.0) / array_size) * data_size) + data_begin
+
+  ul = [array.shape[0], array.shape[1]]
+  lr = [0, 0]
+  row = []
+  col = []
+  data = []
+  with open(fn) as fp:
+    # We assume the maximum length of a line is less than 256.
+    if begin - 256 < data_begin:
+      fp.seek(data_begin)
+    else:
+      # Try to find the last newline before begin
+      fp.seek(begin - 256)
+      pos = fp.tell()
+      while pos <= begin:
+        real_begin = pos
+        line = fp.readline()
+        pos = fp.tell()
+      fp.seek(real_begin)
+
+    pos = fp.tell()
+    for line in fp:
+      pos += len(line)
+      if pos > end + 1: # +1 in case end locates on \n
+        break
+      (_row, _col), val = _extract_mm_coordinate(line)
+      _row -= 1
+      _col -= 1
+      row.append(_row)
+      col.append(_col)
+      data.append(float(val))
+      ul[0] = _row if _row < ul[0] else ul[0]
+      ul[1] = _col if _col < ul[1] else ul[1]
+      lr[0] = _row if _row > lr[0] else lr[0]
+      lr[1] = _col if _col > lr[1] else lr[1]
+
+  # Adjust row, col based on the ul of this submatrix.
+  for i in range(len(row)):
+    row[i] -= ul[0]
+    col[i] -= ul[1]
+
+  new_ex = extent.create(ul, [lr[0] + 1, lr[1] + 1], array.shape)
+  new_array = sp.coo_matrix((data, (row, col)), new_ex.shape).tocsr()
+  return new_ex, new_array
+
+def _readmm_mapper(array, ex, fn = None, data_begin = None):
+  if array.sparse:
+    new_ex, new_array = _local_read_sparse_mm(array, ex, fn, data_begin)
+  else:
+    pass
+
+  yield new_ex, new_array
+
+def _extract_mm_coordinate(shape_info):
+  shape_info = shape_info.split()
+  shape = [int(i) for i in shape_info[:-1]]
+  edges = shape_info[-1]
+  return (shape, edges)
+
+def _parse_mm_header(fn, sparse_threshold = 0.01):
+  with open(fn) as fp:
+    line = fp.readline().strip()
+    header = line
+    while line[0] == '%':
+      line = fp.readline()
+    shape_info = line
+    data_begin = fp.tell()
+
+  if header.find('real'):
+    dtype = np.float
+  elif header.find('integer'):
+    dtype = np.int
+
+  shape, edges = _extract_mm_coordinate(shape_info)
+  edges = int(edges)
+  if (edges * 1.0) / np.product(shape) < sparse_threshold:
+    sparse = True
+  else:
+    sparse = False
+
+  return (shape, dtype, sparse, data_begin)
+
+def _bulk_read(fp, size, bulk_size = 2**25):
+  '''
+  size must be 4, 8, 16 or 32. build_size must be 2^n
+  '''
+  assert(size == 4 or size == 8 or size == 16 or size == 32)
+  while True:
+    data = fp.read(bulk_size)
+    if not data:
+      break
+    tell = 0
+    data_len = len(data)
+    while tell + size <= data_len:
+      tell += size
+      yield data[(tell - size):tell]
+
+def _local_read_sparse_npy(array, ex, fn):
+  '''
+  1. Noted that coo_matrix format doesn't require row[] or col[] to be sorted.
+     If one of row[] or col[] is sorted (by either row or col), each worker will
+     return only a part of the array. If the file is unsorted, each worker may
+     return a very big and sparser sub-array of the original array. In the worst
+     case, the sub-array can be as large as the original array but sparser.
+  2. For numpy format, we can evenly distribute the files we need to read to
+     workers.
+  '''
+
+  data_begin = {}
+  dtype = {}
+  dtype_size = {}
+  dtype_format = {}
+  shape = {}
+  fp = {}
+  read_next = {}
+
+  shape['row'], dtype['row'], data_begin['row'] = _parse_npy_header(fn + '_row.npy')
+  shape['col'], dtype['col'], data_begin['col'] = _parse_npy_header(fn + '_col.npy')
+  shape['data'], dtype['data'], data_begin['data'] = _parse_npy_header(fn + '_data.npy')
+
+  item_count = np.product(array.shape)
+  begin_item = extent.ravelled_pos(ex.ul, array.shape)
+  begin_item = int(math.ceil(((begin_item * 1.0) / item_count) * shape['data'][0]))
+  end_item = extent.ravelled_pos([(i - 1) for i in ex.lr], array.shape)
+  end_item = int(math.floor((end_item * 1.0) / item_count * shape['data'][0])) + 1
+  end_item = shape['data'][0] if end_item > shape['data'][0] else end_item
+
+  ul = [array.shape[0], array.shape[1]]
+  lr = [0, 0]
+  row = []
+  col = []
+  data = []
+  fp['row'] = open(fn + '_row.npy')
+  fp['col'] = open(fn + '_col.npy')
+  fp['data'] = open(fn + '_data.npy')
+  dtype_name['float64':'d', 'float32':'f', 'int64':'f', 'int32':'i']
+
+  for k, v in data_begin.iteritems():
+    dtype_size[k] = dtype[k].itemsize
+    fp[k].seek(v + begin_item * dtype_size[k])
+    read_next[k] = _bulk_read(fp[k], dtype_size[k])
+    dtype[k] = dtype_name[dtype[k]]
+
+  for i in range(begin_item, end_item):
+    _row = struct.unpack(dtype['row'], read_next['row'].next())[0]
+    row.append(_row)
+    _col = struct.unpack(dtype['col'], read_next['col'].next())[0]
+    col.append(_col)
+    _data = struct.unpack(dtype['data'], read_next['data'].next())[0]
+    data.append(_data)
+
+    ul[0] = _row if _row < ul[0] else ul[0]
+    ul[1] = _col if _col < ul[1] else ul[1]
+    lr[0] = _row if _row > lr[0] else lr[0]
+    lr[1] = _col if _col > lr[1] else lr[1]
+
+  for i in range(len(row)):
+    row[i] -= ul[0]
+    col[i] -= ul[1]
+
+  new_ex = extent.create(ul, [lr[0] + 1, lr[1] + 1], array.shape)
+  new_array = sp.coo_matrix((data, (row, col)), new_ex.shape).tocsr()
+  fp['row'].close()
+  fp['col'].close()
+  fp['data'].close()
+
+  return (new_ex, new_array)
+
+def _readnpy_mapper(array, ex, fn = None):
+  if array.sparse:
+    new_ex, new_array = _local_read_sparse_npy(array, ex, fn)
+  else:
+    pass
+
+  yield (new_ex, new_array)
+
+def _parse_npy_header(fn):
+  with open(fn) as fp:
+    fp.seek(8) # Skip magic
+    dict_len = ord(fp.read(1)) + ord(fp.read(1)) * 256
+    dict_str = fp.read(dict_len)
+    dict_cnt = ast.literal_eval(dict_str)
+    data_begin = fp.tell()
+
+  return (dict_cnt['shape'], np.dtype(dict_cnt['descr']), data_begin)
+
+def from_file_parallel(fn, file_format = 'mm', sparse = True, tile_hint = None):
+  '''
+  Make a distarray from a file or files. The file(s) will be read by workers.
+  Therefore, the file(s) should be located in a shared file system such as HDFS.
+
+  This API currently supports:
+    numpy(sparse)
+    Matrix Market format(sparse).
+
+  Matrix Market:
+    http://math.nist.gov/MatrixMarket/formats.html
+    Sample Python code to save a coo_matrix to a Matrix Market format file:
+      scipy.io.mmwrite('xxx.mtx', coo)
+
+  Numpy:
+    Since numpy format doesn't actually support sparse arrays, we assume that
+    there are four npy files if the file format is numpy. These files store row,
+    col, data and shape for a coo_matrix. Their file name should be fn_row.npy,
+    fn_col.npy, fn_data.npy and fn_shape.npy where fn is the first argument of
+    this API. We also ask at one of fn_row.npy and fn_col.npy is sorted.
+    Sample python code to save a coo_matirx:
+      numpy.save('xxx_row.npy', coo.row)
+      numpy.save('xxx_col.npy', coo.col)
+      numpy.save('xxx_data.npy', astype(coo.data.astype(numpy.float32)))
+      numpy.save('xxx_shape.npy', numpy.asarray(coo.shape, dtype = numpy.float32))
+
+  Args
+    fn: `file name`
+    file_format: `The format of fn`
+    sparse: `Sparse array or not`
+    tile_hint: `tile hint`
+  Return
+    Expr
+  '''
+
+  if file_format == 'numpy':
+    shape = list(np.load(fn + '_shape.npy'))
+    if sparse:
+      mapper = _readnpy_mapper
+      reducer = _local_load_reducer
+      _shape, dtype, _data_begin = _parse_npy_header(fn + '_data.npy')
+      kw = {'fn': fn}
+    else:
+      raise NotImplementedError("Only support sparse numpy now.")
+  elif file_format == 'mm':
+    shape, dtype, sparse, data_begin = _parse_mm_header(fn)
+    if not sparse:
+      raise NotImplementedError("Only support sparse mm now.")
+    if len(shape) != 2:
+      raise NotImplementedError("Only support two-dimension sparse mm now.")
+    mapper = _readmm_mapper
+    reducer = _local_load_reducer
+    kw = {'fn' : fn, 'data_begin' : data_begin}
+  else:
+    raise NotImplementedError("Only support mm now. Got %s" % file_type)
+
+  array = ndarray(shape = shape, dtype = dtype, sparse = sparse)
+  target = ndarray(shape = shape, dtype = dtype, sparse = sparse,
+                   tile_hint = tile_hint, reduce_fn = reducer)
+  return shuffle(array, fn = mapper, kw = kw, target = target)
+
+def from_file(fn, file_type = 'numpy', sparse = True, tile_hint = None):
   '''
   Make a distarray from a file.
-  Currently support npy/npz.
 
-  :param fn: `file name`
-  :rtype: `Expr`
-  
+  This API Currently supports:
+    numpy(dense/sparse)
+    Matrix Market format(dense/sparse).
+
+  The detail file format descriptions are in the comment in from_file_parallel().
+
+  Args
+    fn: `file name`
+    file_format: `The format of fn`
+    sparse: `Sparse array or not`
+    tile_hint: `tile hint`
+  Return
+    Expr
   '''
 
   if file_type == 'numpy':
-    npa = np.load(fn)
-    if fn.endswith("npz"):
-      # We expect only one npy in npz
-      for k, v in npa.iteritems():
-        fn = v
-      npa.close()
-      npa = fn
+    if sparse:
+    else:
+      npa = np.load(fn)
+      if fn.endswith("npz"):
+        # We expect only one npy in npz
+        for k, v in npa.iteritems():
+          fn = v
+        npa.close()
+        npa = fn
+  elif file_type == 'mm':
+    npa = scipy.io.mmread(path)
+    if sp.issparse(npa) and npa.dtype == np.float64:
+      npa = npa.astype(np.float32)
   else:
     raise NotImplementedError("Only support npy/npz now. Got %s" % file_type)
 
-  return from_numpy(npa)
+  return from_numpy(npa, tile_hint)
 
-def from_numpy(npa):
+def from_numpy(npa, tile_hint = None):
   '''
   Make a distarray from a numpy array
 
-  :param npa: `numpy.ndarray`
-  :rtype: `Expr`
-  
+  Args
+    npa: `numpy.ndarray`
+    tile_hint: `tile hint`
+  Return
+    Expr
   '''
   if (not isinstance(npa, np.ndarray)) and (not sp.issparse(npa)):
     raise TypeError("Expected ndarray, got: %s" % type(npa))
   
-  array = ndarray(shape = npa.shape, dtype = npa.dtype, sparse = sp.issparse(npa))
+  # if the sparse type can't support slice, we need to convert it to another type.
+  if sp.issparse(npa):
+    npa = npa.tocsr()
+
+  array = ndarray(shape = npa.shape, dtype = npa.dtype, sparse = sp.issparse(npa), tile_hint = tile_hint)
   slices = tuple([slice(0, i) for i in npa.shape])
 
   return write(array, slices, npa, slices)
