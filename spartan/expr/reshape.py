@@ -8,11 +8,11 @@ import scipy.sparse as sp
 from spartan import rpc
 from .base import Expr, lazify
 from .. import master, blob_ctx, util
-from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from ..array import extent, tile, distarray
 from ..core import LocalKernelResult
 from .shuffle import target_mapper
+from traits.api import PythonValue, Instance, Tuple
 
 def _ravelled_ex(ul, lr, shape):
   ravelled_ul = extent.ravelled_pos(ul, shape)
@@ -141,9 +141,11 @@ class Reshape(distarray.DistArray):
             new[new_r,new_c] = tile[i,j]
       return new
 
-@node_type
 class ReshapeExpr(Expr):
-  _members = ['array', 'new_shape', 'tile_hint']
+  #_members = ['array', 'new_shape', 'tile_hint']
+  array = Instance(Expr) 
+  new_shape = Tuple 
+  tile_hint = PythonValue(None, desc="None or Tuple")
 
   def __str__(self):
     return 'Reshape[%d] %s to %s' % (self.expr_id, self.expr, self.new_shape)

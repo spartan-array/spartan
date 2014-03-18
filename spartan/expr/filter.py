@@ -8,13 +8,11 @@ import numpy as np
 from .. import util, blob_ctx
 from ..array import extent, tile, distarray
 from ..core import LocalKernelResult
-from ..node import node_type
 from ..util import Assert, join_tuple
 from .base import Expr, ListExpr, TupleExpr
 from . import base
+from traits.api import Instance, PythonValue
 
-
-@node_type
 class FilterExpr(Expr):
   '''Represents an indexing operation.
   
@@ -22,10 +20,12 @@ class FilterExpr(Expr):
     src: `Expr` to index into
     idx: `tuple` (for slicing) or `Expr` (for bool/integer indexing) 
   '''
-  _members = ['src', 'idx']
+  #_members = ['src', 'idx']
+  src = Instance(Expr) 
+  idx = PythonValue(None, desc="Tuple or Expr")
 
-  def node_init(self):
-    Expr.node_init(self)
+  def __init__(self, *args, **kw):
+    super(FilterExpr, self).__init__(*args, **kw)
     assert not isinstance(self.src, ListExpr)
     assert not isinstance(self.idx, ListExpr)
     assert not isinstance(self.idx, TupleExpr)

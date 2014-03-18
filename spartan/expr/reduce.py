@@ -8,13 +8,12 @@ import numpy as np
 import collections
 
 from ..array import extent, distarray
-from ..expr.local import make_var, LocalReduceExpr, LocalInput, LocalCtx
-from ..node import node_type
+from ..expr.local import make_var, LocalExpr, LocalReduceExpr, LocalInput, LocalCtx
 from ..util import Assert
 from . import broadcast
 from .base import Expr, DictExpr
 from ..core import LocalKernelResult
-
+from traits.api import Instance, Function, PythonValue
 
 def _reduce_mapper(ex, children, op, axis, output):
   '''Run a local reducer for a tile, and update the appropiate 
@@ -58,12 +57,16 @@ def _reduce_mapper(ex, children, op, axis, output):
   output.update(dst_extent, local_reduction)
   return LocalKernelResult(result=[])
 
-@node_type
 class ReduceExpr(Expr):
-  _members = ['children', 'axis', 'dtype_fn', 'op', 'accumulate_fn']
-  
-  def node_init(self):
-    Expr.node_init(self)
+  #_members = ['children', 'axis', 'dtype_fn', 'op', 'accumulate_fn']
+  children = Instance(DictExpr) 
+  axis = PythonValue(None, desc="Integer or None")
+  dtype_fn = Function
+  op = Instance(LocalExpr) 
+  accumulate_fn = PythonValue(None, desc="Function or ReduceExpr")
+
+  def __init__(self, *args, **kw):
+    super(ReduceExpr, self).__init__(*args, **kw)
     assert self.dtype_fn is not None
     assert isinstance(self.children, DictExpr)
 

@@ -1,15 +1,18 @@
 from .base import Expr, lazify
 from ..config import FLAGS
 from .. import master, util
-from ..node import node_type
 from .fio import save
 from ..array.distarray import from_replica
 from fio import partial_load, load
 from .. import blob_ctx
+from traits.api import Bool, Str, Instance, PythonValue, HasTraits
 
-@node_type
 class CheckpointExpr(Expr):
-  _members = ['children', 'path', 'mode', 'ready']
+  #_members = ['children', 'path', 'mode', 'ready']
+  children = Instance(Expr) 
+  path = Str 
+  mode = Str
+  ready = Bool 
 
   def __str__(self):
     return 'checkpoint(expr_id=%s, path=%s)' % (self.expr_id, self.disk)
@@ -52,4 +55,3 @@ def checkpoint(x, mode='disk'):
   :rtype: `Expr`
   '''
   return CheckpointExpr(children=lazify(x), path=FLAGS.checkpoint_path, mode=mode, ready=False)
-     

@@ -17,8 +17,9 @@ import traceback
 import types
 import weakref
 from .. import cloudpickle, util, core
-from ..node import Node, node_type
+from ..node import Node
 from . import serialization, rlock
+from traits.api import PythonValue
 
 
 CLIENT_PENDING = weakref.WeakKeyDictionary()
@@ -36,17 +37,17 @@ def set_default_timeout(seconds):
   util.log_info('Set default timeout to %s seconds.', DEFAULT_TIMEOUT)
 
 
-@node_type
-class RPCException(object):
-  _members = ['py_exc']
+class RPCException(Node):
+  #_members = ['py_exc']
+  py_exc = PythonValue
 
-@node_type
-class PickledData(object):
+class PickledData(Node):
   '''
   Helper class: indicates that this message has already been pickled,
   and should be sent as is, rather than being re-pickled.
   '''
-  _members = ['data']
+  #_members = ['data']
+  data = PythonValue
 
 class SocketBase(object):
   def send(self, blob): assert False

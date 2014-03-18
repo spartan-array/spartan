@@ -3,7 +3,7 @@ from . import broadcast
 from ..util import Assert
 from ..array import distarray, extent
 from . import base
-
+from traits.api import Instance, Tuple, PythonValue
 
 def _slice_mapper(ex, **kw):
   '''
@@ -72,7 +72,6 @@ class Slice(distarray.DistArray):
     return self.base.fetch(offset)
 
 
-@node.node_type
 class SliceExpr(base.Expr):
   '''Represents an indexing operation.
 
@@ -81,10 +80,13 @@ class SliceExpr(base.Expr):
     idx: `tuple` (for slicing) or `Expr` (for bool/integer indexing)
     broadcast_to: shape to broadcast to before slicing
   '''
-  _members = ['src', 'idx', 'broadcast_to']
+  #_members = ['src', 'idx', 'broadcast_to']
+  src = Instance(base.Expr) 
+  idx = PythonValue(None, desc="Tuple or Expr") 
+  broadcast_to = PythonValue 
 
-  def node_init(self):
-    base.Expr.node_init(self)
+  def __init__(self, *args, **kw):
+    super(SliceExpr, self).__init__(*args, **kw)
     assert not isinstance(self.src, base.ListExpr)
     assert not isinstance(self.idx, base.ListExpr)
     assert not isinstance(self.idx, base.TupleExpr)

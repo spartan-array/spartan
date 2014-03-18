@@ -10,12 +10,13 @@ import sys
 import traceback
 import numpy as np
 
-from ..node import Node, node_type
+from ..node import Node
 from .. import blob_ctx, node, util
 from ..util import Assert, copy_docstring
 from ..array import distarray
 from ..config import FLAGS
 from ..rpc import TimeoutException
+from traits.api import Dict, Instance, Int, PythonValue
 
 class NotShapeable(Exception):
   '''
@@ -140,7 +141,7 @@ class ExprTrace(object):
 
 eval_cache = EvalCache()
 
-class Expr(object):
+class Expr(Node):
   '''
   Base class for all expressions.
   
@@ -153,7 +154,9 @@ class Expr(object):
   result of evaluating an expression is cached until the expression
   itself is reclaimed. 
   ''' 
-  _members = ['expr_id', 'stack_trace']
+  #_members = ['expr_id', 'stack_trace']
+  expr_id = PythonValue(None, desc="Integer or None")
+  stack_trace = Instance(ExprTrace) 
 
   # should evaluation of this object be cached
   needs_cache = True
@@ -250,7 +253,8 @@ class Expr(object):
   def __del__(self):
     eval_cache.deregister(self.expr_id)
 
-  def node_init(self):
+  def __init__(self, *args, **kw):
+    super(Expr, self).__init__(*args, **kw)
     #assert self.expr_id is not None
     if self.expr_id is None:
       self.expr_id = unique_id.next()
@@ -435,14 +439,14 @@ Expr.__rmul__ = Expr.__mul__
 Expr.__rdiv__ = Expr.__div__
 
 
-@node_type
 class AsArray(Expr):
   '''Promote a value to be array-like.
 
   This should be wrapped around most user-inputs that may be
   used in an array context, e.g. (``1 + x => map((as_array(1), as_array(x)), +)``)
   '''
-  _members = ['val']
+  #_members = ['val']
+  val = PythonValue
 
   def label(self):
     return self.val
@@ -467,10 +471,10 @@ class AsArray(Expr):
     return 'V(%s)' % self.val
 
 
-@node_type
 class Val(Expr):
   '''Convert an existing value to an expression.'''
-  _members = ['val']
+  #_members = ['val']
+  val = PythonValue
 
   needs_cache = False
 
@@ -500,7 +504,8 @@ class CollectionExpr(Expr):
   all of the tuple, list or dictionary elements in this expression.
   '''
   needs_cache = False
-  _members = ['vals']
+  #_members = ['vals']
+  vals = Dict 
 
   def __str__(self):
     return '%s(%s)' % (self.node_type, self.vals,)
@@ -525,7 +530,6 @@ class CollectionExpr(Expr):
     return iter(self.vals)
 
 
-@node_type
 class DictExpr(CollectionExpr):
   def iteritems(self): return self.vals.iteritems()
   def keys(self): return self.vals.keys()
@@ -538,7 +542,6 @@ class DictExpr(CollectionExpr):
     return DictExpr(vals=dict([(k, visitor.visit(v)) for (k, v) in self.vals.iteritems()]))
 
 
-@node_type
 class ListExpr(CollectionExpr):
   def dependencies(self):
     return dict(('v%d' % i, self.vals[i]) for i in range(len(self.vals)))
@@ -547,7 +550,6 @@ class ListExpr(CollectionExpr):
     return ListExpr(vals=[visitor.visit(v) for v in self.vals])
 
 
-@node_type
 class TupleExpr(CollectionExpr):
   
   def dependencies(self):

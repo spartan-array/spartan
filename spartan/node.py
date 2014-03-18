@@ -2,91 +2,14 @@
 
 Provides pretty printing, equality testing, hashing and keyword initialization.
 '''  
+from traits.api import HasTraits
+from traits.traits import CTrait
 
-
-from itertools import izip
-import copy
-
-_members_cache = {}  
-_mro_cache = {}
-_reversed_mro_cache = {}
-  
-def get_mro(klass):
-  if klass in _mro_cache:
-    return _mro_cache[klass]
-  else:
-    mro = klass.mro()
-    rev_mro = list(reversed(mro))
-    _mro_cache[klass] = mro
-    _reversed_mro_cache[klass] = rev_mro
-    return mro 
-  
-def get_reverse_mro(klass):
-  if klass in _reversed_mro_cache:
-    return _reversed_mro_cache[klass]
-  else:
-    mro = klass.mro()
-    rev_mro = list(reversed(mro))
-    _mro_cache[klass] = mro
-    _reversed_mro_cache[klass] = rev_mro
-    return rev_mro 
-  
-
-def node_initializer(self, *args, **kw):
-  assert len(args) == 0, 'Keyword initialization only!'
-  
-  get_members = self.members
-  n_args = len(args)
-  n_members = len(get_members)
-  class_name = self.__class__.__name__ 
-  self_dict = self.__dict__
-  if n_args == n_members:
-    assert len(kw) == 0
-    for (k,v) in zip(get_members,args):
-      self_dict[k] = v
-  elif n_args < n_members:
-    for field in get_members:
-      self_dict[field] = kw.get(field)
-    
-    for field, value in izip(get_members, args):
-      self_dict[field] = value
-      
-    for (k,v) in kw.iteritems():
-      assert k in get_members, \
-        "Keyword argument '%s' not recognized for %s: %s" % \
-        (k, self.node_type, get_members)
-  else:
-    raise Exception('Too many arguments for %s, expected %s' % \
-                    (class_name, get_members))
-     
-  # it's more common to not define a node initializer, 
-  # so add an extra check to avoid having to always
-  # traverse the full class hierarchy 
-  if hasattr(self, 'node_init'):
-    for C in _reversed_mro_cache[self.__class__]:
-      if 'node_init' in C.__dict__:
-        C.node_init(self)
-
-    
-def get_members(klass):
-  """
-  Walk through classes in mro order, accumulating member names.
-  """
-  if klass  in _members_cache:
-    return _members_cache[klass]
-  
-  m = []
-  for c in get_mro(klass):
-    curr_members = getattr(c, '_members', []) 
-    for name in curr_members:
-      if name not in m:
-        m.append(name)  
-  _members_cache[klass] = m
-  return m
+member_caches = {}
 
 def node_str(node):
   member_strings = []
-  for (k,v) in node.node_items():
+  for (k,v) in node_iteritems(node):
     if isinstance(v, list):
       v_str = ['[']
       for i, v in enumerate(v):
@@ -102,83 +25,42 @@ def node_str(node):
   
   return "%s { \n%s \n}" % (node.node_type, child_str) 
   
+
 def node_iteritems(node):
   for k in node.members:
     yield (k, getattr(node, k, None))
-    
-class Node(object):
-  def __init__(self):
-    assert 'No longer used.'
 
-# class Node(object):
-#   def __init__(self, *args, **kw):
-#     assert len(args) == 0, 'Node objects must be initialized with keywords.'
-#     node_initializer(self, *args, **kw)
-#  
-#   def iteritems(self):
-#     return node_iteritems(self)
-#       
-#   def itervalues(self):
-#     for (_,v) in self.iteritems():
-#       yield v 
-#   
-#   def items(self):
-#     return [(k,getattr(self,k)) for k in self.members()]
-# 
-#   def __hash__(self):
-#     # print "Warning: __hash__ not implemented for %s" % self
-#     hash_values = []
-#     for m in self.members():
-#       v = getattr(self, m)
-#       if isinstance(v, (list, tuple)):
-#         v = tuple(v)
-#       hash_values.append(v)
-#     return hash(tuple(hash_values))
-#   
-#   def eq_members(self, other):
-#     for (k,v) in self.iteritems():
-#       if not hasattr(other, k):
-#         return False
-#       if getattr(other, k) != v:
-#         return False
-#     return True 
-#   
-#   def __eq__(self, other):
-#     return other.__class__ is  self.__class__ and self.eq_members(other)
-# 
-#   def __ne__(self, other):
-#     return not self == other 
-#   
-#   def node_type(self):
-#     return self.__class__.__name__
-#   
-#   def clone(self, **kwds):
-#     cloned = copy.deepcopy(self)
-#     for (k,v) in kwds.values():
-#       setattr(cloned, k, v)
-#     return cloned 
-#   
-#   def __repr__(self): return node_str(self)
-#   def __str__(self): return node_str(self)
-    
-def node_type(klass):
-  '''Decorator to add node behavior to a class.'''
-  def obj_init(self, *args, **kw):
-    node_initializer(self, *args, **kw)
+
+def get_members(klass):
+  global member_caches
+  if klass in member_caches:
+    return member_caches[klass]
   
-  mem = get_members(klass)
-  get_mro(klass)
-  get_reverse_mro(klass)
-
-  klass.__init__ = obj_init
+  members = []
+  for k, v in klass.__dict__["__base_traits__"].iteritems():
+    if isinstance(v, CTrait) and k != "trait_added" and k != "trait_modified":
+      members.append(k)
   
-  if klass.__repr__ == object.__repr__: klass.__repr__ = node_str
-  if klass.__str__  == object.__repr__: klass.__str__ = node_str
+  member_caches[klass] = members
+  return members
 
-  klass.node_items = node_iteritems
-  klass.node_type = klass.__name__
+
+class Node(HasTraits):
+  def __init__(self, *args, **kw):
+    super(Node, self).__init__(*args, **kw)
+    self.members = get_members(self.__class__)
+
+  """
+  @property
+  def members(self):
+    return get_members(self.__class__)
+  """
+  @property
+  def node_type(self):
+    return self.__class__.__name__
+
+  def __str__(self):
+    return node_str(self)
   
-  #klass.__doc__ = 'Tree-like object.  Members:\n\n' + '\n'.join(':param %s: ' % k for k in mem)
-  klass.members = get_members(klass)
-
-  return klass
+  def __repr__(self):
+    return node_str(self)
