@@ -15,11 +15,6 @@ cdef class FastRLock:
     to release it when it's done.  This is all made possible by the
     wonderful GIL.
     """
-    cdef pythread.PyThread_type_lock _real_lock
-    cdef long _owner            # ID of thread owning the lock
-    cdef int _count             # re-entry count
-    cdef int _pending_requests  # number of pending requests for real lock
-    cdef bint _is_locked        # whether the real lock is acquired
 
     def __cinit__(self):
         self._owner = -1

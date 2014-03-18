@@ -25,7 +25,7 @@ import time
 
 from . import config, util, rpc, core, blob_ctx
 from .config import FLAGS, StrFlag, IntFlag, BoolFlag
-from .rpc import zeromq, TimeoutException
+from .rpc import zeromq, TimeoutException, rlock
 from .util import Assert
 import psutil
 import weakref
@@ -59,7 +59,8 @@ class Worker(object):
                                            time.time(),
                                            [], [])
     
-    self._lock = threading.Lock()
+    self._lock = rlock.FastRLock()
+    #self._lock = threading.Lock()
     
     #Patch to fix buggy assumption by multiprocessing library  
     if not hasattr(threading.current_thread(), "_children"):

@@ -25,7 +25,7 @@ class TestPerformance(test_common.ClusterTest):
                 "matrix_mult" : 14,
                 "kmeans" : 16.7,
                 "pagerank" : 13
-                }
+               }
   
   #Once the factor is greater the threshold, we treat the test fails.
   FACTOR_THRESHOLD = 1.5
@@ -66,7 +66,7 @@ class TestPerformance(test_common.ClusterTest):
     for i in range(5):
       yp = expr.dot(x, w)
       diff = x * (yp - y)
-      grad = expr.sum(diff, axis=0).glom().reshape((N_DIM, 1))
+      grad = expr.sum(diff, axis=0, tile_hint=[N_DIM]).glom().reshape((N_DIM, 1))
       wprime = w - grad * 1e-6
       expr.force(wprime)
 
@@ -85,7 +85,7 @@ class TestPerformance(test_common.ClusterTest):
     start = time.time()
 
     for i in range(5):
-      res = expr.dot(x, y)
+      res = expr.dot(x, y, tile_hint=(N_POINTS, N_POINTS/ self.ctx.num_workers))
       res.force()
 
     cost = time.time() - start
@@ -127,7 +127,7 @@ class TestPerformance(test_common.ClusterTest):
                         tile_hint=(PAGES_PER_WORKER / 8, 1), 
                         dtype=np.float32))
     
-    expr.dot(wts, p).force()
+    expr.dot(wts, p, tile_hint=(PAGES_PER_WORKER / 8, 1)).force()
 
     cost = time.time() - start
     self._verify_cost("pagerank", cost)

@@ -205,11 +205,12 @@ class Timer(object):
     self.elapsed += time.time() - self.st
 
   def __enter__(self):
-    self.start()
-
+    #self.start()
+    pass
+  
   def __exit__(self, exc_type, exc_val, exc_tb):
-    self.stop()
-
+    #self.stop()
+    pass
 
 def dump_stacks(out):
   '''Dump the stacks of all threads.'''

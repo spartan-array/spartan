@@ -60,7 +60,7 @@ def _reduce_mapper(ex, children, op, axis, output):
 
 @node_type
 class ReduceExpr(Expr):
-  _members = ['children', 'axis', 'dtype_fn', 'op', 'accumulate_fn']
+  _members = ['children', 'axis', 'dtype_fn', 'op', 'accumulate_fn', 'tile_hint']
   
   def node_init(self):
     Expr.node_init(self)
@@ -99,7 +99,7 @@ class ReduceExpr(Expr):
     shape = extent.shape_for_reduction(vals[0].shape, axis)
     
     output_array = distarray.create(shape, dtype,
-                                    reducer=tile_accum)
+                                    reducer=tile_accum, tile_hint=self.tile_hint)
 
   # util.log_info('Reducing into array %s', output_array)
     largest.foreach_tile(_reduce_mapper, kw={'children' : children,
@@ -110,7 +110,7 @@ class ReduceExpr(Expr):
     return output_array
 
  
-def reduce(v, axis, dtype_fn, local_reduce_fn, accumulate_fn, fn_kw=None):
+def reduce(v, axis, dtype_fn, local_reduce_fn, accumulate_fn, fn_kw=None, tile_hint=None):
   '''
   Reduce ``v`` over axis ``axis``.
   
@@ -147,5 +147,6 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, accumulate_fn, fn_kw=None):
                     axis=axis,
                     dtype_fn=dtype_fn,
                     op=reduce_op,
-                    accumulate_fn=accumulate_fn)
+                    accumulate_fn=accumulate_fn,
+                    tile_hint=tile_hint)
 

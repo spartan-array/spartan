@@ -133,6 +133,7 @@ FLAGS.add(IntFlag('default_rpc_timeout', default=60))
 
 FLAGS.add(BoolFlag('opt_keep_stack', default=False))
 FLAGS.add(BoolFlag('capture_expr_stack', default=False))
+FLAGS.add(BoolFlag('dump_timers', default=False))
 
 # print flags in sorted order
 # from http://stackoverflow.com/questions/12268602/sort-argparse-help-alphabetically

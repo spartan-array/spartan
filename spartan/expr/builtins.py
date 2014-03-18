@@ -278,7 +278,7 @@ def _sum_local(ex, data, axis):
   return data.sum(axis)
 
 
-def sum(x, axis=None):
+def sum(x, axis=None, tile_hint=None):
   '''
   Sum ``x`` over ``axis``.
   
@@ -290,7 +290,9 @@ def sum(x, axis=None):
                 axis=axis,
                 dtype_fn=lambda input: input.dtype,
                 local_reduce_fn=_sum_local,
-                accumulate_fn=np.add)
+                accumulate_fn=np.add,
+                tile_hint=tile_hint)
+                
 
 def _scan_reduce_mapper(array, ex, reduce_fn=None, axis=None):
   if reduce_fn is None:
