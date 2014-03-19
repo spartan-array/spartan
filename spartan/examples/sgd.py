@@ -36,6 +36,7 @@ class SGDRegressor(object):
     self.y = expr.eager(self.y)
 
     for i in range(self.iterations):
+      util.log_warn('iter:%d', i)
       diff = self.update()
       grad = expr.sum(diff, axis=0, tile_hint=[self.N_DIM]).glom().reshape((self.N_DIM, 1))
       self.w = self.w - grad * self.alpha

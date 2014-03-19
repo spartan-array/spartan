@@ -144,8 +144,12 @@ class Worker(object):
     '''
     with self._lock:
       for id in req.ids:
-        if id in self._blobs:
+        blob = self._blobs.get(id)
+        if blob:
+          blob.ref -= 1
+          #util.log_warn('CQ: destroy: %s tile ref:%s', id, blob.ref)
           del self._blobs[id]
+            
           #util.log_info('Destroyed blob %s', id)
 
     #util.log_info('Destroy...')
@@ -162,7 +166,14 @@ class Worker(object):
     #util.log_info('W%d Update: %s', self.id, req.id)
     with self._lock:
       blob =  self._blobs[req.id]
-      self._blobs[req.id] = blob.update(req.region, req.data, req.reducer)
+    
+      if blob.ref > 1:
+        #util.log_warn('CQ: update: copy on write with tile %s, ref:%s', req.id, blob.ref)
+        blob.ref -= 1
+        blob = blob.copy()
+        self._blobs[req.id] = blob
+      
+    blob.update(req.region, req.data, req.reducer)
     
     handle.done()
 
@@ -198,6 +209,12 @@ class Worker(object):
     start_time = time.time()  
     futures = []
     try:
+      apply_region = []
+      fn_kw = req.kw['op'].kw if 'op' in req.kw else req.kw.get('fn_kw')
+      if fn_kw and 'apply_region' in fn_kw:
+        apply_region = fn_kw['apply_region']
+        del fn_kw['apply_region']
+          
       blob_ctx.set(self._ctx)
       results = {}
       for tile_id in req.blobs:
@@ -205,7 +222,7 @@ class Worker(object):
         if tile_id in self._blobs:
           #util.log_info('W%d kernel start', self.id)
           blob = self._blobs[tile_id]
-          map_result = req.mapper_fn(tile_id, blob, **req.kw)
+          map_result = req.mapper_fn(tile_id, blob, apply_region, **req.kw)
           results[tile_id] = map_result.result
           
           if map_result.futures is not None:

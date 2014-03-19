@@ -13,7 +13,7 @@ from ..array import extent, tile, distarray
 from ..core import LocalKernelResult
 from .shuffle import target_mapper
 
-def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
+def _tile_mapper(tile_id, blob, apply_region, array=None, user_fn=None, **kw):
   ex = array.base.extent_for_blob(tile_id)
   ex = extent.create(ex.ul[::-1], ex.lr[::-1], array.shape)
   return user_fn(ex, **kw)

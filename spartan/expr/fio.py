@@ -311,7 +311,7 @@ def unpickle(prefix, path = '.', iszip = False):
                  fn = _unpickle_mapper, 
                  kw = {'path' : path, 'prefix' : prefix, 'iszip' : iszip})
 
-def _tile_mapper(tile_id, blob, tiles = None, user_fn=None, **kw):
+def _tile_mapper(tile_id, blob, apply_region, tiles = None, user_fn=None, **kw):
   for k, v in tiles.iteritems():
     if v == tile_id:
       ex = k

@@ -104,9 +104,18 @@ def compute_extents(shape, tile_hint=None, num_shards=-1):
   
   return result
 
-def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
+def _tile_mapper(tile_id, blob, apply_region, array=None, user_fn=None, **kw):
   '''Invoke ``user_fn`` on ``blob``, and construct tiles from the results.'''
   ex = array.extent_for_blob(tile_id)
+  
+  if len(apply_region) > 0:    
+    for region in apply_region:
+      if extent.intersection(region, ex):
+        return user_fn(ex, **kw)
+    blob.ref += 1
+    new_tile_id = blob_ctx.get().create(blob).wait().tile_id
+    #util.log_warn('CQ: run_kernel: %s tile share:%s with %s', tile_id, blob.ref, new_tile_id)
+    return LocalKernelResult(result=[(ex, new_tile_id)])
   return user_fn(ex, **kw)
 
 
