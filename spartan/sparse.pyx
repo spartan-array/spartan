@@ -217,12 +217,12 @@ def slice_coo(X not None, tuple slices):
     return scipy.sparse.coo_matrix((data[idx_begin:idx_end], (rows[idx_begin:idx_end]-row_begin, cols[idx_begin:idx_end])), shape=tuple([slice.stop-slice.start for slice in slices]))
 
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
-def csr_update(data, update, slices):
+def csrcsc_update(data, update, slices):
   '''
-  csr_matrix can't support fancing indexing like data[slices] = update.
-  This API uses hstack and vstack to implement to simulate fancing indexing. 
-  It's faster but can't support slicing with step is not 1. This should be 
-  enough for Spartan.
+  csr_matrix and csc_matrix can't support fancing indexing like
+  data[slices] = update. This API uses hstack and vstack to implement to
+  simulate fancing indexing. It  can't support slicing with step is not 1.
+  This should be enough for Spartan.
   '''
   upper_slice = (__builtins__.slice(0, slices[0].start),
                  __builtins__.slice(0, data.shape[1]))

@@ -238,18 +238,18 @@ def merge(old_tile, subslice, update, reducer):
         else:
           old_tile.data = update
       else:
-        #import time
-        #begin = time.time()
-        if reducer is not None:  
-          old_tile.data = old_tile.data.tocsr()
-          update = reducer(old_tile.data[subslice], update.tocsr()).tocsr()
-          old_tile.data = sparse.csr_update(old_tile.data, update, subslice)
+        if old_tile.data.shape[0] > old_tile.data.shape[1]:
+          old_tile.data = old_tile.data.tocsc()
+          update = update.tocsc()
+          if reducer is not None:
+            update = reducer(old_tile.data[subslice], update).tocsc()
         else:
-          old_tile.data = sparse.csr_update(old_tile.data.tocsr(),
-                                            update.tocsr(), subslice)
+          old_tile.data = old_tile.data.tocsr()
+          update = update.tocsr()
+          if reducer is not None:
+            update = reducer(old_tile.data[subslice], update).tocsr()
 
-        #with open('/home/fegin/workspace/spartan-fork/progress', 'a+') as fp:
-            #fp.write(str(subslice) + ' ' + str(time.time() - begin) + ' end\n')
+        old_tile.data = sparse.csrcsc_update(old_tile.data, update, subslice)
 
     return old_tile
     

@@ -128,8 +128,6 @@ def _local_read_sparse_mm(array, ex, fn, data_begin):
 
     pos = fp.tell()
 
-    #import time
-    #begin = time.time()
     for line in fp:
       pos += len(line)
       if pos > end + 1: # +1 in case end locates on \n
@@ -146,19 +144,20 @@ def _local_read_sparse_mm(array, ex, fn, data_begin):
       lr[1] = _col if _col > lr[1] else lr[1]
 
   # Adjust row, col based on the ul of this submatrix.
-  for i in range(len(row)):
+  for i in xrange(len(row)):
     row[i] -= ul[0]
     col[i] -= ul[1]
 
-
   new_ex = extent.create(ul, [lr[0] + 1, lr[1] + 1], array.shape)
-  new_array = sp.coo_matrix((data, (row, col)), new_ex.shape).tocsr()
+  new_array = sp.coo_matrix((data, (row, col)), new_ex.shape)
+  if new_ex.shape[0] > new_ex.shape[1]:
+    new_array = new_array.tocsc()
+  else:
+    new_array = new_array.tocsr()
   return new_ex, new_array
 
 def _readmm_mapper(array, ex, fn = None, data_begin = None):
   if array.sparse:
-    #with open('/home/fegin/workspace/spartan-fork/progress', 'a+') as fp:
-      #fp.write(str(ex) + ' start\n')
     new_ex, new_array = _local_read_sparse_mm(array, ex, fn, data_begin)
   else:
     pass
@@ -194,7 +193,7 @@ def _parse_mm_header(fn, sparse_threshold = 0.01):
 
   return (shape, dtype, sparse, data_begin)
 
-def _bulk_read(fp, size, bulk_size = 2**25):
+def _bulk_read(fp, size, bulk_size = 2**27):
   '''
   size must be 4, 8, 16 or 32. build_size must be 2^n
   '''
@@ -243,9 +242,9 @@ def _local_read_sparse_npy(array, ex, fn):
   row = []
   col = []
   data = []
-  fp['row'] = open(fn + '_row.npy')
-  fp['col'] = open(fn + '_col.npy')
-  fp['data'] = open(fn + '_data.npy')
+  fp['row'] = open(fn + '_row.npy', 'rb')
+  fp['col'] = open(fn + '_col.npy', 'rb')
+  fp['data'] = open(fn + '_data.npy', 'rb')
   dtype_name = {'float64':'d', 'float32':'f', 'int64':'q', 'int32':'i'}
 
   for k, v in data_begin.iteritems():
@@ -254,10 +253,7 @@ def _local_read_sparse_npy(array, ex, fn):
     read_next[k] = _bulk_read(fp[k], dtype_size[k])
     dtype[k] = dtype_name[dtype[k].name]
 
-  #import time
-  #begin = time.time()
-
-  for i in range(begin_item, end_item):
+  for i in xrange(begin_item, end_item):
     _row = struct.unpack(dtype['row'], read_next['row'].next())[0]
     row.append(_row)
     _col = struct.unpack(dtype['col'], read_next['col'].next())[0]
@@ -274,20 +270,20 @@ def _local_read_sparse_npy(array, ex, fn):
   fp['col'].close()
   fp['data'].close()
 
-  for i in range(len(row)):
+  for i in xrange(len(row)):
     row[i] -= ul[0]
     col[i] -= ul[1]
 
   new_ex = extent.create(ul, [lr[0] + 1, lr[1] + 1], array.shape)
-  new_array = sp.coo_matrix((data, (row, col)), new_ex.shape).tocsr()
-  #with open('/home/fegin/workspace/spartan-fork/progress', 'a+') as fpp:
-    #fpp.write(str(ex) + ' ' + str(new_ex) + ' ' + str(time.time() - begin) + ' end\n')
+  new_array = sp.coo_matrix((data, (row, col)), new_ex.shape)
+  if new_ex.shape[0] > new_ex.shape[1]:
+    new_array = new_array.tocsc()
+  else:
+    new_array = new_array.tocsr()
   return (new_ex, new_array)
 
 def _readnpy_mapper(array, ex, fn = None):
   if array.sparse:
-    #with open('/home/fegin/workspace/spartan-fork/progress', 'a+') as fp:
-      #fp.write(str(ex) + ' start\n')
     new_ex, new_array = _local_read_sparse_npy(array, ex, fn)
   else:
     pass
@@ -360,11 +356,12 @@ def from_file_parallel(fn, file_format = 'mm', sparse = True, tile_hint = None):
   else:
     raise NotImplementedError("Only support mm now. Got %s" % file_type)
 
-  if tile_hint == None:
-    tile_hint = distarray.good_tile_shape(shape, num_shards = master.get().num_workers)
+
+  array_tile_hint = distarray.good_tile_shape(shape, num_shards =
+                                                     master.get().num_workers)
 
   array = ndarray(shape = shape, dtype = dtype, sparse = sparse,
-                  tile_hint = tile_hint)
+                  tile_hint = array_tile_hint)
   target = ndarray(shape = shape, dtype = dtype, sparse = sparse,
                    tile_hint = tile_hint, reduce_fn = reducer)
   return shuffle(array, fn = mapper, kw = kw, target = target)
