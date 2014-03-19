@@ -60,7 +60,7 @@ cdef extern from "pthread.h":
 CLIENT_PENDING = weakref.WeakKeyDictionary()
 SERVER_PENDING = weakref.WeakKeyDictionary()
 
-_broadcast_rpc_id = xrange(0, 1000000).__iter__()
+_broadcast_rpc_id = xrange(1000000, 2000000).__iter__()
 
 NO_RESULT = object()
 
