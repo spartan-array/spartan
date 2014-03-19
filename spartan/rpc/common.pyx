@@ -60,7 +60,7 @@ cdef extern from "pthread.h":
 CLIENT_PENDING = weakref.WeakKeyDictionary()
 SERVER_PENDING = weakref.WeakKeyDictionary()
 
-_broadcast_rpc_id = xrange(1000000, 2000000).__iter__()
+_rpc_id_generator = xrange(10000000).__iter__()
 
 NO_RESULT = object()
 
@@ -484,7 +484,6 @@ cdef class Client:
   cdef Socket _socket
   cdef dict _futures
   cdef FastRLock _lock
-  cdef object _rpc_id
   
   def __init__(self, socket):
     self._socket = socket
@@ -492,14 +491,13 @@ cdef class Client:
     self._socket.connect()
     self._futures = {}
     self._lock = rlock.FastRLock()
-    self._rpc_id = xrange(10000000).__iter__()
 
   def __reduce__(self, *args, **kwargs):
     raise cPickle.PickleError('Not pickleable.')
 
   def send(self, method, request, timeout):
     with self._lock:
-      rpc_id = self._rpc_id.next()
+      rpc_id = _rpc_id_generator.next() 
       header = { 'method' : method, 'rpc_id' : rpc_id }
       w = serialization_buffer.Writer()
       
@@ -556,7 +554,7 @@ def forall(clients, method, request, timeout=None):
     clients = [c for c in clients]
   
   n_jobs = len(clients)  
-  rpc_id = _broadcast_rpc_id.next()
+  rpc_id = _rpc_id_generator.next()
   fgroup = BcastFutureGroup(rpc_id, n_jobs, timeout=timeout) 
 
   with TIMER.serial_once:
