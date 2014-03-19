@@ -331,8 +331,8 @@ class DistArrayImpl(DistArray):
       tgt = np.ma.MaskedArray(np.ndarray(region.shape, dtype=self.dtype))
       tgt.mask = 0
     elif output_type == SPARSE:
-      tgt = scipy.sparse.lil_matrix(region.shape, dtype=self.dtype)
-      #tgt = scipy.sparse.csr_matrix(region.shape, dtype=self.dtype)
+      #tgt = scipy.sparse.lil_matrix(region.shape, dtype=self.dtype)
+      tgt = scipy.sparse.csr_matrix(region.shape, dtype=self.dtype)
     else:
       tgt = np.ndarray(region.shape, dtype=self.dtype)
     

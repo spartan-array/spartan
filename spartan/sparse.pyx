@@ -234,13 +234,13 @@ def csr_update(data, update, slices):
                  __builtins__.slice(0, data.shape[1]))
   
   if slices[1].start > 0:
-    update = scipy.sparse.hstack((data[midleft_slice], update), dtype = update.dtype)
+    update = scipy.sparse.hstack((data[midleft_slice], update), dtype = data.dtype)
   if slices[1].stop < data.shape[1]:
-    update = scipy.sparse.hstack((update, data[midright_slice]), dtype = update.dtype)
+    update = scipy.sparse.hstack((update, data[midright_slice]), dtype = data.dtype)
   if slices[0].start > 0:
-    update = scipy.sparse.vstack((data[upper_slice], update), dtype = update.dtype)
+    update = scipy.sparse.vstack((data[upper_slice], update), dtype = data.dtype)
   if slices[0].stop < data.shape[0]:
-    update = scipy.sparse.vstack((update, data[lower_slice]), dtype = update.dtype)
+    update = scipy.sparse.vstack((update, data[lower_slice]), dtype = data.dtype)
 
   return update
 

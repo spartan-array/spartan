@@ -16,6 +16,7 @@ import ast
 import struct
 
 from spartan import rpc
+from spartan import master
 from spartan.array import distarray, extent
 from .slice import Slice
 from ..core import LocalKernelResult
@@ -126,6 +127,9 @@ def _local_read_sparse_mm(array, ex, fn, data_begin):
       fp.seek(real_begin)
 
     pos = fp.tell()
+
+    #import time
+    #begin = time.time()
     for line in fp:
       pos += len(line)
       if pos > end + 1: # +1 in case end locates on \n
@@ -146,12 +150,15 @@ def _local_read_sparse_mm(array, ex, fn, data_begin):
     row[i] -= ul[0]
     col[i] -= ul[1]
 
+
   new_ex = extent.create(ul, [lr[0] + 1, lr[1] + 1], array.shape)
   new_array = sp.coo_matrix((data, (row, col)), new_ex.shape).tocsr()
   return new_ex, new_array
 
 def _readmm_mapper(array, ex, fn = None, data_begin = None):
   if array.sparse:
+    #with open('/home/fegin/workspace/spartan-fork/progress', 'a+') as fp:
+      #fp.write(str(ex) + ' start\n')
     new_ex, new_array = _local_read_sparse_mm(array, ex, fn, data_begin)
   else:
     pass
@@ -212,7 +219,6 @@ def _local_read_sparse_npy(array, ex, fn):
   2. For numpy format, we can evenly distribute the files we need to read to
      workers.
   '''
-
   data_begin = {}
   dtype = {}
   dtype_size = {}
@@ -240,13 +246,16 @@ def _local_read_sparse_npy(array, ex, fn):
   fp['row'] = open(fn + '_row.npy')
   fp['col'] = open(fn + '_col.npy')
   fp['data'] = open(fn + '_data.npy')
-  dtype_name['float64':'d', 'float32':'f', 'int64':'f', 'int32':'i']
+  dtype_name = {'float64':'d', 'float32':'f', 'int64':'q', 'int32':'i'}
 
   for k, v in data_begin.iteritems():
     dtype_size[k] = dtype[k].itemsize
     fp[k].seek(v + begin_item * dtype_size[k])
     read_next[k] = _bulk_read(fp[k], dtype_size[k])
-    dtype[k] = dtype_name[dtype[k]]
+    dtype[k] = dtype_name[dtype[k].name]
+
+  #import time
+  #begin = time.time()
 
   for i in range(begin_item, end_item):
     _row = struct.unpack(dtype['row'], read_next['row'].next())[0]
@@ -261,20 +270,24 @@ def _local_read_sparse_npy(array, ex, fn):
     lr[0] = _row if _row > lr[0] else lr[0]
     lr[1] = _col if _col > lr[1] else lr[1]
 
+  fp['row'].close()
+  fp['col'].close()
+  fp['data'].close()
+
   for i in range(len(row)):
     row[i] -= ul[0]
     col[i] -= ul[1]
 
   new_ex = extent.create(ul, [lr[0] + 1, lr[1] + 1], array.shape)
   new_array = sp.coo_matrix((data, (row, col)), new_ex.shape).tocsr()
-  fp['row'].close()
-  fp['col'].close()
-  fp['data'].close()
-
+  #with open('/home/fegin/workspace/spartan-fork/progress', 'a+') as fpp:
+    #fpp.write(str(ex) + ' ' + str(new_ex) + ' ' + str(time.time() - begin) + ' end\n')
   return (new_ex, new_array)
 
 def _readnpy_mapper(array, ex, fn = None):
   if array.sparse:
+    #with open('/home/fegin/workspace/spartan-fork/progress', 'a+') as fp:
+      #fp.write(str(ex) + ' start\n')
     new_ex, new_array = _local_read_sparse_npy(array, ex, fn)
   else:
     pass
@@ -347,7 +360,11 @@ def from_file_parallel(fn, file_format = 'mm', sparse = True, tile_hint = None):
   else:
     raise NotImplementedError("Only support mm now. Got %s" % file_type)
 
-  array = ndarray(shape = shape, dtype = dtype, sparse = sparse)
+  if tile_hint == None:
+    tile_hint = distarray.good_tile_shape(shape, num_shards = master.get().num_workers)
+
+  array = ndarray(shape = shape, dtype = dtype, sparse = sparse,
+                  tile_hint = tile_hint)
   target = ndarray(shape = shape, dtype = dtype, sparse = sparse,
                    tile_hint = tile_hint, reduce_fn = reducer)
   return shuffle(array, fn = mapper, kw = kw, target = target)
@@ -408,7 +425,8 @@ def from_numpy(npa, tile_hint = None):
   if sp.issparse(npa):
     npa = npa.tocsr()
 
-  array = ndarray(shape = npa.shape, dtype = npa.dtype, sparse = sp.issparse(npa), tile_hint = tile_hint)
+  array = ndarray(shape = npa.shape, dtype = npa.dtype,
+                  sparse = sp.issparse(npa), tile_hint = tile_hint)
   slices = tuple([slice(0, i) for i in npa.shape])
 
   return write(array, slices, npa, slices)
