@@ -25,7 +25,7 @@ from ..util import TIMER
 cimport zeromq
 from zeromq cimport Socket, ServerSocket, StubSocket
 from rlock cimport FastRLock
-import copy
+from cpython cimport bool
 
 #cdef extern from "time.h":
 #  cdef struct timespec:
@@ -60,8 +60,7 @@ cdef extern from "pthread.h":
 CLIENT_PENDING = weakref.WeakKeyDictionary()
 SERVER_PENDING = weakref.WeakKeyDictionary()
 
-#These ids reserve for broad cast messages
-_broadcast_rpc_id = xrange(1000000, 2000000).__iter__()
+_broadcast_rpc_id = xrange(0, 1000000).__iter__()
 
 NO_RESULT = object()
 
@@ -225,7 +224,7 @@ cdef class Condition:
 cdef class Future:
   cdef object addr
   cdef long rpc_id
-  cdef object have_result
+  cdef bool have_result
   cdef object result
   cdef object finished_fn
   cdef object _cv
@@ -323,7 +322,7 @@ class FutureGroup(list):
 
 cdef class BcastFutureGroup:
   cdef public long rpc_id
-  cdef object have_all_results
+  cdef bool have_all_results
   cdef list results
   cdef object _cv
   cdef long _start
@@ -475,9 +474,11 @@ cdef class ProxyMethod:
     self.client = client
     self.method = method
 
-  #raw_data is true means the request has already been serialized along with the header
-  def __call__(self, request=None, timeout=None, raw_data=False, future=None):
-    return self.client.send(self.method, request, timeout, raw_data, future)
+  def __call__(self, request=None, timeout=None):
+    return self.client.send(self.method, request, timeout)
+  
+  def call_raw(self, data=None, future=None):
+    return self.client.send_raw(data=data, future=future)
 
 cdef class Client:
   cdef Socket _socket
@@ -496,31 +497,30 @@ cdef class Client:
   def __reduce__(self, *args, **kwargs):
     raise cPickle.PickleError('Not pickleable.')
 
-  def send(self, method, request, timeout, raw_data, future):
+  def send(self, method, request, timeout):
     with self._lock:
-      if not raw_data:
-        rpc_id = self._rpc_id.next()
-        header = { 'method' : method, 'rpc_id' : rpc_id }
-        w = serialization_buffer.Writer()
-        
-        if isinstance(request, PickledData):
-          with util.TIMER.send_serialize:
-            cPickle.dump(header, w, -1)
-            w.write(request.data)
-        else:
+      rpc_id = self._rpc_id.next()
+      header = { 'method' : method, 'rpc_id' : rpc_id }
+      w = serialization_buffer.Writer()
+      
+      if isinstance(request, PickledData):
+        with util.TIMER.send_serialize:
           cPickle.dump(header, w, -1)
-          serialize_to(request, w)
-
-        data = w.getvalue()
-        f = Future(self.addr(), rpc_id, timeout)
-        self._futures[rpc_id] = f
+          w.write(request.data)
       else:
-        f = future
-        data = request
-        self._futures[f.rpc_id] = f
+        cPickle.dump(header, w, -1)
+        serialize_to(request, w)
 
+      data = w.getvalue()
+      f = Future(self.addr(), rpc_id, timeout)
+      self._futures[rpc_id] = f
       self._socket.send(data)
       return f
+  
+  def send_raw(self, data, future):
+    with self._lock:
+      self._futures[future.rpc_id] = future
+      self._socket.send(data) 
 
   def addr(self):
     return self._socket.addr
@@ -557,7 +557,7 @@ def forall(clients, method, request, timeout=None):
   
   n_jobs = len(clients)  
   rpc_id = _broadcast_rpc_id.next()
-  fgroup = BcastFutureGroup(rpc_id, n_jobs) 
+  fgroup = BcastFutureGroup(rpc_id, n_jobs, timeout=timeout) 
 
   with TIMER.serial_once:
     #only serialize the header and body once.
@@ -569,6 +569,6 @@ def forall(clients, method, request, timeout=None):
   
   with TIMER.master_loop:
     for c in clients:
-      getattr(c, method)(data, timeout=timeout, raw_data=True, future=fgroup)
+      getattr(c, method).call_raw(data, future=fgroup)
   
   return fgroup
