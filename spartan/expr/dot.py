@@ -7,11 +7,11 @@ import scipy.sparse as sp
 from .. import sparse, rpc
 from .base import Expr, lazify
 from .. import blob_ctx, util
-from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from ..array import extent, tile, distarray
 from .shuffle import target_mapper, notarget_mapper
 from ..core import LocalKernelResult
+from traits.api import PythonValue, HasTraits
 
 def _dot_mapper(inputs, ex, av, bv):
   # read current tile of array 'a'
@@ -68,9 +68,10 @@ def _dot_numpy(array, ex, numpy_data=None):
 
   yield (ex[0].add_dim(), np.dot(l, r))
 
-@node_type
 class DotExpr(Expr):
-  _members = ['matrix_a', 'matrix_b', 'tile_hint']
+  matrix_a = PythonValue(None, desc="np.ndarray or Expr")
+  matrix_b = PythonValue(None, desc="np.ndarray or Expr")
+  tile_hint = PythonValue(None, desc="Tuple or None")
 
   def __str__(self):
     return 'Dot[%s, %s]' % (self.matrix_a, self.matrix_b)

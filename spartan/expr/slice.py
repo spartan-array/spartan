@@ -1,8 +1,9 @@
 from .. import util, node, core
+from . import broadcast
 from ..util import Assert
 from ..array import distarray, extent
 from . import base
-
+from traits.api import Instance, Tuple, PythonValue
 
 def _slice_mapper(ex, **kw):
   '''
@@ -50,32 +51,27 @@ class Slice(distarray.DistArray):
     util.log_info('New slice: %s', idx)
 
     Assert.isinstance(darray, distarray.DistArray)
-    self.darray = darray
+    self.base = darray
     self.slice = idx
     self.shape = self.slice.shape
-    intersections = [extent.intersection(self.slice, ex) for ex in self.darray.tiles]
-    intersections = [ex for ex in intersections if ex is not None]
-    offsets = [extent.offset_from(self.slice, ex) for ex in intersections]
-    self.tiles = offsets
     self.dtype = darray.dtype
 
   @property
   def bad_tiles(self):
-    bad_intersections = [extent.intersection(self.slice, ex) for ex in self.darray.bad_tiles]
+    bad_intersections = [extent.intersection(self.slice, ex) for ex in self.base.bad_tiles]
     return [ex for ex in bad_intersections if ex is not None]
 
   def foreach_tile(self, mapper_fn, kw):
-    return self.darray.foreach_tile(mapper_fn = _slice_mapper,
+    return self.base.foreach_tile(mapper_fn = _slice_mapper,
                                     kw={'fn_kw' : kw,
                                         '_slice_extent' : self.slice,
                                         '_slice_fn' : mapper_fn })
 
   def fetch(self, idx):
     offset = extent.compute_slice(self.slice, idx.to_slice())
-    return self.darray.fetch(offset)
+    return self.base.fetch(offset)
 
 
-@node.node_type
 class SliceExpr(base.Expr):
   '''Represents an indexing operation.
 
@@ -84,10 +80,12 @@ class SliceExpr(base.Expr):
     idx: `tuple` (for slicing) or `Expr` (for bool/integer indexing)
     broadcast_to: shape to broadcast to before slicing
   '''
-  _members = ['src', 'idx', 'broadcast_to']
+  src = Instance(base.Expr) 
+  idx = PythonValue(None, desc="Tuple or Expr") 
+  broadcast_to = PythonValue 
 
-  def node_init(self):
-    base.Expr.node_init(self)
+  def __init__(self, *args, **kw):
+    super(SliceExpr, self).__init__(*args, **kw)
     assert not isinstance(self.src, base.ListExpr)
     assert not isinstance(self.idx, base.ListExpr)
     assert not isinstance(self.idx, base.TupleExpr)
@@ -121,4 +119,9 @@ class SliceExpr(base.Expr):
 
     assert not isinstance(idx, list)
     util.log_debug('Evaluating slice: %s', idx)
+    if self.broadcast_to is not None:
+      new_shape = self.broadcast_to
+      if src.shape != new_shape:
+        src = broadcast.Broadcast(src, new_shape)
+
     return Slice(src, idx)

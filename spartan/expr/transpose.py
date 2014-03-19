@@ -7,15 +7,15 @@ import scipy.sparse as sp
 from spartan import rpc
 from .base import Expr, lazify
 from .. import blob_ctx, util
-from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from ..array import extent, tile, distarray
 from ..core import LocalKernelResult
 from .shuffle import target_mapper
+from traits.api import Instance, PythonValue
 
 def _tile_mapper(tile_id, blob, apply_region, array=None, user_fn=None, **kw):
-  ex = array.base.extent_for_blob(tile_id)
-  ex = extent.create(ex.ul[::-1], ex.lr[::-1], array.shape)
+  base_ex = array.base.extent_for_blob(tile_id)
+  ex = extent.create(base_ex.ul[::-1], base_ex.lr[::-1], array.shape)
   return user_fn(ex, **kw)
 
 class Transpose(distarray.DistArray):
@@ -54,12 +54,12 @@ class Transpose(distarray.DistArray):
 
   def fetch(self, ex):
     base_ex = extent.create(ex.ul[::-1], ex.lr[::-1], self.base.shape)
-    tile = self.base.fetch(base_ex)
-    return tile.transpose()
+    base_tile = self.base.fetch(base_ex)
+    return base_tile.transpose()
 
-@node_type
 class TransposeExpr(Expr):
-  _members = ['array', 'tile_hint']
+  array = Instance(Expr) 
+  tile_hint = PythonValue(None, desc="Tuple or None") 
 
   def __str__(self):
     return 'Transpose[%d] %s' % (self.expr_id, self.expr)

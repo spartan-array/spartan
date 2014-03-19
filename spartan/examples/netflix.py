@@ -12,11 +12,10 @@ import random
 import scipy.sparse
 import sys
 import zipfile
-
+from traits.api import PythonValue
 import numpy as np
 from spartan import util, expr, node
 from spartan.expr import lazify
-from spartan.node import node_type
 
 # import parakeet
 # @util.synchronized
@@ -124,9 +123,10 @@ def _compute_strata(V):
   
   return strata
 
-@node_type
 class NetflixSGD(expr.Expr):
-  _members = ['V', 'M', 'U']
+  V = PythonValue
+  M = PythonValue
+  U = PythonValue
 
   def _evaluate(self, ctx, deps):
     V, M, U = deps['V'], deps['M'], deps['U']

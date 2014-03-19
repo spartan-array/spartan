@@ -1,12 +1,27 @@
 import numpy as np
 
 from ..array import distarray, extent
-from .. import util
+from .. import util, blob_ctx
 from ..util import Assert
 
 
 def broadcast_mapper(ex, tile, mapper_fn=None, bcast_obj=None):
   raise NotImplementedError
+
+def _broadcast_mapper(tile_id, blob, apply_region, array = None, user_fn = None, **kw):
+    base_ex = array.base.extent_for_blob(tile_id)
+    ul = [0 for dim in array.shape]
+    lr = [dim for dim in array.shape]
+
+    for i in range(len(base_ex.ul) - 1, 0, -1):
+      broadcast_i = i + array.prepend_dim
+      if array.base.shape[i] != array.shape[broadcast_i]:
+        # array.base.shape[i] must be 1 according to the broadcast rules.
+        assert(ul[i + array.prepend_dim] == 0)
+        lr[i + array.prepend_dim] = array.shape[broadcast_i]
+    ex = extent.create(ul, lr, array.shape)
+
+    return user_fn(ex, **kw)
 
 class Broadcast(distarray.DistArray):
   '''Mimics the behavior of Numpy broadcasting.
@@ -22,6 +37,7 @@ class Broadcast(distarray.DistArray):
     self.shape = shape
     self.dtype = base.dtype
     self.bad_tiles = []
+    self.prepend_dim = len(shape) - len(base.shape)
 
 
   def __repr__(self):
@@ -34,6 +50,17 @@ class Broadcast(distarray.DistArray):
     Offset by one to prefer direct arrays over broadcasts.
     '''
     return np.prod(self.base.shape) - 1
+
+  def foreach_tile(self, mapper_fn, kw=None):
+    ctx = blob_ctx.get()
+
+    if kw is None: kw = {}
+    kw['array'] = self
+    kw['user_fn'] = mapper_fn
+
+    return ctx.map(self.base.tiles.values(),
+                   mapper_fn = _broadcast_mapper,
+                   kw=kw)
 
   def fetch(self, ex):
     # make a template to pass to numpy broadcasting

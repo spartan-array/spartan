@@ -38,7 +38,7 @@ def good_tile_shape(shape, num_shards=-1):
   tile_shape = [1] * len(shape)
   idx = len(shape) - 1
   while tile_size > 1:
-    tile_shape[idx] = max(shape[idx], tile_size)
+    tile_shape[idx] = min(shape[idx], tile_size)
     tile_size /= shape[idx]
     idx -= 1
 
@@ -520,8 +520,8 @@ class LocalWrapper(DistArray):
   def __init__(self, data):
     self._data = np.asarray(data)
     self.bad_tiles = []
-    #assert not isinstance(data, core.TileId)
     Assert.isinstance(data, (np.ndarray, int, float))
+    #assert not isinstance(data, core.TileId)
     #print 'Wrapping: %s %s (%s)' % (data, type(data), np.isscalar(data))
     #print 'DATA: %s' % type(self._data)
 

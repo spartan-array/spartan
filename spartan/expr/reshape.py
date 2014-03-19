@@ -8,11 +8,11 @@ import scipy.sparse as sp
 from spartan import rpc
 from .base import Expr, lazify
 from .. import master, blob_ctx, util
-from ..node import Node, node_type
 from ..util import is_iterable, Assert
 from ..array import extent, tile, distarray
 from ..core import LocalKernelResult
 from .shuffle import target_mapper
+from traits.api import PythonValue, Instance, Tuple
 
 def _ravelled_ex(ul, lr, shape):
   ravelled_ul = extent.ravelled_pos(ul, shape)
@@ -101,7 +101,6 @@ class Reshape(distarray.DistArray):
     kw['array'] = self
     kw['user_fn'] = mapper_fn
 
-    print self._same_tiles
     if self._same_tiles:
       tiles = self.base.tiles.values()
     else:
@@ -126,9 +125,10 @@ class Reshape(distarray.DistArray):
     tile = self.base.fetch(base_ex)
     if not self.base.sparse:
       tile = np.ravel(tile)
-      tile = tile[(base_ravelled_ul - ravelled_ul):(base_ravelled_lr - ravelled_ul) + 1]
+      tile = tile[(ravelled_ul - base_ravelled_ul):(ravelled_lr - base_ravelled_ul) + 1]
       return tile.reshape(ex.shape)
     else:
+      tile = tile.tolil()
       new = sp.lil_matrix(ex.shape, dtype=self.base.dtype)
       j_max = tile.shape[1]
       for i,row in enumerate(tile.rows):
@@ -141,9 +141,10 @@ class Reshape(distarray.DistArray):
             new[new_r,new_c] = tile[i,j]
       return new
 
-@node_type
 class ReshapeExpr(Expr):
-  _members = ['array', 'new_shape', 'tile_hint']
+  array = Instance(Expr) 
+  new_shape = Tuple 
+  tile_hint = PythonValue(None, desc="None or Tuple")
 
   def __str__(self):
     return 'Reshape[%d] %s to %s' % (self.expr_id, self.expr, self.new_shape)
