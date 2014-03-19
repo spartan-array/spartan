@@ -567,6 +567,6 @@ def forall(clients, method, request, timeout=None):
   
   with TIMER.master_loop:
     for c in clients:
-      getattr(c, method).call_raw(data, future=fgroup)
+      c.send_raw(data=data, future=fgroup)
   
   return fgroup
