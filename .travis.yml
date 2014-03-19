@@ -12,5 +12,6 @@ install:
   - LANG=C pip install cython
   - LANG=C pip install parakeet
   - LANG=C pip install scikit-learn
+  - LANG=C pip install traits 
   - LANG=C python setup.py develop
 script: nosetests -v --logging-level=INFO --logging-clear-handlers --logging-format='%(filename)s:%(lineno)s [%(funcName)s] %(message)s'

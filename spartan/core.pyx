@@ -8,7 +8,10 @@ running a function on array data (`KernelReq`, `ResultResp`), registering and in
 workers (`RegisterReq`, `InitializeReq`).
 '''
 
-from .node import node_type
+from traits.api import Function, Instance, Dict, Int, HasTraits, Tuple, PythonValue, List, Float, Str, Trait
+import numpy as np
+from spartan.array.tile import Tile
+from node import Node
 
 cdef class TileId(object):
   '''A `TileId` uniquely identifies a tile in a Spartan execution.
@@ -81,56 +84,54 @@ cdef class WorkerStatus(object):
                   str(self.mem_usage), str(self.cpu_usage), 
                   str(self.task_reports), str(self.task_failures))
     
-
-cdef class Message(object):
+class Message(Node):
   '''Base class for all RPC messages.'''
-  def __reduce__(Message self):
+  def __reduce__(self):
     return (self.__class__, tuple(), self.__dict__)
 
-@node_type  
 class RegisterReq(Message):
   '''Sent by worker to master when registering during startup.''' 
-  _members = ['host', 'port', 'worker_status']
+  #_members = ['host', 'port', 'worker_status']
+  host = Str
+  port = Int
+  worker_status = Instance(WorkerStatus)
 
-
-@node_type
 class EmptyMessage(Message):
   pass
 
 
-@node_type
 class InitializeReq(Message):
   '''Sent from the master to a worker after all workers have registered.
   
   Contains the workers unique identifier and a list of all other workers in the execution.
   '''
-  _members = ['id', 'peers']
+  #_members = ['id', 'peers']
+  id = Int
+  peers = Dict
 
-
-@node_type
 class GetReq(Message):
   '''
   Fetch a region from a tile.
   '''
-  _members = ['id', 'subslice']
+  #_members = ['id', 'subslice']
+  id = Instance(TileId) 
+  subslice = PythonValue 
 
-
-@node_type
 class GetResp(Message):
   '''
   The result of a fetch operation: the tile fetched from and the resulting data.
   '''
-  _members = ['id', 'data']
+  #_members = ['id', 'data']
+  id = Instance(TileId) 
+  data = PythonValue
 
-
-@node_type
 class DestroyReq(Message):
   '''
   Destroy any tiles listed in ``ids``.
   '''
-  _members = ['ids' ]
+  #_members = ['ids' ]
+  ids = List 
 
-@node_type
 class UpdateReq(Message):
   '''
   Update ``region`` (a slice, or None) of tile with id ``id`` .
@@ -138,10 +139,12 @@ class UpdateReq(Message):
   ``data`` should be a Numpy or sparse array.  ``data`` is combined with
   existing tile data using the supplied reducer function.
   '''
-  _members = ['id', 'region', 'data', 'reducer']
+  #_members = ['id', 'region', 'data', 'reducer']
+  id = Instance(TileId) 
+  region = Tuple
+  data = PythonValue(None) 
+  reducer = PythonValue(None) 
 
-
-@node_type
 class LocalKernelResult(Message):
   '''The local result returned from a kernel invocation.
   
@@ -150,10 +153,10 @@ class LocalKernelResult(Message):
   that must be waited for before returning the result of this
   kernel.
   ''' 
-  _members = ['result', 'futures']
-  
+  #_members = ['result', 'futures']
+  result = PythonValue 
+  futures = Instance(list)
 
-@node_type
 class RunKernelReq(Message):
   '''
   Run ``mapper_fn`` on the list of tiles ``tiles``.
@@ -161,29 +164,34 @@ class RunKernelReq(Message):
   For efficiency (since Python serialization is slow), the same message
   is sent to all workers. 
   '''
-  _members = ['blobs', 'mapper_fn', 'kw']
+  #_members = ['blobs', 'mapper_fn', 'kw']
+  blobs = List
+  mapper_fn = Function(None)
+  kw = Dict
 
-@node_type
 class RunKernelResp(Message):
   '''The result returned from running a kernel function.
   
   This is typically a map from `Extent` to TileId.
   '''
-  _members = ['result']
+  #_members = ['result']
+  result = PythonValue
 
-@node_type
 class CreateTileReq(Message):
-  _members = ['tile_id', 'data']
+  #_members = ['tile_id', 'data']
+  tile_id = Instance(TileId)
+  data = Instance(Tile)
 
-@node_type
 class CreateTileResp(Message):
-  _members = ['tile_id']
+  #_members = ['tile_id']
+  tile_id = Instance(TileId)
 
-@node_type
 class HeartbeatReq(Message):
-  _members = ['worker_id', 'worker_status']
+  #_members = ['worker_id', 'worker_status']
+  worker_id = Int
+  worker_status = Instance(WorkerStatus)
 
-@node_type
 class TileOpReq(Message):
-  _members = ['tile_id', 'fn']
-
+  #_members = ['tile_id', 'fn']
+  tile_id = Instance(TileId)
+  fn = Function(None)
