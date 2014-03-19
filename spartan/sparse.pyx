@@ -232,7 +232,7 @@ def csrcsc_update(data, update, slices):
                     __builtins__.slice(slices[1].stop, data.shape[1]))
   lower_slice = (__builtins__.slice(slices[0].stop, data.shape[0]),
                  __builtins__.slice(0, data.shape[1]))
-  
+
   if slices[1].start > 0:
     update = scipy.sparse.hstack((data[midleft_slice], update), dtype = data.dtype)
   if slices[1].stop < data.shape[1]:
@@ -244,7 +244,7 @@ def csrcsc_update(data, update, slices):
 
   return update
 
-@cython.boundscheck(False) # turn of bounds-checking for entire function   
+@cython.boundscheck(False) # turn of bounds-checking for entire function
 def multiple_slice(X not None, list slices):
     if len(slices) == 0:
         return []
@@ -281,7 +281,7 @@ def multiple_slice_coo(X not None, list slices):
         if src_slice[0].start > rows[-1]:
             break
 
-        end_idx = numpy.searchsorted(rows[idx:], src_slice[1].stop) + idx
+        end_idx = numpy.searchsorted(rows[idx:], src_slice[0].stop) + idx
         #print src_slice[0], rows[idx], rows[end_idx-1]
         results.append((tile_id, dst_slice, scipy.sparse.coo_matrix((data[idx:end_idx], (rows[idx:end_idx]-src_slice[0].start, cols[idx:end_idx])),
                                             shape=tuple([slice.stop-slice.start for slice in src_slice]))))
