@@ -220,9 +220,8 @@ def slice_coo(X not None, tuple slices):
 def csrcsc_update(data, update, slices):
   '''
   csr_matrix and csc_matrix can't support fancing indexing like
-  data[slices] = update. This API uses hstack and vstack to implement to
-  simulate fancing indexing. It  can't support slicing with step is not 1.
-  This should be enough for Spartan.
+  data[slices] = update. This API uses hstack and vstack to implement update.
+  This is a out-place update and can only support slicing with step is 1.
   '''
   upper_slice = (__builtins__.slice(0, slices[0].start),
                  __builtins__.slice(0, data.shape[1]))
