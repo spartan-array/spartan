@@ -388,7 +388,11 @@ def from_file(fn, file_type = 'numpy', sparse = True, tile_hint = None):
 
   if file_type == 'numpy':
     if sparse:
-      raise NotImplementedError("Only support dense npy now.")
+      shape = list(np.load(fn + '_shape.npy'))
+      row = np.load(fn + '_row.npy')
+      col = np.load(fn + '_col.npy')
+      data = np.load(fn + '_data.npy')
+      npa = sp.coo_matrix((data, (row, col)), shape = shape)
     else:
       npa = np.load(fn)
       if fn.endswith("npz"):
