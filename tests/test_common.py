@@ -44,8 +44,6 @@ def run(filename):
   signal.signal(signal.SIGQUIT, sig_handler)
   os.system('rm ./_worker_profiles/*')
 
-
-  #config.initialize(sys.argv)
   mod_name, _ = splitext(basename(filename))
   module = imp.load_source(mod_name, filename)
   util.log_info('Running benchmarks for module: %s (%s)', module, filename)
