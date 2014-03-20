@@ -24,7 +24,7 @@ def _unravelled_ex(ravelled_ul, ravelled_lr, shape):
   lr = extent.unravelled_pos(ravelled_lr, shape)
   return ul, lr
 
-def _tile_mapper(tile_id, blob, apply_region, array=None, user_fn=None, **kw):
+def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
   if array.shape_array == None:
     # Maps over the original array, translating the region to reflect the
     # reshape operation.

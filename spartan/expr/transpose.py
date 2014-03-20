@@ -13,7 +13,7 @@ from ..core import LocalKernelResult
 from .shuffle import target_mapper
 from traits.api import Instance, PythonValue
 
-def _tile_mapper(tile_id, blob, apply_region, array=None, user_fn=None, **kw):
+def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
   base_ex = array.base.extent_for_blob(tile_id)
   ex = extent.create(base_ex.ul[::-1], base_ex.lr[::-1], array.shape)
   return user_fn(ex, **kw)

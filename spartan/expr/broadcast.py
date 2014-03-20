@@ -8,7 +8,7 @@ from ..util import Assert
 def broadcast_mapper(ex, tile, mapper_fn=None, bcast_obj=None):
   raise NotImplementedError
 
-def _broadcast_mapper(tile_id, blob, apply_region, array = None, user_fn = None, **kw):
+def _broadcast_mapper(tile_id, blob, array = None, user_fn = None, **kw):
     base_ex = array.base.extent_for_blob(tile_id)
     ul = [0 for dim in array.shape]
     lr = [dim for dim in array.shape]

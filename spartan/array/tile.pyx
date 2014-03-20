@@ -40,8 +40,7 @@ class Tile(object):
     self.type = tile_type
     self.mask = mask
     self.data = data
-    self.ref = 1
-    
+
     if data is not None:
       Assert.eq(data.shape, shape)
       Assert.eq(data.dtype, dtype)
@@ -49,9 +48,6 @@ class Tile(object):
     if isinstance(mask, np.ndarray):
       Assert.eq(mask.shape, shape)
 
-  def copy(self):
-    return Tile(self.shape, self.dtype, self.data.copy(), self.mask.copy(), self.type)
-  
   @property
   def data(self):
     #util.log_info('DATA %s %s', self.id, self._data)
