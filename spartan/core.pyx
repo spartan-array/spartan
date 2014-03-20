@@ -69,10 +69,10 @@ cdef class WorkerStatus(object):
     self.last_report_time = report_time
 
   def add_task_report(self, task_req, start_time, finish_time):
-    self.task_reports.append({'task':task_req.get_content(), 'start_time':start_time, 'finish_time':finish_time})
+    self.task_reports.append({'task':task_req, 'start_time':start_time, 'finish_time':finish_time})
   
   def add_task_failure(self, task_req):
-    self.task_failures.append(task_req.get_content())
+    self.task_failures.append(task_req)
     
   def clean_status(self):
     self.task_reports = []
@@ -88,6 +88,14 @@ class Message(Node):
   '''Base class for all RPC messages.'''
   def __reduce__(self):
     return (self.__class__, tuple(), self.__dict__)
+
+  def __reduce_ex__(self, protocol):
+    return Message.__reduce__(self)
+
+  def __getstate__(self):
+    return self.__dict__
+
+
 
 class RegisterReq(Message):
   '''Sent by worker to master when registering during startup.''' 
@@ -108,6 +116,7 @@ class InitializeReq(Message):
   #_members = ['id', 'peers']
   id = Int
   peers = Dict
+
 
 class GetReq(Message):
   '''
