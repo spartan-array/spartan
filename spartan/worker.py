@@ -237,6 +237,7 @@ class Worker(object):
     :param handle: `PendingRequest`
     
     '''
+    #threading.Thread(target=self._run_kernel, args=(req, handle)).start()
     self._kernel_threads.apply_async(self._run_kernel, args=(req, handle))
       
   def shutdown(self, req, handle):
@@ -354,4 +355,4 @@ if __name__ == '__main__':
   for w in workers:
     w.join()
     
-  print >>sys.stderr, 'All workers exited!'
+  print >>sys.stderr, 'Worker: all worker processes exited!'

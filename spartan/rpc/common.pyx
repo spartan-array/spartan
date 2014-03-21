@@ -25,6 +25,7 @@ from ..util import TIMER
 cimport zeromq
 from zeromq cimport Socket, ServerSocket, StubSocket
 from rlock cimport FastRLock
+from cpython cimport bool
 
 #cdef extern from "time.h":
 #  cdef struct timespec:
@@ -58,6 +59,8 @@ cdef extern from "pthread.h":
 
 CLIENT_PENDING = weakref.WeakKeyDictionary()
 SERVER_PENDING = weakref.WeakKeyDictionary()
+
+_rpc_id_generator = xrange(10000000).__iter__()
 
 NO_RESULT = object()
 
@@ -221,7 +224,7 @@ cdef class Condition:
 cdef class Future:
   cdef object addr
   cdef long rpc_id
-  cdef object have_result
+  cdef bool have_result
   cdef object result
   cdef object finished_fn
   cdef object _cv
@@ -317,6 +320,68 @@ class FutureGroup(list):
       results.append(f.wait())
     return results
 
+cdef class BcastFutureGroup:
+  cdef public long rpc_id
+  cdef bool have_all_results
+  cdef list results
+  cdef object _cv
+  cdef long _start
+  cdef long _finish
+  cdef long _deadline
+  cdef int  _n_jobs
+
+  def __init__(self, rpc_id, n_jobs, timeout=None):
+    self.rpc_id = rpc_id
+    self._n_jobs = n_jobs
+    self.have_all_results = False
+    self.results = []
+    self._cv = Condition()
+    self._start = time.time()
+    self._finish = time.time() + 1000000
+    if timeout is None:
+      timeout = DEFAULT_TIMEOUT
+    self._deadline = time.time() + timeout
+
+  def done(self, result=None):
+    self._cv.acquire()
+    self._n_jobs -= 1
+    self.results.append(result)
+    #notify if all jobs are done 
+    if self._n_jobs == 0:
+      self.have_all_results = True
+      self._finish = time.time()
+      self._cv.notify()
+    self._cv.release()
+
+  def timed_out(self):
+    return self._deadline < time.time()
+
+  def elapsed_time(self):
+    return min(time.time(), self._finish) - self._start
+  
+  def __repr__(self):
+    return 'Future(id:%d) [%s]' % (self.rpc_id, self.elapsed_time())
+  
+  def wait(self):
+    self._cv.acquire()
+    while not self.have_all_results and not self.timed_out():
+      # use a timeout so that ctrl-c works.
+      self._cv.wait(timeout=1)
+      
+      if self.elapsed_time() > WARN_THRESHOLD:
+        util.log_info('Waiting for RPC: %s', self.rpc_id)
+    
+    self._cv.release()
+    if not self.have_all_results and self.timed_out():
+      util.log_info('timed out!')
+      raise TimeoutException('Timed out on remote call (%s)' % (self.rpc_id,))
+    
+    for result in self.results:
+      if isinstance(result, RPCException):
+        raise RemoteException(result.py_exc)
+    return self.results
+
+
 def wait_for_all(futures):
   return [f.wait() for f in futures]
 
@@ -371,7 +436,6 @@ cdef class Server:
 
   cpdef handle_read(self, StubSocket socket):
     #util.log_info('Reading...')
-
     data = socket.recv()
     #reader = cStringIO.StringIO(data)
     reader = serialization_buffer.Reader(data)
@@ -411,15 +475,15 @@ cdef class ProxyMethod:
     self.method = method
 
   def __call__(self, request=None, timeout=None):
-#    if len(serialized) > 800000:
-#      util.log_info('%s::\n %s; \n\n\n %s', self.method, ''.join(traceback.format_stack()), request)
     return self.client.send(self.method, request, timeout)
+  
+  def call_raw(self, data=None, future=None):
+    return self.client.send_raw(data=data, future=future)
 
 cdef class Client:
   cdef Socket _socket
   cdef dict _futures
   cdef FastRLock _lock
-  cdef object _rpc_id
   
   def __init__(self, socket):
     self._socket = socket
@@ -427,19 +491,15 @@ cdef class Client:
     self._socket.connect()
     self._futures = {}
     self._lock = rlock.FastRLock()
-    self._rpc_id = xrange(10000000).__iter__()
 
   def __reduce__(self, *args, **kwargs):
     raise cPickle.PickleError('Not pickleable.')
 
   def send(self, method, request, timeout):
     with self._lock:
-      rpc_id = self._rpc_id.next()
+      rpc_id = _rpc_id_generator.next() 
       header = { 'method' : method, 'rpc_id' : rpc_id }
-
-      #w = cStringIO.StringIO()
       w = serialization_buffer.Writer()
-
       
       if isinstance(request, PickledData):
         with util.TIMER.send_serialize:
@@ -450,12 +510,15 @@ cdef class Client:
         serialize_to(request, w)
 
       data = w.getvalue()
-      
       f = Future(self.addr(), rpc_id, timeout)
       self._futures[rpc_id] = f
-      #util.log_info('Send %s, %s', self.addr(), rpc_id)
       self._socket.send(data)
       return f
+  
+  def send_raw(self, data, future):
+    with self._lock:
+      self._futures[future.rpc_id] = future
+      self._socket.send(data) 
 
   def addr(self):
     return self._socket.addr
@@ -481,18 +544,29 @@ cdef class Client:
 def forall(clients, method, request, timeout=None):
   '''Invoke ``method`` with ``request`` for each client in ``clients``
 
-  ``request`` is only serialized once, so this is more efficient when
-  targeting multiple workers with the same data.
+  ``request`` and header is only serialized once, and we only create one
+  future object, so this is more efficient when targeting multiple workers 
+  with the same data.
 
-  Returns a future wrapping all of the requests.
+  Returns a BcastFutureGroup wrapping all of the requests.
   '''
-  cdef list futures = []
+  if not isinstance(clients, list):
+    clients = [c for c in clients]
   
-  with TIMER.serial_body:
-    pickled = PickledData(data=serialize(request))
+  n_jobs = len(clients)  
+  rpc_id = _rpc_id_generator.next()
+  fgroup = BcastFutureGroup(rpc_id, n_jobs, timeout=timeout) 
+
+  with TIMER.serial_once:
+    #only serialize the header and body once.
+    header = { 'method' : method, 'rpc_id' : rpc_id }
+    w = serialization_buffer.Writer()
+    cPickle.dump(header, w, -1)
+    serialize_to(request, w)
+    data = w.getvalue()
   
   with TIMER.master_loop:
     for c in clients:
-      futures.append(getattr(c, method)(pickled, timeout=timeout))
-
-  return FutureGroup(futures)
+      c.send_raw(data=data, future=fgroup)
+  
+  return fgroup

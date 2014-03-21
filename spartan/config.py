@@ -201,12 +201,11 @@ def parse(argv):
       flag.set(getattr(parsed_flags, name))
 
   # reset loggers so that basic config works
-  if not 'nose' in sys.modules:
-    logging.root = logging.RootLogger(logging.WARNING)
-    logging.basicConfig(
-      format='%(created)f %(hostname)s:%(pid)s %(filename)s:%(lineno)s [%(funcName)s] %(message)s',
-      level=FLAGS.log_level,
-      stream=sys.stderr)
+  logging.root = logging.RootLogger(logging.WARNING)
+  logging.basicConfig(
+    format='%(created)f %(hostname)s:%(pid)s %(filename)s:%(lineno)s [%(funcName)s] %(message)s',
+    level=FLAGS.log_level,
+    stream=sys.stderr)
 
   for f in rest:
     if f.startswith('-'):
