@@ -76,7 +76,7 @@ def compute_extents(shape, tile_hint=None, num_shards=-1):
     list: list of `Extent`
   '''
 
-  util.log_info('Splitting %s %s %s', shape, tile_hint, num_shards)
+  util.log_debug('Splitting %s %s %s', shape, tile_hint, num_shards)
 
   # try to make reasonable tiles
   if len(shape) == 0:
@@ -229,8 +229,7 @@ class DistArrayImpl(DistArray):
     self.id = ID_COUNTER.next()
 
     if self.ctx.is_master():
-      util.log_info('New array: %s, %s, %s tiles', shape, dtype, len(tiles))
-      #util.log_info('%s', extents)
+      #util.log_info('New array: %s, %s, %s tiles', shape, dtype, len(tiles))
       if _pending_destructors:
         self.ctx.destroy_all(_pending_destructors)
         del _pending_destructors[:]
@@ -498,7 +497,7 @@ def from_table(extents):
   if len(extents) > 0:
     # fetch one tile from the table to figure out the dtype
     key, tile_id = extents.iteritems().next()
-    util.log_info('%s :: %s', key, tile_id)
+    util.log_debug('%s :: %s', key, tile_id)
     
     #dtype = blob_ctx.get().run_on_tile(tile_id, lambda t: t.dtype).wait()
     dtype, sparse = blob_ctx.get().tile_op(tile_id, lambda t: (t.dtype, t.type == tile.TYPE_SPARSE)).result
