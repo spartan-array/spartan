@@ -510,6 +510,7 @@ class LocalWrapper(DistArray):
   '''
   def __init__(self, data):
     self._data = np.asarray(data)
+    self.sparse = False
     self.bad_tiles = []
     Assert.isinstance(data, (np.ndarray, int, float))
     #assert not isinstance(data, core.TileId)

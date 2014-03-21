@@ -19,7 +19,7 @@ from .reduce import ReduceExpr, LocalReduceExpr
 from ..util import Assert
 
 from .. import util
-from .base import Expr, Val, AsArray, DictExpr, lazify, expr_like, ExprTrace
+from .base import Expr, Val, AsArray, DictExpr, lazify, expr_like, ExprTrace, NotShapeable
 from .map import MapExpr, LocalMapExpr
 from .ndarray import NdArrayExpr
 from .shuffle import ShuffleExpr
@@ -357,7 +357,7 @@ class RotateSlice(OptimizePass):
 
     try:
       map_shape = map_expr.compute_shape()
-    except base.NotShapeable:
+    except NotShapeable:
       return slice_expr.visit(self)
 
     Assert.iterable(map_expr.children)
@@ -416,7 +416,7 @@ def add_optimization(klass, default):
 add_optimization(MapMapFusion, True)
 add_optimization(ReduceMapFusion, True)
 add_optimization(CollapsedCachedExpressions, True)
-add_optimization(RotateSlice, False)
+add_optimization(RotateSlice, True)
 
 if parakeet is not None:
   add_optimization(ParakeetGeneration, True)

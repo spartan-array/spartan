@@ -69,6 +69,10 @@ class TransposeExpr(Expr):
 
     return Transpose(v)
 
+  def compute_shape(self):
+    # May raise NotShapeable
+    return self.array.shape[::-1]
+
 def transpose(array, tile_hint = None):
   '''
   Transpose ``array``.

@@ -154,6 +154,9 @@ class ReshapeExpr(Expr):
     shape = deps['new_shape']
     return Reshape(v, shape, self.tile_hint)
 
+  def compute_shape(self):
+    return self.new_shape
+
 def reshape(array, new_shape, tile_hint=None):
   '''
   Reshape/retile ``array``.
