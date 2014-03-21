@@ -264,7 +264,11 @@ class Assert(object):
       return
 
     if np.isscalar(a) or np.isscalar(b):
-      assert a == b, 'Failed: \n%s\n ==\n%s' % (a, b)
+      if tolerance == 0:
+        assert a == b, 'Failed: \n%s\n ==\n%s' % (a, b)
+      else:
+        import math
+        assert abs(a - b) < tolerance, 'Failed: \n%s\n ==\n%s' % (a, b)
       return
 
     assert is_iterable(a), (a, b)

@@ -59,6 +59,7 @@ def _reduce_mapper(ex, children, op, axis, output):
 
 class ReduceExpr(Expr):
   children = Instance(DictExpr) 
+  children_order = Instance(list)
   axis = PythonValue(None, desc="Integer or None")
   dtype_fn = Function
   op = Instance(LocalExpr) 
@@ -147,6 +148,7 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, accumulate_fn, fn_kw=None, tile_h
                               kw=fn_kw)
 
   return ReduceExpr(children=DictExpr(vals={ varname : v}),
+                    children_order=[varname],
                     axis=axis,
                     dtype_fn=dtype_fn,
                     op=reduce_op,

@@ -527,7 +527,8 @@ class LocalWrapper(DistArray):
 
   @property
   def tiles(self):
-    return {self._ex:0}
+    # A hack to return a non-existed tile
+    return {self._ex:core.TileId(master.get().num_workers + 1, 0)}
 
   def extent_for_blob(tile_id):
     return self._ex

@@ -93,7 +93,7 @@ def fusable(v):
                         WriteArrayExpr))
 
 
-def merge_var(children, k, v):
+def merge_var(children, children_order, k, v):
   """Add a new expression with key ``k`` to the ``children`` dictionary.
 
   If ``k`` is already in the dictionary, than ``v`` must be equal to
@@ -103,6 +103,7 @@ def merge_var(children, k, v):
     Assert.eq(v, children[k])
   else:
     children[k] = v
+    children_order.append(k)
 
 
 class MapMapFusion(OptimizePass):
@@ -133,15 +134,18 @@ class MapMapFusion(OptimizePass):
 
     #util.log_info('Original: %s', expr.op)
     children = {}
+    children_order = []
     combined_op = LocalMapExpr(fn=expr.op.fn,
                                kw=expr.op.kw,
                                pretty_fn=expr.op.pretty_fn)
     trace = ExprTrace()
-    for name, child_expr in map_children.iteritems():
+    for name in expr.children_order:
+      child_expr = map_children[name]
       trace.fuse(child_expr.stack_trace)
       if isinstance(child_expr, MapExpr):
-        for k, v in child_expr.children.iteritems():
-          merge_var(children, k, v)
+        for k in child_expr.children_order:
+          v = child_expr.children[k]
+          merge_var(children, children_order, k, v)
 
         #util.log_info('Merging: %s', child_expr.op)
         combined_op.add_dep(child_expr.op)
@@ -149,9 +153,11 @@ class MapMapFusion(OptimizePass):
         key = make_var()
         combined_op.add_dep(LocalInput(idx=key))
         children[key] = child_expr
+        children_order.append(key)
 
     return expr_like(expr,
                      children=DictExpr(vals=children),
+                     children_order=children_order,
                      op=combined_op,
                      trace=trace)
 
@@ -174,15 +180,19 @@ class ReduceMapFusion(OptimizePass):
                                   deps=[expr.op.deps[0]])
 
     new_children = {}
+    new_children_order = []
     trace = ExprTrace()
-    for name, child_expr in old_children.iteritems():
-      for k, v in child_expr.children.iteritems():
-        merge_var(new_children, k, v)
+    for name in expr.children_order:
+      child_expr = old_children[name]
+      for k in child_expr.children_order:
+        v = child_expr.children[k]
+        merge_var(new_children, new_children_order, k, v)
       combined_op.add_dep(child_expr.op)
       trace.fuse(child_expr.stack_trace)
 
     return expr_like(expr,
                      children=DictExpr(vals=new_children),
+                     children_order=new_children_order,
                      axis=expr.axis,
                      dtype_fn=expr.dtype_fn,
                      accumulate_fn=expr.accumulate_fn,
@@ -372,6 +382,7 @@ class RotateSlice(OptimizePass):
     return expr_like(map_expr,
                      op=map_expr.op,
                      children=DictExpr(vals=children),
+                     children_order=map_expr.children_order,
                      trace=map_expr.stack_trace)
 
 

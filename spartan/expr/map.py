@@ -73,6 +73,7 @@ class MapExpr(Expr):
   :ivar children: One or more `Expr` to map over.
   '''
   children = Instance(DictExpr) 
+  children_order = Instance(list)
   op = Instance(LocalExpr) 
 
   def label(self):
@@ -130,10 +131,12 @@ def map(inputs, fn, numpy_expr=None, fn_kw=None):
 
   op_deps = []
   children = {}
+  children_order = []
   for v in inputs:
     v = as_array(v)
     varname = make_var()
     children[varname] = v
+    children_order.append(varname)
     op_deps.append(LocalInput(idx=varname))
 
   children = DictExpr(vals=children)
@@ -142,6 +145,6 @@ def map(inputs, fn, numpy_expr=None, fn_kw=None):
                     pretty_fn=numpy_expr,
                     deps=op_deps)
 
-  return MapExpr(children=children, op=op)
+  return MapExpr(children=children, children_order=children_order, op=op)
 
 
