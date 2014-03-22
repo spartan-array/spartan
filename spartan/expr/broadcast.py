@@ -9,19 +9,22 @@ def broadcast_mapper(ex, tile, mapper_fn=None, bcast_obj=None):
   raise NotImplementedError
 
 def _broadcast_mapper(tile_id, blob, array = None, user_fn = None, **kw):
-    base_ex = array.base.extent_for_blob(tile_id)
-    ul = [0 for dim in array.shape]
-    lr = [dim for dim in array.shape]
+  base_ex = array.base.extent_for_blob(tile_id)
+  ul = [0 for dim in array.shape]
+  lr = [dim for dim in array.shape]
 
-    for i in range(len(base_ex.ul) - 1, 0, -1):
-      broadcast_i = i + array.prepend_dim
-      if array.base.shape[i] != array.shape[broadcast_i]:
-        # array.base.shape[i] must be 1 according to the broadcast rules.
-        assert(ul[i + array.prepend_dim] == 0)
-        lr[i + array.prepend_dim] = array.shape[broadcast_i]
-    ex = extent.create(ul, lr, array.shape)
+  print array.shape, array.base.shape
+  for i in range(len(base_ex.ul) - 1, -1, -1):
+    broadcast_i = i + array.prepend_dim
+    if array.base.shape[i] != array.shape[broadcast_i]:
+      # array.base.shape[i] must be 1 according to the broadcast rules.
+      assert(ul[broadcast_i] == 0)
+    else:
+      ul[broadcast_i] = base_ex.ul[i]
+      lr[broadcast_i] = base_ex.lr[i]
+  ex = extent.create(ul, lr, array.shape)
 
-    return user_fn(ex, **kw)
+  return user_fn(ex, **kw)
 
 class Broadcast(distarray.DistArray):
   '''Mimics the behavior of Numpy broadcasting.
@@ -36,6 +39,7 @@ class Broadcast(distarray.DistArray):
     self.base = base
     self.shape = shape
     self.dtype = base.dtype
+    self.sparse = self.base.sparse
     self.bad_tiles = []
     self.prepend_dim = len(shape) - len(base.shape)
 

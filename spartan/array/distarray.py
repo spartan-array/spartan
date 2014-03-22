@@ -514,7 +514,10 @@ class LocalWrapper(DistArray):
   '''
   def __init__(self, data):
     self._data = np.asarray(data)
+    self.sparse = False
     self.bad_tiles = []
+    self._ex = extent.from_slice(np.index_exp[:], self.shape)
+    Assert.isinstance(data, (np.ndarray, int, float))
     #assert not isinstance(data, core.TileId)
     Assert.isinstance(data, (np.ndarray, int, float))
     #print 'Wrapping: %s %s (%s)' % (data, type(data), np.isscalar(data))
@@ -528,6 +531,15 @@ class LocalWrapper(DistArray):
   def shape(self):
     return self._data.shape
 
+  @property
+  def tiles(self):
+    # LocalWrapper doesn't actually have tiles, so return a fake tile
+    # representing the entire array
+    return {self._ex:core.TileId(-1, 0)}
+
+  def extent_for_blob(tile_id):
+    return self._ex
+
   def fetch(self, ex):
     return self._data[ex.to_slice()]
 
@@ -537,8 +549,7 @@ class LocalWrapper(DistArray):
   def foreach_tile(self, mapper_fn, kw=None):
     #print 'Mapping: ', mapper_fn, ' over ', self._data
     if kw is None: kw = {}
-    ex = extent.from_slice(np.index_exp[:], self.shape)
-    map_result = mapper_fn(ex, **kw)
+    map_result = mapper_fn(self._ex, **kw)
     result = map_result.result
     
     assert len(result) == 1

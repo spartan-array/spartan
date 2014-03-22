@@ -19,7 +19,7 @@ from .reduce import ReduceExpr, LocalReduceExpr
 from ..util import Assert
 
 from .. import util
-from .base import Expr, Val, AsArray, DictExpr, lazify, expr_like, ExprTrace
+from .base import Expr, Val, AsArray, ListExpr, lazify, expr_like, ExprTrace, NotShapeable
 from .map import MapExpr, LocalMapExpr
 from .ndarray import NdArrayExpr
 from .shuffle import ShuffleExpr
@@ -93,16 +93,18 @@ def fusable(v):
                         WriteArrayExpr))
 
 
-def merge_var(children, k, v):
+def merge_var(children, child_to_var, k, v):
   """Add a new expression with key ``k`` to the ``children`` dictionary.
 
   If ``k`` is already in the dictionary, than ``v`` must be equal to
   the current value.
   """
-  if k in children:
-    Assert.eq(v, children[k])
-  else:
-    children[k] = v
+  try:
+    i = child_to_var.index(k)
+    Assert.eq(v, children[i])
+  except ValueError:
+    children.append(v)
+    child_to_var.append(k)
 
 
 class MapMapFusion(OptimizePass):
@@ -119,8 +121,10 @@ class MapMapFusion(OptimizePass):
     #util.log_info('VISIT %s', op.children)
     map_children = self.visit(expr.children)
     all_maps = True
-    Assert.isinstance(map_children, DictExpr)
-    for k, v in map_children.iteritems():
+    Assert.isinstance(map_children, ListExpr)
+    for i in range(len(map_children)):
+      k = expr.child_to_var[i]
+      v = map_children[i]
       if not fusable(v):
         print 'Skipping fusion: (%s -> %s)' % (k, type(v))
         all_maps = False
@@ -132,26 +136,33 @@ class MapMapFusion(OptimizePass):
       return expr.visit(self)
 
     #util.log_info('Original: %s', expr.op)
-    children = {}
+    children = []
+    child_to_var = []
     combined_op = LocalMapExpr(fn=expr.op.fn,
                                kw=expr.op.kw,
                                pretty_fn=expr.op.pretty_fn)
     trace = ExprTrace()
-    for name, child_expr in map_children.iteritems():
+    for i in range(len(map_children)):
+      name = expr.child_to_var[i]
+      child_expr = map_children[i]
       trace.fuse(child_expr.stack_trace)
       if isinstance(child_expr, MapExpr):
-        for k, v in child_expr.children.iteritems():
-          merge_var(children, k, v)
+        for j in range(len(child_expr.children)):
+          k = child_expr.child_to_var[j]
+          v = child_expr.children[j]
+          merge_var(children, child_to_var, k, v)
 
         #util.log_info('Merging: %s', child_expr.op)
         combined_op.add_dep(child_expr.op)
       else:
         key = make_var()
         combined_op.add_dep(LocalInput(idx=key))
-        children[key] = child_expr
+        children.append(child_expr)
+        child_to_var.append(key)
 
     return expr_like(expr,
-                     children=DictExpr(vals=children),
+                     children=ListExpr(vals=children),
+                     child_to_var=child_to_var,
                      op=combined_op,
                      trace=trace)
 
@@ -162,10 +173,10 @@ class ReduceMapFusion(OptimizePass):
   after = [MapMapFusion]
 
   def visit_ReduceExpr(self, expr):
-    Assert.isinstance(expr.children, DictExpr)
+    Assert.isinstance(expr.children, ListExpr)
     old_children = self.visit(expr.children)
 
-    for k, v in old_children.iteritems():
+    for v in old_children:
       if not isinstance(v, MapExpr):
         return expr.visit(self)
 
@@ -173,16 +184,22 @@ class ReduceMapFusion(OptimizePass):
                                   kw=expr.op.kw,
                                   deps=[expr.op.deps[0]])
 
-    new_children = {}
+    new_children = []
+    new_child_to_var = []
     trace = ExprTrace()
-    for name, child_expr in old_children.iteritems():
-      for k, v in child_expr.children.iteritems():
-        merge_var(new_children, k, v)
+    for i in range(len(old_children)):
+      name = expr.child_to_var[i]
+      child_expr = old_children[i]
+      for j in range(len(child_expr.children)):
+        k = child_expr.child_to_var[j]
+        v = child_expr.children[j]
+        merge_var(new_children, new_child_to_var, k, v)
       combined_op.add_dep(child_expr.op)
       trace.fuse(child_expr.stack_trace)
 
     return expr_like(expr,
-                     children=DictExpr(vals=new_children),
+                     children=ListExpr(vals=new_children),
+                     child_to_var=new_child_to_var,
                      axis=expr.axis,
                      dtype_fn=expr.dtype_fn,
                      accumulate_fn=expr.accumulate_fn,
@@ -309,7 +326,8 @@ class ParakeetGeneration(OptimizePass):
       source = _parakeet_codegen(expr.op)
       return expr_like(expr,
                        op=local.ParakeetExpr(source=source,  deps=expr.op.deps),
-                       children=expr.children)
+                       children=expr.children,
+                       child_to_var=expr.child_to_var)
     except local.CodegenException:
       util.log_info('Failed to convert to parakeet.')
       return expr.visit(self)
@@ -357,21 +375,22 @@ class RotateSlice(OptimizePass):
 
     try:
       map_shape = map_expr.compute_shape()
-    except base.NotShapeable:
+    except NotShapeable:
       return slice_expr.visit(self)
 
     Assert.iterable(map_expr.children)
     map_children = self.visit(map_expr.children)
 
-    children = {}
-    for name, child_expr in map_children.iteritems():
-      children[name] = SliceExpr(src=child_expr,
-                                 idx=slice_expr.idx,
-                                 broadcast_to=map_shape)
+    children = []
+    for child_expr in map_children:
+      children.append(SliceExpr(src=child_expr,
+                                idx=slice_expr.idx,
+                                broadcast_to=map_shape))
 
     return expr_like(map_expr,
                      op=map_expr.op,
-                     children=DictExpr(vals=children),
+                     children=ListExpr(vals=children),
+                     child_to_var=map_expr.child_to_var,
                      trace=map_expr.stack_trace)
 
 
@@ -416,7 +435,7 @@ def add_optimization(klass, default):
 add_optimization(MapMapFusion, True)
 add_optimization(ReduceMapFusion, True)
 add_optimization(CollapsedCachedExpressions, True)
-add_optimization(RotateSlice, False)
+add_optimization(RotateSlice, True)
 
 if parakeet is not None:
   add_optimization(ParakeetGeneration, True)

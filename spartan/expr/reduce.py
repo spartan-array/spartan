@@ -11,11 +11,11 @@ from ..array import extent, distarray
 from ..expr.local import make_var, LocalExpr, LocalReduceExpr, LocalInput, LocalCtx
 from ..util import Assert
 from . import broadcast
-from .base import Expr, DictExpr
+from .base import Expr, ListExpr 
 from ..core import LocalKernelResult
 from traits.api import Instance, Function, PythonValue
 
-def _reduce_mapper(ex, children, op, axis, output):
+def _reduce_mapper(ex, children, child_to_var, op, axis, output):
   '''Run a local reducer for a tile, and update the appropiate 
   portion of the output array.
   
@@ -31,7 +31,10 @@ def _reduce_mapper(ex, children, op, axis, output):
   
   #util.log_info('Reduce: %s %s %s %s %s', reducer, ex, tile, axis, fn_kw)
 
-  local_values = dict([(k, v.fetch(ex)) for k, v in children.iteritems()])
+  local_values = {}
+  for i in range(len(children)):
+    lv = children[i].fetch(ex)
+    local_values[child_to_var[i]] = lv
   
   # Set extent and axis information for user functions
   local_values['extent'] = ex
@@ -58,7 +61,8 @@ def _reduce_mapper(ex, children, op, axis, output):
   return LocalKernelResult(result=[])
 
 class ReduceExpr(Expr):
-  children = Instance(DictExpr) 
+  children = Instance(ListExpr)
+  child_to_var = Instance(list)
   axis = PythonValue(None, desc="Integer or None")
   dtype_fn = Function
   op = Instance(LocalExpr) 
@@ -68,10 +72,10 @@ class ReduceExpr(Expr):
   def __init__(self, *args, **kw):
     super(ReduceExpr, self).__init__(*args, **kw)
     assert self.dtype_fn is not None
-    assert isinstance(self.children, DictExpr)
+    assert isinstance(self.children, ListExpr)
 
   def compute_shape(self):
-    shapes = [i.shape for i in self.children.values()]
+    shapes = [i.shape for i in self.children]
     child_shape = collections.defaultdict(int)
     for s in shapes:
       for i, v in enumerate(s):
@@ -84,28 +88,27 @@ class ReduceExpr(Expr):
   
   def _evaluate(self, ctx, deps):
     children = deps['children']
+    child_to_var = deps['child_to_var']
     axis = deps['axis']
     op = deps['op']
     tile_accum = deps['accumulate_fn']
 
-    keys = children.keys()
-    vals = children.values()
-    vals = broadcast.broadcast(vals)
-    largest = distarray.largest_value(vals)
-    children = dict(zip(keys, vals))
+    children = broadcast.broadcast(children)
+    largest = distarray.largest_value(children)
 
-    dtype = deps['dtype_fn'](vals[0])
+    dtype = deps['dtype_fn'](children[0])
     # util.log_info('Reducer: %s', op)
     # util.log_info('Combiner: %s', tile_accum)
     # util.log_info('Reducing %s over axis %s', children, axis)
 
-    shape = extent.shape_for_reduction(vals[0].shape, axis)
+    shape = extent.shape_for_reduction(children[0].shape, axis)
     
     output_array = distarray.create(shape, dtype,
                                     reducer=tile_accum, tile_hint=self.tile_hint)
 
   # util.log_info('Reducing into array %s', output_array)
     largest.foreach_tile(_reduce_mapper, kw={'children' : children,
+                                             'child_to_var' : child_to_var,
                                              'op' : op,
                                              'axis' : axis,
                                              'output' : output_array})
@@ -146,7 +149,8 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, accumulate_fn, fn_kw=None, tile_h
                               ],
                               kw=fn_kw)
 
-  return ReduceExpr(children=DictExpr(vals={ varname : v}),
+  return ReduceExpr(children=ListExpr(vals=[v]),
+                    child_to_var=[varname],
                     axis=axis,
                     dtype_fn=dtype_fn,
                     op=reduce_op,

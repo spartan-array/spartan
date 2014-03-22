@@ -7,7 +7,7 @@ from ..node import Node
 from ..util import is_iterable, Assert
 from .base import Expr, lazify
 from traits.api import Instance, Function, PythonValue, HasTraits
-from .base import DictExpr
+from .base import DictExpr, NotShapeable
 
 def shuffle(v, fn, tile_hint=None, target=None, kw=None):
   '''
@@ -113,7 +113,6 @@ class ShuffleExpr(Expr):
     util.log_info('Keywords: %s', fn_kw)
 
     map_fn = self.map_fn
-    
     if target is not None:
       v.foreach_tile(mapper_fn = target_mapper,
                      kw = dict(map_fn=map_fn, source=v, target=target, fn_kw=fn_kw))
@@ -121,3 +120,12 @@ class ShuffleExpr(Expr):
     else:
       return v.map_to_array(mapper_fn = notarget_mapper,
                               kw = dict(source=v, map_fn=map_fn, fn_kw=fn_kw))
+
+  def compute_shape(self):
+    if self.target != None:
+      return self.target.shape
+    else:
+      # We don't know the shape after shuffle.
+      raise NotShapeable
+
+

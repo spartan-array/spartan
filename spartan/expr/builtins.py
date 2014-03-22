@@ -259,7 +259,7 @@ def arange(shape, dtype=np.float, tile_hint=None):
   An extended version of `np.arange`.  
   
   Returns a new array of the given shape and dtype. Values of the
-  array are equivalent to running: ``np.arange(np.prod(shape)).ravel(shape)``.
+  array are equivalent to running: ``np.arange(np.prod(shape)).reshape(shape)``.
   
   :param shape:
   :param dtype:

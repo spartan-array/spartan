@@ -76,6 +76,10 @@ class DotExpr(Expr):
   def __str__(self):
     return 'Dot[%s, %s]' % (self.matrix_a, self.matrix_b)
 
+  def compute_shape(self):
+    # May raise NotShapeable
+    return (self.matrix_a.shape[0], self.matrix_b.shape[1])
+
   def _evaluate(self, ctx, deps):
     av = deps['matrix_a']
     bv = deps['matrix_b']

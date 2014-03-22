@@ -46,7 +46,7 @@ class WriteArrayExpr(Expr):
   dst_slices = PythonValue(None, desc="Slices or a tuple of slices") 
 
   def __str__(self):
-    return 'WriteArrayExpr[%d] %s %s %s' % (self.expr_id, self.array, self.data)
+    return 'WriteArrayExpr[%d] %s %s' % (self.expr_id, self.array, self.data)
   
   def _evaluate(self, ctx, deps):
     array = deps['array']
@@ -70,6 +70,9 @@ class WriteArrayExpr(Expr):
       raise TypeError
 
     return array
+
+  def compute_shape(self):
+    return self.array.shape
 
 def write(array, src_slices, data, dst_slices):
   '''
