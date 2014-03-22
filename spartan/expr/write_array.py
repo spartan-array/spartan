@@ -20,7 +20,7 @@ from spartan import master
 from spartan.array import distarray, extent
 from .slice import Slice
 from ..core import LocalKernelResult
-from ..util import Assert
+from ..util import Assert, FileHelper
 from .base import Expr
 from .ndarray import ndarray
 from .shuffle import shuffle
@@ -110,8 +110,8 @@ def _local_read_sparse_mm(array, ex, fn, data_begin):
 
   ul = [array.shape[0], array.shape[1]]
   lr = [0, 0]
-  row = []
-  col = []
+  rows = []
+  cols = []
   data = []
   with open(fn) as fp:
     # We assume the maximum length of a line is less than 256.
@@ -136,21 +136,21 @@ def _local_read_sparse_mm(array, ex, fn, data_begin):
       (_row, _col), val = _extract_mm_coordinate(line)
       _row -= 1
       _col -= 1
-      row.append(_row)
-      col.append(_col)
+      rows.append(_row)
+      cols.append(_col)
       data.append(float(val))
       ul[0] = _row if _row < ul[0] else ul[0]
       ul[1] = _col if _col < ul[1] else ul[1]
       lr[0] = _row if _row > lr[0] else lr[0]
       lr[1] = _col if _col > lr[1] else lr[1]
 
-  # Adjust row, col based on the ul of this submatrix.
-  for i in xrange(len(row)):
-    row[i] -= ul[0]
-    col[i] -= ul[1]
+  # Adjust rows and cols based on the ul of this submatrix.
+  for i in xrange(len(rows)):
+    rows[i] -= ul[0]
+    cols[i] -= ul[1]
 
   new_ex = extent.create(ul, [lr[0] + 1, lr[1] + 1], array.shape)
-  new_array = sp.coo_matrix((data, (row, col)), new_ex.shape)
+  new_array = sp.coo_matrix((data, (rows, cols)), new_ex.shape)
   if new_ex.shape[0] > new_ex.shape[1]:
     new_array = new_array.tocsc()
   else:
@@ -219,64 +219,72 @@ def _local_read_sparse_npy(array, ex, fn):
   2. For numpy format, we can evenly distribute the files we need to read to
      workers.
   '''
-  data_begin = {}
-  dtype = {}
-  dtype_size = {}
-  dtype_format = {}
-  shape = {}
-  fp = {}
-  read_next = {}
+  #data_begin = {}
+  #dtype = {}
+  #dtype_size = {}
+  #shape = {}
+  #fp = {}
+  #read_next = {}
+  attr = {'data_begin':{}, 'dtype':{}, 'shape':None,
+          'read_next':{}, 'fn':{}}
+  types = ['row', 'col', 'data']
+  dtype_name = {'float64':'d', 'float32':'f', 'int64':'q', 'int32':'i'}
 
-  shape['row'], dtype['row'], data_begin['row'] = _parse_npy_header(fn + '_row.npy')
-  shape['col'], dtype['col'], data_begin['col'] = _parse_npy_header(fn + '_col.npy')
-  shape['data'], dtype['data'], data_begin['data'] = _parse_npy_header(fn + '_data.npy')
+  for i in types:
+    _fn = '%s_%s.npy' % (fn, i)
+    attr['fn'][i] = _fn
+    _shape, attr['dtype'][i], attr['data_begin'][i] = _parse_npy_header(_fn)
+    if attr['shape'] != None:
+      assert attr['shape'] == _shape
+    else:
+      attr['shape'] = _shape
+  #shape['row'], dtype['row'], data_begin['row'] = _parse_npy_header(fn + '_row.npy')
+  #shape['col'], dtype['col'], data_begin['col'] = _parse_npy_header(fn + '_col.npy')
+  #shape['data'], dtype['data'], data_begin['data'] = _parse_npy_header(fn + '_data.npy')
 
   item_count = np.product(array.shape)
   begin_item = extent.ravelled_pos(ex.ul, array.shape)
-  begin_item = int(math.ceil(((begin_item * 1.0) / item_count) * shape['data'][0]))
+  begin_item = int(math.ceil(((begin_item * 1.0) / item_count) * attr['shape'][0]))
   end_item = extent.ravelled_pos([(i - 1) for i in ex.lr], array.shape)
-  end_item = int(math.floor((end_item * 1.0) / item_count * shape['data'][0])) + 1
-  end_item = shape['data'][0] if end_item > shape['data'][0] else end_item
+  end_item = int(math.floor((end_item * 1.0) / item_count * attr['shape'][0])) + 1
+  end_item = attr['shape'][0] if end_item > attr['shape'][0] else end_item
 
   ul = [array.shape[0], array.shape[1]]
   lr = [0, 0]
-  row = []
-  col = []
+  rows = []
+  cols = []
   data = []
-  fp['row'] = open(fn + '_row.npy', 'rb')
-  fp['col'] = open(fn + '_col.npy', 'rb')
-  fp['data'] = open(fn + '_data.npy', 'rb')
-  dtype_name = {'float64':'d', 'float32':'f', 'int64':'q', 'int32':'i'}
+  with FileHelper(row=open(attr['fn']['row'], 'rb'),
+                  col=open(attr['fn']['col'], 'rb'),
+                  data=open(attr['fn']['data'], 'rb')) as fp:
+    for k in types:
+      _dtype = attr['dtype'][k]
+      _dtype_size = _dtype.itemsize
+      _fp = getattr(fp, k)
 
-  for k, v in data_begin.iteritems():
-    dtype_size[k] = dtype[k].itemsize
-    fp[k].seek(v + begin_item * dtype_size[k])
-    read_next[k] = _bulk_read(fp[k], dtype_size[k])
-    dtype[k] = dtype_name[dtype[k].name]
+      _fp.seek(attr['data_begin'][k] + begin_item * _dtype_size)
+      attr['read_next'][k] = _bulk_read(_fp, _dtype_size) 
+      attr['dtype'][k] = dtype_name[_dtype.name]
 
-  for i in xrange(begin_item, end_item):
-    _row = struct.unpack(dtype['row'], read_next['row'].next())[0]
-    row.append(_row)
-    _col = struct.unpack(dtype['col'], read_next['col'].next())[0]
-    col.append(_col)
-    _data = struct.unpack(dtype['data'], read_next['data'].next())[0]
-    data.append(_data)
+    for i in xrange(begin_item, end_item):
+      _row = struct.unpack(attr['dtype']['row'], attr['read_next']['row'].next())[0]
+      rows.append(_row)
+      _col = struct.unpack(attr['dtype']['col'], attr['read_next']['col'].next())[0]
+      cols.append(_col)
+      _data = struct.unpack(attr['dtype']['data'], attr['read_next']['data'].next())[0]
+      data.append(_data)
 
-    ul[0] = _row if _row < ul[0] else ul[0]
-    ul[1] = _col if _col < ul[1] else ul[1]
-    lr[0] = _row if _row > lr[0] else lr[0]
-    lr[1] = _col if _col > lr[1] else lr[1]
+      ul[0] = _row if _row < ul[0] else ul[0]
+      ul[1] = _col if _col < ul[1] else ul[1]
+      lr[0] = _row if _row > lr[0] else lr[0]
+      lr[1] = _col if _col > lr[1] else lr[1]
 
-  fp['row'].close()
-  fp['col'].close()
-  fp['data'].close()
-
-  for i in xrange(len(row)):
-    row[i] -= ul[0]
-    col[i] -= ul[1]
+  for i in xrange(len(rows)):
+    rows[i] -= ul[0]
+    cols[i] -= ul[1]
 
   new_ex = extent.create(ul, [lr[0] + 1, lr[1] + 1], array.shape)
-  new_array = sp.coo_matrix((data, (row, col)), new_ex.shape)
+  new_array = sp.coo_matrix((data, (rows, cols)), new_ex.shape)
   if new_ex.shape[0] > new_ex.shape[1]:
     new_array = new_array.tocsc()
   else:
@@ -320,7 +328,8 @@ def from_file_parallel(fn, file_format = 'mm', sparse = True, tile_hint = None):
     there are four npy files if the file format is numpy. These files store row,
     col, data and shape for a coo_matrix. Their file name should be fn_row.npy,
     fn_col.npy, fn_data.npy and fn_shape.npy where fn is the first argument of
-    this API. We also ask at one of fn_row.npy and fn_col.npy is sorted.
+    this API. For efficient loading, the row and column matrices should be
+    sorted. Unsorted matrices are supported, but performance will be poor.
     Sample python code to save a coo_matirx:
       numpy.save('xxx_row.npy', coo.row)
       numpy.save('xxx_col.npy', coo.col)

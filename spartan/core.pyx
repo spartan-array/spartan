@@ -69,10 +69,10 @@ cdef class WorkerStatus(object):
     self.last_report_time = report_time
 
   def add_task_report(self, task_req, start_time, finish_time):
-    self.task_reports.append({'task':task_req, 'start_time':start_time, 'finish_time':finish_time})
+    self.task_reports.append({'task':task_req.get_content(), 'start_time':start_time, 'finish_time':finish_time})
   
   def add_task_failure(self, task_req):
-    self.task_failures.append(task_req)
+    self.task_failures.append(task_req.get_content())
     
   def clean_status(self):
     self.task_reports = []

@@ -216,7 +216,7 @@ def merge(old_tile, subslice, update, reducer):
 
   assert not isinstance(update, np.ma.MaskedArray)
  
-  # update(sparse) to old_tile(sparse or dense)
+  # Apply a sparse update array to the current tile data (which may be sparse or dense)
   if scipy.sparse.issparse(update):
     if old_tile.type == TYPE_DENSE:
       #util.log_debug('Update sparse to dense')
@@ -238,22 +238,13 @@ def merge(old_tile, subslice, update, reducer):
         else:
           old_tile.data = update
       else:
-        if old_tile.data.shape[0] > old_tile.data.shape[1]:
-          old_tile.data = old_tile.data.tocsc()
-          update = update.tocsc()
-          if reducer is not None:
-            update = reducer(old_tile.data[subslice], update).tocsc()
-        else:
-          old_tile.data = old_tile.data.tocsr()
-          update = update.tocsr()
-          if reducer is not None:
-            update = reducer(old_tile.data[subslice], update).tocsr()
-
-        old_tile.data = sparse.csrcsc_update(old_tile.data, update, subslice)
-
+        old_tile.data = sparse.compute_sparse_update(old_tile.data,
+                                                     update,
+                                                     subslice,
+                                                     reducer)
     return old_tile
     
-  # update(dense) to old_tile(sparse or dense)
+  # Apply a dense update array to the current tile data (which may be sparse or dense)
   if old_tile.type == TYPE_DENSE:
     # initialize:
     # old_data[subslice] = data

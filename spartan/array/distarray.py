@@ -341,10 +341,7 @@ class DistArrayImpl(DistArray):
       #util.log_info('tgt.shape:%s result.shape:%s tgt.type:%s result.type:%s', tgt[dst_slice].shape, result.shape, type(tgt), type(result))
       if np.all(result.shape):
         if output_type == SPARSE:
-          if tgt.shape[0] > tgt.shape[1]:
-            tgt = sparse.csrcsc_update(tgt.tocsc(), result.tocsc(), dst_slice)
-          else:
-            tgt = sparse.csrcsc_update(tgt.tocsr(), result.tocsr(), dst_slice)
+          tgt = sparse.compute_sparse_update(tgt, result, dst_slice)
         else:
           tgt[dst_slice] = result
 

@@ -217,12 +217,23 @@ def slice_coo(X not None, tuple slices):
     return scipy.sparse.coo_matrix((data[idx_begin:idx_end], (rows[idx_begin:idx_end]-row_begin, cols[idx_begin:idx_end])), shape=tuple([slice.stop-slice.start for slice in slices]))
 
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
-def csrcsc_update(data, update, slices):
+def compute_sparse_update(data, update, slices, reducer = None):
   '''
   csr_matrix and csc_matrix can't support fancing indexing like
   data[slices] = update. This API uses hstack and vstack to implement update.
   This is a out-place update and can only support slicing with step is 1.
   '''
+  if data.shape[0] > data.shape[1]:
+    data = data.tocsc()
+    update = update.tocsc()
+    if reducer is not None:
+      update = reducer(data[slices], update).tocsc()
+  else:
+    data = data.tocsr()
+    update = update.tocsr()
+    if reducer is not None:
+      update = reducer(data[slices], update).tocsr()
+
   upper_slice = (__builtins__.slice(0, slices[0].start),
                  __builtins__.slice(0, data.shape[1]))
   midleft_slice = (__builtins__.slice(slices[0].start, slices[0].stop),
