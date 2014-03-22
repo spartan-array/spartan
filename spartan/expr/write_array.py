@@ -266,7 +266,7 @@ def _local_read_sparse_npy(array, ex, fn):
       _fp = getattr(fp, k)
 
       _fp.seek(attr['data_begin'][k] + begin_item * _dtype_size)
-      attr['read_next'][k] = _bulk_read(_fp, _dtype_size) 
+      attr['read_next'][k] = _bulk_read(_fp, _dtype_size)
       attr['dtype'][k] = dtype_name[_dtype.name]
 
     for i in xrange(begin_item, end_item):

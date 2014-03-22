@@ -519,7 +519,6 @@ class LocalWrapper(DistArray):
     self._ex = extent.from_slice(np.index_exp[:], self.shape)
     Assert.isinstance(data, (np.ndarray, int, float))
     #assert not isinstance(data, core.TileId)
-    Assert.isinstance(data, (np.ndarray, int, float))
     #print 'Wrapping: %s %s (%s)' % (data, type(data), np.isscalar(data))
     #print 'DATA: %s' % type(self._data)
 
