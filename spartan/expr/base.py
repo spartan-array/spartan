@@ -16,7 +16,7 @@ from ..util import Assert, copy_docstring
 from ..array import distarray
 from ..config import FLAGS
 from ..rpc import TimeoutException
-from traits.api import Dict, Instance, Int, PythonValue
+from traits.api import Any, Instance, Int, PythonValue
 
 class NotShapeable(Exception):
   '''
@@ -501,7 +501,7 @@ class CollectionExpr(Expr):
   all of the tuple, list or dictionary elements in this expression.
   '''
   needs_cache = False
-  vals = Dict 
+  vals = PythonValue
 
   def __str__(self):
     return '%s(%s)' % (self.node_type, self.vals,)
@@ -542,19 +542,36 @@ class ListExpr(CollectionExpr):
   def dependencies(self):
     return dict(('v%d' % i, self.vals[i]) for i in range(len(self.vals)))
   
+  def _evaluate(self, ctx, deps):
+    ret = []
+    for i in range(len(self.vals)):
+      k = 'v%d' % i
+      ret.append(deps[k])
+    return ret
+
   def visit(self, visitor):
     return ListExpr(vals=[visitor.visit(v) for v in self.vals])
 
+  def __len__(self):
+    return len(self.vals)
 
 class TupleExpr(CollectionExpr):
   
   def dependencies(self):
     return dict(('v%d' % i, self.vals[i]) for i in range(len(self.vals)))
 
+  def _evaluate(self, ctx, deps):
+    ret = []
+    for i in range(len(self.vals)):
+      k = 'v%d' % i
+      ret.append(deps[k])
+    return tuple(ret)
+
   def visit(self, visitor):
     return TupleExpr(vals=tuple([visitor.visit(v) for v in self.vals]))
 
-
+  def __len__(self):
+    return len(self.vals)
 
 def glom(value):
   '''

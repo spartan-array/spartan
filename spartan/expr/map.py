@@ -19,13 +19,13 @@ import collections
 from .. import util, blob_ctx
 from ..array import distarray, tile
 from ..util import Assert
-from .base import DictExpr, Expr, as_array
+from .base import ListExpr, Expr, as_array
 from .local import LocalExpr, LocalCtx, make_var, LocalInput, LocalMapExpr
 from ..core import LocalKernelResult
-from traits.api import Instance, Dict, HasTraits, PythonValue
+from traits.api import Instance, List, HasTraits, PythonValue
 from . import broadcast
 
-def tile_mapper(ex, children, op):
+def tile_mapper(ex, children, child_to_var, op):
   '''
   Run for each tile of a `Map` operation.
   
@@ -33,6 +33,7 @@ def tile_mapper(ex, children, op):
   
   :param ex: `Extent`
   :param children: Input arrays for this operation.
+  :param child_to_var: Map from a child to the varname.
   :param op: `LocalExpr` to evaluate.
   '''
   ctx = blob_ctx.get()
@@ -41,9 +42,9 @@ def tile_mapper(ex, children, op):
   #util.log_info('%s %s', children, ex)
 
   local_values = {}
-  for k, gv in children.iteritems():
-    lv = gv.fetch(ex)
-    local_values[k] = lv
+  for i in range(len(children)):
+    lv = children[i].fetch(ex)
+    local_values[child_to_var[i]] = lv
 
   #local_values = dict([(k, v.fetch(ex)) for (k, v) in children.iteritems()])
   #util.log_info('Local %s', [type(v) for v in local_values.values()])
@@ -72,7 +73,8 @@ class MapExpr(Expr):
   :ivar op: A `LocalExpr` to evaluate on the input(s)
   :ivar children: One or more `Expr` to map over.
   '''
-  children = Instance(DictExpr) 
+  children = Instance(ListExpr)
+  child_to_var = Instance(list)
   op = Instance(LocalExpr) 
 
   def label(self):
@@ -83,7 +85,7 @@ class MapExpr(Expr):
 
     Broadcasting results in a map taking the shape of the largest input.
     '''
-    shapes = [i.shape for i in self.children.values()]
+    shapes = [i.shape for i in self.children]
     output_shape = collections.defaultdict(int)
     for s in shapes:
       for i, v in enumerate(s):
@@ -92,24 +94,22 @@ class MapExpr(Expr):
 
   def _evaluate(self, ctx, deps):
     children = deps['children']
+    child_to_var = deps['child_to_var']
     op = self.op
 
     #util.log_info('Codegen for expression: %s', local.codegen(op))
 
-    keys = children.keys()
-    vals = children.values()
-    vals = broadcast.broadcast(vals)
-    largest = distarray.largest_value(vals)
+    children = broadcast.broadcast(children)
+    largest = distarray.largest_value(children)
 
-    children = dict(zip(keys, vals))
-    for k, child in children.iteritems():
+    for child in children:
       util.log_debug('Map children: %s', child)
 
     #util.log_info('Mapping %s over %d inputs; largest = %s', op, len(children), largest.shape)
 
     return largest.map_to_array(
               tile_mapper, 
-              kw = { 'children' : children, 'op' : op })
+              kw = {'children':children, 'child_to_var':child_to_var, 'op':op})
 
 def map(inputs, fn, numpy_expr=None, fn_kw=None):
   '''
@@ -129,19 +129,21 @@ def map(inputs, fn, numpy_expr=None, fn_kw=None):
     inputs = [inputs]
 
   op_deps = []
-  children = {}
+  children = []
+  child_to_var = []
   for v in inputs:
     v = as_array(v)
     varname = make_var()
-    children[varname] = v
+    children.append(v)
+    child_to_var.append(varname)
     op_deps.append(LocalInput(idx=varname))
 
-  children = DictExpr(vals=children)
+  children = ListExpr(vals=children)
   op = LocalMapExpr(fn=fn,
                     kw=fn_kw,
                     pretty_fn=numpy_expr,
                     deps=op_deps)
 
-  return MapExpr(children=children, op=op)
+  return MapExpr(children=children, child_to_var=child_to_var, op=op)
 
 

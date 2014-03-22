@@ -254,14 +254,21 @@ class Assert(object):
   '''
 
   @staticmethod
-  def all_eq(a, b):
+  def all_eq(a, b, tolerance = 0):
     if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
       assert a.shape == b.shape, 'Mismatched shapes: %s %s' % (a.shape, b.shape)
-      assert np.all(a == b), 'Failed: \n%s\n ==\n%s' % (a, b)
+      if tolerance == 0:
+        assert np.all(a == b), 'Failed: \n%s\n ==\n%s' % (a, b)
+      else:
+        assert np.all(np.abs(a - b) < tolerance), 'Failed: \n%s\n ==\n%s' % (a, b)
       return
 
     if np.isscalar(a) or np.isscalar(b):
-      assert a == b, 'Failed: \n%s\n ==\n%s' % (a, b)
+      if tolerance == 0:
+        assert a == b, 'Failed: \n%s\n ==\n%s' % (a, b)
+      else:
+        import math
+        assert abs(a - b) < tolerance, 'Failed: \n%s\n ==\n%s' % (a, b)
       return
 
     assert is_iterable(a), (a, b)

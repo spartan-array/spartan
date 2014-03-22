@@ -1,9 +1,10 @@
-from .. import util, node, core
+from .. import util, node, core, master
 from . import broadcast
 from ..util import Assert
 from ..array import distarray, extent
 from . import base
 from traits.api import Instance, Tuple, PythonValue
+
 
 def _slice_mapper(ex, **kw):
   '''
@@ -55,11 +56,17 @@ class Slice(distarray.DistArray):
     self.slice = idx
     self.shape = self.slice.shape
     self.dtype = darray.dtype
+    self.sparse = self.base.sparse
+    self._tile_shape = distarray.good_tile_shape(self.shape,
+                                                 master.get().num_workers)
 
   @property
   def bad_tiles(self):
     bad_intersections = [extent.intersection(self.slice, ex) for ex in self.base.bad_tiles]
     return [ex for ex in bad_intersections if ex is not None]
+
+  def tile_shape(self):
+    return self._tile_shape
 
   def foreach_tile(self, mapper_fn, kw):
     return self.base.foreach_tile(mapper_fn = _slice_mapper,
