@@ -18,6 +18,7 @@ import struct
 from spartan import rpc
 from spartan import master
 from spartan.array import distarray, extent
+from spartan import sparse
 from .slice import Slice
 from ..core import LocalKernelResult
 from ..util import Assert, FileHelper
@@ -117,25 +118,18 @@ def _local_read_sparse_mm(array, ex, fn, data_begin):
   cols = []
   data = []
   with open(fn) as fp:
-    # We assume the maximum length of a line is less than 256.
-    if begin - 256 < data_begin:
-      fp.seek(data_begin)
-    else:
-      # Try to find the last newline before begin
-      fp.seek(begin - 256)
-      pos = fp.tell()
-      while pos <= begin:
-        real_begin = pos
+    fp.seek(begin)
+    if begin != data_begin:
+      fp.seek(begin - 1)
+      a = fp.read(1)
+      if a != '\n':
         line = fp.readline()
-        pos = fp.tell()
-      fp.seek(real_begin)
 
     pos = fp.tell()
-
     for line in fp:
-      pos += len(line)
       if pos > end + 1: # +1 in case end locates on \n
         break
+      pos += len(line)
       (_row, _col), val = _extract_mm_coordinate(line)
       _row -= 1
       _col -= 1
@@ -154,11 +148,7 @@ def _local_read_sparse_mm(array, ex, fn, data_begin):
 
   new_ex = extent.create(ul, [lr[0] + 1, lr[1] + 1], array.shape)
   new_array = sp.coo_matrix((data, (rows, cols)), new_ex.shape)
-  if new_ex.shape[0] > new_ex.shape[1]:
-    new_array = new_array.tocsc()
-  else:
-    new_array = new_array.tocsr()
-  return new_ex, new_array
+  return new_ex, sparse.convert_sparse_array(new_array)
 
 def _readmm_mapper(array, ex, fn = None, data_begin = None):
   if array.sparse:
@@ -288,11 +278,7 @@ def _local_read_sparse_npy(array, ex, fn):
 
   new_ex = extent.create(ul, [lr[0] + 1, lr[1] + 1], array.shape)
   new_array = sp.coo_matrix((data, (rows, cols)), new_ex.shape)
-  if new_ex.shape[0] > new_ex.shape[1]:
-    new_array = new_array.tocsc()
-  else:
-    new_array = new_array.tocsr()
-  return (new_ex, new_array)
+  return new_ex, sparse.convert_sparse_array(new_array)
 
 def _readnpy_mapper(array, ex, fn = None):
   if array.sparse:
@@ -371,7 +357,7 @@ def from_file_parallel(fn, file_format = 'mm', sparse = True, tile_hint = None):
 
 
   array_tile_hint = distarray.good_tile_shape(shape, num_shards =
-                                                     master.get().num_workers)
+                                                     master.get().num_workers * 1)
 
   array = ndarray(shape = shape, dtype = dtype, sparse = sparse,
                   tile_hint = array_tile_hint)

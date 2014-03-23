@@ -216,6 +216,19 @@ def slice_coo(X not None, tuple slices):
 
     return scipy.sparse.coo_matrix((data[idx_begin:idx_end], (rows[idx_begin:idx_end]-row_begin, cols[idx_begin:idx_end])), shape=tuple([slice.stop-slice.start for slice in slices]))
 
+@cython.boundscheck(False) # turn of bounds-checking for entire function
+def convert_sparse_array(array, use_getitem = True):
+  if array.shape[0] > array.shape[1]:
+    if not use_getitem and array.nnz < array.shape[0]:
+      return array.tocoo()
+    else:
+      return array.tocsc()
+  else:
+    if not use_getitem and array.nnz < array.shape[1]:
+      return array.tocoo()
+    else:
+      return array.tocsr()
+
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
 def compute_sparse_update(data, update, slices, reducer = None):
   '''
@@ -264,9 +277,10 @@ def multiple_slice(X not None, list slices):
     elif scipy.sparse.issparse(X):
         l = []
         for (tile_id, src_slice, dst_slice) in slices:
-            result = X[src_slice].tocoo()
+            result = X[src_slice]
             if result.getnnz() == 0:
                 continue
+            result = convert_sparse_array(result, use_getitem = False)
             l.append((tile_id, dst_slice, result))
         return l
     else:
