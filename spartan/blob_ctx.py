@@ -220,15 +220,6 @@ class BlobCtx(object):
     req = core.CreateTileReq(tile_id=tile_id, data=data)
     return self._send(tile_id, 'create', req, wait=False, timeout=timeout)
 
-  def partial_map(self, targets, tile_ids, mapper_fn, kw, timeout=None):
-    req = core.RunKernelReq(blobs=tile_ids, mapper_fn=mapper_fn, kw=kw)
-    futures = self._send_all('run_kernel', req, targets=targets, timeout=timeout)
-    result = {}
-    for f in futures:
-      for source_tile, map_result in f.iteritems():
-        result[source_tile] = map_result
-    return result
-
   def map(self, tile_ids, mapper_fn, kw, timeout=None):
     '''
     Run ``mapper_fn`` on all tiles in ``tile_ids``.
@@ -242,11 +233,13 @@ class BlobCtx(object):
     Returns:
       dict: mapping from (source_tile, result of ``mapper_fn``)
     '''
-    return self.partial_map(None,
-                            tile_ids,
-                            mapper_fn,
-                            kw,
-                            timeout)
+    req = core.RunKernelReq(blobs=tile_ids, mapper_fn=mapper_fn, kw=kw)
+    futures = self._send_all('run_kernel', req, targets=None, timeout=timeout)
+    result = {}
+    for f in futures:
+      for source_tile, map_result in f.iteritems():
+        result[source_tile] = map_result
+    return result
 
   def tile_op(self, tile_id, fn):
     '''Run ``fn`` on a single tile.
