@@ -1,5 +1,6 @@
-from spartan import expr
+from spartan import expr, util
 from spartan.examples.simple_svm import SVM
+from spartan.examples.DisDCA_svm import fit, predict
 import test_common
 import numpy as np
 from datetime import datetime
@@ -14,8 +15,8 @@ def millis(t1, t2):
 def benchmark_svm(ctx, timer):
   
   print "#worker:", ctx.num_workers
-  
-  N = 50 * ctx.num_workers
+  max_iter = 10
+  N = 10000 * ctx.num_workers
   D = 2
   
   # create data
@@ -30,27 +31,41 @@ def benchmark_svm(ctx, timer):
       labels[i,0] = -1.0
       
   data = expr.lazify(data)
-      
-  svm = SVM(maxiter=30)
   
-  #test_method = ['smo_2005', 'smo_1998']
-  test_method = ['smo_2005']
-  for method in test_method:
-    t1 = datetime.now()  
-    svm.fit(data, labels, method)
-    t2 = datetime.now()
-    print method, 'train time: %s ms' % millis(t1,t2)
+  w, t1, t2 = fit(data, labels, ctx.num_workers, T=max_iter)
+  util.log_warn('train time per iteration:%s ms, final w:%s', millis(t1,t2)/max_iter, w.glom().T)
   
-    correct = 0
-    for i in range(10):
-      new_data = expr.randn(1, D, dtype=np.float64, tile_hint=[1, D])
-      new_label = svm.predict_one(new_data)
-      print 'point %s, predict %s' % (new_data.glom(), new_label)
-      
-      new_data = new_data.glom()
-      if new_data[0,0] >= new_data[0,1] and new_label == 1.0 or new_data[0,0] < new_data[0,1] and new_label == -1.0:
-        correct += 1
-    print 'predict precision:', correct * 1.0 / 10
+  correct = 0
+  for i in range(10):
+    new_data = expr.randn(1, D, dtype=np.float64, tile_hint=[1, D])
+    new_label = predict(w, new_data)
+    #print 'point %s, predict %s' % (new_data.glom(), new_label)
+     
+    new_data = new_data.glom()
+    if new_data[0,0] >= new_data[0,1] and new_label == 1.0 or new_data[0,0] < new_data[0,1] and new_label == -1.0:
+      correct += 1
+  print 'predict precision:', correct * 1.0 / 10
+    
+#   svm = SVM(maxiter=30)
+#   
+#   #test_method = ['smo_2005', 'smo_1998']
+#   test_method = ['smo_2005']
+#   for method in test_method:
+#     t1 = datetime.now()  
+#     svm.fit(data, labels, method)
+#     t2 = datetime.now()
+#     print method, 'train time: %s ms' % millis(t1,t2)
+#   
+#     correct = 0
+#     for i in range(10):
+#       new_data = expr.randn(1, D, dtype=np.float64, tile_hint=[1, D])
+#       new_label = svm.predict_one(new_data)
+#       print 'point %s, predict %s' % (new_data.glom(), new_label)
+#       
+#       new_data = new_data.glom()
+#       if new_data[0,0] >= new_data[0,1] and new_label == 1.0 or new_data[0,0] < new_data[0,1] and new_label == -1.0:
+#         correct += 1
+#     print 'predict precision:', correct * 1.0 / 10
       
 if __name__ == '__main__':
   test_common.run(__file__)
