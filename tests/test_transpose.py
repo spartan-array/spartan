@@ -33,6 +33,7 @@ class TransposeTest(test_common.ClusterTest):
     t2 = expr.from_numpy(npa2)
     t3 = expr.dot(t1, expr.transpose(t2))
     #t4 = expr.dot(expr.transpose(t1), t2)
-    Assert.all_eq(result1, t3.glom())
+    assert np.all(np.isclose(result1, t3.glom()))
+    #Assert.all_eq(result1, t3.glom())
     # This will fail due to current implementation of dot
     #Assert.all_eq(result2, t4.glom())
