@@ -11,7 +11,7 @@ from ..array import extent, distarray
 from ..expr.local import make_var, LocalExpr, LocalReduceExpr, LocalInput, LocalCtx
 from ..util import Assert
 from . import broadcast
-from .base import Expr, ListExpr 
+from .base import Expr, ListExpr
 from ..core import LocalKernelResult
 from traits.api import Instance, Function, PythonValue
 

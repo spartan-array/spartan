@@ -330,7 +330,9 @@ class DistArrayImpl(DistArray):
       tgt = np.ma.MaskedArray(np.ndarray(region.shape, dtype=self.dtype))
       tgt.mask = 0
     elif output_type == SPARSE:
-      tgt = scipy.sparse.lil_matrix(region.shape, dtype=self.dtype)
+      #tgt = scipy.sparse.lil_matrix(region.shape, dtype=self.dtype)
+      tgt = scipy.sparse.coo_matrix(region.shape, dtype=self.dtype)
+      tgt = sparse.convert_sparse_array(tgt)
     else:
       tgt = np.ndarray(region.shape, dtype=self.dtype)
     
@@ -339,7 +341,11 @@ class DistArrayImpl(DistArray):
       #util.log_info('ex:%s region:%s intersection:%s dst_slice:%s result:%s', ex, region, intersection, dst_slice, result)
       #util.log_info('tgt.shape:%s result.shape:%s tgt.type:%s result.type:%s', tgt[dst_slice].shape, result.shape, type(tgt), type(result))
       if np.all(result.shape):
-        tgt[dst_slice] = result
+        if output_type == SPARSE:
+          tgt = sparse.compute_sparse_update(tgt, result, dst_slice)
+        else:
+          tgt[dst_slice] = result
+
 
     return tgt
     #return tile.data[]

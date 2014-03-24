@@ -487,3 +487,19 @@ def copy_docstring(source_function):
       func.__doc__ = source_doc + '\n\n' + func.__doc__
     return func
   return _decorator
+
+class FileHelper(object):
+  def __init__(self, **files):
+    # FileHelper(x=open('x'), y=open('y'...)
+    self._files = files
+    for k, v in files.iteritems():
+      setattr(self, k, v)
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    for v in self._files.values():
+     v.close()
+
+

@@ -216,7 +216,58 @@ def slice_coo(X not None, tuple slices):
 
     return scipy.sparse.coo_matrix((data[idx_begin:idx_end], (rows[idx_begin:idx_end]-row_begin, cols[idx_begin:idx_end])), shape=tuple([slice.stop-slice.start for slice in slices]))
 
+@cython.boundscheck(False) # turn of bounds-checking for entire function
+def convert_sparse_array(array, use_getitem = True):
+  if array.shape[0] > array.shape[1]:
+    if not use_getitem and array.nnz < array.shape[0]:
+      return array.tocoo()
+    else:
+      return array.tocsc()
+  else:
+    if not use_getitem and array.nnz < array.shape[1]:
+      return array.tocoo()
+    else:
+      return array.tocsr()
+
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
+def compute_sparse_update(data, update, slices, reducer = None):
+  '''
+  csr_matrix and csc_matrix can't support fancing indexing like
+  data[slices] = update. This API uses hstack and vstack to implement update.
+  This is a out-place update and can only support slicing with step is 1.
+  '''
+  if data.shape[0] > data.shape[1]:
+    data = data.tocsc()
+    update = update.tocsc()
+    if reducer is not None:
+      update = reducer(data[slices], update).tocsc()
+  else:
+    data = data.tocsr()
+    update = update.tocsr()
+    if reducer is not None:
+      update = reducer(data[slices], update).tocsr()
+
+  upper_slice = (__builtins__.slice(0, slices[0].start),
+                 __builtins__.slice(0, data.shape[1]))
+  midleft_slice = (__builtins__.slice(slices[0].start, slices[0].stop),
+                   __builtins__.slice(0, slices[1].start))
+  midright_slice = (__builtins__.slice(slices[0].start, slices[0].stop),
+                    __builtins__.slice(slices[1].stop, data.shape[1]))
+  lower_slice = (__builtins__.slice(slices[0].stop, data.shape[0]),
+                 __builtins__.slice(0, data.shape[1]))
+
+  if slices[1].start > 0:
+    update = scipy.sparse.hstack((data[midleft_slice], update), dtype = data.dtype)
+  if slices[1].stop < data.shape[1]:
+    update = scipy.sparse.hstack((update, data[midright_slice]), dtype = data.dtype)
+  if slices[0].start > 0:
+    update = scipy.sparse.vstack((data[upper_slice], update), dtype = data.dtype)
+  if slices[0].stop < data.shape[0]:
+    update = scipy.sparse.vstack((update, data[lower_slice]), dtype = data.dtype)
+
+  return update
+
+@cython.boundscheck(False) # turn of bounds-checking for entire function
 def multiple_slice(X not None, list slices):
     if len(slices) == 0:
         return []
@@ -226,9 +277,10 @@ def multiple_slice(X not None, list slices):
     elif scipy.sparse.issparse(X):
         l = []
         for (tile_id, src_slice, dst_slice) in slices:
-            result = X[src_slice].tocoo()
+            result = X[src_slice]
             if result.getnnz() == 0:
                 continue
+            result = convert_sparse_array(result, use_getitem = False)
             l.append((tile_id, dst_slice, result))
         return l
     else:
