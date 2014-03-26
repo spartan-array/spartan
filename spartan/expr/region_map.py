@@ -35,18 +35,22 @@ def _region_mapper(ex, **kw):
   fn_kw = kw['fn_kw']
   if fn_kw is None: fn_kw = {}
 
-  intersection = extent.intersection(slice_extent, ex)
-  if intersection is None:
-    return core.LocalKernelResult(result=[(ex, array.tiles[ex])])
-
-  subslice = extent.offset_slice(ex, intersection)
-  result = array.fetch(ex).copy()
-  result[subslice] = mapper_fn(result[subslice], **fn_kw)
-  
-  result_tile = tile.from_data(result)
-  tile_id = blob_ctx.get().create(result_tile).wait().tile_id
- 
-  return core.LocalKernelResult(result=[(ex, tile_id)])
+  for slice in slice_extent:
+    intersection = extent.intersection(slice, ex)
+    if intersection:
+      if 'with_array' in fn_kw: fn_kw['with_array'] = array
+      if 'with_ex' in fn_kw: fn_kw['with_ex'] = ex
+      
+      result = array.fetch(ex).copy()
+      subslice = extent.offset_slice(ex, intersection)
+      result[subslice] = mapper_fn(result[subslice], **fn_kw)
+      
+      result_tile = tile.from_data(result)
+      tile_id = blob_ctx.get().create(result_tile).wait().tile_id
+     
+      return core.LocalKernelResult(result=[(ex, tile_id)])
+    
+  return core.LocalKernelResult(result=[(ex, array.tiles[ex])])
 
 class RegionMapExpr(base.Expr):
   '''Represents a partial map operation.
@@ -58,7 +62,7 @@ class RegionMapExpr(base.Expr):
     fn_kw: other parameters for the user mapper function
   '''
   array = Instance(base.Expr)
-  region = Instance(extent.TileExtent)
+  region = Instance(base.ListExpr)
   fn = PythonValue
   fn_kw = Instance(base.DictExpr) 
   
@@ -103,14 +107,14 @@ class RegionMapExpr(base.Expr):
  
     return SealArray(shape=array.shape, dtype=array.dtype, tiles=tiles, reducer_fn=array.reducer_fn, sparse=array.sparse)
 
-def region_map(array, region, fn, fn_kw):
+def region_map(array, region, fn, fn_kw=None):
   '''
   Map the fn to a region of an array to generate a new SealArray.
   For tiles not in the region, reuse the tiles of the original array.
 
   Args:
     array (Expr or DistArray): array to be mapped
-    region (TileExtent): the region that fn should be run on
+    region (list or ListExpr): the region (list of TileExtent) that fn should be run on
     fn: user mapper function
     fn_kw (dict or DictExpr): other parameters for the user mapper function
 
@@ -118,6 +122,12 @@ def region_map(array, region, fn, fn_kw):
     RegionMapExpr: An expression node.
   '''
 
+  if fn_kw is None: fn_kw = dict()
   array = base.lazify(array)
   fn_kw = base.lazify(fn_kw)
+  
+  if isinstance(region, extent.TileExtent):
+    region = list([region])
+  region = base.lazify(region)
+  
   return RegionMapExpr(array=array, region=region, fn=fn, fn_kw=fn_kw)
