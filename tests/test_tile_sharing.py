@@ -9,7 +9,7 @@ def test_tilesharing(ctx):
   print "#worker:", ctx.num_workers
   N_EXAMPLES = 5 *  ctx.num_workers
   x = expr.ones((N_EXAMPLES, 1), tile_hint=(N_EXAMPLES / ctx.num_workers, 1))
-  y = expr.region_map(x, extent.create((0,0), (3,1), (N_EXAMPLES, 1)), fn=lambda arr,a:arr+a, fn_kw={'a': 1})
+  y = expr.region_map(x, extent.create((0,0), (3,1), (N_EXAMPLES, 1)), fn=lambda data,array,ex,a:data+a, fn_kw={'a': 1})
   
   npx = np.ones((N_EXAMPLES, 1))
   npy = np.ones((N_EXAMPLES, 1))

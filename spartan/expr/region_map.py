@@ -37,12 +37,9 @@ def _region_mapper(ex, orig_array=None, _slice_fn=None, _slice_extent=None, fn_k
   for slice in _slice_extent:
     intersection = extent.intersection(slice, ex)
     if intersection:
-      if 'with_array' in fn_kw: fn_kw['with_array'] = orig_array
-      if 'with_ex' in fn_kw: fn_kw['with_ex'] = ex
-      
       result = orig_array.fetch(ex).copy()
       subslice = extent.offset_slice(ex, intersection)
-      result[subslice] = _slice_fn(result[subslice], **fn_kw)
+      result[subslice] = _slice_fn(result[subslice], orig_array, ex, **fn_kw)
       
       result_tile = tile.from_data(result)
       tile_id = blob_ctx.get().create(result_tile).wait().tile_id
@@ -76,7 +73,7 @@ class RegionMapExpr(base.Expr):
 
   def _evaluate(self, ctx, deps):
     '''
-    Map the fn to a region of an array to generate a new SealArray.
+    Map the fn to a region of an array to generate a new SealedArray.
     For tiles not in the region, reuse the tiles of the original array.
 
     Args:
@@ -87,7 +84,7 @@ class RegionMapExpr(base.Expr):
       fn_kw: other parameters for the user mapper function
 
     Returns:
-      A SealArray which combines original tiles with new tiles
+      A SealedArray which combines original tiles with new tiles
     '''
     array = deps['array']
     region = deps['region']
@@ -112,13 +109,16 @@ class RegionMapExpr(base.Expr):
 
 def region_map(array, region, fn, fn_kw=None):
   '''
-  Map `fn` over a (possibly non-contiguous) region of an array.
-  For tiles not in the region, reuse the tiles of the array.
+  Map ``fn`` over a subset of ``array``.
+  This returns a new array of the same shape as the input. 
+
+  For areas within the region list are replaced with the result of `fn`; areas outside of the
+  region list keep the values from the original array.
 
   Args:
     array (Expr or DistArray): array to be mapped
     region (list or ListExpr): the region (list of TileExtent) that fn should be run on
-    fn: user mapper function
+    fn: user Mapper function. Should take arguments (tile, array, extent, **kw)
     fn_kw (dict or DictExpr): other parameters for the user mapper function
 
   Returns:
