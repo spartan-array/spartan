@@ -27,7 +27,7 @@ def _region_mapper(ex, orig_array=None, _slice_fn=None, _slice_extent=None, fn_k
 
   :param ex:
   :param orig_array: the array to be mapped over.
-  :param _slice_fn: User mapper function.
+  :param _slice_fn: User Mapper function. Should take arguments (tile, array, extent, **kw)
   :param _slice_extent: list of `TileExtent` representing the region of the input array.
   :param fn_kw: the parameters for the user define mapper function.
   '''
@@ -54,7 +54,7 @@ class RegionMapExpr(base.Expr):
   Attributes:
     array: `Expr` to be mapped
     region (TileExtent): the region that mapper_fn should be run on
-    fn: user mapper function
+    fn: user Mapper function. Should take arguments (tile, array, extent, **kw)
     fn_kw: other parameters for the user mapper function
   '''
   array = Instance(base.Expr)
@@ -80,7 +80,7 @@ class RegionMapExpr(base.Expr):
       ctx: `BlobCtx`
       array: `DistArray`
       region: `TileExtent` that should be mapped
-      fn: user mapper function
+      fn: user Mapper function. Should take arguments (tile, array, extent, **kw)
       fn_kw: other parameters for the user mapper function
 
     Returns:
