@@ -5,17 +5,20 @@ from ..array import distarray, extent, tile
 from . import base
 from traits.api import Instance, Tuple, PythonValue
 
-class SealArray(distarray.DistArrayImpl):
-  '''Seal DistArray which cannot be updated. It is read-only.
+class SealedArray(distarray.DistArrayImpl):
+  '''
+  SealedArrays are read-only.
+
+  Because they can not be updated, SealedArrays can share tiles with one another freely.
   '''
  
   def __init__(self, shape, dtype, tiles, reducer_fn, sparse):
-    super(SealArray, self).__init__(shape, dtype, tiles, reducer_fn, sparse)
+    super(SealedArray, self).__init__(shape, dtype, tiles, reducer_fn, sparse)
 
   def update(self, ex, data):
     raise NotImplementedError
 
-def _region_mapper(ex, **kw):
+def _region_mapper(ex, orig_array=None, _slice_fn=None, _slice_extent=None, fn_kw=None):
   '''
   Run when mapping over a region.
   Computes the intersection of the current tile and a global region.
@@ -23,34 +26,30 @@ def _region_mapper(ex, **kw):
   Otherwise, run the user mapper function.
 
   :param ex:
-  :param orig_array: the array to be mapped over
-  :param _slice_fn: User mapper function
-  :param _slice_extent: `TileExtent` representing the region of the input array.
+  :param orig_array: the array to be mapped over.
+  :param _slice_fn: User mapper function.
+  :param _slice_extent: list of `TileExtent` representing the region of the input array.
+  :param fn_kw: the parameters for the user define mapper function.
   '''
 
-  array = kw['orig_array']
-  mapper_fn = kw['_slice_fn']
-  slice_extent = kw['_slice_extent']
-
-  fn_kw = kw['fn_kw']
   if fn_kw is None: fn_kw = {}
 
-  for slice in slice_extent:
+  for slice in _slice_extent:
     intersection = extent.intersection(slice, ex)
     if intersection:
-      if 'with_array' in fn_kw: fn_kw['with_array'] = array
+      if 'with_array' in fn_kw: fn_kw['with_array'] = orig_array
       if 'with_ex' in fn_kw: fn_kw['with_ex'] = ex
       
-      result = array.fetch(ex).copy()
+      result = orig_array.fetch(ex).copy()
       subslice = extent.offset_slice(ex, intersection)
-      result[subslice] = mapper_fn(result[subslice], **fn_kw)
+      result[subslice] = _slice_fn(result[subslice], **fn_kw)
       
       result_tile = tile.from_data(result)
       tile_id = blob_ctx.get().create(result_tile).wait().tile_id
      
       return core.LocalKernelResult(result=[(ex, tile_id)])
     
-  return core.LocalKernelResult(result=[(ex, array.tiles[ex])])
+  return core.LocalKernelResult(result=[(ex, orig_array.tiles[ex])])
 
 class RegionMapExpr(base.Expr):
   '''Represents a partial map operation.
@@ -105,12 +104,16 @@ class RegionMapExpr(base.Expr):
       for ex, id in d:
         tiles[ex] = id
  
-    return SealArray(shape=array.shape, dtype=array.dtype, tiles=tiles, reducer_fn=array.reducer_fn, sparse=array.sparse)
+    return SealedArray(shape=array.shape, 
+                       dtype=array.dtype, 
+                       tiles=tiles, 
+                       reducer_fn=array.reducer_fn, 
+                       sparse=array.sparse)
 
 def region_map(array, region, fn, fn_kw=None):
   '''
-  Map the fn to a region of an array to generate a new SealArray.
-  For tiles not in the region, reuse the tiles of the original array.
+  Map `fn` over a (possibly non-contiguous) region of an array.
+  For tiles not in the region, reuse the tiles of the array.
 
   Args:
     array (Expr or DistArray): array to be mapped
