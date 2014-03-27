@@ -12,5 +12,4 @@ def listen_on_random_port(host):
   return server
 
 def connect(host, port):
-  socket = client_socket((host, port))
-  return Client(socket)  
+  return DummyClient(host, port)
