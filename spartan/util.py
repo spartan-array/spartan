@@ -97,7 +97,7 @@ class Timer(object):
 
 TIMER = Timer()
 def _dump_timer():
-  if FLAGS.dump_timers:
+  if hasattr(FLAGS, "dump_timers") and FLAGS.dump_timers:
     TIMER.dump()
 
 
