@@ -271,11 +271,12 @@ class Server(object):
   def serve_nonblock(self):
     def start_loop():
       ''' starting a polling loop for server socket '''
-      self._socket.loop.start()
+      self._socket._event_loop.start()
     
     poll_thread = threading.Thread(target=start_loop)
     poll_thread.daemon=True
     poll_thread.start()
+    self._socket.listen()
     return poll_thread
 
   def register_object(self, obj):
@@ -313,7 +314,7 @@ class Server(object):
   def shutdown(self):
     util.log_debug('Server going down...')
     #self._socket.close()
-    self._socket.loop.stop()
+    self._socket._event_loop.stop()
 
 class ProxyMethod(object):
   def __init__(self, client, method):
@@ -345,7 +346,7 @@ class Client(object):
       serialize_to(request, w)
 
     data = w.getvalue()
-    f = Future(self.addr(), rpc_id, timeout, self._socket.loop)
+    f = Future(self.addr(), rpc_id, timeout, self._socket._event_loop)
     self._futures[rpc_id] = f
     self._socket.send(data)
     return f
@@ -358,7 +359,7 @@ class Client(object):
     return self._socket.addr
 
   def close(self):
-    self._socket.close()
+    pass
 
   def __getattr__(self, method_name):
     return ProxyMethod(self, method_name)
@@ -383,12 +384,9 @@ def forall(clients, method, request, timeout=None):
   Returns a BroadcaseFuture wrapping all of the requests. 
  
   '''  
-  if not isinstance(clients, list):
-      clients = [c for c in clients]
-    
   n_jobs = len(clients)  
   rpc_id = _rpc_id_generator.next()
-  fgroup = BroadcastFuture(rpc_id, n_jobs, timeout=timeout, loop=clients[0]._socket.loop) 
+  fgroup = BroadcastFuture(rpc_id, n_jobs, timeout=timeout, loop=clients[0]._socket._event_loop) 
 
   with TIMER.serial_once:
     #only serialize the header and body once.

@@ -34,6 +34,8 @@ class ZMQLoop(object):
   A subset functions of tornado.ioloop, used only for server socket
   to send data and receive data in polling thread.    
   '''
+  
+  '''These constants are used by the zmqstream class'''  
   # Constants from the epoll module
   _EPOLLIN = 0x001
   _EPOLLPRI = 0x002
@@ -59,16 +61,15 @@ class ZMQLoop(object):
 
   def add_handler(self, fd, handler, events):
     ''' This function will be called by ZMQStream to add handler'''
-    self._poller.register(fd, zmq.POLLIN)    
+    self._poller.register(fd, zmq.POLLIN | self.ERROR)    
     self._handler[fd] = handler 
 
   def update_handler(self, fd, events):
     ''' This function will be called by ZMQStream to update handler'''
-    self._poller.modify(fd, events)  
+    self._poller.modify(fd, events | self.ERROR)  
 
   def remove_handler(self, fd):
     ''' This function will be called by ZMQStream to remove handler'''
-    self._poller.modify(fd, events)  
     self._handlers.pop(fd, None)  
   
   def start(self):
@@ -114,11 +115,9 @@ class Socket(object):
   def __init__(self, ctx, sock_type, hostport, loop=None):
     self._zmq = ctx.socket(sock_type)
     self.addr = hostport
-    self.loop = loop or get_threadlocal_loop() 
-    self._stream = zmqstream.ZMQStream(self._zmq, self.loop)
-    
-    #Register recv callback, it(Socket.on_recv or 
-    #ServerSocket.on_recv) will be called in polling thread.
+    self._event_loop = loop or get_threadlocal_loop() 
+    self._stream = zmqstream.ZMQStream(self._zmq, self._event_loop)
+    #Register this socket with the ZMQ stream to handle incoming messages.
     self._stream.on_recv(self.on_recv)
     self._status = CLOSED
     
@@ -162,6 +161,7 @@ class ServerSocket(Socket):
     self._listen = False
     self.addr = hostport
     self._out = collections.deque() 
+    self._out_lock = FastRLock()
     self.bind()
 
   def listen(self):
@@ -169,22 +169,24 @@ class ServerSocket(Socket):
   
   def handle_write(self):
     ''' 
-    This function is called from poll thread, send data in poll thread 
-    to resolve the thread safety issue of ZMQ Socket.
+    Thiss function is called from inside of the poll thread.
+    It sends out any messages which were enqueued by other threads. 
     '''
-    while self._out:
-      msg = self._out.popleft()
-      if isinstance(msg, Group):
-        self._zmq.send_multipart(msg, copy=False)
-      else:
-        self._zmq.send(msg, copy=False)
+    with self._out_lock:
+      while self._out:
+        msg = self._out.popleft()
+        if isinstance(msg, Group):
+          self._zmq.send_multipart(msg, copy=False)
+        else:
+          self._zmq.send(msg, copy=False)
 
   def send(self, msg):
-    if threading.current_thread() != self.loop.running_thread(): 
+    if threading.current_thread() != self._event_loop.running_thread(): 
       #if the this function is not called in polling thread, put the message in queue
       #to guarantee thread safety, otherwise send the message directly.
-      self._out.append(msg)
-      self.loop.add_callback(self.handle_write)
+      with self._out_lock:
+        self._out.append(msg)
+        self._event_loop.add_callback(self.handle_write)
     else:
       if isinstance(msg, Group):
         self._zmq.send_multipart(msg, copy=False)
@@ -205,6 +207,8 @@ class ServerSocket(Socket):
         raise
     
   def on_recv(self, msg):
+    if self.listen == False:
+      return
     source, rest = msg[0], msg[1:]
     stub_socket = StubSocket(source, self, rest)
     self._handler(stub_socket)
@@ -216,7 +220,6 @@ class StubSocket(object):
     self._out = collections.deque()
     self.source = source
     self.socket = socket
-
     assert isinstance(data, list)
     assert len(data) == 1
     self.data = data[0]
