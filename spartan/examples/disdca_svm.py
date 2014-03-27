@@ -1,9 +1,8 @@
 import numpy as np
 from spartan import expr, util
 from spartan.array import extent, distarray
-from datetime import datetime
 
-def svm_disdca_train(X, Y, alpha, w, m, scale, lambda_n):
+def _svm_disdca_train(X, Y, alpha, w, m, scale, lambda_n):
   '''
   Using disdca method to train local linear SVM.
 
@@ -50,7 +49,7 @@ def _svm_mapper(array, ex, labels, alpha, w, m, scale, lambda_n):
   
   old_w = np.zeros((X.shape[1],1)) if w is None else w[:]
   
-  new_w, new_alpha = svm_disdca_train(X, Y, old_alpha, old_w, m, scale, lambda_n)
+  new_w, new_alpha = _svm_disdca_train(X, Y, old_alpha, old_w, m, scale, lambda_n)
   
   # update the alpha vector
   alpha.update(ex_alpha, new_alpha)
@@ -73,14 +72,12 @@ def fit(data, labels, num_tiles, T=50, la=1.0):
   w = None
   m = data.shape[0]/num_tiles
   alpha = expr.zeros((m*num_tiles, 1), dtype=np.float64, tile_hint=(m,1)).force()
-  t1 = datetime.now()
   for i in range(T):
     #util.log_warn('iter:%d', i)
     new_weight = distarray.create((data.shape[1], 1), np.float64, reducer=np.add, tile_hint=(data.shape[1], 1))
-    expr.shuffle(data, _svm_mapper, target=new_weight, kw={'labels':labels, 'alpha':alpha, 'w':w, 'm':m, 'scale':num_tiles, 'lambda_n':la * data.shape[0]}).force()
+    expr.shuffle(data, _svm_mapper, target=new_weight, kw={'labels': labels, 'alpha': alpha, 'w': w, 'm': m, 'scale': num_tiles, 'lambda_n': la * data.shape[0]}).force()
     w = expr.force(expr.lazify(new_weight)/num_tiles)
-  t2 = datetime.now()
-  return w, t1, t2
+  return w
 
 def predict(w, new_data):
   '''
@@ -93,3 +90,4 @@ def predict(w, new_data):
   ret = np.dot(new_data.glom(), w.glom())
   if ret >= 0: return 1
   else: return -1
+  

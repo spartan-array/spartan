@@ -18,7 +18,7 @@ def benchmark_cholesky(ctx, timer):
   A = expr.randn(ARRAY_SIZE, ARRAY_SIZE, tile_hint=(ARRAY_SIZE/ctx.num_workers, ARRAY_SIZE/ctx.num_workers))
   A = expr.dot(A, expr.transpose(A))
   
-  L = cholesky(A, ctx.num_workers).glom()
+  L = cholesky(A).glom()
   assert np.all(np.isclose(A.glom(), np.dot(L, L.T.conj())))
   
 if __name__ == '__main__':
