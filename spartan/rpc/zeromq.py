@@ -112,10 +112,10 @@ class ZMQLoop(object):
 
 
 class Socket(object):
-  def __init__(self, ctx, sock_type, hostport, loop=None):
+  def __init__(self, ctx, sock_type, hostport, event_loop=None):
     self._zmq = ctx.socket(sock_type)
     self.addr = hostport
-    self._event_loop = loop or get_threadlocal_loop() 
+    self._event_loop = event_loop or get_threadlocal_loop() 
     self._stream = zmqstream.ZMQStream(self._zmq, self._event_loop)
     #Register this socket with the ZMQ stream to handle incoming messages.
     self._stream.on_recv(self.on_recv)
@@ -156,8 +156,8 @@ class Socket(object):
     self._handler = handler
 
 class ServerSocket(Socket):
-  def __init__(self, ctx, sock_type, hostport, loop = ZMQLoop()):
-    Socket.__init__(self, ctx, sock_type, hostport, loop)
+  def __init__(self, ctx, sock_type, hostport, event_loop = ZMQLoop()):
+    Socket.__init__(self, ctx, sock_type, hostport, event_loop)
     self._listen = False
     self.addr = hostport
     self._out = collections.deque() 

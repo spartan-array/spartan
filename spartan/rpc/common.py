@@ -126,13 +126,13 @@ class RemoteException(Exception):
     return repr(self)
 
 class Future(object):
-  def __init__(self, addr, rpc_id, timeout=None, loop=None):
+  def __init__(self, addr, rpc_id, timeout=None, event_loop=None):
     self.addr = addr
     self.rpc_id = rpc_id
     self.have_result = False
     self.result = None
     self.finished_fn = None
-    self._loop = loop
+    self._event_loop = event_loop
     self._start = time.time()
     self._finish = time.time() + 1000000
     if timeout is None:
@@ -146,8 +146,8 @@ class Future(object):
       self.result = self.finished_fn(result)
     else:
       self.result = result
-    if self._loop is not None:
-      self._loop.stop() 
+    if self._event_loop is not None:
+      self._event_loop.stop() 
 
   def timed_out(self):
     return self._deadline < time.time()
@@ -160,7 +160,7 @@ class Future(object):
   
   def wait(self):
     while not self.have_result:
-      self._loop.start()
+      self._event_loop.start()
 
       if self.elapsed_time() > WARN_THRESHOLD:
         util.log_info('Waiting for result from %s RPC: %s', self.addr, self.rpc_id)
@@ -177,11 +177,11 @@ class Future(object):
     return FnFuture(self, fn)
 
 class BroadcastFuture(object):
-  def __init__(self, rpc_id, n_jobs, timeout=None, loop=None):
+  def __init__(self, rpc_id, n_jobs, timeout=None, event_loop=None):
     self.rpc_id = rpc_id
     self.have_all_results = False
     self.results = [] 
-    self._loop = loop
+    self._event_loop = event_loop
     self._start = time.time()
     self._finish = time.time() + 1000000
     if timeout is None:
@@ -196,7 +196,7 @@ class BroadcastFuture(object):
     if self._n_jobs == 0:
       self.have_all_results = True
       self._finish = time.time()
-      self._loop.stop()
+      self._event_loop.stop()
 
   def timed_out(self):
     return self._deadline < time.time()
@@ -209,7 +209,7 @@ class BroadcastFuture(object):
   
   def wait(self):
     while not self.have_all_results:
-      self._loop.start()
+      self._event_loop.start()
 
       if self.elapsed_time() > WARN_THRESHOLD:
         util.log_info('Waiting for result from RPC: %s', self.rpc_id)
@@ -386,7 +386,10 @@ def forall(clients, method, request, timeout=None):
   '''  
   n_jobs = len(clients)  
   rpc_id = _rpc_id_generator.next()
-  fgroup = BroadcastFuture(rpc_id, n_jobs, timeout=timeout, loop=clients[0]._socket._event_loop) 
+  fgroup = BroadcastFuture(rpc_id, 
+                            n_jobs, 
+                            timeout=timeout, 
+                            event_loop=clients[0]._socket._event_loop) 
 
   with TIMER.serial_once:
     #only serialize the header and body once.
