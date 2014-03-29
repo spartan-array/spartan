@@ -45,7 +45,6 @@ def capture_exception(exc_info=None):
   tb = traceback.format_exception(*exc_info)
   return RPCException(py_exc=''.join(tb).replace('\n', '\n:: '))
 
-
 class Group(tuple):
   pass
 
@@ -173,8 +172,6 @@ class Future(object):
       raise RemoteException(self.result.py_exc)
     return self.result
 
-  def on_finished(self, fn):
-    return FnFuture(self, fn)
 
 class BroadcastFuture(object):
   def __init__(self, rpc_id, n_jobs, timeout=None, event_loop=None):
@@ -216,20 +213,6 @@ class BroadcastFuture(object):
     return self.results
 
 
-class FnFuture(object):
-  '''Chain ``fn`` to the given future.
-
-  ``self.wait()`` return ``fn(future.wait())``.
-  '''
-  def __init__(self, future, fn):
-    self.future = future
-    self.fn = fn
-    self.result = None
-
-  def wait(self):
-    return self.fn(self.future.wait())
-
-
 class FutureGroup(list):
   def wait(self):
     results = []
@@ -269,11 +252,8 @@ class Server(object):
     self.serve_nonblock().join()
 
   def serve_nonblock(self):
-    def start_loop():
-      ''' starting a polling loop for server socket '''
-      self._socket._event_loop.start()
-    
-    poll_thread = threading.Thread(target=start_loop)
+    # We start a new thread to run the polling loop for the server socket.
+    poll_thread = threading.Thread(target=self._socket._event_loop.start)
     poll_thread.daemon=True
     poll_thread.start()
     self._socket.listen()
@@ -352,14 +332,17 @@ class Client(object):
     return f
   
   def send_raw(self, data, future):
+    '''
+    This function is used to send serialized data.
+    Now only used in 'forall' function, so we can 
+    serialize the messages once and send the serialized 
+    message to all clients.
+    '''
     self._futures[future.rpc_id] = future
     self._socket.send(data)     
  
   def addr(self):
     return self._socket.addr
-
-  def close(self):
-    pass
 
   def __getattr__(self, method_name):
     return ProxyMethod(self, method_name)
@@ -392,7 +375,7 @@ def forall(clients, method, request, timeout=None):
                             event_loop=clients[0]._socket._event_loop) 
 
   with TIMER.serial_once:
-    #only serialize the header and body once.
+    # Only serialize the header and body once for all the clients.
     header = { 'method' : method, 'rpc_id' : rpc_id }
     w = serialization_buffer.Writer()
     cPickle.dump(header, w, -1)
@@ -406,14 +389,18 @@ def forall(clients, method, request, timeout=None):
 
 
 from zeromq import client_socket
-#one client per client per thread
+
+# Use thread-locals to create one "real" client per thread
 _clients = threading.local()
 
-class DummyClient(object):
-  '''
-  Client proxy returned to user.
-  Create one Client object per client per thread. 
-  '''
+# ZeroMQ sockets are _not_ thread-safe.  
+# To avoid locking overhead/deadlock issues, requests are proxied through
+# a unique, thread-local client for each thread.  This has the potential to create
+# many clients (if a thread were spawned per request), but works well in practice.
+# We use thread-locals instead of adding locks is that this design is simpler than 
+# adding lock. For adding lock, we not only need to consider sending conflict, but also
+# need to consider receiving/receiving or sending/receiving conflict.
+class ThreadLocalClient(object):
   def __init__(self, host, port):
     self.host = host
     self.port = port

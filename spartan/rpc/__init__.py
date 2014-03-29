@@ -12,4 +12,4 @@ def listen_on_random_port(host):
   return server
 
 def connect(host, port):
-  return DummyClient(host, port)
+  return ThreadLocalClient(host, port)

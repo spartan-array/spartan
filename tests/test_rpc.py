@@ -7,7 +7,7 @@ from multiprocessing.pool import ThreadPool
 port = 7278
 host = "localhost"
 #number of threads we launch to send request on one client
-NUM_THREADS = 2
+NUM_THREADS = 4 
 
 class EchoServer(object):
   def __init__(self, server):
