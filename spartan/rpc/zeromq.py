@@ -66,6 +66,9 @@ class ZMQServerLoop(object):
         if event & zmq.POLLOUT: 
           socket.handle_write()
       self._poller.register(socket.zmq(), self._direction)
+    
+    # Close serversocket after the loop ends.
+    self._socket.close()
 
   def stop(self):
     self._running = False  
@@ -161,8 +164,9 @@ class ServerSocket(Socket):
       self._event_loop.modify(zmq.POLLIN)
 
   def send(self, msg):
-    #if the this function is not called in polling thread, put the message in queue
-    #to guarantee thread safety, otherwise send the message directly.
+    # We put the msg in queue and let the polling thread send the message.
+    # An alternative way is that we send the message directly if it is in
+    # polling thread, otherwise we put the message in queue.
     with self._out_lock:
       self._out.append(msg)
       self._event_loop.modify(zmq.POLLIN | zmq.POLLOUT)
