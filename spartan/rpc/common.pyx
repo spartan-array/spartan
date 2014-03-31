@@ -27,12 +27,12 @@ from zeromq cimport Socket, ServerSocket, StubSocket
 from rlock cimport FastRLock
 from cpython cimport bool
 
-#cdef extern from "time.h":
-#  cdef struct timespec:
-#    long int tv_sec
-#    long int tv_nsec
+cdef extern from "time.h":
+  cdef struct timespec:
+    long int tv_sec
+    long int tv_nsec
 
-#  int clock_gettime(int timerid, timespec *value)
+  int clock_gettime(int timerid, timespec * value) nogil
  
 cdef extern from "pthread.h":
   ctypedef struct pthread_mutex_t:
@@ -50,12 +50,10 @@ cdef extern from "pthread.h":
   int pthread_cond_destroy(pthread_cond_t *)
   int pthread_cond_signal(pthread_cond_t *) nogil
   int pthread_cond_wait(pthread_cond_t *, pthread_mutex_t *) nogil
-  #int pthread_cond_timedwait(pthread_cond_t *, pthread_mutex_t *, const timespec *) nogil
+  int pthread_cond_timedwait(pthread_cond_t *, pthread_mutex_t *, timespec *) nogil
 
-#CLOCK_REALTIME = 0
-#CLOCK_MONOTONIC = 1
-#DEF CLOCK_REALTIME = 0
-#DEF CLOCK_MONOTONIC = 1    
+cdef CLOCK_REALTIME = 0
+cdef CLOCK_MONOTONIC = 1    
 
 CLIENT_PENDING = weakref.WeakKeyDictionary()
 SERVER_PENDING = weakref.WeakKeyDictionary()
@@ -194,7 +192,7 @@ class RemoteException(Exception):
 cdef class Condition:
   cdef pthread_mutex_t mutex
   cdef pthread_cond_t cond
-  #cdef timespec now
+  cdef timespec now
  
   def __init__(self):
     pthread_mutex_init(&self.mutex, NULL)
@@ -208,11 +206,11 @@ cdef class Condition:
     pthread_mutex_unlock(&self.mutex)
     
   def wait(self, timeout=1):
-    #clock_gettime(CLOCK_REALTIME, &self.now)
-    #self.now.tv_sec += timeout
+    clock_gettime(CLOCK_REALTIME, &self.now)
+    self.now.tv_sec += timeout
     with nogil:
-      #pthread_cond_timedwait(&self.cond, &self.mutex, &self.now)
-      pthread_cond_wait(&self.cond, &self.mutex)
+      pthread_cond_timedwait(&self.cond, &self.mutex, &self.now)
+      #pthread_cond_wait(&self.cond, &self.mutex)
         
   def notify(self):
     pthread_cond_signal(&self.cond)
