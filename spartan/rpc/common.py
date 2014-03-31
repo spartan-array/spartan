@@ -125,48 +125,34 @@ class RemoteException(Exception):
     return repr(self)
 
 class Future(object):
-  def __init__(self, addr, rpc_id, timeout=None, event_loop=None):
+  def __init__(self, addr, rpc_id, timeout=None, poller=None):
     self.addr = addr
     self.rpc_id = rpc_id
     self.have_result = False
     self.result = None
-    self.finished_fn = None
-    self._event_loop = event_loop
-    self._start = time.time()
-    self._finish = time.time() + 1000000
+    self._poller = poller 
     if timeout is None:
       timeout = DEFAULT_TIMEOUT
-    self._deadline = time.time() + timeout
+    self._timeout = timeout 
 
   def done(self, result=None):
     self.have_result = True
-    self._finish = time.time()
-    if self.finished_fn is not None:
-      self.result = self.finished_fn(result)
-    else:
-      self.result = result
-    if self._event_loop is not None:
-      self._event_loop.stop() 
+    self.result = result
 
-  def timed_out(self):
-    return self._deadline < time.time()
-
-  def elapsed_time(self):
-    return min(time.time(), self._finish) - self._start
-  
   def __repr__(self):
-    return 'Future(%s:%d) [%s]' % (self.addr, self.rpc_id, self.elapsed_time())
+    return 'Future(%s:%d)' % (self.addr, self.rpc_id)
   
   def wait(self):
     while not self.have_result:
-      self._event_loop.start()
-
-      if self.elapsed_time() > WARN_THRESHOLD:
-        util.log_info('Waiting for result from %s RPC: %s', self.addr, self.rpc_id)
-
-    if not self.have_result and self.timed_out():
-      util.log_info('timed out!')
-      raise TimeoutException('Timed out on remote call (%s %s)' % (self.addr, self.rpc_id))
+      socks = dict(self._poller.poll(self._timeout * 1000))
+      for fd, events in socks.iteritems():
+        # Here we only care about read. We send message directly.
+        self._poller._sockets[fd].handle_read()
+  
+      if len(socks) == 0:
+        # It means timeout.
+        util.log_info('timed out!')
+        raise TimeoutException('Timed out on remote call (%s %s)' % (self.addr, self.rpc_id))
 
     if isinstance(self.result, RPCException):
       raise RemoteException(self.result.py_exc)
@@ -174,42 +160,42 @@ class Future(object):
 
 
 class BroadcastFuture(object):
-  def __init__(self, rpc_id, n_jobs, timeout=None, event_loop=None):
+  def __init__(self, rpc_id, n_jobs, timeout=None, poller=None):
     self.rpc_id = rpc_id
     self.have_all_results = False
     self.results = [] 
-    self._event_loop = event_loop
+    self._poller = poller 
     self._start = time.time()
     self._finish = time.time() + 1000000
     if timeout is None:
       timeout = DEFAULT_TIMEOUT
-    self._deadline = time.time() + timeout
     self._n_jobs = n_jobs
+    self._timeout = timeout
 
   def done(self, result=None):
     self._n_jobs -= 1
     self.results.append(result)
-    
     if self._n_jobs == 0:
       self.have_all_results = True
-      self._finish = time.time()
-      self._event_loop.stop()
 
-  def timed_out(self):
-    return self._deadline < time.time()
-
-  def elapsed_time(self):
-    return min(time.time(), self._finish) - self._start
-  
   def __repr__(self):
     return 'Future(%d) [%s]' % (self.rpc_id, self.elapsed_time())
   
   def wait(self):
     while not self.have_all_results:
-      self._event_loop.start()
-
-      if self.elapsed_time() > WARN_THRESHOLD:
-        util.log_info('Waiting for result from RPC: %s', self.rpc_id)
+      socks = dict(self._poller.poll(self._timeout * 1000))
+      for fd, events in socks.iteritems():
+        # Here we only care about read. We send message directly.
+        self._poller._sockets[fd].handle_read()
+      
+      if len(socks) == 0:
+        # It means timeout.
+        util.log_info('timed out!')
+        raise TimeoutException('Timed out on remote call (%s %s)' % (self.addr, self.rpc_id))
+    
+    for result in self.results:
+      if isinstance(result, RPCException):
+        raise RemoteException(self.result.py_exc)
     return self.results
 
 
@@ -293,7 +279,6 @@ class Server(object):
   
   def shutdown(self):
     util.log_debug('Server going down...')
-    #self._socket.close()
     self._socket._event_loop.stop()
 
 class ProxyMethod(object):
@@ -326,7 +311,7 @@ class Client(object):
       serialize_to(request, w)
 
     data = w.getvalue()
-    f = Future(self.addr(), rpc_id, timeout, self._socket._event_loop)
+    f = Future(self.addr(), rpc_id, timeout, self._socket._poller)
     self._futures[rpc_id] = f
     self._socket.send(data)
     return f
@@ -364,7 +349,7 @@ def forall(clients, method, request, timeout=None):
   future object, so this is more efficient when targeting multiple workers 
   with the same data.
 
-  Returns a BroadcaseFuture wrapping all of the requests. 
+  Returns a BroadcastFuture wrapping all of the requests. 
  
   '''  
   n_jobs = len(clients)  
@@ -372,7 +357,7 @@ def forall(clients, method, request, timeout=None):
   fgroup = BroadcastFuture(rpc_id, 
                             n_jobs, 
                             timeout=timeout, 
-                            event_loop=clients[0]._socket._event_loop) 
+                            poller=clients[0]._socket._poller) 
 
   with TIMER.serial_once:
     # Only serialize the header and body once for all the clients.

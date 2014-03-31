@@ -14,13 +14,15 @@ from spartan import util
 from zmq.eventloop import zmqstream, ioloop 
 from rlock import FastRLock
 
-#for client socket, we have one polling loop per thread.
-_loop = threading.local()
+#for client socket, we have one poller per thread.
+_poller = threading.local()
 
-def get_threadlocal_loop():
-  if not hasattr(_loop, "val"):
-    _loop.val = ioloop.IOLoop()
-  return _loop.val
+def get_threadlocal_poller():
+  if not hasattr(_poller, "val"):
+    _poller.val = zmq.Poller()
+    # Mapping from zeromq socket to our Socket class.
+    _poller.val._sockets = {}
+  return _poller.val
 
 class ZMQServerLoop(object):
   '''  
@@ -75,7 +77,7 @@ class ZMQServerLoop(object):
     self.wakeup()
      
   def running_thread(self):
-    ''' query the running thread '''
+    ''' Return the thread currently managing this event loop '''
     return self._running_thread 
 
   def modify(self, direction):
@@ -86,13 +88,12 @@ class ZMQServerLoop(object):
     os.write(self._pipe[1], 'x')
 
 class Socket(object):
-  def __init__(self, ctx, sock_type, hostport, event_loop=None):
+  def __init__(self, ctx, sock_type, hostport, poller=None):
     self._zmq = ctx.socket(sock_type)
     self.addr = hostport
-    self._event_loop = event_loop or get_threadlocal_loop() 
-    self._stream = zmqstream.ZMQStream(self._zmq, self._event_loop)
-    #Register this socket with the ZMQ stream to handle incoming messages.
-    self._stream.on_recv(self.on_recv)
+    self._poller = poller or get_threadlocal_poller() 
+    self._poller.register(self._zmq, zmq.POLLIN)
+    self._poller._sockets[self._zmq] = self   
 
   def zmq(self):
     return self._zmq
@@ -109,9 +110,6 @@ class Socket(object):
     else:
       self._zmq.send(msg, copy=False)
 
-  def on_recv(self, msg):
-    self._handler(msg[0])
-
   def connect(self):
     self._zmq.connect('tcp://%s:%s' % self.addr)
 
@@ -125,13 +123,17 @@ class Socket(object):
   
   def register_handler(self, handler):
     self._handler = handler
+  
+  def handle_read(self):
+    data = self._zmq.recv()
+    self._handler(data)
 
 class ServerSocket(Socket):
   ''' ServerSocket use its own loop and use its own handle_read/handle_write functions. '''
   def __init__(self, ctx, sock_type, hostport):
     #Socket.__init__(self, ctx, sock_type, hostport, event_loop)
     self._zmq = ctx.socket(sock_type)
-    self._listen = False
+    self._listening = False
     self.addr = hostport
     self._event_loop = ZMQServerLoop(self)
     self._out = collections.deque() 
@@ -139,10 +141,10 @@ class ServerSocket(Socket):
     self.bind()
 
   def listen(self):
-    self._listen = True
+    self._listening = True
   
   def handle_read(self):
-    if self.listen == False:
+    if self._listening == False:
       return
     packet = self._zmq.recv_multipart(copy=False, track=False)
     source, rest = packet[0], packet[1:]
@@ -151,7 +153,7 @@ class ServerSocket(Socket):
 
   def handle_write(self):
     ''' 
-    Thiss function is called from inside of the poll thread.
+    This function is called from inside of the poll thread.
     It sends out any messages which were enqueued by other threads. 
     '''
     with self._out_lock:
@@ -186,7 +188,12 @@ class ServerSocket(Socket):
     
 
 class StubSocket(object):
-  '''Handles a single read from a client'''
+  '''
+  ZeroMQ handles server side sockets by sending back a `Group` message 
+  which is prefixed with the original sender we are replying to.  
+  `StubSocket` wraps up this detail so that users can use server-side and 
+  client-side sockets interchangeably
+  '''
   def __init__(self, source, socket, data):
     self._out = collections.deque()
     self.source = source
