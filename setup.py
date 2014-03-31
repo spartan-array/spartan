@@ -71,9 +71,6 @@ setup(
               language='c++', 
               extra_compile_args=["-std=c++0x"], 
               extra_link_args=["-std=c++11"]),
-    Extension('spartan.rpc.zeromq', ['spartan/rpc/zeromq' + suffix]),
-    Extension('spartan.rpc.common', ['spartan/rpc/common' + suffix]),
-          
     Extension('spartan.rpc.rlock',
               ['spartan/rpc/rlock' + suffix], language="c++"),
     Extension('spartan.examples.sklearn.util.graph_shortest_path', 

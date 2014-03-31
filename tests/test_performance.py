@@ -30,14 +30,6 @@ class TestPerformance(test_common.ClusterTest):
   #Once the factor is greater the threshold, we treat the test fails.
   FACTOR_THRESHOLD = 1.5
 
-  @classmethod
-  def setUpClass(cls):
-    cls.ctx = spartan.initialize()
-  
-  @classmethod
-  def tearDownClass(cls):
-    cls.ctx = spartan.shutdown()
-  
   def _verify_cost(self, test_name, cost):
     baseline = self._base_line[test_name]
     factor = float(cost) / baseline
