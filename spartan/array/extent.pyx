@@ -208,6 +208,18 @@ cpdef ravelled_pos(idx, array_shape):
   
   return rpos
 
+@cython.boundscheck(False)
+def valid_shape(shape):
+  '''
+  Check if the shape is valid (all elements are biger than zero). This is equal to
+  np.all(shape) but is faster because this API doesn't create a numpy array.
+  '''
+  cdef unsigned int i
+  for i in shape:
+    if i == 0:
+      return False
+  return True
+
 @cython.cdivision(True)
 def find_rect(ravelled_ul, ravelled_lr, shape):
   '''
