@@ -230,7 +230,7 @@ def merge(old_tile, subslice, update, reducer):
       #  old_tile.data[subslice] = reducer(old_tile.data[subslice], update)
       #else:
       #  old_tile.data[subslice] = update.todense()
-      old_tile.mask = np.ones(old_tile.shape, dtype=np.bool)
+      #old_tile.mask[subslice] = True
     else:
       if old_tile.shape == update.shape:
         if reducer is not None:
@@ -263,7 +263,7 @@ def merge(old_tile, subslice, update, reducer):
         old_tile.data = reducer(old_tile.data, update)
       else:
         old_tile.data = update
-      old_tile.mask = True
+      old_tile.mask = np.ones(old_tile.shape, dtype=np.bool)
     else:
       replaced = ~old_tile.mask[subslice]
       updated = old_tile.mask[subslice]
