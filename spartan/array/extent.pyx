@@ -209,7 +209,7 @@ cpdef ravelled_pos(idx, array_shape):
   return rpos
 
 @cython.boundscheck(False)
-def valid_shape(shape):
+def all_nonzero_shape(shape):
   '''
   Check if the shape is valid (all elements are biger than zero). This is equal to
   np.all(shape) but is faster because this API doesn't create a numpy array.
