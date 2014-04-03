@@ -205,7 +205,7 @@ def normalize(array, axis=None):
     `Expr`: Normalized array.
   '''
   axis_sum = sum(array, axis=axis).glom()
-  return shuffle(array, norm_mapper, kw=dict(axis=axis, norm_value=axis_sum))
+  return shuffle(array, _norm_mapper, kw=dict(axis=axis, norm_value=axis_sum))
 
 @disable_parakeet 
 def _tocoo(data):
