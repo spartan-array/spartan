@@ -141,6 +141,7 @@ class Reshape(distarray.DistArray):
             new[new_r,new_c] = tile[i,j]
       return new
 
+
 class ReshapeExpr(Expr):
   array = Instance(Expr) 
   new_shape = Tuple 
@@ -153,9 +154,10 @@ class ReshapeExpr(Expr):
     v = deps['array']
     shape = deps['new_shape']
     return Reshape(v, shape, self.tile_hint)
-
+  
   def compute_shape(self):
     return self.new_shape
+
 
 def reshape(array, new_shape, tile_hint=None):
   '''
@@ -169,7 +171,6 @@ def reshape(array, new_shape, tile_hint=None):
   Returns:
     `ReshapeExpr`: Reshaped array.
   '''
-
   Assert.isinstance(new_shape, tuple)
   array = lazify(array)
 
@@ -177,3 +178,13 @@ def reshape(array, new_shape, tile_hint=None):
                      new_shape=new_shape,
                      tile_hint=tile_hint)
 
+
+def retile(array, tile_hint):
+  '''
+  Change the tiling of ``array``, while retaining the same shape.
+
+  Args:
+    array(Expr): Array to reshape
+    tile_hint(tuple): New tile shape
+  '''
+  return reshape(array, array.shape, tile_hint)
