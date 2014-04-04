@@ -16,7 +16,6 @@ from traits.api import PythonValue, HasTraits
 def _dot_mapper(inputs, ex, av, bv):
   # read current tile of array 'a'
   ex_a = ex
-  util.log_warn(": %s %s %s", ex, av, bv)
   # fetch all column tiles of b that correspond to tile a's rows, i.e.
   # rows = ex_a.cols (should be ex_a.rows?)
   # cols = *
