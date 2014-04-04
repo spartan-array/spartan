@@ -16,7 +16,7 @@ from traits.api import PythonValue, HasTraits
 def _dot_mapper(inputs, ex, av, bv):
   # read current tile of array 'a'
   ex_a = ex
-
+  util.log_warn(": %s %s %s", ex, av, bv)
   # fetch all column tiles of b that correspond to tile a's rows, i.e.
   # rows = ex_a.cols (should be ex_a.rows?)
   # cols = *
@@ -63,10 +63,15 @@ def _dot_mapper(inputs, ex, av, bv):
 
 
 def _dot_numpy(array, ex, numpy_data=None):
-  l = array.fetch(ex)
-  r = numpy_data
+  if not ex.ul[1] == 0:
+    # If it's not the tile begins with first column, skip.
+    # Let the tile starts with first column does the dot product.
+    return None
 
-  yield (ex[0].add_dim(), np.dot(l, r))
+  # Fetch the data of entire row. 
+  l = array.fetch(extent.create(ex.ul, (ex.lr[0], array.shape[1]), array.shape))
+  r = numpy_data
+  return ((ex[0].add_dim(), np.dot(l, r)),)
 
 class DotExpr(Expr):
   matrix_a = PythonValue(None, desc="np.ndarray or Expr")
