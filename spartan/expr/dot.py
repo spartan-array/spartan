@@ -62,15 +62,9 @@ def _dot_mapper(inputs, ex, av, bv):
 
 
 def _dot_numpy(array, ex, numpy_data=None):
-  if not ex.ul[1] == 0:
-    # If it's not the tile begins with first column, skip.
-    # Let the tile starts with first column does the dot product.
-    return None
-
-  # Fetch the data of entire row. 
-  l = array.fetch(extent.create(ex.ul, (ex.lr[0], array.shape[1]), array.shape))
-  r = numpy_data
-  return ((ex[0].add_dim(), np.dot(l, r)),)
+  l = array.fetch(ex)
+  r = numpy_data[ex.ul[1]:ex.lr[1]]
+  yield (ex[0].add_dim(), np.dot(l, r))
 
 class DotExpr(Expr):
   matrix_a = PythonValue(None, desc="np.ndarray or Expr")
@@ -91,9 +85,21 @@ class DotExpr(Expr):
     Assert.eq(av.shape[1], bv.shape[0])
 
     if isinstance(bv, np.ndarray):
+      if self.tile_hint is None:
+        tile_hint = (av.tile_shape()[0], 1)
+      else:
+        tile_hint = self.tile_hint
+        
+      target = distarray.create((av.shape[0], 1), dtype=av.dtype,
+                        tile_hint=tile_hint, reducer=np.add)
+
       fn_kw = dict(numpy_data = bv)
-      return av.map_to_array(mapper_fn = notarget_mapper,
-                             kw = dict(source=av, map_fn=_dot_numpy, fn_kw=fn_kw))
+      av.foreach_tile(mapper_fn = target_mapper,
+                             kw = dict(source=av, 
+                                        map_fn=_dot_numpy,
+                                        target=target,
+                                        fn_kw=fn_kw))
+      return target
     else:
       if self.tile_hint is None:
         tile_hint = np.maximum(av.tile_shape(), bv.tile_shape())
