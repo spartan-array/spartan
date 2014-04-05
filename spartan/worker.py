@@ -49,8 +49,10 @@ class Worker(object):
       _blobs (dict): Mapping from tile id to tile.
   '''
   def __init__(self, master):
-    # Initialize the seed of numpy. 
-    # So every worker won't generate the same random numbers.
+    # Reseed the Numpy random number state.
+    # 
+    # The default initialization results in all worker processes on the machine having the 
+    # same random seed.
     np.random.seed(seed=os.getpid())
 
     self.id = -1
