@@ -46,7 +46,7 @@ def cholesky(A):
     diag_ex = get_ex(k, k, tile_size, A.shape)
     A = expr.region_map(A, diag_ex, _cholesky_dpotrf_mapper)
     
-    if k == n - 1: continue
+    if k == n - 1: break
     
     # A[l,k] = DTRSM(A[k,k], A[l,k]) l -> [k+1,n)
     col_ex = extent.create(((k+1)*tile_size, k*tile_size),(n*tile_size, (k+1)*tile_size), A.shape)
@@ -54,7 +54,7 @@ def cholesky(A):
     
     # A[m,m] = DSYRK(A[m,k], A[m,m]) m -> [k+1,n)
     # A[l,m] = DGEMM(A[l,k], A[m,k], A[l,m]) m -> [k+1,n) l -> [m+1,n)
-    col_exs = list([extent.create((m*tile_size, m*tile_size),(n*tile_size, (m+1)*tile_size),A.shape) for m in range(k+1,n)])
+    col_exs = list([extent.create((m*tile_size, m*tile_size), (n*tile_size, (m+1)*tile_size), A.shape) for m in range(k+1,n)])
     A = expr.region_map(A, col_exs, _cholesky_dsyrk_dgemm_mapper, fn_kw=dict(k=k))
   
   

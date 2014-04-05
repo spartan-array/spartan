@@ -29,9 +29,12 @@ from .rpc import zeromq, TimeoutException, rlock
 from .util import Assert
 import psutil
 import weakref
+import os
+import numpy as np
 
 #timeout for hearbeat messsage
 HEARTBEAT_TIMEOUT=10
+
 
 class Worker(object):
   '''
@@ -46,6 +49,12 @@ class Worker(object):
       _blobs (dict): Mapping from tile id to tile.
   '''
   def __init__(self, master):
+    # Reseed the Numpy random number state.
+    # 
+    # The default initialization results in all worker processes on the machine having the 
+    # same random seed.
+    np.random.seed(seed=os.getpid())
+
     self.id = -1
     self._initialized = False
     self._peers = {}

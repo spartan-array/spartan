@@ -340,7 +340,7 @@ class DistArrayImpl(DistArray):
       dst_slice = extent.offset_slice(region, intersection)
       #util.log_info('ex:%s region:%s intersection:%s dst_slice:%s result:%s', ex, region, intersection, dst_slice, result)
       #util.log_info('tgt.shape:%s result.shape:%s tgt.type:%s result.type:%s', tgt[dst_slice].shape, result.shape, type(tgt), type(result))
-      if np.all(result.shape):
+      if extent.all_nonzero_shape(result.shape):
         if output_type == SPARSE:
           tgt = sparse.compute_sparse_update(tgt, result, dst_slice)
         else:
@@ -380,7 +380,7 @@ class DistArrayImpl(DistArray):
       dst_slice = extent.offset_slice(dst_extent, intersection)
    
       shape = [slice.stop - slice.start for slice in dst_slice]
-      if np.all(shape):   
+      if extent.all_nonzero_shape(shape):
         slices.append((tile_id, src_slice, dst_slice))
       #util.log_info('Update src:%s dst:%s data shape:%s', src_slice, dst_slice, data.shape)
     
@@ -537,7 +537,7 @@ class LocalWrapper(DistArray):
     # representing the entire array
     return {self._ex:core.TileId(-1, 0)}
 
-  def extent_for_blob(tile_id):
+  def extent_for_blob(self, tile_id):
     return self._ex
 
   def fetch(self, ex):

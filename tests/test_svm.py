@@ -15,7 +15,7 @@ def benchmark_svm(ctx, timer):
   
   print "#worker:", ctx.num_workers
   max_iter = 5
-  N = 50000 * ctx.num_workers
+  N = 30000 * ctx.num_workers
   D = 2
   
   # create data
