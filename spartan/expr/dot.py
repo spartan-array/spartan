@@ -64,7 +64,7 @@ def _dot_mapper(inputs, ex, av, bv):
 def _dot_numpy(array, ex, numpy_data=None):
   l = array.fetch(ex)
   r = numpy_data[ex.ul[1]:ex.lr[1]]
-  yield (ex[0].add_dim(), np.dot(l, r))
+  yield (ex[0].add_dim(), l.dot(r))
 
 class DotExpr(Expr):
   matrix_a = PythonValue(None, desc="np.ndarray or Expr")
