@@ -26,7 +26,7 @@ cpdef sparse_to_dense_update(np.ndarray[ndim=2, dtype=DTYPE_FLT] target,
                              int reducer):
   
   cdef int i
-  for i in range(rows.shape[0]):
+  for i in xrange(rows.shape[0]):
     if reducer == REDUCE_NONE or mask[rows[i], cols[i]] == 0:
       target[rows[i], cols[i]] = data[i]
     elif reducer == REDUCE_ADD:
@@ -65,7 +65,7 @@ def dot_coo_dense_dict(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not Non
     #result = numpy.zeros(X.shape[0], dtype=numpy.float64)
     
     cdef int i   
-    for i in range(rows.shape[0]):
+    for i in xrange(rows.shape[0]):
         #result[rows[i]] += data[i] * W[cols[i], 0]
         if not result.has_key(rows[i]):
             result[rows[i]] = data[i] * W[cols[i], 0]
@@ -125,7 +125,7 @@ def dot_coo_dense_unordered_map(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] 
     result.rehash(rows.size)
     
     cdef int i   
-    for i in range(rows.shape[0]):
+    for i in xrange(rows.shape[0]):
         result[rows[i]] += data[i] * W[cols[i], 0]
     
     cdef int size = result.size()
@@ -142,7 +142,7 @@ def dot_coo_dense_unordered_map(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] 
         inc(iter)
 
     new_rows.sort()
-    for i in range(new_rows.size):
+    for i in xrange(new_rows.size):
         new_data[i] = result[new_rows[i]]
  
     return scipy.sparse.coo_matrix((new_data, (new_rows, new_cols)), shape=(X.shape[0], 1))
@@ -174,7 +174,7 @@ def dot_coo_dense_vec(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not None
     result = numpy.zeros(X.shape[0], dtype=numpy.float32)
     
     cdef int i   
-    for i in range(rows.shape[0]):
+    for i in xrange(rows.shape[0]):
         result[rows[i]] += data[i] * W[cols[i], 0]
     
     cdef np.ndarray[DTYPE_INT] new_rows = result.nonzero()[0].astype(numpy.int32)
