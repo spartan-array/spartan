@@ -96,9 +96,9 @@ class DotExpr(Expr):
       fn_kw = dict(numpy_data = bv)
       av.foreach_tile(mapper_fn = target_mapper,
                              kw = dict(source=av, 
-                                        map_fn=_dot_numpy,
-                                        target=target,
-                                        fn_kw=fn_kw))
+                                       map_fn=_dot_numpy,
+                                       target=target,
+                                       fn_kw=fn_kw))
       return target
     else:
       if self.tile_hint is None:
