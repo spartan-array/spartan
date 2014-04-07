@@ -16,7 +16,6 @@ from traits.api import PythonValue, HasTraits
 def _dot_mapper(inputs, ex, av, bv):
   # read current tile of array 'a'
   ex_a = ex
-
   # fetch all column tiles of b that correspond to tile a's rows, i.e.
   # rows = ex_a.cols (should be ex_a.rows?)
   # cols = *
@@ -64,9 +63,8 @@ def _dot_mapper(inputs, ex, av, bv):
 
 def _dot_numpy(array, ex, numpy_data=None):
   l = array.fetch(ex)
-  r = numpy_data
-
-  yield (ex[0].add_dim(), np.dot(l, r))
+  r = numpy_data[ex.ul[1]:ex.lr[1]]
+  yield (ex[0].add_dim(), l.dot(r))
 
 class DotExpr(Expr):
   matrix_a = PythonValue(None, desc="np.ndarray or Expr")
@@ -87,9 +85,21 @@ class DotExpr(Expr):
     Assert.eq(av.shape[1], bv.shape[0])
 
     if isinstance(bv, np.ndarray):
+      if self.tile_hint is None:
+        tile_hint = (av.tile_shape()[0], 1)
+      else:
+        tile_hint = self.tile_hint
+        
+      target = distarray.create((av.shape[0], 1), dtype=av.dtype,
+                        tile_hint=tile_hint, reducer=np.add)
+
       fn_kw = dict(numpy_data = bv)
-      return av.map_to_array(mapper_fn = notarget_mapper,
-                             kw = dict(source=av, map_fn=_dot_numpy, fn_kw=fn_kw))
+      av.foreach_tile(mapper_fn = target_mapper,
+                             kw = dict(source=av, 
+                                       map_fn=_dot_numpy,
+                                       target=target,
+                                       fn_kw=fn_kw))
+      return target
     else:
       if self.tile_hint is None:
         tile_hint = np.maximum(av.tile_shape(), bv.tile_shape())
