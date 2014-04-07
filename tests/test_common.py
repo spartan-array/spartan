@@ -15,6 +15,11 @@ import unittest
 
 FLAGS.add(StrFlag('worker_list', default='4,8,16,32,64,80'))
 
+def millis(t1, t2):
+  dt = t2 - t1
+  ms = (dt.days * 24 * 60 * 60 + dt.seconds) * 1000 + dt.microseconds / 1000.0
+  return ms
+
 def sig_handler(sig, frame):
   import threading
   import sys

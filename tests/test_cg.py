@@ -1,13 +1,9 @@
 from spartan import expr, util
 from spartan.examples.conj_gradient import conj_gradient
 import test_common
+from test_common import millis
 import numpy as np
 from datetime import datetime
-
-def millis(t1, t2):
-  dt = t2 - t1
-  ms = (dt.days * 24 * 60 * 60 + dt.seconds) * 1000 + dt.microseconds / 1000.0
-  return ms
 
 def numpy_cgit(A, x):
   z = np.zeros(x.shape)

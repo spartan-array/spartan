@@ -1,13 +1,9 @@
 from spartan import expr, util
 from spartan.examples.naive_bayes import fit, predict
 import test_common
+from test_common import millis
 import numpy as np
 from datetime import datetime
-
-def millis(t1, t2):
-  dt = t2 - t1
-  ms = (dt.days * 24 * 60 * 60 + dt.seconds) * 1000 + dt.microseconds / 1000.0
-  return ms
 
 #@test_common.with_ctx
 #def test_pr(ctx):
