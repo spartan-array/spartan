@@ -59,7 +59,7 @@ def _make_sparse_rand(input,
 
 @not_idempotent
 def _make_sparse_diagonal(tile, ex):
-  data = sp.lil_matrix(ex.shape)
+  data = sp.lil_matrix(ex.shape, dtype=tile.dtype)
 
   if ex.ul[0] >= ex.ul[1] and ex.ul[0] < ex.lr[1]:
     for i in range(ex.ul[0], min(ex.lr[0], ex.lr[1])):
@@ -190,7 +190,7 @@ def diag(array):
   '''
   return shuffle(array, diag_mapper)
 
-def _norm_mapper(array, ex, axis, norm_value):
+def _normalize_mapper(array, ex, axis, norm_value):
   '''
   Normalize a region of an array.
   Returns a new, normalized region.
@@ -225,7 +225,45 @@ def normalize(array, axis=None):
     `Expr`: Normalized array.
   '''
   axis_sum = sum(array, axis=axis).glom()
-  return shuffle(array, norm_mapper, kw=dict(axis=axis, norm_value=axis_sum))
+  return shuffle(array, _normalize_mapper, kw=dict(axis=axis, norm_value=axis_sum))
+
+def norm(array, ord=2):
+  '''
+  Norm of ``array``.
+  
+  The following norms can be calculated:
+  =====  ============================  ==========================
+  ord    norm for matrices             norm for vectors
+  =====  ============================  ==========================
+  1      max(sum(abs(array), axis=0))  sum(abs(array))
+  2      not support                   sum(abs(array)**2)**(1/2)
+  =====  ============================  ==========================  
+  
+  Args:
+    array (Expr): input array
+    ord (int): ord must be in {1,2}, the order of the norm.
+
+  Returns:
+    `Expr`: Normed array.
+  '''
+  assert ord == 1 or ord == 2
+  
+  if ord == 1: 
+    result = reduce(array, 
+                    axis=0,
+                    dtype_fn=lambda input: input.dtype,
+                    local_reduce_fn=lambda ex, data, axis:np.abs(data).sum(axis),
+                    accumulate_fn=np.add).glom()
+    return np.max(result)
+  elif len(array.shape) == 1 or len(array.shape) == 2 and array.shape[1] == 1:
+    result = reduce(array, 
+                    axis=0,
+                    dtype_fn=lambda input: input.dtype,
+                    local_reduce_fn=lambda ex, data, axis:np.square(data).sum(axis),
+                    accumulate_fn=np.add).glom()
+    return np.sqrt(result)
+  
+  assert False, "matrix norm-2 is not support!"
 
 @disable_parakeet 
 def _tocoo(data):

@@ -71,7 +71,6 @@ class Worker(object):
     if FLAGS.profile_worker:
       self._kernel_prof = cProfile.Profile()
       self._kernel_prof.disable()
-      zeromq.poller().enable_profiling()
     else:
       self._kernel_prof = None
 
@@ -255,7 +254,7 @@ class Worker(object):
     if FLAGS.profile_worker:
       try:
         os.system('mkdir -p ./_worker_profiles/')
-        stats = pstats.Stats(zeromq.poller().profiler, self._kernel_prof)
+        stats = pstats.Stats(self._kernel_prof)
         stats.dump_stats('./_worker_profiles/%d' % self.id)
       except Exception, ex:
         print 'Failed to write profile.', ex
