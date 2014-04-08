@@ -25,6 +25,8 @@ from ..core import LocalKernelResult
 from traits.api import Instance, List, HasTraits, PythonValue
 from . import broadcast
 
+from scipy import sparse as sp
+
 def tile_mapper(ex, children, child_to_var, op):
   '''
   Run for each tile of a `Map` operation.
@@ -46,6 +48,15 @@ def tile_mapper(ex, children, child_to_var, op):
     lv = children[i].fetch(ex)
     local_values[child_to_var[i]] = lv
 
+  # Not all Numpy operations are compatible with mixed sparse and dense arrays.  
+  # To address this, if only one of the inputs is sparse, we convert it to dense before 
+  # computing our result.
+  vals = local_values.values()
+  if len(vals) == 2 and sp.issparse(vals[0]) ^ sp.issparse(vals[1]):
+    for (k,v) in local_values.iteritems():
+      if sp.issparse(v):
+        local_values[k] = v.todense()
+    
   #local_values = dict([(k, v.fetch(ex)) for (k, v) in children.iteritems()])
   #util.log_info('Local %s', [type(v) for v in local_values.values()])
   #util.log_info('Local %s', local_values)

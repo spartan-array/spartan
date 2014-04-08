@@ -86,6 +86,7 @@ class Worker(object):
     hostname = socket.gethostname()
     self._server = rpc.listen_on_random_port(hostname)
     self._server.register_object(self)
+
     if FLAGS.profile_worker:
       self._server._socket._event_loop.enable_profiling()
 
