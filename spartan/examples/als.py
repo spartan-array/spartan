@@ -5,7 +5,7 @@ from spartan.array import extent, distarray
 
 def _als_solver(feature_vectors, rating_vector, la):
   '''
-  local Alternating Least Squares solver
+  local alternating least-squares solver
   
   Args:
     feature_vectors(numpy.ndarray): part of the U or M matrix.
@@ -25,10 +25,11 @@ def _als_solver(feature_vectors, rating_vector, la):
 
 def _solve_U_or_M_mapper(array, ex, U_or_M, la):
   '''
-  given A and U (or M), solve M (or U) such that A = U M' using Alternating Least Squares factorization
+  given A and U (or M), solve M (or U) such that A = U M' 
+  using alternating least-squares factorization method
   
   Args:
-    array(DistArray): the user-item (or item-user) matrix of known ratings.
+    array(DistArray): the user-item (or item-user) rating matrix.
     ex(Extent): region being processed.
     U_or_M(DistArray): the matrix U (or M).
     la(float): the parameter of the als.
@@ -77,11 +78,10 @@ def als(A, la=0.065, num_features=20, num_iter=10):
   '''
   compute the factorization A = U M' using the alternating least-squares (ALS) method.
   
-  where A (users * items) is the matrix of known ratings
-        U (users * features) is the representation of users in the feature space
-        M (items * features) is the representation of items in the feature space
+  where `A` is the "ratings" matrix which maps from a user and item to a rating score, 
+        `U` and `M` are the factor matrices, which represent user and item preferences.
   Args:
-    A(Expr or DistArray): the user-item matrix of known ratings.
+    A(Expr or DistArray): the rating matrix which maps from a user and item to a rating score.
     la(float): the parameter of the als.
     num_features(int): dimension of the feature space.
     num_iter(int): max iteration to run.
