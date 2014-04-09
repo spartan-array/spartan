@@ -75,7 +75,7 @@ def _transpose_mapper(array, ex, orig_array):
   
 def als(A, la=0.065, num_features=20, num_iter=10):
   '''
-  compute the factorization A = U M' using Alternating Least Squares method
+  compute the factorization A = U M' using the alternating least-squares (ALS) method.
   
   where A (users * items) is the matrix of known ratings
         U (users * features) is the representation of users in the feature space

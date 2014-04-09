@@ -1,15 +1,11 @@
 from spartan import expr, util
 from spartan.examples.als import als
 import test_common
+from test_common import millis
 import numpy as np
 import math
 from spartan.expr.write_array import from_numpy
 from datetime import datetime
-
-def millis(t1, t2):
-  dt = t2 - t1
-  ms = (dt.days * 24 * 60 * 60 + dt.seconds) * 1000 + dt.microseconds / 1000.0
-  return ms
 
 #@test_common.with_ctx
 #def test_pr(ctx):
