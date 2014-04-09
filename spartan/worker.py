@@ -98,8 +98,9 @@ class Worker(object):
     req.worker_status = self.worker_status
 
     with _init_lock:
-      # This is first time we call Client.send.
-      # Guarantee the resource is initialized in thread-safe way.
+      # There is a race-condition in the initialization code for zeromq; this causes
+      # sporadic crashes when running in multi-thread mode.  We lock the first
+      # client RPC to workaround this issue.
       master.register(req)
 
   def initialize(self, req, handle):
