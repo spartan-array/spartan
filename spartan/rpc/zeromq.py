@@ -30,6 +30,7 @@ class ZMQServerLoop(object):
   server socket to send data and receive data in polling thread.    
   '''
   def __init__(self, socket):
+    self.profiler = None
     self._poller = zmq.Poller()
     self._running = False
     self._running_thread = None
@@ -41,6 +42,12 @@ class ZMQServerLoop(object):
     self._poller.register(self._pipe[0], zmq.POLLIN)
     self._poller.register(socket.zmq(), self._direction)
 
+  def enable_profiling(self):
+    self.profiler = cProfile.Profile()
+
+  def disable_profiling(self):
+    self.profiler = None
+
   def start(self):
     MAX_TIMEOUT = 10 
     self._running = True
@@ -50,6 +57,9 @@ class ZMQServerLoop(object):
     _poll_time = 1
     _poll = self._poller.poll
     socket = self._socket 
+    
+    if self.profiler is not None:
+      self.profiler.enable()
     
     while self._running:
       socks = dict(_poll())

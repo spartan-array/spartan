@@ -34,7 +34,7 @@ import numpy as np
 
 #timeout for hearbeat messsage
 HEARTBEAT_TIMEOUT=10
-
+_init_lock = rlock.FastRLock()
 
 class Worker(object):
   '''
@@ -86,13 +86,22 @@ class Worker(object):
     hostname = socket.gethostname()
     self._server = rpc.listen_on_random_port(hostname)
     self._server.register_object(self)
+
+    if FLAGS.profile_worker:
+      self._server._socket._event_loop.enable_profiling()
+
     self._server.serve_nonblock()
 
     req = core.RegisterReq()
     req.host = hostname
     req.port = self._server.addr[1]
     req.worker_status = self.worker_status
-    master.register(req)
+
+    with _init_lock:
+      # There is a race-condition in the initialization code for zeromq; this causes
+      # sporadic crashes when running in multi-thread mode.  We lock the first
+      # client RPC to workaround this issue.
+      master.register(req)
 
   def initialize(self, req, handle):
     '''
@@ -263,7 +272,7 @@ class Worker(object):
     if FLAGS.profile_worker:
       try:
         os.system('mkdir -p ./_worker_profiles/')
-        stats = pstats.Stats(self._kernel_prof)
+        stats = pstats.Stats(self._server._socket._event_loop.profiler, self._kernel_prof)
         stats.dump_stats('./_worker_profiles/%d' % self.id)
       except Exception, ex:
         print 'Failed to write profile.', ex

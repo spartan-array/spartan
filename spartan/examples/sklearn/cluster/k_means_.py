@@ -12,9 +12,10 @@ def _find_closest(pts, centers):
     min_dist = 1e9
     min_idx = 0
     p = pts[i]
+
     for j in xrange(centers.shape[0]):
       c = centers[j]
-      dist = np.sum(p ** 2 - c ** 2)
+      dist = np.sum((p - c) ** 2)
       if dist < min_dist:
         min_dist = dist
         min_idx = j
@@ -24,16 +25,17 @@ def _find_closest(pts, centers):
 
 def _find_cluster_mapper(inputs, ex, d_pts, old_centers, 
                          new_centers, new_counts):
-  centers = old_centers.glom()
+  centers = old_centers
   pts = d_pts.fetch(ex)
   closest = _find_closest(pts, centers)
-  l_counts = np.zeros((centers.shape[0], 1))
+  
+  l_counts = np.zeros((centers.shape[0], 1), dtype=np.int)
   l_centers = np.zeros_like(centers)
   
   for i in range(centers.shape[0]):
-    matching = closest == i
-    l_counts[i,0] = matching.sum()
-    l_centers[i] = pts[matching].sum(axis=0)
+    matching = (closest == i)
+    l_counts[i] = matching.sum()
+    l_centers[i] = pts[matching].sum(axis=0) 
   
   # update centroid positions
   new_centers.update(extent.from_shape(new_centers.shape), l_centers)
@@ -42,33 +44,65 @@ def _find_cluster_mapper(inputs, ex, d_pts, old_centers,
 
 
 class KMeans(object):
-  def __init__(self, n_clusters = 8,  max_iter=10):
-    self.n_clusters = n_clusters
-    self.max_iter = max_iter
+  def __init__(self, n_clusters = 8,  n_iter=10):
+    """K-Means clustering
+    Parameters
+    ----------
 
-  def fit(self, X):
+    n_clusters : int, optional, default: 8
+        The number of clusters to form as well as the number of
+        centroids to generate.
+
+    n_iter : int, optional, default: 10
+        Number of iterations of the k-means algorithm for a
+        single run.
+    """
+    self.n_clusters = n_clusters
+    self.n_iter = n_iter
+
+  def fit(self, X, centers = None):
     """Compute k-means clustering.
 
     Parameters
     ----------
-    X : array-like or sparse matrix, shape=(n_samples, n_features)
+    X : spartan matrix, shape=(n_samples, n_features). It should be tiled by rows.
+    centers : numpy.ndarray. The initial centers. If None, it will be randomly generated.
     """
     num_dim = X.shape[1]
-    centers = expr.rand(self.n_clusters, num_dim)
+  
+    if centers is None:
+      centers = np.random.rand(self.n_clusters, num_dim)
     
-    for i in range(self.max_iter):
+    for i in range(self.n_iter):
       # Reset them to zero.
       new_centers = expr.ndarray((self.n_clusters, num_dim), reduce_fn=lambda a, b: a + b)
-      new_counts = expr.ndarray((self.n_clusters, 1), reduce_fn=lambda a, b: a + b)
+      new_counts = expr.ndarray((self.n_clusters, 1), dtype=np.int, reduce_fn=lambda a, b: a + b)
       
       _ = expr.shuffle(X,
                         _find_cluster_mapper,
                         kw={'d_pts' : X,
                             'old_centers' : centers,
                             'new_centers' : new_centers,
-                            'new_counts' : new_counts})
+                            'new_counts' : new_counts
+                            })
       _.force()
+
+      new_counts = new_counts.glom()
+      new_centers = new_centers.glom()
       
+      # If any centroids don't have any points assigined to them.
+      zcount_indices = (new_counts == 0).reshape(self.n_clusters)
+      
+      if np.any(zcount_indices):
+        # One or more centroids may not have any points assigned to them,
+        # which results in their position being the zero-vector.  We reseed these
+        # centroids with new random values.
+        n_points = np.count_nonzero(zcount_indices)
+        # In order to get rid of dividing by zero.
+        new_counts[zcount_indices] = 1
+        new_centers[zcount_indices, :] = np.random.randn(n_points, num_dim)
+
       new_centers = new_centers / new_counts
       centers = new_centers
+
     return centers
