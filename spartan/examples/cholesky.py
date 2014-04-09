@@ -10,8 +10,8 @@ def _cholesky_dpotrf_mapper(input, array, ex):
 
 def _cholesky_dtrsm_mapper(input, array, ex, diag_ex):
   A_kk = array.fetch(diag_ex)
-  #L,info = linalg.lapack.dtrtrs(A_kk, input, lower=1)
-  return np.dot(input, linalg.inv(A_kk.T))
+  L,info = linalg.lapack.dtrtrs(A_kk, input.T, lower=1)
+  return L.T
 
 def _cholesky_dsyrk_dgemm_mapper(input, array, ex, k):
   

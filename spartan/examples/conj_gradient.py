@@ -1,4 +1,5 @@
 from spartan import expr, util
+import math
 
 def cgit(A, x):
   '''
@@ -9,7 +10,7 @@ def cgit(A, x):
   A(Expr): matrix to be processed.
   x(Expr): the input vector.
   '''
-  z = expr.zeros(x.shape, tile_hint=(A.shape[1]/len(A.tiles),1))
+  z = expr.zeros(x.shape, tile_hint=(A.shape[1]/int(math.sqrt(len(A.tiles))), 1))
   r = x
   rho = expr.dot(expr.transpose(r), r).glom()
   #util.log_warn('rho:%s', rho)
@@ -42,10 +43,10 @@ def conj_gradient(A, num_iter=15):
     num_iter(int): max iteration to run.
   '''
   A = expr.force(A)
-  x = expr.ones((A.shape[1],1), tile_hint=(A.shape[1]/len(A.tiles),1))
+  x = expr.ones((A.shape[1],1), tile_hint=(A.shape[1]/int(math.sqrt(len(A.tiles))), 1))
   
   for iter in range(num_iter):
-    util.log_warn('iteration:%d', iter)
+    #util.log_warn('iteration:%d', iter)
     z = cgit(A, x)
     x = z / expr.norm(z)
   return x

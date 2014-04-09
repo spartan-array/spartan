@@ -3,6 +3,7 @@ from spartan.examples.conj_gradient import conj_gradient
 import test_common
 from test_common import millis
 import numpy as np
+import math
 from datetime import datetime
 
 def numpy_cgit(A, x):
@@ -39,14 +40,15 @@ def numpy_cg(A, num_iter):
 #def test_pr(ctx):
 def benchmark_cg(ctx, timer):
   print "#worker:", ctx.num_workers
-  n = 1600
-  nonzer = 7
+  l = int(math.sqrt(ctx.num_workers))
+  n = 4000 * l
   la = 20
-  niter = 15
-  nz = n * (nonzer + 1) * (nonzer + 1) + n * (nonzer + 2)
-  tile_hint = (n, n/ctx.num_workers)
+  niter = 5
+  tile_hint = (n/l, n/l)
   
-  # density = 0.5 * nz/(n*n)
+  #nonzer = 7
+  #nz = n * (nonzer + 1) * (nonzer + 1) + n * (nonzer + 2)
+  #density = 0.5 * nz/(n*n)
   A = expr.sparse_rand((n, n), density=0.9, tile_hint=tile_hint)
   A = (A + expr.transpose(A))*0.5
   
