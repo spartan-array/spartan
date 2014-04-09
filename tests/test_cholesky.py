@@ -1,25 +1,30 @@
 from spartan import expr, util
 from spartan.examples.cholesky import cholesky
 import test_common
+from test_common import millis
 import numpy as np
 from scipy import linalg
 import math
+from spartan.expr.write_array import from_numpy
 from datetime import datetime
-
-def millis(t1, t2):
-  dt = t2 - t1
-  ms = (dt.days * 24 * 60 * 60 + dt.seconds) * 1000 + dt.microseconds / 1000.0
-  return ms
 
 #@test_common.with_ctx
 #def test_pr(ctx):
 def benchmark_cholesky(ctx, timer):
   print "#worker:", ctx.num_workers
   n = int(math.sqrt(ctx.num_workers))
-  ARRAY_SIZE = 2000 * n
-  A = expr.randn(ARRAY_SIZE, ARRAY_SIZE, tile_hint=(ARRAY_SIZE/n, ARRAY_SIZE/n))
-  A = expr.dot(A, expr.transpose(A)).force()
+  ARRAY_SIZE = 1600 * n
   
+  A = np.random.randn(ARRAY_SIZE, ARRAY_SIZE)
+  A = np.dot(A, A.T)
+  
+  util.log_warn('prepare data!')
+  A = expr.force(from_numpy(A, tile_hint=(ARRAY_SIZE/n, ARRAY_SIZE/n)))
+
+  #A = expr.randn(ARRAY_SIZE, ARRAY_SIZE, tile_hint=(ARRAY_SIZE/n, ARRAY_SIZE/n))
+  #A = expr.dot(A, expr.transpose(A)).force()
+  
+  util.log_warn('begin cholesky!')
   t1 = datetime.now()
   L = cholesky(A).glom()
   t2 = datetime.now()

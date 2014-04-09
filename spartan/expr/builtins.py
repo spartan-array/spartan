@@ -529,19 +529,21 @@ def _countnonzero_local(ex, data, axis):
   
   return (data > 0).sum(axis)  
 
-def count_nonzero(array, axis=None):
+def count_nonzero(array, axis=None, tile_hint=None):
   '''
   Return the number of nonzero values in the axis of the ``array``.
   
   :param array: DistArray or `Expr`.
   :param axis: the axis to count
+  :param tile_hint:
   :rtype: np.int64
   
   '''
   return reduce(array, axis,
                 dtype_fn=lambda input: np.int64,
                 local_reduce_fn=_countnonzero_local,
-                accumulate_fn = np.add)
+                accumulate_fn = np.add,
+                tile_hint=tile_hint)
 
 def _countzero_local(ex, data, axis):
   if axis is None:
