@@ -75,8 +75,8 @@ class KMeans(object):
     
     for i in range(self.n_iter):
       # Reset them to zero.
-      new_centers = expr.ndarray((self.n_clusters, num_dim), reduce_fn=lambda a, b: a + b).force()
-      new_counts = expr.ndarray((self.n_clusters, 1), dtype=np.int, reduce_fn=lambda a, b: a + b).force()
+      new_centers = expr.ndarray((self.n_clusters, num_dim), reduce_fn=lambda a, b: a + b)
+      new_counts = expr.ndarray((self.n_clusters, 1), dtype=np.int, reduce_fn=lambda a, b: a + b)
       
       _ = expr.shuffle(X,
                         _find_cluster_mapper,
@@ -90,15 +90,16 @@ class KMeans(object):
       new_counts = new_counts.glom()
       new_centers = new_centers.glom()
       
-      # If any centers have no closest points.
+      # If any centroids don't have any points assigined to them.
       zcount_indices = (new_counts == 0).reshape(self.n_clusters)
       
-      # If these centers exist, we regenerate these centers randomly.
       if np.any(zcount_indices):
+        # One or more centroids may not have any points assigned to them,
+        # which results in their position being the zero-vector.  We reseed these
+        # centroids with new random values.
         n_points = np.count_nonzero(zcount_indices)
         # In order to get rid of dividing by zero.
         new_counts[zcount_indices] = 1
-        # Regenerate these centers randomly.
         new_centers[zcount_indices, :] = np.random.randn(n_points, num_dim)
 
       new_centers = new_centers / new_counts
