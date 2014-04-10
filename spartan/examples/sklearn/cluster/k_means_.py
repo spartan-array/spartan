@@ -41,7 +41,7 @@ def _find_cluster_mapper(inputs, ex, d_pts, old_centers,
   new_centers.update(extent.from_shape(new_centers.shape), l_centers)
   new_counts.update(extent.from_shape(new_counts.shape), l_counts)
   labels.update(extent.create(ex.ul, (ex.lr[0], 1), labels.shape), 
-                        closest.reshape(pts.shape[0], 1))
+                closest.reshape(pts.shape[0], 1))
   return []
 
 
