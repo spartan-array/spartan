@@ -7,7 +7,7 @@ from spartan.array import distarray, extent
 @util.synchronized
 @parakeet.jit
 def _find_closest(pts, centers):
-  idxs = np.zeros(pts.shape[0])
+  idxs = np.zeros(pts.shape[0], np.int)
   for i in range(pts.shape[0]):
     min_dist = 1e9
     min_idx = 0
@@ -24,7 +24,7 @@ def _find_closest(pts, centers):
   return idxs
 
 def _find_cluster_mapper(inputs, ex, d_pts, old_centers, 
-                         new_centers, new_counts):
+                         new_centers, new_counts, labels):
   centers = old_centers
   pts = d_pts.fetch(ex)
   closest = _find_closest(pts, centers)
@@ -40,6 +40,8 @@ def _find_cluster_mapper(inputs, ex, d_pts, old_centers,
   # update centroid positions
   new_centers.update(extent.from_shape(new_centers.shape), l_centers)
   new_counts.update(extent.from_shape(new_counts.shape), l_counts)
+  labels.update(extent.create(ex.ul, (ex.lr[0], 1), labels.shape), 
+                        closest.reshape(pts.shape[0], 1))
   return []
 
 
@@ -69,6 +71,7 @@ class KMeans(object):
     centers : numpy.ndarray. The initial centers. If None, it will be randomly generated.
     """
     num_dim = X.shape[1]
+    labels = expr.zeros((X.shape[0],1), dtype=np.int)
   
     if centers is None:
       centers = np.random.rand(self.n_clusters, num_dim)
@@ -83,7 +86,8 @@ class KMeans(object):
                         kw={'d_pts' : X,
                             'old_centers' : centers,
                             'new_centers' : new_centers,
-                            'new_counts' : new_counts
+                            'new_counts' : new_counts,
+                            'labels': labels
                             })
       _.force()
 
@@ -105,4 +109,4 @@ class KMeans(object):
       new_centers = new_centers / new_counts
       centers = new_centers
 
-    return centers
+    return centers, labels.glom().reshape(X.shape[0])
