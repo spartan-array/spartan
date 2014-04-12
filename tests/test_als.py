@@ -11,12 +11,12 @@ from datetime import datetime
 #def test_pr(ctx):
 def benchmark_als(ctx, timer):
   print "#worker:", ctx.num_workers
-  USER_SIZE = 3000
-  MOVIE_SIZE = 6000
+  USER_SIZE = 200 * ctx.num_workers
+  MOVIE_SIZE = 12800
   num_features = 20
-  num_iter = 10
+  num_iter = 5
   
-  A = expr.randint(USER_SIZE, MOVIE_SIZE, low=0, high=5, tile_hint=(USER_SIZE/ctx.num_workers, MOVIE_SIZE))
+  A = expr.eager(expr.randint(USER_SIZE, MOVIE_SIZE, low=0, high=5, tile_hint=(USER_SIZE/ctx.num_workers, MOVIE_SIZE)))
   
   util.log_warn('begin als!')
   t1 = datetime.now()

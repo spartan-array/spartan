@@ -64,7 +64,7 @@ def _dot_mapper(inputs, ex, av, bv):
 def _dot_numpy(array, ex, numpy_data=None):
   l = array.fetch(ex)
   r = numpy_data[ex.ul[1]:ex.lr[1]]
-  yield (ex[0].add_dim(), l.dot(r))
+  yield (extent.create((ex.ul[0], 0), (ex.lr[0], r.shape[1]), (array.shape[0], r.shape[1])), l.dot(r))
 
 class DotExpr(Expr):
   matrix_a = PythonValue(None, desc="np.ndarray or Expr")
@@ -85,12 +85,15 @@ class DotExpr(Expr):
     Assert.eq(av.shape[1], bv.shape[0])
 
     if isinstance(bv, np.ndarray):
+      if len(bv.shape) < 2:
+        bv = bv.reshape((bv.shape[0], 1))
+        
       if self.tile_hint is None:
-        tile_hint = (av.tile_shape()[0], 1)
+        tile_hint = (av.tile_shape()[0], bv.shape[1])
       else:
         tile_hint = self.tile_hint
         
-      target = distarray.create((av.shape[0], 1), dtype=av.dtype,
+      target = distarray.create((av.shape[0], bv.shape[1]), dtype=av.dtype,
                         tile_hint=tile_hint, reducer=np.add)
 
       fn_kw = dict(numpy_data = bv)

@@ -1,25 +1,32 @@
 from spartan import expr, util
+from spartan.array import extent
 from spartan.examples.naive_bayes import fit, predict
 import test_common
 from test_common import millis
 import numpy as np
 from datetime import datetime
 
+def _init_label_mapper(array, ex):
+  data = array.fetch(ex)
+  
+  labels = np.zeros((data.shape[0], 1), dtype=np.int64)
+  for i in range(data.shape[0]):
+    labels[i] = np.argmax(data[i])
+    
+  yield extent.create((ex.ul[0], 0), (ex.lr[0], 1), (array.shape[0], 1)), labels
+  
 #@test_common.with_ctx
 #def test_pr(ctx):
 def benchmark_naive_bayes(ctx, timer):
   
   print "#worker:", ctx.num_workers
-  N = 50000 * ctx.num_workers
-  D = 64
+  N = 100000 * ctx.num_workers
+  D = 128
   
   # create data
-  data = expr.randint(N, D, low=0, high=D, tile_hint=(N/ctx.num_workers, D)).force()
-  labels = expr.zeros((N,1), dtype=np.int64, tile_hint=(N/ctx.num_workers, 1)).force()
-  for i in range(N):
-    labels[i, 0] = np.argmax(data[i])
+  data = expr.randint(N, D, low=0, high=D, tile_hint=(N/ctx.num_workers, D))
+  labels = expr.eager(expr.shuffle(data, _init_label_mapper))
     
-  data = expr.lazify(data)
   #util.log_warn('data:%s, label:%s', data.glom(), labels.glom())   
   
   util.log_warn('begin train')
