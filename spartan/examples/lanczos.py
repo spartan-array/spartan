@@ -2,7 +2,7 @@ import numpy as np
 from spartan import expr, util
 import math
 
-def solve(A, AT, desired_rank):
+def solve(A, AT, desired_rank, is_symmetric=False):
   '''
   A simple implementation of the Lanczos algorithm
   (http://en.wikipedia.org/wiki/Lanczos_algorithm) for eigenvalue computation.
@@ -37,8 +37,11 @@ def solve(A, AT, desired_rank):
   for i in range(0, desired_rank):
     util.log_info("Iter : %s", i)
     
-    w = expr.dot(A, v_next.reshape(n, 1))
-    w = expr.dot(AT, w).glom().reshape(n)
+    if is_symmetric:
+      w = expr.dot(A, v_next.reshape(n, 1)).glom().reshape(n)
+    else:
+      w = expr.dot(A, v_next.reshape(n, 1))
+      w = expr.dot(AT, w).glom().reshape(n)
 
     alpha[i] = np.dot(w, v_next)
     w = w - alpha[i] * v_next - beta[i] * v_prev
@@ -68,10 +71,10 @@ def solve(A, AT, desired_rank):
   d, v = np.linalg.eig(tridiag) 
   
   # Sort eigenvalues and their corresponding eigenvectors 
-  sorted_idx = np.argsort(d)[::-1]
+  sorted_idx = np.argsort(np.absolute(d))[::-1]
   d = d[sorted_idx]
   v = v[:, sorted_idx]
   
   # Get the eigenvetors of dot(A, A.T)
   s = np.dot(V, v)
-  return d[desired_rank-3::-1], s[:, desired_rank-3::-1] 
+  return d[0:desired_rank-2], s[:, 0:desired_rank-2] 

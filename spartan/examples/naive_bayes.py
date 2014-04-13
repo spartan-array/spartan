@@ -53,30 +53,28 @@ def fit(data, labels, label_size, alpha=1.0):
   labels = expr.force(labels)
   
   # calc document freq
-  df = expr.reshape(expr.reduce(data,
-                                axis=0,
-                                dtype_fn=lambda input: input.dtype,
-                                local_reduce_fn=lambda ex, data, axis: (data > 0).sum(axis),
-                                accumulate_fn=np.add,
-                                tile_hint=(data.shape[1],)),
-                    (1, data.shape[1])) 
+  df = expr.reduce(data,
+                   axis=0,
+                   dtype_fn=lambda input: input.dtype,
+                   local_reduce_fn=lambda ex, data, axis: (data > 0).sum(axis),
+                   accumulate_fn=np.add,
+                   tile_hint=(data.shape[1],))
   
   idf = expr.log(data.shape[0] * 1.0 / (df + 1)) + 1
    
   # Normalized Frequency for a feature in a document is calculated by dividing the feature frequency 
   # by the root mean square of features frequencies in that document
-  square_sum = expr.reshape(expr.reduce(data,
-                                        axis=1,
-                                        dtype_fn=lambda input: input.dtype,
-                                        local_reduce_fn=lambda ex, data, axis: np.square(data).sum(axis),
-                                        accumulate_fn=np.add,
-                                        tile_hint=(data.shape[0],)),
-                            (data.shape[0], 1))
+  square_sum = expr.reduce(data,
+                           axis=1,
+                           dtype_fn=lambda input: input.dtype,
+                           local_reduce_fn=lambda ex, data, axis: np.square(data).sum(axis),
+                           accumulate_fn=np.add,
+                           tile_hint=(data.shape[0],))
   
   rms = expr.sqrt(square_sum * 1.0 / data.shape[1])
   
   # calculate weight normalized Tf-Idf
-  data = data / rms * idf
+  data = data / expr.reshape(rms, (data.shape[0], 1))  * expr.reshape(idf, (1, data.shape[1]))
   
   # add up all the feature vectors with the same labels
   sum_instance_by_label = distarray.create((label_size, data.shape[1]),
