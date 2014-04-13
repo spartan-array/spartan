@@ -6,10 +6,10 @@ from ..core import LocalKernelResult
 from ..node import Node
 from ..util import is_iterable, Assert
 from .base import Expr, lazify
-from traits.api import Instance, Function, PythonValue, HasTraits
+from traits.api import Bool, Instance, Function, PythonValue, HasTraits
 from .base import DictExpr, NotShapeable
 
-def shuffle(v, fn, tile_hint=None, target=None, kw=None):
+def shuffle(v, fn, directly_return=False, tile_hint=None, target=None, kw=None):
   '''
   Evaluate ``fn`` over each extent of ``v``.
   
@@ -31,6 +31,7 @@ def shuffle(v, fn, tile_hint=None, target=None, kw=None):
   
   return ShuffleExpr(array=v,
                      map_fn=fn,
+                     directly_return=directly_return,
                      tile_hint=tile_hint,
                      target=target,
                      fn_kw=kw)
@@ -65,6 +66,32 @@ def target_mapper(ex, map_fn=None, source=None, target=None, fn_kw=None):
 
 
         
+def directly_return_mapper(ex, map_fn=None, source=None, fn_kw=None):
+  '''
+  Kernel function invoked during shuffle.
+  
+  Runs ``map_fn`` over a single tile of the source array and directly return results to master.
+  
+  Args:
+    ex (Extent): Extent being processed.
+    map_fn (function): Function passed into `shuffle`.
+    source (DistArray): DistArray being mapped over.
+    fn_kw (dict): Keyword arguments for ``map_fn``.
+    
+  Returns:
+    LocalKernelResult: List of (new data). 
+  '''
+  result = list(map_fn(source, ex, **fn_kw))
+  
+  if result is None:
+    result = []
+  else:
+    result = [v for (k, v) in result]
+
+  return LocalKernelResult(result=result, futures=None)
+
+
+
 def notarget_mapper(ex, array=None, map_fn=None, source=None, fn_kw=None):
   '''
   Kernel function invoked during shuffle.
@@ -97,7 +124,8 @@ def notarget_mapper(ex, array=None, map_fn=None, source=None, fn_kw=None):
 
 class ShuffleExpr(Expr):
   array = PythonValue(None, desc="DistArray or Expr")
-  map_fn = Function 
+  map_fn = Function
+  directly_return = Bool 
   target = PythonValue(None, desc="DistArray or Expr") 
   tile_hint = PythonValue(None, desc="Tuple or None")
   fn_kw = Instance(DictExpr) 
@@ -113,6 +141,11 @@ class ShuffleExpr(Expr):
     util.log_info('Keywords: %s', fn_kw)
 
     map_fn = self.map_fn
+    
+    if self.directly_return:
+      return v.foreach_tile(mapper_fn = directly_return_mapper,
+                     kw = dict(map_fn=map_fn, source=v, fn_kw=fn_kw))
+      
     if target is not None:
       v.foreach_tile(mapper_fn = target_mapper,
                      kw = dict(map_fn=map_fn, source=v, target=target, fn_kw=fn_kw))

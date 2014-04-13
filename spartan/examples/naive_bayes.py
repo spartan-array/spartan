@@ -74,7 +74,7 @@ def fit(data, labels, label_size, alpha=1.0):
   rms = expr.sqrt(square_sum * 1.0 / data.shape[1])
   
   # calculate weight normalized Tf-Idf
-  data = data / expr.reshape(rms, (data.shape[0], 1))  * expr.reshape(idf, (1, data.shape[1]))
+  data = data / rms.reshape((data.shape[0], 1)) * idf.reshape((1, data.shape[1]))
   
   # add up all the feature vectors with the same labels
   sum_instance_by_label = distarray.create((label_size, data.shape[1]),
