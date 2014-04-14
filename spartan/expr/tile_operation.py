@@ -1,12 +1,8 @@
-from spartan import rpc
-
-from .. import blob_ctx, util
-from ..array import distarray, tile
+from .. import util
 from ..core import LocalKernelResult
-from ..node import Node
-from ..util import is_iterable, Assert
+from ..util import is_iterable
 from .base import Expr, lazify
-from traits.api import Bool, Instance, Function, PythonValue, HasTraits
+from traits.api import Instance, Function, PythonValue
 from .base import DictExpr, NotShapeable
 
 def tile_operation(v, fn, kw=None):
