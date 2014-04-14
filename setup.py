@@ -41,6 +41,7 @@ setup(
     'cython',
     'pyzmq',
     'psutil',
+    'traits',
     # 'yappi',
     # 'parakeet',
   ],

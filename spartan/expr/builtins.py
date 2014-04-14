@@ -350,7 +350,44 @@ def sum(x, axis=None, tile_hint=None):
                 local_reduce_fn=_sum_local,
                 accumulate_fn=np.add,
                 tile_hint=tile_hint)
-                
+
+def max(x, axis=None, tile_hint=None):
+  '''Compute the maximum value over an array (or axis).  See `numpy.max`.
+
+  Arguments:
+    x (Expr):
+    axis (int, tuple, or None): Axis to operate over
+    tile_hint (tuple or None): Tile shape for the output array.
+
+  Returns:
+   Expr:
+  '''
+  return reduce(x,
+      axis=axis,
+      dtype_fn=lambda input: input.dtype,
+      local_reduce_fn=lambda ex, data, axis: data.max(axis),
+      accumulate_fn=np.maximum,
+      tile_hint = tile_hint)
+
+
+def min(x, axis=None, tile_hint=None):
+  '''Compute the minimum value over an array (or axis).  See `numpy.min`.
+
+  Arguments:
+    x (Expr):
+    axis (int, tuple, or None): Axis to operate over
+    tile_hint (tuple or None): Tile shape for the output array.
+
+  Returns:
+   Expr:
+  '''
+  return reduce(x,
+      axis=axis,
+      dtype_fn=lambda input: input.dtype,
+      local_reduce_fn=lambda ex, data, axis: data.min(axis),
+      accumulate_fn=np.minimum,
+      tile_hint = tile_hint)
+
 
 def _scan_reduce_mapper(array, ex, reduce_fn=None, axis=None):
   if reduce_fn is None:
@@ -634,6 +671,34 @@ def square(v): return map(v, fn=np.square)
 def sqrt(v): return map(v, fn=np.sqrt)
 
 def abs(v): return map(v, fn=np.abs)
+
+def _bincount_mapper(array, ex, minlength=None):
+  tile = array.fetch(ex)
+  result = np.bincount(tile, minlength=minlength)
+  result_ex = extent.from_shape(result.shape)
+  util.log_info('%s %s %s', tile.max(), result.shape, result)
+  yield result_ex, result
+
+
+def bincount(v):
+  '''
+  Count unique values in ``v``.  
+  See `numpy.bincount` for more information. 
+
+  Arguments:
+    v (Expr): Array of non-negative integers
+  Returns:
+    Expr: Integer array of counts.
+  '''
+  minval = min(v).glom()
+  maxval = max(v).glom()
+  assert minval > 0
+  target = ndarray((maxval + 1,), dtype=np.int64, reduce_fn=np.add)
+  return shuffle(v, 
+      _bincount_mapper, 
+      target=target,
+      kw = { 'minlength' : maxval + 1})
+
 
 try:
   import scipy.stats
