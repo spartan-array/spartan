@@ -131,7 +131,7 @@ def canopy_cluster(points, t1=0.1, t2=0.1, cf=1):
     t2(float): distance threshold between center point and the points within a canopy.
     cf(int): the minimum canopy size.
   '''
-  new_points = expr.shuffle(points, _canopy_mapper, directly_return=True, kw={'t1': t1, 't2': t2, 'cf': cf}).force()
+  new_points = expr.tile_operation(points, _canopy_mapper, kw={'t1': t1, 't2': t2, 'cf': cf}).force()
   centers = find_centers(new_points.values(), t1, t2, cf)
   labels = expr.shuffle(points, _cluster_mapper, kw={'centers': centers}).force()    
   
