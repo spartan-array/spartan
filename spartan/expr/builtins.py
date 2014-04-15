@@ -61,11 +61,12 @@ def _make_sparse_rand(input,
 def _make_sparse_diagonal(tile, ex):
   data = sp.lil_matrix(ex.shape, dtype=tile.dtype)
 
+  import __builtin__
   if ex.ul[0] >= ex.ul[1] and ex.ul[0] < ex.lr[1]:
-    for i in range(ex.ul[0], min(ex.lr[0], ex.lr[1])):
+    for i in range(ex.ul[0], __builtin__.min(ex.lr[0], ex.lr[1])):
       data[i - ex.ul[0], i - ex.ul[1]] = 1
   elif ex.ul[1] >= ex.ul[0] and ex.ul[1] < ex.lr[0]:
-    for j in range(ex.ul[1], min(ex.lr[1], ex.lr[0])):
+    for j in range(ex.ul[1], __builtin__.min(ex.lr[1], ex.lr[0])):
       data[j - ex.ul[0], j - ex.ul[1]] = 1
 
   return [(ex, data)]
