@@ -28,6 +28,7 @@ from base import Expr, evaluate, optimized_dag, glom, eager, lazify, force,  Not
 from .builtins import *
 from .map import map
 from .region_map import region_map
+from .tile_operation import tile_operation
 from .ndarray import ndarray
 from .outer import outer
 from .reduce import reduce

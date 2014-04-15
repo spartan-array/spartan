@@ -64,7 +64,7 @@ def target_mapper(ex, map_fn=None, source=None, target=None, fn_kw=None):
   return LocalKernelResult(result=[], futures=futures)
 
 
-        
+
 def notarget_mapper(ex, array=None, map_fn=None, source=None, fn_kw=None):
   '''
   Kernel function invoked during shuffle.
@@ -97,7 +97,7 @@ def notarget_mapper(ex, array=None, map_fn=None, source=None, fn_kw=None):
 
 class ShuffleExpr(Expr):
   array = PythonValue(None, desc="DistArray or Expr")
-  map_fn = Function 
+  map_fn = Function
   target = PythonValue(None, desc="DistArray or Expr") 
   tile_hint = PythonValue(None, desc="Tuple or None")
   fn_kw = Instance(DictExpr) 
@@ -112,7 +112,7 @@ class ShuffleExpr(Expr):
 
     util.log_info('Keywords: %s', fn_kw)
 
-    map_fn = self.map_fn
+    map_fn = self.map_fn     
     if target is not None:
       v.foreach_tile(mapper_fn = target_mapper,
                      kw = dict(map_fn=map_fn, source=v, target=target, fn_kw=fn_kw))
