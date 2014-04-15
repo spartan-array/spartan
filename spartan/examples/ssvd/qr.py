@@ -23,11 +23,9 @@ Q...
 import spartan
 from spartan import core, expr, util, blob_ctx
 from spartan.array import extent
-from sys import stderr
 import numpy as np
 from scipy.linalg import qr as skqr
 import parakeet
-import time
 
 def givens(a, b):
   a = float(a)
@@ -57,16 +55,14 @@ def _qr_mapper(ex, Y, k, r, global_R, global_Q):
   to distributed array. It will be merged by another kernel.
   '''
   local_y = Y.fetch(ex)
-  R = np.zeros((k+1, k))
-  R[0, :] = local_y[local_y.shape[0]-1, :]
   
-  qq, rr  = skqr(local_y, mode="economic")
+  Q, R  = skqr(local_y, mode="economic")
   res = core.LocalKernelResult()
   res.result = None #(qq.T, rr)
   
-  global_Q[:, ex.ul[0]:ex.lr[0]] = qq.T
-  st_x = ex.ul[0] / r * k
-  global_R[st_x : st_x + k, :] = rr
+  global_Q[:, ex.ul[0]:ex.lr[0]] = Q.T
+  st_row = ex.ul[0] / r * k
+  global_R[st_row : st_row + k, :] = R 
   return res
 
 
@@ -76,25 +72,31 @@ def _reduce_mapper(ex, Q, R, r, round):
   idx = ex.ul[0]
   k = Q.shape[0]
   qr =  2 ** (round - 1) * r  
+  # Fetch first Q from global spartan array.
   local_Q1 = Q.fetch(extent.create(ul=(0, 2 * idx * qr), 
                                   lr=(Q.shape[0], 2 * idx * qr + qr), 
                                   array_shape=Q.shape))
 
+  # Fetch second Q from global spartan array.
   local_Q2 = Q.fetch(extent.create(ul=(0, 2 * idx * qr + qr), 
                                   lr=(Q.shape[0], 2 * idx * qr + 2 * qr), 
                                   array_shape=Q.shape))
   
+  # Fetch first R from global spartan array.
   local_R1 = R.fetch(extent.create(ul=(2 ** round * idx * k, 0),
                                   lr=(2 ** round * idx * k + k, R.shape[1]),
                                   array_shape=R.shape))
 
+  # Fetch second R from global spartan array.
   local_R2 = R.fetch(extent.create(ul=((2 ** round * idx + 2 ** (round - 1)) * k, 0),
                                   lr=((2 ** round * idx + 2 ** (round - 1)) * k + k, R.shape[1]),
                                   array_shape=R.shape))
   
+  # Merge two Q, R pairs.
   new_Q, new_R = computeQHatSeq(qs=[local_Q1, local_Q2],
                                 rs=[local_R1, local_R2], k=k, r=qr) 
- 
+  
+  # Store back to global Q, R
   Q[:, 2 * idx * qr : 2 * idx * qr + 2 * qr] = new_Q.T
   R[2 ** round * idx * k : 2 ** round * idx * k + k, :] = new_R
   result = core.LocalKernelResult()
@@ -125,14 +127,12 @@ def mergeRonQ(R1, R2, Q1, Q2, k):
   assert Q2.shape[0] == k 
   assert Q2.shape[1] == r
   
-  with util.TIMER.mergeronq:
-    for v in range(0, k):
-      for u in range(v, k):
-        c, s = givens(R1[u, u], R2[u-v, u])
-        with util.TIMER.given:
-          applyGivensInPlace(c, s, R1[u], R2[u-v], u, k-u)
-          applyGivensInPlace(c, s, Q1[u], Q2[u-v], 0, r)
- 
+  for v in range(0, k):
+    for u in range(v, k):
+      c, s = givens(R1[u, u], R2[u-v, u])
+      applyGivensInPlace(c, s, R1[u], R2[u-v], u, k-u)
+      applyGivensInPlace(c, s, Q1[u], Q2[u-v], 0, r)
+
 def mergeQrUp(Q, R1, R2):
   k = Q.shape[0]
   r = Q.shape[1]
@@ -151,17 +151,14 @@ def computeQtHat(Q, i, rs):
   rs_ = [r.copy() for r in rs]
   rTilde = rs_[0]
 
-  with util.TIMER.first_merge:
-    for j in range(1, i):
-      mergeR(rTilde, rs_[j])
+  for j in range(1, i):
+    mergeR(rTilde, rs_[j])
 
-  with util.TIMER.second_timer:
-    if i > 0:
-      Q = mergeQrDown(rTilde, Q, rs_[i])
+  if i > 0:
+    Q = mergeQrDown(rTilde, Q, rs_[i])
 
-  with util.TIMER.third_timer:
-    for t in range(i+1, len(rs)):
-      Q = mergeQrUp(Q, rTilde, rs_[t])
+  for t in range(i+1, len(rs)):
+    Q = mergeQrUp(Q, rTilde, rs_[t])
   return Q.T
 
 def computeQHatSeq(qs, rs, k, r):
