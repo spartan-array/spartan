@@ -351,6 +351,8 @@ cpdef intersection(TileExtent a, TileExtent b):
   '''
   if a is None:
     return None
+    
+  Assert.eq(a.array_shape, b.array_shape, 'Tiles must have compatible shapes!')
   
   cdef coordinate_t ul[MAX_DIM]
   cdef coordinate_t lr[MAX_DIM]
@@ -361,8 +363,6 @@ cpdef intersection(TileExtent a, TileExtent b):
     if a._lr[i] < b._ul[i]: return None
     ul[i] = a._ul[i] if a._ul[i] >= b._ul[i] else b._ul[i]
     lr[i] = a._lr[i] if a._lr[i] <  b._lr[i] else b._lr[i]
-    
-  Assert.eq(a.array_shape, b.array_shape)
   
   return c_create(ul, lr, a.array_shape, a._ul_len)
 
