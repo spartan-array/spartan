@@ -105,7 +105,7 @@ def _reduce_mapper(ex, Q, R, r, round):
 
 
 @parakeet.jit
-def applyGivensInPlace(c, s, row1, row2, offset, len):
+def apply_givens_in_place(c, s, row1, row2, offset, len):
   n = offset + len
   for j in range(offset, n):
     tau1 = row1[j]
@@ -117,10 +117,10 @@ def mergeR(R1, R2, k):
   for v in range(0, k):
     for u in range(v, k):
       c, s = givens(R1[u, u], R2[u-v, u])
-      applyGivensInPlace(c, s, R1[u], R2[u-v], u, k-u)
+      apply_givens_in_place(c, s, R1[u], R2[u-v], u, k-u)
   return R1
 
-def mergeRonQ(R1, R2, Q1, Q2, k):
+def merge_R_on_Q(R1, R2, Q1, Q2, k):
   r = Q1.shape[1]
   assert R1.shape[0] == k
   assert Q1.shape[0] == k
@@ -130,21 +130,21 @@ def mergeRonQ(R1, R2, Q1, Q2, k):
   for v in range(0, k):
     for u in range(v, k):
       c, s = givens(R1[u, u], R2[u-v, u])
-      applyGivensInPlace(c, s, R1[u], R2[u-v], u, k-u)
-      applyGivensInPlace(c, s, Q1[u], Q2[u-v], 0, r)
+      apply_givens_in_place(c, s, R1[u], R2[u-v], u, k-u)
+      apply_givens_in_place(c, s, Q1[u], Q2[u-v], 0, r)
 
-def mergeQrUp(Q, R1, R2):
+def merge_QR_up(Q, R1, R2):
   k = Q.shape[0]
   r = Q.shape[1]
   QTemp = np.zeros(Q.shape)
-  mergeRonQ(R1, R2, Q, QTemp, k)
+  merge_R_on_Q(R1, R2, Q, QTemp, k)
   return Q
 
-def mergeQrDown(R1, Q, R2):
+def merge_QR_down(R1, Q, R2):
   k = Q.shape[0]
   r = Q.shape[1]
   QTemp = np.zeros(Q.shape)
-  mergeRonQ(R1, R2, QTemp, Q, k)
+  merge_R_on_Q(R1, R2, QTemp, Q, k)
   return QTemp
 
 def computeQtHat(Q, i, rs):
@@ -155,10 +155,10 @@ def computeQtHat(Q, i, rs):
     mergeR(rTilde, rs_[j])
 
   if i > 0:
-    Q = mergeQrDown(rTilde, Q, rs_[i])
+    Q = merge_QR_down(rTilde, Q, rs_[i])
 
   for t in range(i+1, len(rs)):
-    Q = mergeQrUp(Q, rTilde, rs_[t])
+    Q = merge_QR_up(Q, rTilde, rs_[t])
   return Q.T
 
 def computeQHatSeq(qs, rs, k, r):
@@ -214,9 +214,11 @@ def _tree_reduce(Q, R, r):
 
 
 def qr(Y):
-  """
-  Y is the matrix you want to decompose, it should be tiled by rows.
-  """
+  '''
+  Compute the QR decomposition of Y.
+
+  For efficient operation, Y should be composed of contiguous row tiles.
+  '''
   k = Y.shape[1]
   r = Y.tile_shape()[0]
   global_Q = expr.zeros((k, Y.shape[0])).force()
