@@ -125,27 +125,8 @@ def spectral_cluster(points, k=10, num_iter=10):
   
   # Run kmeans clustering with init_clusters
   kmeans = KMeans(k, num_iter)
-  U = expr.from_numpy(U, tile_hint=None).force()
+  U = expr.from_numpy(U).force()
   centers, labels = kmeans.fit(U, init_clusters)
   
   return labels
-   
-   
-   
-   
-   
-   
-   
-   
-   
-   
-   
-   
-   
-   
-   
-   
-   
-   
-   
-   
+
