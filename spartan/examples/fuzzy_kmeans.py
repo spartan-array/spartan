@@ -11,7 +11,7 @@ def _calc_probability(point, centers, m):
     centers(numpy.array): the centers of each cluster.
     m(float): the parameter of fuzzy kmeans.
   '''
-  distances = np.square(point - centers).sum(1)
+  distances = np.square(point - centers).sum(axis=1)
   distances[distances == 0] = 0.0000000001
     
   pi = np.zeros(centers.shape[0])
@@ -79,7 +79,7 @@ def fuzzy_kmeans(points, k=10, num_iter=10, m=2.0, centers=None):
                                                    'labels': labels, 
                                                    'm': m}).force()
     
-    # If any centroids don't have any points assigined to them.
+    # If any centroids don't have any points assigned to them.
     zcount_indices = (new_counts.glom() == 0).reshape(k)
       
     if np.any(zcount_indices):
