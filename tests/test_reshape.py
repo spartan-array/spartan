@@ -36,19 +36,19 @@ class ReshapeTest(test_common.ClusterTest):
     Assert.all_eq(f.glom(), g.glom())
 
   def test_reshape5(self):
-    a = expr.arange((124931, ))
-    b = expr.reshape(a, (271, 461))
-    c = expr.reshape(b, (461, 271))
-    d = expr.reshape(c, (1, 124931))
-    e = expr.arange((1, 124931))
+    a = expr.arange((35511, ))
+    b = expr.reshape(a, (133, 267))
+    c = expr.reshape(b, (267, 133))
+    d = expr.reshape(c, (1, 35511))
+    e = expr.arange((1, 35511))
     Assert.all_eq(d.glom(), e.glom())
 
   def test_reshape6(self):
-    a = expr.arange((209723, ))
-    b = expr.reshape(a, (523, 401))
-    c = expr.reshape(b, (401, 523))
-    d = expr.reshape(c, (1, 209723))
-    e = expr.arange((1, 209723))
+    a = expr.arange((12319, ))
+    b = expr.reshape(a, (127, 97))
+    c = expr.reshape(b, (97, 127))
+    d = expr.reshape(c, (1, 12319))
+    e = expr.arange((1, 12319))
     Assert.all_eq(d.glom(), e.glom())
 
   def test_reshape7(self):
@@ -85,12 +85,12 @@ class ReshapeTest(test_common.ClusterTest):
     Assert.all_eq(expr.reshape(e, (1, 276000)).glom(), t4)
 
   def test_reshape8(self):
-    t1 = expr.sparse_diagonal((257, 457))
-    t2 = expr.sparse_diagonal((457, 257))
-    a = expr.reshape(t1, (457, 257))
-    b = expr.reshape(t2, (257, 457))
-    Assert.all_eq(a.glom().todense(), sp.eye(257, 457).tolil().reshape((457, 257)).todense())
-    Assert.all_eq(b.glom().todense(), sp.eye(457, 257).tolil().reshape((257, 457)).todense())
+    t1 = expr.sparse_diagonal((137, 113))
+    t2 = expr.sparse_diagonal((113, 137))
+    a = expr.reshape(t1, (113, 137))
+    b = expr.reshape(t2, (137, 113))
+    Assert.all_eq(a.glom().todense(), sp.eye(137, 113).tolil().reshape((113, 137)).todense())
+    Assert.all_eq(b.glom().todense(), sp.eye(113, 137).tolil().reshape((137, 113)).todense())
 
   def test_reshape_dot(self):
     npa1 = np.random.random((357, 93))
