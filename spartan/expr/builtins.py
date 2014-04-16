@@ -24,6 +24,7 @@ from .optimize import disable_parakeet, not_idempotent
 from .reduce import reduce
 from .shuffle import shuffle
 from spartan import sparse
+import __builtin__
 
 def _make_ones(input): return np.ones(input.shape, input.dtype)
 def _make_zeros(input): return np.zeros(input.shape, input.dtype)
@@ -61,7 +62,6 @@ def _make_sparse_rand(input,
 def _make_sparse_diagonal(tile, ex):
   data = sp.lil_matrix(ex.shape, dtype=tile.dtype)
 
-  import __builtin__
   if ex.ul[0] >= ex.ul[1] and ex.ul[0] < ex.lr[1]:
     for i in range(ex.ul[0], __builtin__.min(ex.lr[0], ex.lr[1])):
       data[i - ex.ul[0], i - ex.ul[1]] = 1
@@ -400,7 +400,7 @@ def _scan_reduce_mapper(array, ex, reduce_fn=None, axis=None):
       id = exts.index(ex)
       dst_ex = extent.create((id,),(id+1,),(len(exts),))
     else:
-      max_axis_shape = max([ext.shape[axis] for ext in array.tiles.keys()])  
+      max_axis_shape = __builtin__.max([ext.shape[axis] for ext in array.tiles.keys()])
       id = ex.ul[axis] / max_axis_shape
       new_ul = list(ex.ul)
       new_lr = list(ex.lr)
@@ -430,7 +430,7 @@ def _scan_mapper(array, ex, scan_fn=None, axis=None, scan_base=None):
         local_data[tuple(np.zeros(len(ex.shape), dtype=int))] += scan_base[id-1]
 
     else:
-      max_axis_shape = max([ext.shape[axis] for ext in array.tiles.keys()])  
+      max_axis_shape = __builtin__.max([ext.shape[axis] for ext in array.tiles.keys()])  
       id = ex.ul[axis] / max_axis_shape
       if id > 0:
         base_slice = list(ex.to_slice())
