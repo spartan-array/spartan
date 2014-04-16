@@ -52,14 +52,22 @@ def rbf_distance(X, Y, gamma=1.0):
   K = euclidean_distance(X, Y, squared=True) * -gamma
   return np.exp(K)
 
-def _row_similarity_mapper(array, ex):
+distance_methods = {'manhattan': manhattan_distance,
+                    'euclidean': euclidean_distance,
+                    'scaled_euclidean': scaled_euclidean_distance,
+                    'rbf': rbf_distance,
+                    }
+
+def _row_similarity_mapper(array, ex, similarity_measurement):
   '''
   calculate distances for each pair of points.
   
   Args:
     array(DistArray): the input data points matrix.
     ex(Extent): region being processed.
+    similarity_measurement(str): distance method used to measure similarity between two points.
   '''
+  measurement = distance_methods[similarity_measurement]
   points = array.fetch(ex)
   result = np.zeros((points.shape[0], array.shape[0]))
   for other_ex in array.tiles:
@@ -70,7 +78,7 @@ def _row_similarity_mapper(array, ex):
     
     for i in range(points.shape[0]):
       for j in range(other_points.shape[0]):
-        result[i, other_ex.ul[0] + j] = rbf_distance(points[i], other_points[j])
+        result[i, other_ex.ul[0] + j] = measurement(points[i], other_points[j])
     
   yield extent.create((ex.ul[0], 0), (ex.lr[0], array.shape[0]), (array.shape[0], array.shape[0])), result
 
@@ -94,7 +102,7 @@ def _laplacian_mapper(array, ex, D):
   L[:, ex.ul[0]:ex.lr[0]].flat[::A.shape[0] + 1] = 1
   yield ex, L
   
-def spectral_cluster(points, k=10, num_iter=10):
+def spectral_cluster(points, k=10, num_iter=10, similarity_measurement='rbf'):
   '''
   clustering data points using kmeans spectral clustering method.
 
@@ -102,9 +110,10 @@ def spectral_cluster(points, k=10, num_iter=10):
     points(Expr or DistArray): the data points to be clustered.
     k(int): the number of clusters we need to generate.
     num_iter(int): the max number of iterations that kmeans clustering method runs. 
+    similarity_measurement(str): distance method used to measure similarity between two points.
   '''  
   # calculate similarity for each pair of points to generate the adjacency matrix A
-  A = expr.shuffle(points, _row_similarity_mapper)
+  A = expr.shuffle(points, _row_similarity_mapper, kw={'similarity_measurement': similarity_measurement})
   
   num_dims = A.shape[1]
   
