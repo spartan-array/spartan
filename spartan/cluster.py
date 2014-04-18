@@ -25,7 +25,7 @@ import spartan.worker
 
 
 class HostListFlag(config.Flag):
-  def set(self, str):
+  def parse(self, str):
     hosts = []
     for host in str.split(','):
       hostname, count = host.split(':')
@@ -40,7 +40,7 @@ class AssignMode(object):
   BY_NODE = 2
 
 class AssignModeFlag(config.Flag):
-  def set(self, option_str):
+  def parse(self, option_str):
     self.val = getattr(AssignMode, option_str)
 
   def _str(self):

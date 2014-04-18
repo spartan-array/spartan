@@ -43,11 +43,11 @@ class Flag(object):
 
 
 class IntFlag(Flag):
-  def set(self, str):
+  def parse(self, str):
     self.val = int(str)
 
 class StrFlag(Flag):
-  def set(self, str):
+  def parse(self, str):
     self.val = str
 
 class BoolFlag(Flag):
@@ -55,7 +55,7 @@ class BoolFlag(Flag):
   
   Accepts '0' or 'false' for false values, '1' or 'true' for true values. 
   '''
-  def set(self, str):
+  def parse(self, str):
     str = str.lower()
     str = str.strip()
 
@@ -78,7 +78,7 @@ LOG_STR = {logging.DEBUG: 'DEBUG',
 
 
 class LogLevelFlag(Flag):
-  def set(self, str):
+  def parse(self, str):
     self.val = getattr(logging, str)
 
   def _str(self):
@@ -104,12 +104,14 @@ class Flags(object):
     if key.startswith('_'): 
       self.__dict__[key] = value
       return
+
+    # print >>sys.stderr, ('Setting flag: %s %s', key, value)
     
     assert self.__dict__['_parsed'], 'Access to flags before config.parse() called.'
     self.__dict__['_vals'][key].val = value
 
   def __repr__(self):
-    return ' '.join([repr(f) for f in self._vals.values()])
+    return ' '.join([repr(f) for f in sorted(self._vals.values())])
 
   def __str__(self):
     return repr(self)
@@ -198,7 +200,7 @@ def parse(argv):
   for name, flag in FLAGS:
     if getattr(parsed_flags, name) is not None:
       #print >>sys.stderr, 'Parsing: %s : %s' % (name, getattr(parsed_flags, name))
-      flag.set(getattr(parsed_flags, name))
+      flag.parse(getattr(parsed_flags, name))
 
   # reset loggers so that basic config works
   logging.root = logging.RootLogger(logging.WARNING)
