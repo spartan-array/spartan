@@ -191,7 +191,7 @@ class BroadcastFuture(object):
       if len(socks) == 0:
         # It means timeout.
         util.log_info('timed out!')
-        raise TimeoutException('Timed out on remote call (%s %s)' % (self.addr, self.rpc_id))
+        raise TimeoutException('Timed out on broadcast remote call (%s)' % (self.rpc_id,))
     
     for result in self.results:
       if isinstance(result, RPCException):
