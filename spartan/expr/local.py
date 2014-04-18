@@ -157,6 +157,9 @@ class ParakeetExpr(LocalExpr):
   def fn_name(self):
     return 'parakeet'
 
+  def pretty_str(self):
+    return 'parakeet_op'
+
   def evaluate(self, ctx):
     names = self.input_names()
     fn = compile_parakeet_source(self.source)
