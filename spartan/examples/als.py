@@ -39,7 +39,7 @@ def _implicit_feedback_als_solver(rating_vector, la, alpha, Y, YT, YTY):
   YT_CuMinusI_Y_laI = np.dot(YT, Y * (Cu - 1)) + np.eye(Y.shape[1]) * la
   
   # Y' Cu p(u)
-  YT_Cu_Pu = (Y * Cu).sum(axis=0)
+  YT_Cu_Pu = (Y * Cu)[rating_vector > 0].sum(axis=0)
   
   return lstsq(YTY + YT_CuMinusI_Y_laI, YT_Cu_Pu)[0]
   

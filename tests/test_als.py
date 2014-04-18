@@ -2,9 +2,6 @@ from spartan import expr, util
 from spartan.examples.als import als
 import test_common
 from test_common import millis
-import numpy as np
-import math
-from spartan.expr.write_array import from_numpy
 from datetime import datetime
 
 #@test_common.with_ctx
