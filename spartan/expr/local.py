@@ -32,11 +32,9 @@ class LocalCtx(Node):
 class LocalExpr(Node):
   '''Represents an internal operation to be performed in the context of a tile.'''
   deps = List()
-  id = Int()
 
   def __init__(self, *args, **kw):
     super(LocalExpr, self).__init__(*args, **kw)
-    self.id = expr_id.next()
 
   def __repr__(self):
     # return self.debug_str()
@@ -97,11 +95,7 @@ class FnCallExpr(LocalExpr):
   def evaluate(self, ctx):
     deps = [d.evaluate(ctx) for d in self.deps]
     #util.log_info('Evaluating %s.%d [%s]', self.fn_name(), self.id, deps)
-    st = time.time()
-    result = self.fn(*deps, **self.kw)
-    # util.log_info('Evaluated %s.%d in %.2f seconds',
-    #               self.fn_name(), self.id, time.time() - st)
-    return result
+    return self.fn(*deps, **self.kw)
 
 
 # The local operation of map and reduce expressions is practically
