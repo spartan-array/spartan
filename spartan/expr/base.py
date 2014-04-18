@@ -88,7 +88,7 @@ class EvalCache(object):
   def deregister(self, expr_id):
     self.refs[expr_id] -= 1
     if self.refs[expr_id] == 0:
-      util.log_debug('Destroying... %s', expr_id)
+      #util.log_debug('Destroying... %s', expr_id)
       if expr_id in self.cache:
         #import objgraph
         #objgraph.show_backrefs([self.cache[expr_id]], filename='%s-refs.png' % expr_id)
@@ -278,8 +278,9 @@ class Expr(Node):
     '''
     cache = self.cache()
     if cache is not None:
+      util.log_debug('Retrieving %d from cache' % self.expr_id)
       return cache
-  
+
     ctx = blob_ctx.get()
     #util.log_info('Evaluting deps for %s', prim)
     deps = {}
@@ -624,8 +625,8 @@ def eager(node):
   
   :param node: `Expr` to evaluate.
   '''
-  force(node)
-  return node
+  result = force(node)
+  return Val(val=result)
 
 
 def lazify(val):

@@ -39,7 +39,7 @@ def get_members(klass):
   return members
 
 
-class Node(HasTraits):
+class Node(HasStrictTraits):
   def __init__(self, *args, **kw):
     super(Node, self).__init__(*args, **kw)
 
