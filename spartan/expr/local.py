@@ -14,10 +14,11 @@ import time
 
 from spartan import util
 from spartan.util import Assert
-from spartan.node import Node
-from traits.api import Str, List, Function, PythonValue
+from spartan.node import Node, indent
+from traits.api import Str, List, Function, PythonValue, Int
 
 var_id = iter(xrange(1000000))
+expr_id = iter(xrange(1000000))
 
 class CodegenException(Exception): pass
 
@@ -50,10 +51,14 @@ class LocalExpr(Node):
 
 class LocalInput(LocalExpr):
   '''An externally supplied input.'''
-  idx = Str() 
+  idx = Str()
 
-  def __str__(self):
-    return 'V(%s)' % self.idx
+  def __init__(self, *args, **kw):
+    LocalExpr.__init__(self, *args, **kw)
+    assert self.idx != ''
+
+  def pretty_str(self):
+    return '%s' % self.idx
 
   def evaluate(self, ctx):
     return ctx.inputs[self.idx]
@@ -80,7 +85,14 @@ class FnCallExpr(LocalExpr):
     if self.kw is None: self.kw = {}
     assert self.fn is not None
 
+  def pretty_str(self):
+    return '%s(%s)' % (
+      self.fn_name(),
+      indent('\n' + ','.join([v.pretty_str() for v in self.deps]) + '\n')
+    )
+
   def fn_name(self):
+    '''Return a name for this function suitable for calling.'''
     if self.pretty_fn:
       return self.pretty_fn
 
