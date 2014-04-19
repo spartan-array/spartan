@@ -359,6 +359,18 @@ class Expr(Node):
 
   def __neg__(self):
     return _map(self, fn=np.negative)
+  
+  def __rsub__(self, other):
+    return _map(other, self, fn=np.subtract)
+
+  def __radd__(self, other):
+    return _map(other, self, fn=np.add)
+
+  def __rmul__(self, other):
+    return _map(other, self, fn=np.multiply)
+
+  def __rdiv__(self, other):
+    return _map(other, self, fn=np.divide)
 
   def reshape(self, new_shape):
     '''
@@ -433,10 +445,6 @@ class Expr(Node):
     return evaluate(self).__reduce__()
 
 
-Expr.__rsub__ = Expr.__sub__
-Expr.__radd__ = Expr.__add__
-Expr.__rmul__ = Expr.__mul__
-Expr.__rdiv__ = Expr.__div__
 
 
 class AsArray(Expr):
