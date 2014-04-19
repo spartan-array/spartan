@@ -13,7 +13,6 @@ master cannot be contacted for a sufficiently long interval, workers
 shut themselves down.   
 '''
 
-import cProfile
 import multiprocessing
 from multiprocessing.pool import ThreadPool
 import os
@@ -78,10 +77,8 @@ class Worker(object):
     self._kernel_threads = ThreadPool(processes=1)
     
     if FLAGS.profile_worker:
-      self._kernel_prof = cProfile.Profile()
-      self._kernel_prof.disable()
-    else:
-      self._kernel_prof = None
+      import yappi
+      yappi.start()
 
     hostname = socket.gethostname()
     self._server = rpc.listen_on_random_port(hostname)
@@ -209,10 +206,7 @@ class Worker(object):
     :param handle: `PendingRequest`
     
     '''
-    if FLAGS.profile_worker:
-      self._kernel_prof.enable()
-    
-    start_time = time.time()  
+    start_time = time.time()
     futures = []
     try:
       blob_ctx.set(self._ctx)
@@ -242,9 +236,6 @@ class Worker(object):
     
     finish_time = time.time()
     self.worker_status.add_task_report(req, start_time, finish_time)
-    
-    if FLAGS.profile_worker:
-      self._kernel_prof.disable()
 
   def run_kernel(self, req, handle):
     '''
@@ -272,8 +263,8 @@ class Worker(object):
     if FLAGS.profile_worker:
       try:
         os.system('mkdir -p ./_worker_profiles/')
-        stats = pstats.Stats(self._server._socket._event_loop.profiler, self._kernel_prof)
-        stats.dump_stats('./_worker_profiles/%d' % self.id)
+        import yappi
+        yappi.get_func_stats().save('_worker_profiles/%d' % self.id, type='pstat')
       except Exception, ex:
         print 'Failed to write profile.', ex
     handle.done()

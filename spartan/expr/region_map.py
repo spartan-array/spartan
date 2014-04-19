@@ -65,9 +65,6 @@ class RegionMapExpr(base.Expr):
   def __init__(self, *args, **kw):
     super(RegionMapExpr, self).__init__(*args, **kw)
 
-  def label(self):
-    return 'region_map(%s, %s, %s)' % (self.array, self.region, self.fn)
-
   def compute_shape(self):
     return self.array.compute_shape()
 
