@@ -16,21 +16,23 @@ def _lda_train(term_docs_matrix, topic_term_counts, topic_sums, doc_topics, k_to
     eta(float): parameter of LDA model.
     max_iter_per_doc(int): the max iterations to train each document.
   '''
+  local_topic_term_counts = topic_term_counts.copy()
+  
   for doc_id in range(term_docs_matrix.shape[1]):
     doc = term_docs_matrix[:, doc_id]
     doc_topic_counts = np.ones(k_topics, dtype=np.float64)/k_topics
     topic_term_model = np.zeros((k_topics, term_docs_matrix.shape[0]), dtype=np.float64)
-    
+
     for i in range(max_iter_per_doc):
       # calc un-normalized p(topic x | term, doc)
       for j in doc.nonzero()[0]:
         topic_term_model[:,j] = (topic_term_counts[:,j] + eta) * (doc_topic_counts + alpha) / (topic_sums + eta * doc.shape[0])
-      
+
       # make sure that each of these is properly normalized by topic: sum_x(p(x|t,d)) = 1
       for j in topic_term_model[0].nonzero()[0]:
         topic_term_model[:,j] /= topic_term_model[:,j].sum()
       #topic_term_model /= topic_term_model.sum(axis=0)
-      
+
       # now multiply, term-by-term, by the document, to get the weighted distribution of
       # term-topic pairs from this document.  
       for j in doc.nonzero()[0]:
@@ -43,11 +45,10 @@ def _lda_train(term_docs_matrix, topic_term_counts, topic_sums, doc_topics, k_to
       doc_topic_counts = doc_topic_counts / np.linalg.norm(doc_topic_counts, 1)
     
     # update p(topic x | term)
-    topic_term_counts += topic_term_model
-    topic_sums += np.linalg.norm(topic_term_model, 1, axis=1)
+    local_topic_term_counts += topic_term_model
     if doc_topics is not None: doc_topics[doc_id] = doc_topic_counts
     
-  return topic_term_counts, topic_sums
+  return local_topic_term_counts
 
 def _lda_mapper(array, ex, k_topics, alpha, eta, max_iter_per_doc, topic_term_counts):
   '''
@@ -66,7 +67,7 @@ def _lda_mapper(array, ex, k_topics, alpha, eta, max_iter_per_doc, topic_term_co
   local_topic_term_counts = topic_term_counts[:]
   local_topic_sums = np.linalg.norm(local_topic_term_counts, 1, axis=1)
   
-  local_topic_term_counts, local_topic_sums = _lda_train(term_docs_matrix, local_topic_term_counts, local_topic_sums, None, k_topics, alpha, eta, max_iter_per_doc)
+  local_topic_term_counts = _lda_train(term_docs_matrix, local_topic_term_counts, local_topic_sums, None, k_topics, alpha, eta, max_iter_per_doc)
   
   yield extent.create((0, 0), (k_topics, array.shape[0]),(k_topics, array.shape[0])), local_topic_term_counts
 
@@ -89,7 +90,7 @@ def _lda_doc_topic_mapper(array, ex, k_topics, alpha, eta, max_iter_per_doc, top
   
   doc_topics = np.ones((term_docs_matrix.shape[1], k_topics), dtype=np.float64)/k_topics
   
-  local_topic_term_counts, local_topic_sums = _lda_train(term_docs_matrix, local_topic_term_counts, local_topic_sums, doc_topics, k_topics, alpha, eta, max_iter_per_doc)
+  local_topic_term_counts = _lda_train(term_docs_matrix, local_topic_term_counts, local_topic_sums, doc_topics, k_topics, alpha, eta, max_iter_per_doc)
   
   yield extent.create((ex.ul[1], 0), (ex.lr[1], k_topics), (array.shape[1], k_topics)), doc_topics
   
@@ -105,11 +106,21 @@ def learn_topics(terms_docs_matrix, k_topics, alpha=0.1, eta=0.1, max_iter=10, m
     max_iter(int):the max iterations to train LDA topic model.
     max_iter_per_doc: the max iterations to train each document.
   '''
-  topic_term_counts = expr.randn(k_topics, terms_docs_matrix.shape[0], tile_hint=(k_topics, terms_docs_matrix.shape[0])).force()
+  topic_term_counts = expr.rand(k_topics, terms_docs_matrix.shape[0], tile_hint=(k_topics, terms_docs_matrix.shape[0])).force()
+
   for i in range(max_iter):
     new_topic_term_counts = distarray.create((k_topics, terms_docs_matrix.shape[0]), np.float64, reducer=np.add, tile_hint=(k_topics, terms_docs_matrix.shape[0]))
     expr.shuffle(terms_docs_matrix, _lda_mapper, target=new_topic_term_counts, kw={'k_topics': k_topics, 'alpha': alpha, 'eta':eta, 'max_iter_per_doc': max_iter_per_doc, 'topic_term_counts': topic_term_counts}).force()
     topic_term_counts = new_topic_term_counts
-  
+    
+  # calculate the doc-topic inference
   doc_topics = expr.shuffle(terms_docs_matrix, _lda_doc_topic_mapper, kw={'k_topics': k_topics, 'alpha': alpha, 'eta':eta, 'max_iter_per_doc': max_iter_per_doc, 'topic_term_counts': topic_term_counts}).force()
+  
+  # normalize the topic-term distribution  
+  norm_val = expr.reduce(topic_term_counts, axis=1, 
+                         dtype_fn=lambda input: input.dtype, 
+                         local_reduce_fn=lambda ex, data, axis:np.abs(data).sum(axis), 
+                         accumulate_fn=np.add)
+  topic_term_counts = expr.lazify(topic_term_counts) / norm_val.reshape((topic_term_counts.shape[0], 1))
+
   return topic_term_counts, doc_topics

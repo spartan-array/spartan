@@ -380,8 +380,8 @@ class Expr(Node):
     :param new_shape: `tuple` with same total size as original shape.
     
     '''
-    from . import builtins
-    return builtins.reshape(self, new_shape)
+    from . import reshape
+    return reshape(self, new_shape)
 
   def __getitem__(self, idx):
     from .slice import SliceExpr
