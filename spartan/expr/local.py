@@ -10,6 +10,7 @@ which can then be executed or converted to parakeet code.
 '''
 import tempfile
 import imp
+import time
 
 from spartan import util
 from spartan.util import Assert
@@ -22,17 +23,26 @@ class CodegenException(Exception): pass
 
 def make_var():
   '''Return a new unique key for use as a variable name'''
-  return 'k%d' % var_id.next()
+  return 'key_%d' % var_id.next()
 
 class LocalCtx(Node):
   inputs = PythonValue
 
+
 class LocalExpr(Node):
   '''Represents an internal operation to be performed in the context of a tile.'''
-  deps = List() 
+  deps = List()
+
+  def __init__(self, *args, **kw):
+    super(LocalExpr, self).__init__(*args, **kw)
+
+  def __repr__(self):
+    # return self.debug_str()
+    return self.pretty_str()
 
   def add_dep(self, v):
     self.deps.append(v)
+    assert len(self.deps) <= 2, v
 
   def input_names(self):
     return util.flatten([v.input_names() for v in self.deps], unique=True)
@@ -84,7 +94,7 @@ class FnCallExpr(LocalExpr):
 
   def evaluate(self, ctx):
     deps = [d.evaluate(ctx) for d in self.deps]
-    #util.log_info('%s %s', deps, self.kw)
+    #util.log_info('Evaluating %s.%d [%s]', self.fn_name(), self.id, deps)
     return self.fn(*deps, **self.kw)
 
 
@@ -131,6 +141,9 @@ def compile_parakeet_source(src):
 class ParakeetExpr(LocalExpr):
   deps = PythonValue
   source = PythonValue
+
+  def fn_name(self):
+    return 'parakeet'
 
   def evaluate(self, ctx):
     names = self.input_names()

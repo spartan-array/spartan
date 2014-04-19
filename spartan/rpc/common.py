@@ -195,7 +195,7 @@ class BroadcastFuture(object):
     
     for result in self.results:
       if isinstance(result, RPCException):
-        raise RemoteException(self.result.py_exc)
+        raise RemoteException(result.py_exc)
     return self.results
 
 

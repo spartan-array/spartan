@@ -110,7 +110,8 @@ class ShuffleExpr(Expr):
     fn_kw = deps['fn_kw']
     target = deps['target']
 
-    util.log_info('Keywords: %s', fn_kw)
+    util.log_debug('Evaluating shuffle.  source: %s, target %s, keywords: %s',
+                   v, target, fn_kw)
 
     map_fn = self.map_fn     
     if target is not None:
