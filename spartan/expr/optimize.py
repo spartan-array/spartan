@@ -53,10 +53,6 @@ def not_idempotent(fn):
 
 
 class OptimizePass(object):
-  # These are used to ensure passes are ordered correctly.
-  before = []
-  after = []
-
   def __init__(self):
     self.visited = {}
 
@@ -97,7 +93,7 @@ def merge_var(children, child_to_var, k, v):
   """Add a new expression with key ``k`` to the ``children`` dictionary.
 
   If ``k`` is already in the dictionary, than ``v`` must be equal to
-  the current value.
+  the current value stored there.
   """
   try:
     i = child_to_var.index(k)
@@ -115,7 +111,6 @@ class MapMapFusion(OptimizePass):
   name = 'map_fusion'
 
   def visit_MapExpr(self, expr):
-    #util.log_info('Map tiles: %s', expr)
     Assert.iterable(expr.children)
     #util.log_info('VISIT %d', id(op))
     #util.log_info('VISIT %s', op.children)
@@ -126,7 +121,7 @@ class MapMapFusion(OptimizePass):
       k = expr.child_to_var[i]
       v = map_children[i]
       if not fusable(v):
-        print 'Skipping fusion: (%s -> %s)' % (k, type(v))
+        util.log_debug('Skipping fusion: (%s -> %s)' % (k, type(v)))
         all_maps = False
         break
 
@@ -142,22 +137,23 @@ class MapMapFusion(OptimizePass):
                                kw=expr.op.kw,
                                pretty_fn=expr.op.pretty_fn)
     trace = ExprTrace()
+
     for i in range(len(map_children)):
-      name = expr.child_to_var[i]
       child_expr = map_children[i]
       trace.fuse(child_expr.stack_trace)
+
       if isinstance(child_expr, MapExpr):
         for j in range(len(child_expr.children)):
           k = child_expr.child_to_var[j]
           v = child_expr.children[j]
           merge_var(children, child_to_var, k, v)
 
-        #util.log_info('Merging: %s', child_expr.op)
         combined_op.add_dep(child_expr.op)
+        util.log_debug('Fusion: %s <- %s', expr.expr_id, child_expr.expr_id)
       else:
+        children.append(child_expr)
         key = make_var()
         combined_op.add_dep(LocalInput(idx=key))
-        children.append(child_expr)
         child_to_var.append(key)
 
     return expr_like(expr,
@@ -170,7 +166,6 @@ class MapMapFusion(OptimizePass):
 class ReduceMapFusion(OptimizePass):
   '''Fuse reduce(f, map(g, X)) -> reduce(f . g, X)'''
   name = 'reduce_fusion'
-  after = [MapMapFusion]
 
   def visit_ReduceExpr(self, expr):
     Assert.isinstance(expr.children, ListExpr)
@@ -207,13 +202,6 @@ class ReduceMapFusion(OptimizePass):
                      trace=trace)
 
 
-class SliceMapFusion(OptimizePass):
-  name = 'slice_map_fusion'
-  after = [MapMapFusion]
-
-  def visit_SliceExpr(self, expr):
-    pass
-
 class CollapsedCachedExpressions(OptimizePass):
   '''Replace expressions which have already been evaluated
   with a simple value expression.
@@ -223,7 +211,6 @@ class CollapsedCachedExpressions(OptimizePass):
   '''
 
   name = 'collapse_cached'
-  before = [MapMapFusion, ReduceMapFusion]
 
   def visit_default(self, expr):
     #util.log_info('Visit: %s, %s', expr.expr_id, expr.cache)
@@ -400,8 +387,11 @@ def apply_pass(klass, dag):
     util.log_debug('Pass %s disabled', klass.name)
     return dag
 
+  util.log_debug('Starting pass %s', klass.name)
   p = klass()
-  return p.visit(dag)
+  result = p.visit(dag)
+  util.log_debug('Finished pass %s', klass.name)
+  return result
 
 
 passes = []
@@ -412,6 +402,7 @@ def optimize(dag):
     util.log_info('Optimizations disabled')
     return dag
 
+  util.log_debug('Optimization: applying %d passes', len(passes))
   for p in passes:
     dag = apply_pass(p, dag)
 
@@ -421,10 +412,6 @@ def optimize(dag):
 def add_optimization(klass, default):
   passes.append(klass)
 
-  for p in passes:
-    assert (not klass in p.before), 'Invalid ordering of passes %s' % passes
-    assert (not klass in p.after), 'Invalid ordering of passes %s' % passes
-
   flagname = 'opt_' + klass.name
   #setattr(Flags, flagname, add_bool_flag(flagname, default=default))
   FLAGS.add(BoolFlag(flagname, default=default, help='Enable %s optimization' % klass.__name__))
@@ -432,9 +419,9 @@ def add_optimization(klass, default):
   #util.log_info('Passes: %s', passes)
 
 
+add_optimization(CollapsedCachedExpressions, True)
 add_optimization(MapMapFusion, True)
 add_optimization(ReduceMapFusion, True)
-add_optimization(CollapsedCachedExpressions, True)
 add_optimization(RotateSlice, True)
 
 if parakeet is not None:

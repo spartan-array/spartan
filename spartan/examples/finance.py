@@ -10,7 +10,9 @@ def black_scholes(current, strike, maturity, rate, volatility):
     log(current / strike) + (rate + volatility ** 2 / 2) * (maturity)
   )
 
-  d2 = d1 - volatility * maturity
+  d2 = 1.0 / (volatility * sqrt(maturity)) * (
+    log(current / strike) + (rate + volatility ** 2 / 2) * (maturity)
+  ) - volatility * maturity
 
   call = norm_cdf(d1) * current - \
          norm_cdf(d2) * strike * exp(-rate * maturity)
