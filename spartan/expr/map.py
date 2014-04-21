@@ -45,7 +45,10 @@ def tile_mapper(ex, children, child_to_var, op):
 
   local_values = {}
   for i in range(len(children)):
-    lv = children[i].fetch(ex)
+    if isinstance(children[i], broadcast.Broadcast):
+      lv = children[i].fetch_base_tile(ex)
+    else:
+      lv = children[i].fetch(ex)
     local_values[child_to_var[i]] = lv
 
   # Not all Numpy operations are compatible with mixed sparse and dense arrays.  

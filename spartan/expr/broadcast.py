@@ -13,7 +13,6 @@ def _broadcast_mapper(tile_id, blob, array = None, user_fn = None, **kw):
   ul = [0 for dim in array.shape]
   lr = [dim for dim in array.shape]
 
-  print array.shape, array.base.shape
   for i in range(len(base_ex.ul) - 1, -1, -1):
     broadcast_i = i + array.prepend_dim
     if array.base.shape[i] != array.shape[broadcast_i]:
@@ -66,10 +65,7 @@ class Broadcast(distarray.DistArray):
                    mapper_fn = _broadcast_mapper,
                    kw=kw)
 
-  def fetch(self, ex):
-    # make a template to pass to numpy broadcasting
-    template = np.ndarray(ex.shape, dtype=self.base.dtype)
-
+  def _base_ex(self, ex):
     # convert the extent to the base form
 
     # first drop extra dimensions
@@ -88,7 +84,14 @@ class Broadcast(distarray.DistArray):
         ul.append(ex.ul[i])
         lr.append(ex.lr[i])
 
-    ex = extent.create(ul, lr, self.base.shape)
+    return extent.create(ul, lr, self.base.shape)
+
+  def fetch(self, ex):
+    # make a template to pass to numpy broadcasting
+    template = np.ndarray(ex.shape, dtype=self.base.dtype)
+
+    ex = self._base_ex(ex)
+
     fetched = self.base.fetch(ex)
 
     _, bcast = np.broadcast_arrays(template, fetched)
@@ -96,6 +99,13 @@ class Broadcast(distarray.DistArray):
     util.log_debug('bcast: %s %s', fetched.shape, template.shape)
     return bcast
 
+  def fetch_base_tile(self, ex):
+    # Fetch the tile from the base array which can be broacasted to ex.
+    ex = self._base_ex(ex)
+    if isinstance(self.base, Broadcast):
+      return self.base.fetch_base_tile(ex)
+    else:
+      return self.base.fetch(ex)
 
 def broadcast(args):
   '''Convert the list of arrays in ``args`` to have the same shape.

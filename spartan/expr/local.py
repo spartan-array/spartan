@@ -11,6 +11,7 @@ which can then be executed or converted to parakeet code.
 import tempfile
 import imp
 import time
+import numpy as np
 
 from spartan import util
 from spartan.util import Assert
@@ -94,8 +95,15 @@ class FnCallExpr(LocalExpr):
 
   def evaluate(self, ctx):
     deps = [d.evaluate(ctx) for d in self.deps]
+    # Do we need to do this ? Or can we let numpy do this ?
+    if len(deps) > 1:
+      deps = np.broadcast_arrays(*deps)
+
     #util.log_info('Evaluating %s.%d [%s]', self.fn_name(), self.id, deps)
-    return self.fn(*deps, **self.kw)
+    begin = time.time()
+    ret = self.fn(*deps, **self.kw)
+    util.log_warn((self.fn, time.time() - begin))
+    return ret
 
 
 # The local operation of map and reduce expressions is practically
@@ -157,7 +165,10 @@ class ParakeetExpr(LocalExpr):
     if FLAGS.use_cuda:
       return fn(_backend='cuda', **kw_args)
     else:
-      return fn(**kw_args)
+      begin = time.time()
+      ret = fn(**kw_args)
+      util.log_warn((fn, time.time() - begin))
+      return ret
 
 from spartan.config import FLAGS, BoolFlag
 FLAGS.add(BoolFlag('use_cuda', default=False))

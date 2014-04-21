@@ -172,7 +172,7 @@ class ReduceMapFusion(OptimizePass):
     old_children = self.visit(expr.children)
 
     for v in old_children:
-      if not isinstance(v, MapExpr):
+      if not isinstance(v, (MapExpr, ParakeetExpr)):
         return expr.visit(self)
 
     combined_op = LocalReduceExpr(fn=expr.op.fn,
@@ -309,11 +309,26 @@ class ParakeetGeneration(OptimizePass):
     if isinstance(expr.op, local.ParakeetExpr):
       return expr.visit(self)
 
+    has_fncallexpr = False
+    for dep in expr.op.deps:
+      if isinstance(dep, local.FnCallExpr):
+        has_fncallexpr = True
+        break
+    # If all deps are not FnCallExprs, it is not worth to do code generation.
+    if not has_fncallexpr:
+      return expr.visit(self)
+
     try:
       source = _parakeet_codegen(expr.op)
+
+      # We need to visit children as well.
+      new_children = []
+      for child in expr.children:
+        new_children.append(self.visit(child))
+
       return expr_like(expr,
                        op=local.ParakeetExpr(source=source,  deps=expr.op.deps),
-                       children=expr.children,
+                       children=ListExpr(vals = new_children),
                        child_to_var=expr.child_to_var)
     except local.CodegenException:
       util.log_info('Failed to convert to parakeet.')
@@ -421,10 +436,10 @@ def add_optimization(klass, default):
 
 add_optimization(CollapsedCachedExpressions, True)
 add_optimization(MapMapFusion, True)
-add_optimization(ReduceMapFusion, True)
 add_optimization(RotateSlice, True)
-
 if parakeet is not None:
   add_optimization(ParakeetGeneration, True)
+add_optimization(ReduceMapFusion, True)
+
 
 FLAGS.add(BoolFlag('optimization', default=True))
