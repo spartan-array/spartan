@@ -90,9 +90,8 @@ class MapExpr(Expr):
   op = Instance(LocalExpr) 
 
   def pretty_str(self):
-    return 'Map.%d(%s, %s)' % (self.expr_id,
-                               self.op.pretty_str(),
-                               indent(self.children.pretty_str()))
+    return 'Map(%s, %s)' % (self.op.pretty_str(),
+                            indent(self.children.pretty_str()))
 
   def compute_shape(self):
     '''MapTiles retains the shape of inputs.

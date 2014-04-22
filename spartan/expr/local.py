@@ -86,9 +86,10 @@ class FnCallExpr(LocalExpr):
     assert self.fn is not None
 
   def pretty_str(self):
+    # drop modules from the prettified string
+    pretty_fn = self.fn_name().split('.')[-1]
     return '%s(%s)' % (
-      self.fn_name(),
-      indent('\n' + ','.join([v.pretty_str() for v in self.deps]) + '\n')
+      pretty_fn, indent(','.join([v.pretty_str() for v in self.deps if not isinstance(v, LocalInput)]))
     )
 
   def fn_name(self):
