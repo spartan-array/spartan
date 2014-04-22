@@ -35,7 +35,10 @@ class Broadcast(distarray.DistArray):
   def __init__(self, base, shape):
     Assert.isinstance(base, (np.ndarray, distarray.DistArray))
     Assert.isinstance(shape, tuple)
-    self.base = base
+    if isinstance(base, Broadcast):
+      self.base = base.base
+    else:
+      self.base = base
     self.shape = shape
     self.dtype = base.dtype
     self.sparse = self.base.sparse
@@ -66,7 +69,7 @@ class Broadcast(distarray.DistArray):
                    kw=kw)
 
   def _base_ex(self, ex):
-    # convert the extent to the base form
+    # Convert ex (by dropping or shrinking dimensions) to map onto the base array.
 
     # first drop extra dimensions
     while len(ex.shape) > len(self.base.shape):
@@ -102,10 +105,7 @@ class Broadcast(distarray.DistArray):
   def fetch_base_tile(self, ex):
     # Fetch the tile from the base array which can be broacasted to ex.
     ex = self._base_ex(ex)
-    if isinstance(self.base, Broadcast):
-      return self.base.fetch_base_tile(ex)
-    else:
-      return self.base.fetch(ex)
+    return self.base.fetch(ex)
 
 def broadcast(args):
   '''Convert the list of arrays in ``args`` to have the same shape.

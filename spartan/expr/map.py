@@ -46,6 +46,9 @@ def tile_mapper(ex, children, child_to_var, op):
   local_values = {}
   for i in range(len(children)):
     if isinstance(children[i], broadcast.Broadcast):
+      # When working with a broadcasted array, it is more efficient to fetch the corresponding
+      # section of the non-broadcasted array and have Numpy broadcast internally, than 
+      # to broadcast ahead of time.
       lv = children[i].fetch_base_tile(ex)
     else:
       lv = children[i].fetch(ex)
