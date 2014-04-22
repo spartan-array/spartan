@@ -1,4 +1,4 @@
-from .base import Expr
+from .base import Expr, expr_like
 from ..node import Node
 from spartan.array import tile, distarray
 import numpy as np
@@ -19,11 +19,12 @@ class NdArrayExpr(Expr):
     return repr(self)
   
   def visit(self, visitor):
-    return NdArrayExpr(_shape=visitor.visit(self.shape),
-                       dtype=visitor.visit(self.dtype),
-                       tile_hint=self.tile_hint,
-                       sparse=self.sparse,
-                       reduce_fn=self.reduce_fn)
+    return expr_like(self,
+      _shape=visitor.visit(self.shape),
+      dtype=visitor.visit(self.dtype),
+      tile_hint=self.tile_hint,
+      sparse=self.sparse,
+      reduce_fn=self.reduce_fn)
   
   def dependencies(self):
     return {}
