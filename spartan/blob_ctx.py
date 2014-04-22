@@ -142,7 +142,24 @@ class BlobCtx(object):
     else:
       return self._send(tile_id, 'get', req, wait=False)
 
+  def get_flatten(self, tile_id, subslice, wait=True, timeout=None):
+    '''
+    Fetch a flatten region of the flatten format of a tile.
+    
+    Args:
+      tile_id (int): Tile to fetch from.
+      subslice (slice or None): Portion of tile to fetch.
+      wait (boolean): Wait for this operation to finish before returning.
+      timeout (float):
+    '''
+    Assert.isinstance(tile_id, core.TileId)
+    req = core.GetReq(id=tile_id, subslice=subslice)
 
+    if wait:
+      return self._send(tile_id, 'get_flatten', req, wait=True, timeout=timeout).data
+    else:
+      return self._send(tile_id, 'get_flatten', req, wait=False)
+    
 #   def update(self, tile_id, data, reducer, wait=True):
 #     req = core.UpdateReq(id=tile_id, data=data, reducer=reducer)
 #     return self._send(tile_id, 'update', req, wait=wait)

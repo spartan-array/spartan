@@ -196,6 +196,22 @@ class Worker(object):
       resp = core.GetResp(data=self._blobs[req.id].get(req.subslice))
       handle.done(resp)
 
+  def get_flatten(self, req, handle):
+    '''
+    Fetch a flatten portion of the flatten format of a tile.
+    
+    :param req: `GetReq`
+    :param handle: `PendingRequest`
+    
+    '''
+    if req.subslice is None:
+      #util.log_info('GET: %s', type(self._blobs[req.id]))
+      resp = core.GetResp(data=self._blobs[req.id].data.flatten())
+      handle.done(resp)
+    else:
+      resp = core.GetResp(data=self._blobs[req.id].data.flatten()[req.subslice])
+      handle.done(resp)
+      
   def _run_kernel(self, req, handle):
     '''
     Run a kernel over the tiles resident on this worker.

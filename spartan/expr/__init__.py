@@ -39,7 +39,7 @@ from .fio import save, load, pickle, unpickle, partial_load, partial_unpickle
 from .reshape import reshape
 from .transpose import transpose
 from .dot import dot
-
+from .sort import sort
 
 Expr.outer = outer
 Expr.sum = sum
