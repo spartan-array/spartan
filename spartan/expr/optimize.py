@@ -321,7 +321,7 @@ class ParakeetGeneration(OptimizePass):
     try:
       source = _parakeet_codegen(expr.op)
 
-      # We need to visit children as well.
+      # Recursively check if any children nodes can be optimized with Parakeet
       new_children = []
       for child in expr.children:
         new_children.append(self.visit(child))
