@@ -5,13 +5,13 @@ import numpy as np
 from numpy import absolute
 from sklearn.decomposition import PCA as SK_PCA
 
-DIM = (20, 20)
+DIM = (40, 20)
 N_COMPONENTS = 10
 
 class TestPCA(test_common.ClusterTest):
   def test_pca(self):
     ctx = blob_ctx.get() 
-    A =  expr.randn(*DIM, tile_hint=(DIM[0]/ctx.num_workers, DIM[1])).force()
+    A =  expr.randn(*DIM, tile_hint=(int(DIM[0]/ctx.num_workers), DIM[1])).force()
     
     m = PCA(N_COMPONENTS)
     m2 = SK_PCA(N_COMPONENTS)

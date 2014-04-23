@@ -1,8 +1,9 @@
 import spartan
 from spartan import core, expr, util, blob_ctx
 import numpy as np
+from .qr import qr
 
-def solve(A, k):
+def svd(A, k=None):
   """
   Stochastic SVD.
 
@@ -15,20 +16,35 @@ def solve(A, k):
 
   The operations include matrix multiplication and QR decomposition.
   We parallelize both of them.
+
+  Returns
+  --------
+  U : Spartan array of shape (M, k)
+  S : numpy array of shape (k,)
+  V : numpy array of shape (k, k)
   """
-  r = A.tile_shape()[0]
+  if k is None:
+    k = A.shape[1]
+
   ctx = blob_ctx.get()
   Omega = expr.randn(A.shape[1], k)
+
   r = A.shape[0] / ctx.num_workers
   Y = expr.dot(A, Omega, tile_hint=(r, k)).force()
   
   Q, R = qr(Y)
   
-  B = expr.dot(expr.transpose(Q), A).glom()
-  BTB = np.dot(B, B.T)
-  D, U_ = eig(BTB)
-  D = np.sqrt(D)
-  U = np.dot(Q.glom(), U_)
+  B = expr.dot(expr.transpose(Q), A)
+  BTB = expr.dot(B, expr.transpose(B)).glom()
 
-  V = np.dot(np.dot(B.T, U_), np.diag(np.ones(D.shape[0]) / D))
-  return U_, D, V 
+  S, U_ = np.linalg.eig(BTB)
+  S = np.sqrt(S)
+
+  # Sort by eigen values from large to small
+  si = np.argsort(S)[::-1]
+  S = S[si]
+  U_ = U_[:, si]
+
+  U = expr.dot(Q, U_).force()
+  V = np.dot(np.dot(expr.transpose(B).glom(), U_), np.diag(np.ones(S.shape[0]) / S))
+  return U, S, V.T 
