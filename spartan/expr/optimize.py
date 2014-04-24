@@ -175,7 +175,7 @@ class ReduceMapFusion(OptimizePass):
     old_children = self.visit(expr.children)
 
     for v in old_children:
-      if not isinstance(v, MapExpr):
+      if not isinstance(v, (MapExpr, ParakeetExpr)):
         return expr.visit(self)
 
     combined_op = LocalReduceExpr(fn=expr.op.fn,
@@ -307,16 +307,38 @@ class ParakeetGeneration(OptimizePass):
   name = 'parakeet_gen'
   after = [MapMapFusion, ReduceMapFusion]
 
+  def _should_run_parakeet(self, expr):
+    has_fncallexpr = False
+    for dep in expr.op.deps:
+      if isinstance(dep, local.FnCallExpr):
+        has_fncallexpr = True
+        break
+
+    # If all deps are not FnCallExprs and len(deps) is a small number(<=2 for now)
+    # it is not worth to do code generation.
+    if not has_fncallexpr and len(expr.op) <= 2:
+      return False
+    return True
+
   def visit_MapExpr(self, expr):
     # if we've already converted this to parakeet, stop now
     if isinstance(expr.op, local.ParakeetExpr):
       return expr.visit(self)
 
+      if not self._should_run_parakeet(self, expr):
+        return expr.visit(self)
+
     try:
       source = _parakeet_codegen(expr.op)
+
+      # Recursively check if any children nodes can be optimized with Parakeet
+      new_children = []
+      for child in expr.children:
+        new_children.append(self.visit(child))
+
       return expr_like(expr,
                        op=local.ParakeetExpr(source=source,  deps=expr.op.deps),
-                       children=expr.children,
+                       children=ListExpr(vals = new_children),
                        child_to_var=expr.child_to_var)
     except local.CodegenException:
       util.log_info('Failed to convert to parakeet.')
@@ -424,10 +446,10 @@ def add_optimization(klass, default):
 
 add_optimization(CollapsedCachedExpressions, True)
 add_optimization(MapMapFusion, True)
-add_optimization(ReduceMapFusion, True)
 add_optimization(RotateSlice, True)
-
 if parakeet is not None:
   add_optimization(ParakeetGeneration, True)
+add_optimization(ReduceMapFusion, True)
+
 
 FLAGS.add(BoolFlag('optimization', default=True))

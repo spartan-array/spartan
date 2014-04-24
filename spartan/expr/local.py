@@ -11,6 +11,7 @@ which can then be executed or converted to parakeet code.
 import tempfile
 import imp
 import time
+import numpy as np
 
 from spartan import util
 from spartan.util import Assert
@@ -107,6 +108,7 @@ class FnCallExpr(LocalExpr):
 
   def evaluate(self, ctx):
     deps = [d.evaluate(ctx) for d in self.deps]
+
     #util.log_info('Evaluating %s.%d [%s]', self.fn_name(), self.id, deps)
     return self.fn(*deps, **self.kw)
 
