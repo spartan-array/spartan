@@ -18,6 +18,7 @@ import collections
 
 from .. import util, blob_ctx
 from ..array import distarray, tile
+from spartan.node import indent
 from ..util import Assert
 from .base import ListExpr, Expr, as_array
 from .local import LocalExpr, LocalCtx, make_var, LocalInput, LocalMapExpr
@@ -88,8 +89,9 @@ class MapExpr(Expr):
   child_to_var = Instance(list)
   op = Instance(LocalExpr) 
 
-  def label(self):
-    return 'map(%s)' % self.op.fn.__name__
+  def pretty_str(self):
+    return 'Map(%s, %s)' % (self.op.pretty_str(),
+                            indent(self.children.pretty_str()))
 
   def compute_shape(self):
     '''MapTiles retains the shape of inputs.
@@ -107,8 +109,7 @@ class MapExpr(Expr):
     children = deps['children']
     child_to_var = deps['child_to_var']
     op = self.op
-
-    #util.log_info('Codegen for expression: %s', local.codegen(op))
+    util.log_debug('Evaluating %s.%d', self.op.fn_name(), self.expr_id)
 
     children = broadcast.broadcast(children)
     largest = distarray.largest_value(children)
