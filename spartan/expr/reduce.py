@@ -9,6 +9,7 @@ import collections
 
 from ..array import extent, distarray
 from ..expr.local import make_var, LocalExpr, LocalReduceExpr, LocalInput, LocalCtx
+from spartan.node import indent
 from ..util import Assert
 from . import broadcast
 from .base import Expr, ListExpr
@@ -89,8 +90,9 @@ class ReduceExpr(Expr):
     input_shape = tuple([child_shape[i] for i in range(len(child_shape))])
     return extent.shape_for_reduction(input_shape, self.axis)
   
-  def label(self):
-    return 'reduce(%s)' % self.op.fn.__name__
+  def pretty_str(self):
+    return 'Reduce(%s, axis=%s, %s)' % (self.op.fn.__name__, self.axis,
+                                        indent(self.children.pretty_str()))
   
   def _evaluate(self, ctx, deps):
     children = deps['children']

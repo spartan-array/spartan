@@ -1,9 +1,10 @@
-from .base import Expr
-from ..node import Node
-from spartan.array import tile, distarray
 import numpy as np
-from .. import util
-from traits.api import Tuple, Bool, PythonValue, HasTraits
+
+from traits.api import Tuple, Bool, PythonValue
+
+from .base import Expr
+from spartan.array import distarray
+
 
 class NdArrayExpr(Expr):
   _shape = Tuple 
@@ -12,18 +13,16 @@ class NdArrayExpr(Expr):
   tile_hint = PythonValue(None, desc="Tuple or None")
   reduce_fn = PythonValue(None, desc="Function or None")
 
-  def __repr__(self):
-    return 'dist_array(%s, %s)' % (self.shape, self.dtype)
+  def pretty_str(self):
+    return 'DistArray(%s, %s)' % (self.shape, np.dtype(self.dtype).name)
 
-  def label(self):
-    return repr(self)
-  
   def visit(self, visitor):
-    return NdArrayExpr(_shape=visitor.visit(self.shape),
-                       dtype=visitor.visit(self.dtype),
-                       tile_hint=self.tile_hint,
-                       sparse=self.sparse,
-                       reduce_fn=self.reduce_fn)
+    return expr_like(self,
+      _shape=visitor.visit(self.shape),
+      dtype=visitor.visit(self.dtype),
+      tile_hint=self.tile_hint,
+      sparse=self.sparse,
+      reduce_fn=self.reduce_fn)
   
   def dependencies(self):
     return {}

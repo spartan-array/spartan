@@ -10,7 +10,7 @@ import sys
 import traceback
 import numpy as np
 
-from ..node import Node
+from ..node import Node, indent
 from .. import blob_ctx, node, util
 from ..util import Assert, copy_docstring
 from ..array import distarray
@@ -43,7 +43,7 @@ def expr_like(expr, **kw):
   The new expression has the same id, but is initialized using ``kw``
   '''
   kw['expr_id'] = expr.expr_id
-  
+
   trace = kw.pop('trace', None)
   if trace != None and FLAGS.opt_keep_stack:
     trace.fuse(expr.stack_trace)
@@ -131,7 +131,7 @@ class ExprTrace(object):
     print >>sys.stderr, 'Expr creation stack traceback.'
     if not FLAGS.opt_keep_stack:
       print >>sys.stderr, '    Use --opt_keep_stack=True to see expressions merged during optimization.'
-    
+
     for s in self.format_stack():
       sys.stderr.write(s)
 
@@ -153,9 +153,9 @@ class Expr(Node):
   Expressions may be evaluated (using `Expr.force`), the 
   result of evaluating an expression is cached until the expression
   itself is reclaimed. 
-  ''' 
+  '''
   expr_id = PythonValue(None, desc="Integer or None")
-  stack_trace = Instance(ExprTrace) 
+  stack_trace = Instance(ExprTrace)
 
   # should evaluation of this object be cached
   needs_cache = True
@@ -220,37 +220,18 @@ class Expr(Node):
       deps[k] = visitor.visit(getattr(self, k))
 
     return expr_like(self, **deps)
-  
-  def graphviz(self):
+
+  def __repr__(self):
+    return self.pretty_str()
+
+  def pretty_str(self):
+    '''Return a pretty representation of this node, suitable for showing to users.
+
+    By default, this returns the debug representation.
     '''
-    Return a string suitable for use with the 'dot' command.
-    '''
-    header = 'digraph G {\n'
-    footer = '}'
+    return self.debug_str()
+    #raise NotImplementedError, type(self)
 
-    seen = set()
-    rest = self._graphviz(None, seen)
-    return header + '\n'.join(rest) + footer
-
-  def label(self):
-    'Graphviz label for this node.'
-    return self.node_type
-
-  def _graphviz(self, parent, seen):
-    result = []
-    
-    if parent is not None:
-      result.append('N%s -> N%s' % (parent.expr_id, self.expr_id))
-
-    if not self in seen:
-      seen.add(self)
-      result.append('N%s [label="%s"]\n' % (self.expr_id, self.label()))
-      for _, value in self.dependencies().items():
-        if isinstance(value, Expr):
-          result.extend(value._graphviz(self, seen))
-
-    return result
-   
   def __del__(self):
     eval_cache.deregister(self.expr_id)
 
@@ -306,7 +287,7 @@ class Expr(Node):
     if self.needs_cache:
       #util.log_info('Caching %s -> %s', prim.expr_id, value)
       eval_cache.set(self.expr_id, value)
-      
+
     return value
 
   def _evaluate(self, ctx, deps):
@@ -420,7 +401,7 @@ class Expr(Node):
   @property
   def size(self):
     return np.prod(self.shape)
-  
+
   def force(self):
     'Evaluate this expression (and all dependencies).'
     return self.evaluate()
@@ -463,9 +444,6 @@ class AsArray(Expr):
   '''
   val = PythonValue
 
-  def label(self):
-    return self.val
-
   def visit(self, visitor):
     return self
 
@@ -479,11 +457,11 @@ class AsArray(Expr):
     raise NotShapeable
 
   def _evaluate(self, ctx, deps):
-    util.log_info('%s: Array promotion: value=%s', self.expr_id, deps['val'])
+    util.log_debug('%s: Array promotion: value=%s', self.expr_id, deps['val'])
     return distarray.as_array(deps['val'])
 
-  def __str__(self):
-    return 'V(%s)' % self.val
+  def pretty_str(self):
+    return str(self.val)
 
 
 class Val(Expr):
@@ -506,8 +484,8 @@ class Val(Expr):
   def _evaluate(self, ctx, deps):
     return self.val
 
-  def __str__(self):
-    return 'Val(%s)' % self.val
+  def pretty_str(self):
+    return str(self.val)
 
 
 class CollectionExpr(Expr):
@@ -520,21 +498,8 @@ class CollectionExpr(Expr):
   needs_cache = False
   vals = PythonValue
 
-  def __str__(self):
-    return '%s(%s)' % (self.node_type, self.vals,)
-
   def _evaluate(self, ctx, deps):
     return deps
-    #return self.dependencies()
-    #return deps['vals']
-
-  def _graphviz(self, parent, seen):
-    result = []
-    for _, value in self.dependencies().items():
-      if isinstance(value, Expr):
-        result.extend(value._graphviz(parent, seen))
-
-    return result
 
   def __getitem__(self, idx):
     return self.vals[idx]
@@ -547,7 +512,11 @@ class DictExpr(CollectionExpr):
   def iteritems(self): return self.vals.iteritems()
   def keys(self): return self.vals.keys()
   def values(self): return self.vals.values()
-  
+
+  def pretty_str(self):
+    return '{ %s } ' % ',\n'.join(
+      ['%s : %s' % (k, v.pretty_str()) for k, v in self.vals])
+
   def dependencies(self):
     return self.vals
 
@@ -558,7 +527,13 @@ class DictExpr(CollectionExpr):
 class ListExpr(CollectionExpr):
   def dependencies(self):
     return dict(('v%d' % i, self.vals[i]) for i in range(len(self.vals)))
-  
+
+  def pretty_str(self):
+    return indent('[\n%s\n]') % ','.join([v.pretty_str() for v in self.vals])
+
+  def __str__(self):
+    return repr(self)
+
   def _evaluate(self, ctx, deps):
     ret = []
     for i in range(len(self.vals)):
@@ -573,9 +548,11 @@ class ListExpr(CollectionExpr):
     return len(self.vals)
 
 class TupleExpr(CollectionExpr):
-  
   def dependencies(self):
     return dict(('v%d' % i, self.vals[i]) for i in range(len(self.vals)))
+
+  def pretty_str(self):
+    return '( %s )' % ','.join([v.pretty_str() for v in self.vals])
 
   def _evaluate(self, ctx, deps):
     ret = []

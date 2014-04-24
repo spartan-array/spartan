@@ -29,9 +29,6 @@ class FilterExpr(Expr):
     assert not isinstance(self.idx, ListExpr)
     assert not isinstance(self.idx, TupleExpr)
 
-  def label(self):
-    return 'slice(%s)' % self.idx
-
   def compute_shape(self):
     if isinstance(self.idx, (int, slice, tuple)):
       src_shape = self.src.compute_shape()
