@@ -159,7 +159,9 @@ class Expr(Node):
 
   # should evaluation of this object be cached
   needs_cache = True
-  
+
+  is_optimized = False
+
   @property
   def ndim(self):
     return len(self.shape)
@@ -276,6 +278,7 @@ class Expr(Node):
     Returns:
       DistArray:
     '''
+
     cache = self.cache()
     if cache is not None:
       util.log_debug('Retrieving %d from cache' % self.expr_id)
@@ -429,7 +432,12 @@ class Expr(Node):
     :rtype: `Expr`
     
     '''
-    return optimized_dag(self)
+    if is_optimized:
+      return self
+    else:
+      optimized_expr = optimized_dag(self)
+      optimized_expr.is_optimized = True
+      return optimized_expr
 
   def glom(self):
     '''

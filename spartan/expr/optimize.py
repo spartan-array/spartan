@@ -304,19 +304,26 @@ class ParakeetGeneration(OptimizePass):
   name = 'parakeet_gen'
   after = [MapMapFusion, ReduceMapFusion]
 
-  def visit_MapExpr(self, expr):
-    # if we've already converted this to parakeet, stop now
-    if isinstance(expr.op, local.ParakeetExpr):
-      return expr.visit(self)
-
+  def _should_run_parakeet(self, expr):
     has_fncallexpr = False
     for dep in expr.op.deps:
       if isinstance(dep, local.FnCallExpr):
         has_fncallexpr = True
         break
-    # If all deps are not FnCallExprs, it is not worth to do code generation.
-    if not has_fncallexpr:
+
+    # If all deps are not FnCallExprs and len(deps) is a small number(<=2 for now)
+    # it is not worth to do code generation.
+    if not has_fncallexpr and len(expr.op) <= 2:
+      return False
+    return True
+
+  def visit_MapExpr(self, expr):
+    # if we've already converted this to parakeet, stop now
+    if isinstance(expr.op, local.ParakeetExpr):
       return expr.visit(self)
+
+      if not self._should_run_parakeet(self, expr):
+        return expr.visit(self)
 
     try:
       source = _parakeet_codegen(expr.op)

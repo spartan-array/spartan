@@ -429,8 +429,17 @@ def create(shape,
     worker_scores = master.get().get_worker_scores()
     for ex, i in extents.iteritems():    
       tiles[ex] = ctx.create(
-                  tile.from_shape(ex.shape, dtype, tile_type=tile_type), 
+                  tile.from_shape(ex.shape, dtype, tile_type=tile_type),
                   hint=worker_scores[i%len(worker_scores)][0])
+  elif FLAGS.tile_assignment_strategy == 'serpentine':
+    for ex, i in extents.iteritems():
+      j = i % ctx.num_workers
+      if (i / ctx.num_workers) % 2 == 1:
+        j = (ctx.num_workers - 1 - j)
+
+      tiles[ex] = ctx.create(
+                    tile.from_shape(ex.shape, dtype, tile_type=tile_type),
+                    hint=j)
   else: #random
     for ex in extents:
       tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype, tile_type=tile_type))
