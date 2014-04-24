@@ -1,14 +1,23 @@
 from spartan import expr, util
+from spartan.array import extent
 from spartan.examples.disdca_svm import fit, predict
 import test_common
+from test_common import millis
 import numpy as np
 from datetime import datetime
 
-def millis(t1, t2):
-  dt = t2 - t1
-  ms = (dt.days * 24 * 60 * 60 + dt.seconds) * 1000 + dt.microseconds / 1000.0
-  return ms
-
+def _init_label_mapper(array, ex):
+  data = array.fetch(ex)
+  
+  labels = np.zeros((data.shape[0], 1), dtype=np.int64)
+  for i in range(data.shape[0]):
+    if data[i,0] > data[i,1]:
+      labels[i,0] = 1.0
+    else:
+      labels[i,0] = -1.0
+    
+  yield extent.create((ex.ul[0], 0), (ex.lr[0], 1), (array.shape[0], 1)), labels
+ 
 #@test_common.with_ctx
 #def test_pr(ctx):
 def benchmark_svm(ctx, timer):
@@ -19,20 +28,11 @@ def benchmark_svm(ctx, timer):
   D = 2
   
   # create data
-  data = expr.randn(N, D, dtype=np.float64, tile_hint=[N/ctx.num_workers, D]).force()
-  labels = expr.zeros((N,1), dtype=np.float64, tile_hint=[N/ctx.num_workers, 1]).force()
-  for i in range(N):
-    x = data[i, 0]
-    s = data[i, 1]
-    if x >= s:
-      labels[i,0] = 1.0
-    else:
-      labels[i,0] = -1.0
-      
-  data = expr.lazify(data)
+  data = expr.randn(N, D, dtype=np.float64, tile_hint=[N/ctx.num_workers, D])
+  labels = expr.eager(expr.shuffle(data, _init_label_mapper))
   
   t1 = datetime.now()
-  w = fit(data, labels, ctx.num_workers, T=max_iter)
+  w = fit(data, labels, ctx.num_workers, T=max_iter).force()
   t2 = datetime.now()
   util.log_warn('train time per iteration:%s ms, final w:%s', millis(t1,t2)/max_iter, w.glom().T)
   
