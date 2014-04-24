@@ -160,7 +160,7 @@ class Expr(Node):
   # should evaluation of this object be cached
   needs_cache = True
 
-  is_optimized = False
+  optimized_expr = None
 
   @property
   def ndim(self):
@@ -276,6 +276,7 @@ class Expr(Node):
         deps[k] = vs
     try:
       value = self._evaluate(ctx, deps)
+      #value = self.optimized()._evaluate(ctx, deps)
     except TimeoutException:
       util.log_info('%s %d need to retry', self.__class__, self.expr_id)
       return self.evaluate()
@@ -405,6 +406,7 @@ class Expr(Node):
   def force(self):
     'Evaluate this expression (and all dependencies).'
     return self.evaluate()
+    #return self.optimized().evaluate()
 
   def optimized(self):
     '''
@@ -413,12 +415,12 @@ class Expr(Node):
     :rtype: `Expr`
     
     '''
-    if self.is_optimized:
-      return self
+    # If the expr has been optimized, return the cached optimized expr.
+    if self.optimized_expr is None:
+      self.optimized_expr = optimized_dag(self)
+      return self.optimized_expr
     else:
-      optimized_expr = optimized_dag(self)
-      optimized_expr.is_optimized = True
-      return optimized_expr
+      return self.optimized_expr
 
   def glom(self):
     '''

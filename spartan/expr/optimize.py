@@ -125,13 +125,14 @@ class MapMapFusion(OptimizePass):
         all_maps = False
         break
 
+    if (not all_maps
+        or isinstance(expr.op, local.ParakeetExpr)):
+      return expr.visit(self)
+
     if expr.op.fn in _not_idempotent:
       util.log_info('Not idempotent: %s', expr.op.fn)
       return expr.visit(self)
 
-    if (not all_maps
-        or isinstance(expr.op, local.ParakeetExpr)):
-      return expr.visit(self)
 
     #util.log_info('Original: %s', expr.op)
     children = []
