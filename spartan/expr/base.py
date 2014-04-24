@@ -413,7 +413,7 @@ class Expr(Node):
     :rtype: `Expr`
     
     '''
-    if is_optimized:
+    if self.is_optimized:
       return self
     else:
       optimized_expr = optimized_dag(self)
