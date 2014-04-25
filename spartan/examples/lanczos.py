@@ -15,6 +15,8 @@ def solve(A, AT, desired_rank, is_symmetric=False):
   should be smaller than the size of matrix, so we could it in local machine 
   efficiently. 
   '''
+  A = expr.force(A)
+  AT = expr.force(AT)
   ctx = blob_ctx.get() 
   # Calculate two more eigenvalues, but we only keep the largest desired_rank
   # one. Doing this to keep the result consistent with scipy.sparse.linalg.svds.
