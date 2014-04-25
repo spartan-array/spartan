@@ -1,5 +1,5 @@
 import numpy as np
-from spartan import expr, util
+from spartan import expr, blob_ctx, util
 import math
 
 def solve(A, AT, desired_rank, is_symmetric=False):
@@ -15,7 +15,7 @@ def solve(A, AT, desired_rank, is_symmetric=False):
   should be smaller than the size of matrix, so we could it in local machine 
   efficiently. 
   '''
-  
+  ctx = blob_ctx.get() 
   # Calculate two more eigenvalues, but we only keep the largest desired_rank
   # one. Doing this to keep the result consistent with scipy.sparse.linalg.svds.
   desired_rank += 2
@@ -34,14 +34,16 @@ def solve(A, AT, desired_rank, is_symmetric=False):
   # you could turn it into spartan distributed array. 
   V = np.zeros((n, desired_rank))
 
+
   for i in range(0, desired_rank):
     util.log_info("Iter : %s", i)
-    
+    v_next_expr = expr.from_numpy(v_next.reshape(n, 1), tile_hint=(n/ctx.num_workers, 1))
+
     if is_symmetric:
-      w = expr.dot(A, v_next.reshape(n, 1)).glom().reshape(n)
+      w = expr.dot(A, v_next_expr).glom().reshape(n)
     else:
-      w = expr.dot(A, v_next.reshape(n, 1))
-      w = expr.dot(AT, w).glom().reshape(n)
+      w = expr.dot(A, v_next_expr, tile_hint=(min(*A.tile_shape()), 1)).force()
+      w = expr.dot(AT, w, tile_hint=(min(*A.tile_shape()), 1)).glom().reshape(n)
 
     alpha[i] = np.dot(w, v_next)
     w = w - alpha[i] * v_next - beta[i] * v_prev

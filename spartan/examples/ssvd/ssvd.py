@@ -27,7 +27,7 @@ def svd(A, k=None):
     k = A.shape[1]
 
   ctx = blob_ctx.get()
-  Omega = expr.randn(A.shape[1], k)
+  Omega = expr.randn(A.shape[1], k, tile_hint=(A.shape[1]/ctx.num_workers, k))
 
   r = A.shape[0] / ctx.num_workers
   Y = expr.dot(A, Omega, tile_hint=(r, k)).force()
