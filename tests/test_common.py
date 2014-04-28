@@ -44,6 +44,22 @@ class BenchTimer(object):
 def run_benchmarks(module, benchmarks, master, timer):
   for benchname in benchmarks:
     getattr(module, benchname)(master, timer)
+
+def benchmark_op(op, min_time=1.0):
+  '''Run ``op`` in a loop until ``min_time`` has passed.'''
+  iters = 0
+  from time import time
+  st = time()
+
+  while 1:
+      iters += 1
+      op()
+      ed = time()
+      if ed - st > min_time:
+          break
+
+  print 'Ran %d ops, %.3f seconds, %f s/op, %f ops/s' % (iters, ed - st, (ed - st) / iters, iters / (ed - st))
+
   
 def run(filename):
   signal.signal(signal.SIGQUIT, sig_handler)
