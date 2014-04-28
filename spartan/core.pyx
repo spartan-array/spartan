@@ -95,6 +95,9 @@ class Message(Node):
   def __getstate__(self):
     return self.__dict__
 
+  def __repr__(self):
+    return self.debug_str()
+
 
 
 class RegisterReq(Message):
