@@ -179,9 +179,15 @@ class ServerSocket(Socket):
     # We put the msg in queue and let the polling thread send the message.
     # An alternative way is that we send the message directly if it is in
     # polling thread, otherwise we put the message in queue.
-    with self._out_lock:
-      self._out.append(msg)
-      self._event_loop.modify(zmq.POLLIN | zmq.POLLOUT)
+    if threading.current_thread() == self._event_loop.running_thread():
+      if isinstance(msg, Group):
+        self._zmq.send_multipart(msg, copy=False)
+      else:
+        self._zmq.send(msg, copy=False)
+    else: 
+      with self._out_lock:
+        self._out.append(msg)
+        self._event_loop.modify(zmq.POLLIN | zmq.POLLOUT)
 
   def bind(self):
     host, port = self.addr
