@@ -33,7 +33,7 @@ class Tile(object):
   '''
 
   def __init__(self, shape, dtype, data, mask, tile_type):
-    Assert.ne(dtype, object)
+    #Assert.ne(dtype, object)
     self.id = ID.next()
     self.shape = shape
     self.dtype = dtype
