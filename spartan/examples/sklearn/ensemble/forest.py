@@ -1,9 +1,12 @@
 import numpy as np
 import spartan
-from spartan import expr, core, blob_ctx, array
+from spartan import expr, core, blob_ctx, array, util
 from sklearn.ensemble import RandomForestClassifier as SKRF
+import time
 
 def _build_mapper(ex, 
+                  task_array,
+                  target_array,
                   X, 
                   y, 
                   criterion,
@@ -23,22 +26,49 @@ def _build_mapper(ex,
   max_features and bootstrap options are passed to the `sklearn.RandomForest` method.
   """
   # The number of rows decides how many trees this kernel will build.
-  n_estimators = ex.shape[0] 
+  st = time.time()
+  idx = ex.ul[0]
+  # Get the number of trees this worker needs to train.
+  n_estimators = task_array[idx] 
   X = X.glom()
   y = y.glom()
+
   rf = SKRF(n_estimators = n_estimators,
-                              criterion = criterion,
-                              max_depth = max_depth,
-                              n_jobs = 1,
-                              min_samples_split = min_samples_split,
-                              min_samples_leaf = min_samples_leaf,
-                              max_features = max_features,
-                              bootstrap = bootstrap)
+                           criterion = criterion,
+                           max_depth = max_depth,
+                           n_jobs = 1,
+                           min_samples_split = min_samples_split,
+                           min_samples_leaf = min_samples_leaf,
+                           max_features = max_features,
+                           bootstrap = bootstrap)
 
   rf.fit(X, y) 
+  # Update the target array.
+  target_array[idx, :] = (rf,) 
+  
   result = core.LocalKernelResult()
-  result.result = rf
+  result.result = None 
+  util.log_info("Finish construction : %s", time.time() - st)
   return result
+
+
+def _predict_mapper(ex,
+                    forest_array,
+                    X):
+  """
+  Predict kernel:
+  Each worker uses the sklearn random forest it generates to predict labels.
+  Return the probilities of the predicted labels to master.
+  """
+  idx = ex.ul[0]
+  forest = forest_array[idx]
+  
+  proba = forest.predict_proba(X) * len(forest.estimators_)
+  
+  result = core.LocalKernelResult()
+  result.result = proba 
+  return result
+  
 
 class RandomForestClassifier(object):
   """A random forest classifier.
@@ -115,6 +145,29 @@ class RandomForestClassifier(object):
     self.max_leaf_nodes = max_leaf_nodes
     self.bootstrap = bootstrap
     self.forests = None
+  
+  def _create_task_array(self, n_workers, n_trees):
+    """
+    Construct the task array. Tells the worker how many trees they need to build.
+    For example,
+    if task_array[2] == 10, this means the third worker needs to build 10 trees.
+    """
+    n_workers = int(n_workers)
+    n_trees = int(n_trees)
+    if n_trees <= n_workers:
+      return np.ones(n_trees, dtype=np.int)
+    
+    task_array = np.empty(n_workers, dtype=np.int)
+    n_trees_per_worker = n_trees / n_workers 
+    n_trees_for_last_worker = n_trees % n_workers + n_trees_per_worker
+
+    for i in range(n_workers):
+      if i == n_workers - 1:
+        task_array[i] = n_trees_for_last_worker 
+      else:
+        task_array[i] = n_trees_per_worker
+    return task_array
+
 
   def fit(self, X, y):
     """
@@ -137,52 +190,60 @@ class RandomForestClassifier(object):
     if isinstance(y, np.ndarray):
       y = expr.from_numpy(y)
     
+    X = expr.force(X)
+    y = expr.force(y)
+
     self.n_classes = np.unique(y.glom()).size
     ctx = blob_ctx.get()
     n_workers = ctx.num_workers
     
-    if self.n_estimators < n_workers:
-      tile_hint = (1,)
-    else:
-      tile_hint = (self.n_estimators / n_workers,)
-    
-    """
-    task_array is used for deciding how many trees each worker needs to train.
-    e.g. If we train 20 trees on 5 workers. Then the tile looks like: 
-          (0:4), (4:8), (8:12), (12:16), (16:20). 
-    The number of rows for each tile indicates how many trees this kernel will
-    build.
-    """
-    task_array = expr.ndarray((self.n_estimators,), tile_hint=tile_hint)
-    task_array = task_array.force()
+    _ = self._create_task_array(n_workers, self.n_estimators)
+    task_array = expr.from_numpy(_, tile_hint=(1, )).force() 
+    target_array = expr.ndarray((task_array.shape[0], ), dtype=object, tile_hint=(1,)).force()
 
-    X = X.force()
-    y = y.force()
     results = task_array.foreach_tile(mapper_fn = _build_mapper, 
-                                      kw = {'X' : X, 'y' : y, 
+                                      kw = {'task_array': task_array, 
+                                            'target_array' : target_array,
+                                            'X' : X, 
+                                            'y' : y, 
                                             'criterion' : self.criterion,
                                             'max_depth' : self.max_depth,
                                             'min_samples_split' : self.min_samples_split,
                                             'min_samples_leaf' : self.min_samples_leaf,
                                             'max_features' : self.max_features,
                                             'bootstrap' : self.bootstrap})
-    """ Aggregate the result """
-    self.forests = [v for k, v in results.iteritems()]
+
+    # Target array stores the local random forest each worker builds,
+    # it's used for further prediction.
+    self.target_array = target_array
+    return self
 
   def predict(self, X):
+    """
+    Parameters
+    ----------
+    X : array-like of shape = [n_samples, n_features]
+
+    Returns
+    -------
+    Y : numpy array of shape = [n_samples,]
+        The predicted label of X.
+    """
     if isinstance(X, expr.Expr) or isinstance(X, array.distarray.DistArray):
       X = X.glom()
-  
-    sk_proba = np.zeros((X.shape[0], self.n_classes), np.float64)
     
-    """ let each forest predict, then add the probabilities together. """
-    if self.forests is not None:
-      for f in self.forests:
-        sk_proba += f.predict_proba(X) * len(f.estimators_)
+    results = self.target_array.foreach_tile(mapper_fn = _predict_mapper,
+                                             kw = {'forest_array' : self.target_array,
+                                                   'X' : X})
     
-    """ choose the most probably one """ 
-    result = np.array([np.argmax(sk_proba[i]) for i in xrange(sk_proba.shape[0])])
+    probas = np.zeros((X.shape[0], self.n_classes), np.float64)
+    for k, v in results.iteritems():
+      probas += v
+
+    # Choose the most probably one.
+    result = np.array([np.argmax(probas[i]) for i in xrange(probas.shape[0])])
     return result
+
 
   def score(self, X, y):
     """Return the mean accuracy on the given test data and labels.
