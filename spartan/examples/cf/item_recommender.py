@@ -4,7 +4,6 @@ from spartan import util
 import socket
 from .helper import *
 import numpy as np
-import time
 
 def _similarity_mapper(ex, rating_table, similarity_table, item_norm, step):
   ''' Find all pair similarities between items. 
@@ -130,7 +129,7 @@ def _select_most_k_similar_mapper(ex,
   return result
 
 class ItemBasedRecommender(object):
-  def __init__(self, rating_table, k=10, metric="cosine"):
+  def __init__(self, rating_table, k=10):
     '''Based on the user-item ratings, recommend items to user.
     Parameters
     ----------
@@ -208,7 +207,6 @@ class ItemBasedRecommender(object):
                                         tile_hint=(self.rating_table.tile_shape()[1], k), 
                                                    dtype=np.int).force()
     
-    st = time.time()
     # Find top-k similar items for each item.
     # Store the similarity scores into table top_k_similar table.
     # Store the indices of top k items into table top_k_similar_indices.
