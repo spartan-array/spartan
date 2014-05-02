@@ -4,6 +4,7 @@ from spartan import util
 import socket
 from .helper import *
 import numpy as np
+import time
 
 def _similarity_mapper(ex, rating_table, similarity_table, item_norm, step):
   ''' Find all pair similarities between items. 
@@ -164,7 +165,7 @@ class ItemBasedRecommender(object):
     if isinstance(rating_table, array.distarray.DistArray):
       rating_table = expr.lazify(rating_table)
     res = expr.sqrt(expr.sum(rating_table ** 2, axis=0, 
-                             tile_hint=(rating_table.shape[1] / ctx.num_workers, )))
+                             tile_hint=(rating_table.shape[1] / ctx.num_workers,)))
     return res.force()
 
   def precompute(self):
@@ -181,8 +182,7 @@ class ItemBasedRecommender(object):
     '''
     M = self.rating_table.shape[0]
     N = self.rating_table.shape[1]
-    if isinstance(self.rating_table, expr.Expr):
-      self.rating_table = self.rating_table.force()
+    self.rating_table = expr.force(self.rating_table)
     
     assert self.rating_table.tile_shape()[0] == M, \
            "rating table is only allowed to tile by columns!"
@@ -191,7 +191,7 @@ class ItemBasedRecommender(object):
                                        tile_hint=(self.rating_table.tile_shape()[1], N)).force() 
 
     self.item_norm = self._get_norm_of_each_item(self.rating_table) 
-    
+
     self.rating_table.foreach_tile(mapper_fn=_similarity_mapper,
                                    kw={'rating_table' : self.rating_table,
                                        'similarity_table' : self.similarity_table,
@@ -205,9 +205,10 @@ class ItemBasedRecommender(object):
                                       tile_hint=(self.rating_table.tile_shape()[1], k)).force()
 
     top_k_similar_indices = expr.zeros((N, k), 
-                                        tile_hint=(self.rating_table.tile_shape()[1], k), dtype=np.int).force()
+                                        tile_hint=(self.rating_table.tile_shape()[1], k), 
+                                                   dtype=np.int).force()
     
-    
+    st = time.time()
     # Find top-k similar items for each item.
     # Store the similarity scores into table top_k_similar table.
     # Store the indices of top k items into table top_k_similar_indices.
@@ -216,6 +217,5 @@ class ItemBasedRecommender(object):
                                            'top_k_similar_table' : top_k_similar_table,
                                            'top_k_similar_indices' : top_k_similar_indices,
                                            'k' : k})
-
     self.top_k_similar_table = top_k_similar_table.glom()
     self.top_k_similar_indices = top_k_similar_indices.glom()

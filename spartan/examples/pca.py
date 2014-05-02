@@ -47,7 +47,6 @@ class PCA(object):
     Returns
     -------
     X_new : reduced dimension numpy.array, shape (n_samples, n_components)
-
     """
     X_transformed = X - self.mean_
     X_transformed = expr.dot(X_transformed, self.components_.T).glom()
