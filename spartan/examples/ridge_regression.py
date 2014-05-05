@@ -17,7 +17,7 @@ class RidgeRegression(sgd.SGDRegressor):
     xT = expr.transpose(self.x)
     g1 = expr.dot(expr.dot(xT, self.x), self.w)
     g2 = expr.dot(xT, self.y)
-    g3 = expr.from_numpy(self.ridge_lambda * self.w)
+    g3 = self.ridge_lambda * self.w
     g4 = (g1 + g2 + g3)
     return expr.reshape(g4, (1, self.N_DIM))
 

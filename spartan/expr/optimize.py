@@ -290,10 +290,11 @@ def _parakeet_codegen(op):
   fn = '\n'.join(module_prelude)
   fn = fn + fn_prelude
   fn = fn + 'def _jit_fn'
-  fn = fn + '(%s):\n  ' % ','.join(op.input_names())
+  fn = fn + '(%s):\n  ' % ','.join(['key_%s'%i for i in range(len(op.input_names()))])
   fn = fn + 'return ' + op_code
   fn = fn + '\n\n'
-
+  #util.log_debug(fn)
+  
   # verify we can compile before proceeding
   local.compile_parakeet_source(fn)
   return fn
@@ -317,7 +318,7 @@ class ParakeetGeneration(OptimizePass):
 
     # If all deps are not FnCallExprs and len(deps) is a small number(<=2 for now)
     # it is not worth to do code generation.
-    if not has_fncallexpr and len(expr.op) <= 2:
+    if len(expr.op.deps) <= 2 and not has_fncallexpr:
       return False
     return True
 
@@ -326,8 +327,8 @@ class ParakeetGeneration(OptimizePass):
     if isinstance(expr.op, local.ParakeetExpr):
       return expr.visit(self)
 
-      if not self._should_run_parakeet(self, expr):
-        return expr.visit(self)
+    if not self._should_run_parakeet(expr):
+      return expr.visit(self)
 
     try:
       source = _parakeet_codegen(expr.op)
@@ -425,7 +426,7 @@ passes = []
 
 def optimize(dag):
   if not FLAGS.optimization:
-    util.log_debug('Optimizations disabled')
+    util.log_info('Optimizations disabled')
     return dag
 
   util.log_debug('Optimization: applying %d passes', len(passes))

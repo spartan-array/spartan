@@ -12,6 +12,7 @@ import tempfile
 import imp
 import time
 import numpy as np
+import re
 
 from spartan import util
 from spartan.util import Assert
@@ -164,13 +165,27 @@ class ParakeetExpr(LocalExpr):
     return 'parakeet_op'
 
   def evaluate(self, ctx):
+    op_map = {}
+    pattern = re.compile('(key_[\d]+)')
+    begin_idx = self.source.index('return')
+    begin_str = self.source[begin_idx:]
+    keys = pattern.findall(begin_str)
+    i = 0
+    for key in keys:
+      if key not in op_map:
+        op_map[key] = 'key_%s' %i
+        begin_str = begin_str.replace(key, 'key_%s' % i)
+        i += 1
+    self.source = self.source[0:begin_idx] + begin_str
+    
+    util.log_warn(self.source)    
     names = self.input_names()
     fn = compile_parakeet_source(self.source)
     
     kw_args = {}
     for var in names:
       value = ctx.inputs[var]
-      kw_args[var] = value
+      kw_args[op_map[var]] = value
     
     if FLAGS.use_cuda:
       return fn(_backend='cuda', **kw_args)

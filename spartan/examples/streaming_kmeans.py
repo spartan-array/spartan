@@ -293,7 +293,7 @@ def streaming_kmeans(points, k=10, num_iters=10, num_ballkmeans_runs=2, trim_fac
   for i in range(k):
     centers[i] = centriods[i].get_center()
 
-  return expr.shuffle(points, _cluster_mapper, kw={'centers': centers}).force()
+  return expr.shuffle(points, _cluster_mapper, kw={'centers': centers})
   
   
   

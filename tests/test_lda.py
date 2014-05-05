@@ -11,9 +11,10 @@ from datetime import datetime
 def benchmark_lda(ctx, timer):
   
   print "#worker:", ctx.num_workers
-  NUM_TERMS = 3000
-  NUM_DOCS = 100 * ctx.num_workers
-  
+  NUM_TERMS = 1000
+  #NUM_DOCS = 200 * ctx.num_workers
+  NUM_DOCS = 100 * 64
+
   # create data
   # NUM_TERMS = 41807
   # NUM_DOCS = 21578
@@ -21,11 +22,13 @@ def benchmark_lda(ctx, timer):
   
   terms_docs_matrix = expr.randint(NUM_TERMS, NUM_DOCS, low=0, high=100, tile_hint=(NUM_TERMS, NUM_DOCS/ctx.num_workers)).force()
   
-  max_iter = 1
+  max_iter = 3
   k_topics = 10
   
   t1 = datetime.now()
-  topic_term_count, doc_topics = learn_topics(terms_docs_matrix, k_topics, max_iter=max_iter)
+  doc_topics, topic_term_count = learn_topics(terms_docs_matrix, k_topics, max_iter=max_iter)
+  doc_topics.force()
+  topic_term_count.force()
   t2 = datetime.now()
   time_cost = millis(t1,t2)
   util.log_warn('total_time:%s ms, train time per iteration:%s ms', time_cost, time_cost/max_iter)

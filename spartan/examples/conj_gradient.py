@@ -10,20 +10,20 @@ def cgit(A, x):
   A(Expr): matrix to be processed.
   x(Expr): the input vector.
   '''
-  z = expr.zeros(x.shape, tile_hint=(A.shape[1]/int(math.sqrt(len(A.tiles))), 1))
+  z = expr.zeros(x.shape, tile_hint=(A.tile_shape()[1], 1))
   r = x
-  rho = expr.dot(expr.transpose(r), r).glom()
+  rho = expr.sum(r * r).glom()
   #util.log_warn('rho:%s', rho)
   p = r
   
   for i in xrange(15):
-    q = expr.dot(A, p)
-    alpha = rho / expr.dot(expr.transpose(p), q).glom()
+    q = expr.dot(A, p, tile_hint=(A.tile_shape()[1], 1))
+    alpha = rho / expr.sum(p * q).glom()
     #util.log_warn('alpha:%s', alpha)
     z = z + p * alpha
     rho0 = rho
     r = r - q * alpha
-    rho = expr.dot(expr.transpose(r), r).glom()
+    rho = expr.sum(r * r).glom()
     beta = rho / rho0
     #util.log_warn('beta:%s', beta)
     p = r + p * beta
@@ -43,7 +43,7 @@ def conj_gradient(A, num_iter=15):
     num_iter(int): max iteration to run.
   '''
   A = expr.force(A)
-  x = expr.ones((A.shape[1],1), tile_hint=(A.shape[1]/int(math.sqrt(len(A.tiles))), 1))
+  x = expr.ones((A.shape[1],1), tile_hint=(A.tile_shape()[1], 1))
   
   for iter in range(num_iter):
     #util.log_warn('iteration:%d', iter)

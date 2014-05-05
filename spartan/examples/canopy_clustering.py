@@ -133,6 +133,6 @@ def canopy_cluster(points, t1=0.1, t2=0.1, cf=1):
   '''
   new_points = expr.tile_operation(points, _canopy_mapper, kw={'t1': t1, 't2': t2, 'cf': cf}).force()
   centers = find_centers(new_points.values(), t1, t2, cf)
-  labels = expr.shuffle(points, _cluster_mapper, kw={'centers': centers}).force()    
+  labels = expr.shuffle(points, _cluster_mapper, kw={'centers': centers})
   
   return labels

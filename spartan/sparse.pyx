@@ -26,15 +26,16 @@ cpdef sparse_to_dense_update(np.ndarray[ndim=2, dtype=DTYPE_FLT] target,
                              int reducer):
   
   cdef int i
-  for i in xrange(rows.shape[0]):
-    if reducer == REDUCE_NONE or mask[rows[i], cols[i]] == 0:
-      target[rows[i], cols[i]] = data[i]
-    elif reducer == REDUCE_ADD:
-      target[rows[i], cols[i]] = target[rows[i], cols[i]] + data[i]
-    elif reducer == REDUCE_MUL:
-      target[rows[i], cols[i]] = target[rows[i], cols[i]] * data[i]
-    
-    mask[rows[i], cols[i]] = 1
+  cdef int size = rows.shape[0]
+  with nogil:
+    for i in xrange(size):
+      if reducer == REDUCE_NONE or mask[rows[i], cols[i]] == 0:
+        target[rows[i], cols[i]] = data[i]
+        mask[rows[i], cols[i]] = 1
+      elif reducer == REDUCE_ADD:
+        target[rows[i], cols[i]] = target[rows[i], cols[i]] + data[i]
+      elif reducer == REDUCE_MUL:
+        target[rows[i], cols[i]] = target[rows[i], cols[i]] * data[i]
     
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
 def dot_coo_dense_dict(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not None):
@@ -121,29 +122,38 @@ def dot_coo_dense_unordered_map(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] 
     cdef np.ndarray[DTYPE_INT, ndim=1] cols = X.col
     cdef np.ndarray[DTYPE_FLT, ndim=1] data = X.data
     
-    cdef unordered_map[DTYPE_INT, DTYPE_FLT] result
-    result.rehash(rows.size)
+    cdef int row_size = rows.size
     
-    cdef int i   
-    for i in xrange(rows.shape[0]):
-        result[rows[i]] += data[i] * W[cols[i], 0]
+    cdef unordered_map[DTYPE_INT, DTYPE_FLT] result
+    cdef int i
+     
+    with nogil:
+        result.rehash(row_size)
+          
+        for i in xrange(row_size):
+            result[rows[i]] += data[i] * W[cols[i], 0]
     
     cdef int size = result.size()
+    
     cdef np.ndarray[DTYPE_INT] new_rows = numpy.zeros(size, dtype=numpy.int32)
     cdef np.ndarray[DTYPE_INT] new_cols = numpy.zeros(size, dtype=numpy.int32)
     cdef np.ndarray[DTYPE_FLT] new_data = numpy.zeros(size, dtype=numpy.float32)
 
     cdef pair[DTYPE_INT, DTYPE_FLT] entry
     cdef unordered_map[DTYPE_INT, DTYPE_FLT].iterator iter = result.begin()
-    i = 0
-    while iter != result.end():
-        new_rows[i] = deref(iter).first
-        i = i + 1
-        inc(iter)
+    
+    with nogil:
+        i = 0
+        while iter != result.end():
+            new_rows[i] = deref(iter).first
+            i = i + 1
+            inc(iter)
 
     new_rows.sort()
-    for i in xrange(new_rows.size):
-        new_data[i] = result[new_rows[i]]
+    
+    with nogil:
+        for i in xrange(size):
+            new_data[i] = result[new_rows[i]]
  
     return scipy.sparse.coo_matrix((new_data, (new_rows, new_cols)), shape=(X.shape[0], 1))
 
