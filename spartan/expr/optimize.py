@@ -319,7 +319,8 @@ class ParakeetGeneration(OptimizePass):
     # it is not worth to do code generation.
     if not has_fncallexpr and len(expr.op.deps) <= 2:
       return False
-    return True
+    else:
+      return True
 
   def visit_MapExpr(self, expr):
     # if we've already converted this to parakeet, stop now
@@ -378,6 +379,7 @@ class RotateSlice(OptimizePass):
   (a + b)[slice] -> broadcast(a, shape)[slice] + broadcast(b, shape)[slice]
   '''
   name = 'rotate_slice'
+  rotated = {}
 
   def visit_SliceExpr(self, slice_expr):
     'Rotate this slice with a child map expression.'
@@ -394,18 +396,30 @@ class RotateSlice(OptimizePass):
     Assert.iterable(map_expr.children)
     map_children = self.visit(map_expr.children)
 
+
     children = []
     for child_expr in map_children:
-      children.append(SliceExpr(src=child_expr,
-                                idx=slice_expr.idx,
-                                broadcast_to=map_shape))
+      child = SliceExpr(src=child_expr,
+                        idx=slice_expr.idx,
+                        broadcast_to=map_shape)
+      if isinstance(child_expr, MapExpr):
+        if self.visited.get(child_expr, None) != None:
+          del self.visited[child_expr]
+        child = self.visit(child)
 
-    return expr_like(map_expr,
+      children.append(child)
+
+    if self.rotated.get(map_expr, None) == True:
+      return MapExpr(children=ListExpr(vals=children),
+                     op=map_expr.op,
+                     child_to_var=map_expr.child_to_var)
+    else:
+      self.rotated[map_expr] = True
+      return expr_like(map_expr,
                      op=map_expr.op,
                      children=ListExpr(vals=children),
                      child_to_var=map_expr.child_to_var,
                      trace=map_expr.stack_trace)
-
 
 
 def apply_pass(klass, dag):
@@ -446,8 +460,8 @@ def add_optimization(klass, default):
 
 
 add_optimization(CollapsedCachedExpressions, True)
-add_optimization(MapMapFusion, True)
 add_optimization(RotateSlice, True)
+add_optimization(MapMapFusion, True)
 if parakeet is not None:
   add_optimization(ParakeetGeneration, True)
 add_optimization(ReduceMapFusion, True)
