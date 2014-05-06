@@ -163,7 +163,7 @@ class ItemBasedRecommender(object):
     ctx = blob_ctx.get()
     if isinstance(rating_table, array.distarray.DistArray):
       rating_table = expr.lazify(rating_table)
-    res = expr.sqrt(expr.sum(rating_table ** 2, axis=0, 
+    res = expr.sqrt(expr.sum(expr.multiply(rating_table, rating_table), axis=0, 
                              tile_hint=(rating_table.shape[1] / ctx.num_workers, )))
     return res.force()
 
