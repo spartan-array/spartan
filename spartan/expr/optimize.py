@@ -403,6 +403,10 @@ class RotateSlice(OptimizePass):
                         idx=slice_expr.idx,
                         broadcast_to=map_shape)
       if isinstance(child_expr, MapExpr):
+        # If the child is a Map, RotateSlice should traverse it again. Some 
+        # nodes may be traversed several times. For current implementation,
+        # traversing a node several times dones't cause any problem for 
+        # RotationSlice.
         if self.visited.get(child_expr, None) != None:
           del self.visited[child_expr]
         child = self.visit(child)
