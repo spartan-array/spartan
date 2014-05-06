@@ -10,7 +10,8 @@ import fcntl
 import time
 import zmq
 from .common import Group
-from spartan import util, config
+from spartan import util
+from spartan.util import FLAGS
 from zmq.eventloop import zmqstream, ioloop 
 from rlock import FastRLock
 
