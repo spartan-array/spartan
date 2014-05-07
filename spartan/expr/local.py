@@ -12,12 +12,11 @@ import tempfile
 import imp
 import time
 import numpy as np
-import re
 
 from spartan import util
 from spartan.util import Assert
 from spartan.node import Node, indent
-from traits.api import Str, List, Function, PythonValue, Int, Dict
+from traits.api import Str, List, Function, PythonValue, Int
 
 var_id = iter(xrange(1000000))
 expr_id = iter(xrange(1000000))
@@ -157,8 +156,7 @@ def compile_parakeet_source(src):
 class ParakeetExpr(LocalExpr):
   deps = PythonValue
   source = PythonValue
-  op_map = Dict()
-  
+
   def fn_name(self):
     return 'parakeet'
 
@@ -166,27 +164,13 @@ class ParakeetExpr(LocalExpr):
     return 'parakeet_op'
 
   def evaluate(self, ctx):
-    if len(self.op_map) == 0:
-      pattern = re.compile('(key_[\d]+)')
-      begin_idx = self.source.index('return')
-      begin_str = self.source[begin_idx:]
-      keys = pattern.findall(begin_str)
-      i = 0
-      for key in keys:
-        if key not in self.op_map:
-          self.op_map[key] = 'key_%s' %i
-          begin_str = begin_str.replace(key, 'key_%s' % i)
-          i += 1
-      self.source = self.source[0:begin_idx] + begin_str
-      #util.log_warn("op_map:%s, source:%s", self.op_map, self.source)    
-      
     names = self.input_names()
     fn = compile_parakeet_source(self.source)
     
     kw_args = {}
     for var in names:
       value = ctx.inputs[var]
-      kw_args[self.op_map[var]] = value
+      kw_args[var] = value
     
     if FLAGS.use_cuda:
       return fn(_backend='cuda', **kw_args)
