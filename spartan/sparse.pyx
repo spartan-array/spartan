@@ -299,15 +299,30 @@ def multiple_slice(X not None, list slices):
             l.append((tile_id, dst_slice, X[src_slice]))
         return l
 
+cdef DTYPE_INT searchsorted(np.ndarray[DTYPE_INT, ndim=1] rows, DTYPE_INT left, DTYPE_INT right, DTYPE_INT e):
+    cdef DTYPE_INT middle
+    
+    while left <= right:
+      middle = (left + right)/2
+      if rows[middle] > e:
+        right = middle - 1
+      elif rows[middle] < e:
+        left = middle + 1
+      else:
+        return middle
+    return left
+  
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
 def multiple_slice_coo(X not None, list slices):
 
     cdef np.ndarray[DTYPE_INT, ndim=1] rows = X.row
     cdef np.ndarray[DTYPE_INT, ndim=1] cols = X.col
     cdef np.ndarray[DTYPE_FLT, ndim=1] data = X.data
-
+    
+    cdef DTYPE_INT last_idx = rows.size - 1
+    
     cdef list results = []
-    cdef int idx = 0, end_idx
+    cdef DTYPE_INT idx = 0, end_idx
     for (tile_id, src_slice, dst_slice) in slices:
         if src_slice[0].stop <= rows[idx]:
             continue
@@ -315,7 +330,8 @@ def multiple_slice_coo(X not None, list slices):
         if src_slice[0].start > rows[-1]:
             break
 
-        end_idx = numpy.searchsorted(rows[idx:], src_slice[0].stop) + idx
+        end_idx = searchsorted(rows, idx, last_idx, src_slice[0].stop)
+        #end_idx = numpy.searchsorted(rows[idx:], src_slice[0].stop) + idx
         #print src_slice[0], rows[idx], rows[end_idx-1]
         results.append((tile_id, dst_slice, scipy.sparse.coo_matrix((data[idx:end_idx], (rows[idx:end_idx]-src_slice[0].start, cols[idx:end_idx])),
                                             shape=tuple([slice.stop-slice.start for slice in src_slice]))))
