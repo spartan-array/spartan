@@ -1,5 +1,5 @@
 import numpy as np
-from spartan import expr, core, array
+from spartan import expr, core, array, blob_ctx
 from sklearn.neighbors import NearestNeighbors as SKNN
 
 def _knn_mapper(ex,
@@ -28,10 +28,8 @@ def _knn_mapper(ex,
   row_start = ex.ul[0]
   col_start = ex.ul[1]
  
-  """
-  If it's not started with the first column, we skip. 
-  Let the tile starts with first column does the computation. 
-  """
+  # If it's not started with the first column, we skip. 
+  # Let the tile starts with first column does the computation. 
   if col_start != 0:
     return result
   
@@ -41,7 +39,7 @@ def _knn_mapper(ex,
   X = X.fetch(ex)
   Q = Q.glom()
   
-  """ Run sklearn SKK locally to find the KNN candidates """ 
+  # Run sklearn SKK locally to find the KNN candidates.
   nbrs = SKNN(n_neighbors=n_neighbors, 
                 algorithm=algorithm).fit(X)
 
@@ -72,24 +70,6 @@ class NearestNeighbors(object):
 
         Note: fitting on sparse input will override the setting of
         this parameter, using brute force.
-
-    Examples
-    --------
-      >>> from spartan.examples.sklearn.neighbors import NearestNeighbors
-      >>> samples = [[0, 0, 2], [1, 0, 0], [0, 0, 1]]
-
-      >>> neigh = NearestNeighbors(2, 0.4)
-      >>> neigh.fit(samples)  #doctest: +ELLIPSIS
-      NearestNeighbors(...)
-
-      >>> neigh.kneighbors([[0, 0, 1.3]], 2)
-      ... #doctest: +ELLIPSIS
-      array([[2, 0]]...)
-
-    Notes
-    -----
-    http://en.wikipedia.org/wiki/K-nearest_neighbor_algorithm
-
   """
   def __init__(self,
                 n_neighbors=5,
@@ -98,8 +78,9 @@ class NearestNeighbors(object):
     self.algorithm = algorithm
 
   def fit(self, X):
+    ctx = blob_ctx.get()
     if isinstance(X, np.ndarray):
-      X = expr.from_numpy(X)    
+      X = expr.from_numpy(X, tile_hint=(X.shape[0] / ctx.num_workers, X.shape[1]))    
     if isinstance(X, expr.Expr):
       X = X.force()
 
@@ -129,6 +110,9 @@ class NearestNeighbors(object):
         ind : array
             Indices of the nearest points in the population matrix.
     """
+    if n_neighbors is not None:
+      self.n_neighbors = n_neighbors
+
     if isinstance(X, np.ndarray):
       X = expr.from_numpy(X)
     

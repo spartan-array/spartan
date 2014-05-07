@@ -132,6 +132,7 @@ FLAGS.add(IntFlag('port_base', default=10000, help='Port master should listen on
 FLAGS.add(StrFlag('tile_assignment_strategy', default='round_robin', help='Decide tile to worker mapping (round_robin, random, performance)'))
 FLAGS.add(StrFlag('checkpoint_path', default='/tmp/spartan/checkpoint/', help='Path for saving checkpoint information'))
 FLAGS.add(IntFlag('default_rpc_timeout', default=60))
+FLAGS.add(IntFlag('max_zeromq_sockets', default=4096))
 
 FLAGS.add(BoolFlag('opt_keep_stack', default=False))
 FLAGS.add(BoolFlag('capture_expr_stack', default=False))

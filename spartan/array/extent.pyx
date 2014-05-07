@@ -98,7 +98,17 @@ cdef class TileExtent(object):
     #return ravelled_pos(self.ul, self.array_shape)
     
   def __richcmp__(self, other, operation):
-    if operation == 2: # eq
+    if operation == 0 or operation == 4: # smaller or bigger
+      smaller = True
+      for i in range(len(self.ul)):
+        if self.ul[i] < other.ul[i]:
+           smaller = True
+           break
+        elif self.ul[i] > other.ul[i]:
+           smaller = False
+           break
+      return smaller if operation == 0 else (not smaller)
+    elif operation == 2: # eq
       return isinstance(other, TileExtent) and \
              self.ul == other.ul and  \
              self.lr == other.lr

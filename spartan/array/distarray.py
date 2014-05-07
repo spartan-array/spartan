@@ -319,6 +319,10 @@ class DistArrayImpl(DistArray):
     MASKED = 1
     SPARSE = 2
     
+    # If there is only one slice, no need to do copy
+    if len(splits) == 1:
+      return results[0]
+
     output_type = DENSE
     for r in results:
       if isinstance(r, np.ma.MaskedArray) and output_type == DENSE: 
@@ -446,6 +450,16 @@ def create(shape,
       tiles[ex] = ctx.create(
                     tile.from_shape(ex.shape, dtype, tile_type=tile_type),
                     hint=j)
+  elif FLAGS.tile_assignment_strategy == 'static':
+    all_extents = list(extents.iterkeys())
+    all_extents.sort()
+    map_file = appdirs.user_data_dir('Spartan', 'rjpower.org') + '/tiles_map'
+    with open(map_file) as fp:
+      for ex in all_extents:
+        worker = int(fp.readline().strip())
+        tiles[ex] = ctx.create(
+                    tile.from_shape(ex.shape, dtype, tile_type=tile_type),
+                    hint = worker)
   else: #random
     for ex in extents:
       tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype, tile_type=tile_type))

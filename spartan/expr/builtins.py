@@ -563,7 +563,10 @@ def argmax(x, axis=None):
 
 def _countnonzero_local(ex, data, axis):
   if axis is None:
-    return np.asarray(np.count_nonzero(data))
+    if sp.issparse(data):
+      return np.asarray(data.nnz)
+    else:
+      return np.asarray(np.count_nonzero(data))
   
   return (data > 0).sum(axis)  
 

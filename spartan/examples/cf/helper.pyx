@@ -79,7 +79,9 @@ def argpartsort_2d_float64_axis1(np.ndarray[np.float64_t, ndim=2] a, int n):
     "Partial sort of 2d array with dtype=float64 along axis=1."
     cdef np.npy_intp i, j = 0, l, r, k = n-1, itmp
     cdef np.float64_t x, tmp
-    cdef np.ndarray[np.float64_t, ndim=2] b = PyArray_Copy(a)
+
+    # Sort original array, no copy.
+    cdef np.ndarray[np.float64_t, ndim=2] b = a #PyArray_Copy(a)
     cdef Py_ssize_t i0, i1
     cdef np.npy_intp *dim
     dim = PyArray_DIMS(a)
@@ -128,7 +130,9 @@ def argpartsort_2d_float32_axis1(np.ndarray[np.float32_t, ndim=2] a, int n):
     "Partial sort of 2d array with dtype=float32 along axis=1."
     cdef np.npy_intp i, j = 0, l, r, k = n-1, itmp
     cdef np.float32_t x, tmp
-    cdef np.ndarray[np.float32_t, ndim=2] b = PyArray_Copy(a)
+
+    # Sort original array, no copy.
+    cdef np.ndarray[np.float32_t, ndim=2] b = a #PyArray_Copy(a)
     cdef Py_ssize_t i0, i1
     cdef np.npy_intp *dim
     dim = PyArray_DIMS(a)
