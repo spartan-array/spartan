@@ -414,6 +414,14 @@ class RotateSlice(OptimizePass):
       children.append(child)
 
     if self.rotated.get(map_expr, None) == True:
+      # If this Map has been rotated, we should create a new MapExpr.
+      # An example is : 
+      #    c = a + b
+      #    d = c[1:50]
+      #    e = c[2:51]
+      # In this example, RotateSlice first roate c[2:51] to a and b.
+      # When RotateSlice rotates c[1:50] to a and b, it should create
+      # a new Map expr(+) for a[1:50] and b[1:50]
       return MapExpr(children=ListExpr(vals=children),
                      op=map_expr.op,
                      child_to_var=map_expr.child_to_var)
