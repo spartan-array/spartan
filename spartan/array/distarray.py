@@ -370,23 +370,29 @@ class DistArrayImpl(DistArray):
       #util.log_info('EXACT: %s %s ', region, dst_slice)
       return ctx.update(tile_id, dst_slice, data, self.reducer_fn, wait=wait)
     
-    splits = list(extent.find_overlapping(self.tiles, region))
+    
     futures = []
     slices = []
-    #util.log_info('%s: Updating %s tiles with data:%s', region, len(splits), data)
     
-    for dst_extent, intersection in splits:
-      #util.log_info('%s %s %s', region, dst_extent, intersection)
-
-      tile_id = self.tiles[dst_extent]
-
-      src_slice = extent.offset_slice(region, intersection)
-      dst_slice = extent.offset_slice(dst_extent, intersection)
-   
-      shape = [slice.stop - slice.start for slice in dst_slice]
-      if extent.all_nonzero_shape(shape):
-        slices.append((tile_id, src_slice, dst_slice))
-      #util.log_info('Update src:%s dst:%s data shape:%s', src_slice, dst_slice, data.shape)
+    if region.shape == self.shape:
+      for ex, tile_id in self.tiles.iteritems():
+        slices.append((tile_id, ex.to_slice(), extent.offset_slice(ex, ex)))
+    else:
+      splits = list(extent.find_overlapping(self.tiles, region))
+      #util.log_info('%s: Updating %s tiles with data:%s', region, len(splits), data)
+      
+      for dst_extent, intersection in splits:
+        #util.log_info('%s %s %s', region, dst_extent, intersection)
+  
+        tile_id = self.tiles[dst_extent]
+  
+        src_slice = extent.offset_slice(region, intersection)
+        dst_slice = extent.offset_slice(dst_extent, intersection)
+     
+        shape = [slice.stop - slice.start for slice in dst_slice]
+        if extent.all_nonzero_shape(shape):
+          slices.append((tile_id, src_slice, dst_slice))
+        #util.log_info('Update src:%s dst:%s data shape:%s', src_slice, dst_slice, data.shape)
     
     slices.sort(key=lambda x: x[1][0].start)
     #util.log_info("Update: slices:%s", slices)

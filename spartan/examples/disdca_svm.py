@@ -1,6 +1,6 @@
 import numpy as np
 from spartan import expr, util
-from spartan.array import extent, distarray
+from spartan.array import extent
 
 def _svm_disdca_train(X, Y, alpha, w, m, scale, lambda_n):
   '''

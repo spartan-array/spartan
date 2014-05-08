@@ -13,7 +13,7 @@ class LogisticRegression(sgd.SGDRegressor):
     h(w) = 1 / (1 + e^(-(x*w)))
     '''
     g = expr.exp(expr.dot(self.x, self.w))
-    yp = g / (g + np.asarray(1))
+    yp = g / (g + 1)
     return self.x * (yp - self.y)
 
 def logistic_regression(x, y, iterations):

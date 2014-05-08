@@ -59,8 +59,7 @@ class TestPerformance(test_common.ClusterTest):
       yp = expr.dot(x, w)
       diff = x * (yp - y)
       grad = expr.sum(diff, axis=0, tile_hint=[N_DIM]).glom().reshape((N_DIM, 1))
-      wprime = w - grad * 1e-6
-      expr.force(wprime)
+      w = w - grad * 1e-6
 
     cost = time.time() - start
     self._verify_cost("linear_reg", cost)

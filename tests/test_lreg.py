@@ -5,7 +5,7 @@ import time
 
 N_EXAMPLES = 100
 N_DIM = 3
-ITERATION = 5
+ITERATION = 3
 
 class TestLinearRegression(test_common.ClusterTest):
   def test_lreg(self):
@@ -14,7 +14,8 @@ class TestLinearRegression(test_common.ClusterTest):
 
 def benchmark_lreg(ctx, timer):
   print "#worker:", ctx.num_workers
-  N_EXAMPLES = 10000000 * ctx.num_workers
+  #N_EXAMPLES = 40000000 * ctx.num_workers
+  N_EXAMPLES = 5000000 * 64
   x = expr.eager(expr.rand(N_EXAMPLES, N_DIM, tile_hint=(N_EXAMPLES / ctx.num_workers, N_DIM)))
   y = expr.eager(expr.rand(N_EXAMPLES, 1, tile_hint=(N_EXAMPLES / ctx.num_workers, 1)))
   start = time.time()

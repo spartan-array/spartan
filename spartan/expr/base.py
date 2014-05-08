@@ -423,6 +423,7 @@ class Expr(Node):
     # If the expr has been optimized, return the cached optimized expr.
     if self.optimized_expr is None:
       self.optimized_expr = optimized_dag(self)
+      self.optimized_expr.optimized_expr = self.optimized_expr
       return self.optimized_expr
     else:
       return self.optimized_expr
@@ -614,7 +615,7 @@ def evaluate(node):
   :param node: `Expr`
   '''
   if isinstance(node, Expr):
-    return node.evaluate()
+    return node.force()
 
   Assert.isinstance(node, (np.ndarray, distarray.DistArray))
   return node

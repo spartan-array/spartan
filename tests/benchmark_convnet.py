@@ -4,18 +4,17 @@ import test_common
 from math import sqrt
 
 N_COLORS = 3
-BASE_IMG_SIZE = 512
+BASE_IMG_SIZE = 256
 FILTER_SIZE = (4, 4)
 N_FILTERS = 64
 ONE_TILE = (10000, 10000, 10000, 10000)
 
 def benchmark_convnet(ctx, timer):
-  #image_size = BASE_IMG_SIZE * int(sqrt(ctx.num_workers))
   image_size = BASE_IMG_SIZE
-  minibatch = ctx.num_workers
+  minibatch = 64
+  #minibatch = ctx.num_workers
   hint = util.divup(image_size, sqrt(ctx.num_workers))
-  tile_hint = (minibatch, N_COLORS, hint, hint)
-  #tile_hint = (util.divup(minibatch, ctx.num_workers), N_COLORS, image_size, image_size)
+  tile_hint = (util.divup(minibatch, ctx.num_workers), N_COLORS, image_size, image_size)
   util.log_info('Hint: %s', tile_hint)
     
   images = expr.eager(expr.ones((minibatch, N_COLORS, image_size, image_size),
