@@ -14,9 +14,11 @@ from ..node import Node, indent
 from .. import blob_ctx, node, util
 from ..util import Assert, copy_docstring
 from ..array import distarray
-from ..config import FLAGS
+from ..config import FLAGS, BoolFlag
 from ..rpc import TimeoutException
 from traits.api import Any, Instance, Int, PythonValue
+
+FLAGS.add(BoolFlag('opt_expression_cache', True, 'Enable expression caching.'))
 
 class NotShapeable(Exception):
   '''
@@ -177,6 +179,9 @@ class Expr(Node):
     If a cached value is not available, or the cached array is
     invalid (missing tiles), returns None. 
     '''
+    if not FLAGS.optimization or not FLAGS.opt_expression_cache:
+      return None
+
     result = eval_cache.get(self.expr_id)
     if result is not None and len(result.bad_tiles) == 0:
       return result
@@ -418,6 +423,7 @@ class Expr(Node):
     # If the expr has been optimized, return the cached optimized expr.
     if self.optimized_expr is None:
       self.optimized_expr = optimized_dag(self)
+      self.optimized_expr.optimized_expr = self.optimized_expr
       return self.optimized_expr
     else:
       return self.optimized_expr
@@ -609,7 +615,7 @@ def evaluate(node):
   :param node: `Expr`
   '''
   if isinstance(node, Expr):
-    return node.evaluate()
+    return node.force()
 
   Assert.isinstance(node, (np.ndarray, distarray.DistArray))
   return node

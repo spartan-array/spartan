@@ -196,6 +196,22 @@ class Worker(object):
       resp = core.GetResp(data=self._blobs[req.id].get(req.subslice))
       handle.done(resp)
 
+  def get_flatten(self, req, handle):
+    '''
+    Fetch a flatten portion of the flatten format of a tile.
+    
+    :param req: `GetReq`
+    :param handle: `PendingRequest`
+    
+    '''
+    if req.subslice is None:
+      #util.log_info('GET: %s', type(self._blobs[req.id]))
+      resp = core.GetResp(data=self._blobs[req.id].data.flatten())
+      handle.done(resp)
+    else:
+      resp = core.GetResp(data=self._blobs[req.id].data.flatten()[req.subslice])
+      handle.done(resp)
+      
   def _run_kernel(self, req, handle):
     '''
     Run a kernel over the tiles resident on this worker.
@@ -259,7 +275,9 @@ class Worker(object):
     :param handle: `PendingRequest`
     
     '''
-    util.log_info('Shutdown worker %d (profile? %d)', self.id, FLAGS.profile_worker)
+    if FLAGS.profile_worker:
+        util.log_info('Working shutting down... writing profile.', self.id, FLAGS.profile_worker)
+
     if FLAGS.profile_worker:
       try:
         os.system('mkdir -p ./_worker_profiles/')
@@ -294,12 +312,12 @@ class Worker(object):
       try:
         future.wait()
       except TimeoutException:
-        util.log_info("Exit due to heartbeat message timeout.")
+        util.log_error("Exit due to heartbeat message timeout.")
         sys.exit(0)
 
       last_heartbeat = time.time()
 
-    util.log_info('Worker shutdown.  Exiting.')
+    util.log_debug('Worker shutdown.  Exiting.')
 
 
 def _start_worker(master, local_id):

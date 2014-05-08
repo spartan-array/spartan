@@ -77,25 +77,26 @@ def fit(data, labels, label_size, alpha=1.0):
   data = data / rms.reshape((data.shape[0], 1)) * idf.reshape((1, data.shape[1]))
   
   # add up all the feature vectors with the same labels
-  sum_instance_by_label = distarray.create((label_size, data.shape[1]),
-                                           np.float64, reducer=np.add,
-                                           tile_hint=(label_size / len(labels.tiles), data.shape[1]))
-  expr.shuffle(data,
-               _sum_instance_by_label_mapper,
-               target=sum_instance_by_label,
-               kw={'labels': labels, 'label_size': label_size}).force()
+  sum_instance_by_label = expr.ndarray((label_size, data.shape[1]),
+                                       dtype=np.float64, 
+                                       reduce_fn=np.add,
+                                       tile_hint=(label_size / len(labels.tiles), data.shape[1]))
+  sum_instance_by_label = expr.shuffle(data,
+                                       _sum_instance_by_label_mapper,
+                                       target=sum_instance_by_label,
+                                       kw={'labels': labels, 'label_size': label_size})
 
   # sum up all the weights for each label from the previous step
-  weights_per_label = expr.sum(sum_instance_by_label, axis=1, tile_hint=(label_size,)).force()
+  weights_per_label = expr.sum(sum_instance_by_label, axis=1, tile_hint=(label_size,))
   
   # generate naive bayes per_label_and_feature weights
   weights_per_label_and_feature = expr.shuffle(sum_instance_by_label,
                                                _naive_bayes_mapper,
                                                kw={'weights_per_label': weights_per_label, 
-                                                   'alpha':alpha}).force()
+                                                   'alpha':alpha})
   
-  return {'scores_per_label_and_feature': weights_per_label_and_feature,
-          'scores_per_label': weights_per_label,
+  return {'scores_per_label_and_feature': weights_per_label_and_feature.force(),
+          'scores_per_label': weights_per_label.force(),
           }
   
 def predict(model, new_data):

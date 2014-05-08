@@ -1,6 +1,6 @@
 import numpy as np
 from spartan import expr, util
-from spartan.array import extent, distarray
+from spartan.array import extent
 
 def _svm_disdca_train(X, Y, alpha, w, m, scale, lambda_n):
   '''
@@ -68,15 +68,13 @@ def fit(data, labels, num_tiles, T=50, la=1.0):
     T(int): max training iterations.
     la(float): lambda parameter of this SVM model.
   '''
-  labels = expr.force(labels)
   w = None
-  m = data.shape[0]/num_tiles
-  alpha = expr.zeros((m*num_tiles, 1), dtype=np.float64, tile_hint=(m,1)).force()
+  m = data.shape[0] / num_tiles
+  alpha = expr.zeros((m * num_tiles, 1), dtype=np.float64, tile_hint=(m,1)).force()
   for i in range(T):
-    #util.log_warn('iter:%d', i)
-    new_weight = distarray.create((data.shape[1], 1), np.float64, reducer=np.add, tile_hint=(data.shape[1], 1))
-    expr.shuffle(data, _svm_mapper, target=new_weight, kw={'labels': labels, 'alpha': alpha, 'w': w, 'm': m, 'scale': num_tiles, 'lambda_n': la * data.shape[0]}).force()
-    w = expr.force(expr.lazify(new_weight)/num_tiles)
+    new_weight = expr.ndarray((data.shape[1], 1), dtype=np.float64, reduce_fn=np.add, tile_hint=(data.shape[1], 1))
+    new_weight = expr.shuffle(data, _svm_mapper, target=new_weight, kw={'labels': labels, 'alpha': alpha, 'w': w, 'm': m, 'scale': num_tiles, 'lambda_n': la * data.shape[0]})
+    w = new_weight / num_tiles
   return w
 
 def predict(w, new_data):

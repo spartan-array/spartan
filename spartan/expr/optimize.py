@@ -443,7 +443,7 @@ passes = []
 
 def optimize(dag):
   if not FLAGS.optimization:
-    util.log_info('Optimizations disabled')
+    util.log_debug('Optimizations disabled')
     return dag
 
   util.log_debug('Optimization: applying %d passes', len(passes))

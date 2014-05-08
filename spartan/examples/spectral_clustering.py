@@ -118,7 +118,7 @@ def spectral_cluster(points, k=10, num_iter=10, similarity_measurement='rbf'):
   num_dims = A.shape[1]
   
   # Construct the diagonal matrix D
-  D = expr.sum(A, axis=1, tile_hint=(A.shape[0],)).force()
+  D = expr.sum(A, axis=1, tile_hint=(A.shape[0],))
   
   # Calculate the normalized Laplacian of the form: L = D^(-0.5)AD^(-0.5)
   L = expr.shuffle(A, _laplacian_mapper, kw={'D': D})
@@ -134,7 +134,7 @@ def spectral_cluster(points, k=10, num_iter=10, similarity_measurement='rbf'):
   
   # Run kmeans clustering with init_clusters
   kmeans = KMeans(k, num_iter)
-  U = expr.from_numpy(U).force()
+  U = expr.from_numpy(U)
   centers, labels = kmeans.fit(U, init_clusters)
   
   return labels

@@ -41,24 +41,26 @@ def numpy_cg(A, num_iter):
 def benchmark_cg(ctx, timer):
   print "#worker:", ctx.num_workers
   l = int(math.sqrt(ctx.num_workers))
-  n = 4000 * l
+  n = 2000 * 16
+  #n = 4000 * l
   la = 20
   niter = 5
-  tile_hint = (n/l, n/l)
+  tile_hint = (n, n/ctx.num_workers)
   
   #nonzer = 7
   #nz = n * (nonzer + 1) * (nonzer + 1) + n * (nonzer + 2)
   #density = 0.5 * nz/(n*n)
-  A = expr.sparse_rand((n, n), density=0.9, tile_hint=tile_hint)
+  A = expr.rand(n, n, tile_hint=tile_hint)
   A = (A + expr.transpose(A))*0.5
   
-  I = expr.sparse_diagonal((n,n), tile_hint=tile_hint)
-  A = expr.eager(A - la * I)
+  I = expr.sparse_diagonal((n,n), tile_hint=tile_hint) * la
+  I.force()
+  A = expr.eager(A - I)
 
   #x1 = numpy_cg(A.glom(), niter)
-
+  util.log_warn('begin cg!')
   t1 = datetime.now()
-  x2 = conj_gradient(A, niter).glom()
+  x2 = conj_gradient(A, niter).force()
   t2 = datetime.now()
   cost_time = millis(t1,t2)
   print "total cost time:%s ms, per iter cost time:%s ms" % (cost_time, cost_time/niter)

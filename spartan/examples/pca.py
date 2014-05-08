@@ -1,8 +1,7 @@
 import spartan
 from spartan import expr, array
-from .svd import svds
-from .lanczos import solve
 import numpy as np
+from .ssvd import svd
 
 class PCA(object):
   """Principal component analysis (PCA)
@@ -31,9 +30,10 @@ class PCA(object):
     X -= self.mean_
     X = X.force()
     if rank is None:
-      rank = X.shape[0]
-    S, U = solve(X, expr.transpose(X), rank, False)
-    self.components_ = U.T
+      rank = min(X.shape[0], X.shape[1])
+
+    V, S, U = svd(X, rank)
+    self.components_ = U
     self.components_ = self.components_[:self.n_components, :]
     return self
 
@@ -47,7 +47,6 @@ class PCA(object):
     Returns
     -------
     X_new : reduced dimension numpy.array, shape (n_samples, n_components)
-
     """
     X_transformed = X - self.mean_
     X_transformed = expr.dot(X_transformed, self.components_.T).glom()

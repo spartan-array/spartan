@@ -5,7 +5,8 @@ from spartan import expr
 from datetime import datetime    
 
 def benchmark_streaming_kmeans(ctx, timer):
-  N_PTS = 100 * ctx.num_workers
+  #N_PTS = 100 * ctx.num_workers
+  N_PTS = 100 * 64
   N_DIM = 2
   N_CENTERS = 5
   
@@ -14,9 +15,9 @@ def benchmark_streaming_kmeans(ctx, timer):
 
   print pts.glom()
   t1 = datetime.now()
-  cluster_result = streaming_kmeans(pts, k=N_CENTERS)
+  cluster_result = streaming_kmeans(pts, k=N_CENTERS).glom()
   t2 = datetime.now()
-  print cluster_result.glom()
+  #print cluster_result.glom()
   time_cost = millis(t1, t2)
   print 'streaming_kmeans_cluster time:%s ms' % time_cost
   

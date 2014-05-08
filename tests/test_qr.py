@@ -13,6 +13,7 @@ class TestQR(test_common.ClusterTest):
     Y = expr.randn(M, N, tile_hint=(M/4, N)).force()
     
     Q1, R1 = qr(Y)
+    Q1 = Q1.glom()
     Q2, R2 = linalg.qr(Y.glom(), mode="economic")
     
     assert np.allclose(np.absolute(Q1), np.absolute(Q2))

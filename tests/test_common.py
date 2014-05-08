@@ -4,7 +4,7 @@ from os.path import basename, splitext
 import signal
 from spartan import util, config
 from spartan.cluster import start_cluster
-from spartan.config import FLAGS, StrFlag
+from spartan.config import FLAGS, StrFlag, BoolFlag
 import cProfile
 import imp
 import spartan
@@ -14,6 +14,7 @@ import types
 import unittest
 
 FLAGS.add(StrFlag('worker_list', default='4,8,16,32,64,80'))
+FLAGS.add(BoolFlag('test_optimizations', default=False))
 
 def millis(t1, t2):
   dt = t2 - t1
@@ -32,18 +33,55 @@ def sig_handler(sig, frame):
 class BenchTimer(object):
   def __init__(self, num_workers):
     self.num_workers = num_workers
-     
+    self.prefix = ''
+
   def time_op(self, key, fn):
     st = time.time()
     result = fn()
     ed = time.time()
-    print '%d,"%s",%f' % (self.num_workers, key, ed - st)
+    self.log('%d,"%s",%f', self.num_workers, key, ed - st)
     return result
+
+  def benchmark_op(self, op, min_time=1.0):
+    '''Run ``op`` in a loop until ``min_time`` has passed.'''
+    iters = 0
+    from time import time
+    st = time()
+
+    while 1:
+        iters += 1
+        op()
+        ed = time()
+        if ed - st > min_time:
+            break
+
+    self.log('Ran %d ops, %.3f seconds, %f s/op, %f ops/s' % (iters, ed - st, (ed - st) / iters, iters / (ed - st)))
+
+
+  def log(self, fmt, *args):
+    msg = fmt % args if len(args) > 0 else fmt
+    print self.prefix, msg
     
 
 def run_benchmarks(module, benchmarks, master, timer):
   for benchname in benchmarks:
     getattr(module, benchname)(master, timer)
+
+def benchmark_op(op, min_time=1.0):
+  '''Run ``op`` in a loop until ``min_time`` has passed.'''
+  iters = 0
+  from time import time
+  st = time()
+
+  while 1:
+      iters += 1
+      op()
+      ed = time()
+      if ed - st > min_time:
+          break
+
+  print 'Ran %d ops, %.3f seconds, %f s/op, %f ops/s' % (iters, ed - st, (ed - st) / iters, iters / (ed - st))
+
   
 def run(filename):
   signal.signal(signal.SIGQUIT, sig_handler)
@@ -70,7 +108,15 @@ def run(filename):
       
       timer = BenchTimer(i)
       util.log_info('Running benchmarks on %d workers', i)
+      if FLAGS.test_optimizations:
+          timer.prefix = 'opt_enabled'
+          FLAGS.optimization = 1
+          run_benchmarks(module, benchmarks, ctx, timer)
+          
+      timer.prefix = 'opt_disabled'
+      FLAGS.optimization = 0
       run_benchmarks(module, benchmarks, ctx, timer)
+
       spartan.shutdown()
       time.sleep(1)
 

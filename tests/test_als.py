@@ -8,7 +8,8 @@ from datetime import datetime
 #def test_pr(ctx):
 def benchmark_als(ctx, timer):
   print "#worker:", ctx.num_workers
-  USER_SIZE = 200 * ctx.num_workers
+  #USER_SIZE = 400 * ctx.num_workers
+  USER_SIZE = 200 * 64
   MOVIE_SIZE = 12800
   num_features = 20
   num_iter = 5
@@ -18,6 +19,8 @@ def benchmark_als(ctx, timer):
   util.log_warn('begin als!')
   t1 = datetime.now()
   U, M = als(A, implicit_feedback=True, num_features=num_features, num_iter=num_iter)
+  U.force()
+  M.force()
   t2 = datetime.now()
   cost_time = millis(t1,t2)
   print "total cost time:%s ms, per iter cost time:%s ms" % (cost_time, cost_time/num_iter)

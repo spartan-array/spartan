@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.linalg import lstsq
 from spartan import expr, util
-from spartan.array import extent, distarray
+from spartan.array import extent
 
 def _als_solver(feature_vectors, rating_vector, la):
   '''
@@ -119,24 +119,24 @@ def als(A, la=0.065, alpha=40, implicit_feedback=False, num_features=20, num_ite
     num_iter(int): max iteration to run.
   '''
   A = expr.force(A)
-  AT = expr.shuffle(distarray.create((A.shape[1], A.shape[0]), dtype=A.dtype,
-                                     tile_hint=(A.shape[1] / len(A.tiles), A.shape[0])),
+  AT = expr.shuffle(expr.ndarray((A.shape[1], A.shape[0]), dtype=A.dtype,
+                                 tile_hint=(A.shape[1] / len(A.tiles), A.shape[0])),
                     _transpose_mapper, kw={'orig_array': A})
   
   num_items = A.shape[1]
   
-  avg_rating = (expr.sum(A, axis=0, tile_hint=(num_items / len(A.tiles),)) * 1.0 / 
-                expr.count_nonzero(A, axis=0, tile_hint=(num_items / len(A.tiles),))).force()
+  avg_rating = expr.sum(A, axis=0, tile_hint=(num_items / len(A.tiles),)) * 1.0 / \
+               expr.count_nonzero(A, axis=0, tile_hint=(num_items / len(A.tiles),))
   
-  M = expr.shuffle(distarray.create((num_items, num_features), 
-                                    tile_hint=(num_items / len(A.tiles), num_features)), 
-                   _init_M_mapper, kw={'avg_rating': avg_rating}).force()
+  M = expr.shuffle(expr.ndarray((num_items, num_features), 
+                                tile_hint=(num_items / len(A.tiles), num_features)), 
+                   _init_M_mapper, kw={'avg_rating': avg_rating})
   #util.log_warn('avg_rating:%s M:%s', avg_rating.glom(), M.glom())
   
   for i in range(num_iter):
     # Recomputing U
-    U = expr.shuffle(A, _solve_U_or_M_mapper, kw={'U_or_M': M, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback}).force()
+    U = expr.shuffle(A, _solve_U_or_M_mapper, kw={'U_or_M': M, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback})
     # Recomputing M
-    M = expr.shuffle(AT, _solve_U_or_M_mapper, kw={'U_or_M': U, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback}).force()
+    M = expr.shuffle(AT, _solve_U_or_M_mapper, kw={'U_or_M': U, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback})
     
   return U, M

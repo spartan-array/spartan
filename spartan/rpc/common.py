@@ -52,7 +52,7 @@ def serialize_to(obj, writer):
   pos = writer.tell()
   try:
     cPickle.dump(obj, writer, -1)
-  except (pickle.PicklingError, PickleError, TypeError):
+  except (ImportError, pickle.PicklingError, PickleError, TypeError):
     writer.seek(pos)
     cloudpickle.dump(obj, writer, -1)
     
