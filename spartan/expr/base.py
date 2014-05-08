@@ -410,8 +410,8 @@ class Expr(Node):
 
   def force(self):
     'Evaluate this expression (and all dependencies).'
-    #return self.evaluate()
-    return self.optimized().evaluate()
+    return self.evaluate()
+    #return self.optimized().evaluate()
 
   def optimized(self):
     '''
