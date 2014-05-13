@@ -282,7 +282,7 @@ class Worker(object):
       self.worker_status.add_task_failure(req)
       handle.exception()
       
-    util.log_warn('worker(%s) kernel run time:%s', self.id, finish_time - start_time)
+    util.log_debug('worker(%s) kernel run time:%s', self.id, finish_time - start_time)
      
   def run_kernel(self, req, handle):
     '''

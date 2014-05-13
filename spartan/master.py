@@ -141,7 +141,7 @@ class Master(object):
     
     # update the migrated tile
     if req.old_tile_id is not None:
-      util.log_warn('worker(%s) update old_tile:%s new_tile:%s', req.worker_id, req.old_tile_id, req.new_tile_id)
+      util.log_debug('worker(%s) update old_tile:%s new_tile:%s', req.worker_id, req.old_tile_id, req.new_tile_id)
       for array in self._arrays:
         ex = array.blob_to_ex.get(req.old_tile_id)
         if ex is not None:
@@ -160,9 +160,8 @@ class Master(object):
       if len(slow_worker[1].kernel_remain_tiles) == 0: break
         
       tile_id = slow_worker[1].kernel_remain_tiles[0]
-      #util.log_warn('try tile:%s', tile_id)
       if self._ctx.cancel_tile(slow_worker[0], tile_id):
-        util.log_warn('move tile:%s from worker(%s) to worker(%s)', tile_id, slow_worker[0], req.worker_id)
+        util.log_debug('move tile:%s from worker(%s) to worker(%s)', tile_id, slow_worker[0], req.worker_id)
         slow_worker[1].kernel_remain_tiles.remove(tile_id)
         resp = core.TileIdMessage(tile_id=tile_id)
         handle.done(resp)
