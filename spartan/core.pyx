@@ -47,42 +47,41 @@ cdef class WorkerStatus(object):
   cdef public int num_processors
   cdef public float mem_usage, cpu_usage
   cdef public double last_report_time
-  cdef public list task_reports, task_failures
+  cdef public list kernel_remain_tiles, task_failures
   
-  def __init__(self, phy_memory, num_processors, mem_usage, cpu_usage, last_report_time, task_reports, task_failures):
+  def __init__(self, phy_memory, num_processors, mem_usage, cpu_usage, last_report_time, 
+  			   kernel_remain_tiles, task_failures):
     self.total_physical_memory = phy_memory
     self.num_processors = num_processors
     self.mem_usage = mem_usage
     self.cpu_usage = cpu_usage
     self.last_report_time = last_report_time
-    self.task_reports = task_reports
+    self.kernel_remain_tiles = kernel_remain_tiles
     self.task_failures = task_failures
 
   def __reduce__(self):
     return (WorkerStatus, (self.total_physical_memory, self.num_processors, 
                            self.mem_usage, self.cpu_usage, self.last_report_time, 
-                           self.task_reports, self.task_failures))
+                           self.kernel_remain_tiles, self.task_failures))
       
-  def update_status(self, mem_usage, cpu_usage, report_time):
+  def update_status(self, mem_usage, cpu_usage, report_time, kernel_remain_tiles):
     self.mem_usage = mem_usage
     self.cpu_usage = cpu_usage
     self.last_report_time = report_time
-
-  def add_task_report(self, task_req, start_time, finish_time):
-    self.task_reports.append({'task':task_req.get_content(), 'start_time':start_time, 'finish_time':finish_time})
+    self.kernel_remain_tiles = kernel_remain_tiles
   
   def add_task_failure(self, task_req):
-    self.task_failures.append(task_req.get_content())
+    self.task_failures.append(task_req)
     
   def clean_status(self):
-    self.task_reports = []
+    self.kernel_remain_tiles = []
     self.task_failures = []
     
   def __repr__(WorkerStatus self):
-    return 'WorkerStatus:total_phy_mem:%s num_processors:%s mem_usage:%s cpu_usage:%s task_reports:%s task_failures:%s' % (
+    return 'WorkerStatus:total_phy_mem:%s num_processors:%s mem_usage:%s cpu_usage:%s remain_tiles:%s task_failures:%s' % (
                   str(self.total_physical_memory), str(self.num_processors), 
                   str(self.mem_usage), str(self.cpu_usage), 
-                  str(self.task_reports), str(self.task_failures))
+                  str(self.kernel_remain_tiles), str(self.task_failures))
     
 class Message(Node):
   '''Base class for all RPC messages.'''
@@ -194,7 +193,7 @@ class CreateTileReq(Message):
   tile_id = Instance(TileId)
   data = Instance(Tile)
 
-class CreateTileResp(Message):
+class TileIdMessage(Message):
   #_members = ['tile_id']
   tile_id = Instance(TileId)
 
@@ -203,6 +202,12 @@ class HeartbeatReq(Message):
   worker_id = Int
   worker_status = Instance(WorkerStatus)
 
+class UpdateAndApplyNewTileReq(Message):
+  #_members = ['worker_id', 'old_tile_id', 'new_tile_id']
+  worker_id = Int
+  old_tile_id = Instance(TileId)
+  new_tile_id = Instance(TileId)
+  
 class TileOpReq(Message):
   #_members = ['tile_id', 'fn']
   tile_id = Instance(TileId)

@@ -32,7 +32,7 @@ import os
 import numpy as np
 
 #timeout for hearbeat messsage
-HEARTBEAT_TIMEOUT=10
+HEARTBEAT_TIMEOUT=100
 _init_lock = rlock.FastRLock()
 
 class Worker(object):
@@ -75,6 +75,7 @@ class Worker(object):
       threading.current_thread()._children = weakref.WeakKeyDictionary()
     
     self._kernel_threads = ThreadPool(processes=1)
+    self._kernel_remain_tiles = []
     
     if FLAGS.profile_worker:
       import yappi
@@ -141,13 +142,13 @@ class Worker(object):
         id = req.tile_id
   
       self._blobs[id] = req.data
-      resp = core.CreateTileResp(tile_id=id)
+    resp = core.TileIdMessage(tile_id=id)
     handle.done(resp)
 
   def tile_op(self, req, handle):
     resp = core.RunKernelResp(result=req.fn(self._blobs[req.tile_id]))
     handle.done(resp)
-        
+
   def destroy(self, req, handle):
     '''
     Delete zero or more blobs.
@@ -211,7 +212,20 @@ class Worker(object):
     else:
       resp = core.GetResp(data=self._blobs[req.id].data.flatten()[req.subslice])
       handle.done(resp)
-      
+
+  def cancel_tile(self, req, handle):
+    '''
+    Cancel the tile from the kernel remain tile list. The tile will not be executed in this worker.
+    
+    :param req: `TileIdMessage`
+    :param handle: `PendingRequest`
+    '''
+    try:
+      self._kernel_remain_tiles.remove(req.tile_id)
+      handle.done(True)
+    except:
+      handle.done(False)
+
   def _run_kernel(self, req, handle):
     '''
     Run a kernel over the tiles resident on this worker.
@@ -228,31 +242,48 @@ class Worker(object):
       blob_ctx.set(self._ctx)
       results = {}
       for tile_id in req.blobs:
-        #util.log_info('%s %s', tile_id, tile_id in self._blobs)
-        if tile_id in self._blobs:
-          #util.log_info('W%d kernel start', self.id)
-          blob = self._blobs[tile_id]
-          map_result = req.mapper_fn(tile_id, blob, **req.kw)
-          results[tile_id] = map_result.result
-          
-          if map_result.futures is not None:
-            futures.append(map_result.futures)
+        if tile_id.worker == self.id:
+          self._kernel_remain_tiles.append(tile_id)
+    
+      # sort all tiles
+      self._kernel_remain_tiles.sort(key=lambda x: np.size(self._blobs[x].data))
+      
+      while len(self._kernel_remain_tiles) > 0:
+        tile_id = self._kernel_remain_tiles.pop()
 
+        blob = self._blobs[tile_id]
+        map_result = req.mapper_fn(tile_id, blob, **req.kw)
+        results[tile_id] = map_result.result
           
-          #util.log_info('W%d kernel finish', self.id)
+        if map_result.futures is not None:
+          futures.append(map_result.futures)
       
       # wait for all kernel update operations to finish
-#       util.log_warn('Waiting for %s futures', len(futures))
       rpc.wait_for_all(futures) 
+      
+      if FLAGS.load_balance:
+        tile_id = self._ctx.update_and_apply_new_tile(None, None).tile_id
+        while tile_id is not None:
+          blob = self._ctx.get(tile_id, None)
+          map_result = req.mapper_fn(tile_id, blob, **req.kw)
+          with self._lock:
+            id = self._ctx.new_tile_id()
+            self._blobs[id] = blob
+          results[id] = map_result.result
+          if map_result.futures is not None:
+            rpc.wait_for_all(map_result.futures)
+             
+          tile_id = self._ctx.update_and_apply_new_tile(tile_id, id).tile_id
+        
+      finish_time = time.time()
       handle.done(results)
     except:
       util.log_warn('Exception occurred during kernel call', exc_info=1)
       self.worker_status.add_task_failure(req)
       handle.exception()
-    
-    finish_time = time.time()
-    self.worker_status.add_task_report(req, start_time, finish_time)
-
+      
+    util.log_warn('worker(%s) kernel run time:%s', self.id, finish_time - start_time)
+     
   def run_kernel(self, req, handle):
     '''
     Run a kernel on tiles local to this worker.
@@ -307,7 +338,7 @@ class Worker(object):
         time.sleep(0.1)
         continue
       
-      self.worker_status.update_status(psutil.virtual_memory().percent, psutil.cpu_percent(), now)
+      self.worker_status.update_status(psutil.virtual_memory().percent, psutil.cpu_percent(), now, self._kernel_remain_tiles)
       future = self._ctx.heartbeat(self.worker_status, HEARTBEAT_TIMEOUT)  
       try:
         future.wait()
