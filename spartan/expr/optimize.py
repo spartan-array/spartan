@@ -179,6 +179,9 @@ class ReduceMapFusion(OptimizePass):
       if not isinstance(v, (MapExpr, ParakeetExpr)):
         return expr.visit(self)
 
+      if isinstance(v, MapExpr) and v.op.fn in _not_idempotent:
+        return expr.visit(self)
+      
     combined_op = LocalReduceExpr(fn=expr.op.fn,
                                   kw=expr.op.kw,
                                   deps=[expr.op.deps[0]])

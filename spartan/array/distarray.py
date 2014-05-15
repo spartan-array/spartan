@@ -262,7 +262,7 @@ class DistArrayImpl(DistArray):
     for ex in self.tiles.iterkeys():
       scounts[ex.shape] += 1
     
-    return sorted(scounts.items(), key=lambda kv: kv[1])[-1][0]
+    return sorted(scounts.items(), key=lambda kv: (kv[1], kv[0]))[-1][0]
 
   def foreach_tile(self, mapper_fn, kw=None):
     ctx = blob_ctx.get()

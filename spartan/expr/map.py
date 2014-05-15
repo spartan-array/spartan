@@ -95,6 +95,11 @@ class MapExpr(Expr):
   child_to_var = Instance(list)
   op = Instance(LocalExpr) 
 
+  def __init__(self, *args, **kw):
+    super(MapExpr, self).__init__(*args, **kw)
+    from .optimize import _not_idempotent
+    self.needs_cache = self.op.fn in _not_idempotent
+    
   def pretty_str(self):
     return 'Map(%s, %s)' % (self.op.pretty_str(),
                             indent(self.children.pretty_str()))

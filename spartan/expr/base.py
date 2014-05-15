@@ -179,9 +179,6 @@ class Expr(Node):
     If a cached value is not available, or the cached array is
     invalid (missing tiles), returns None. 
     '''
-    if not FLAGS.optimization or not FLAGS.opt_expression_cache:
-      return None
-
     result = eval_cache.get(self.expr_id)
     if result is not None and len(result.bad_tiles) == 0:
       return result
@@ -252,7 +249,8 @@ class Expr(Node):
       self.stack_trace = ExprTrace()
 
     eval_cache.register(self.expr_id)
-
+    self.needs_cache = self.needs_cache and FLAGS.optimization and FLAGS.opt_expression_cache
+    
   def evaluate(self):
     '''
     Evaluate an `Expr`.  

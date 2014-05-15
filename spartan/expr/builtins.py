@@ -58,7 +58,7 @@ def _make_sparse_rand(input,
                  format=format,
                  dtype=dtype)
 
-@not_idempotent
+@disable_parakeet
 def _make_sparse_diagonal(tile, ex):
   data = sp.lil_matrix(ex.shape, dtype=tile.dtype)
 
