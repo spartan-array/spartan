@@ -21,7 +21,7 @@ from ..array import distarray, tile
 from spartan.node import indent
 from ..util import Assert
 from .base import ListExpr, Expr, as_array
-from .local import LocalExpr, LocalCtx, make_var, LocalInput, LocalMapExpr
+from .local import LocalExpr, FnCallExpr, LocalCtx, make_var, LocalInput, LocalMapExpr
 from ..core import LocalKernelResult
 from traits.api import Instance, List, HasTraits, PythonValue
 from . import broadcast
