@@ -29,22 +29,18 @@ import __builtin__
 def _make_ones(input): return np.ones(input.shape, input.dtype)
 def _make_zeros(input): return np.zeros(input.shape, input.dtype)
 
-@not_idempotent
 @disable_parakeet
 def _make_rand(input):
   return np.random.rand(*input.shape)
 
-@not_idempotent
 @disable_parakeet
 def _make_randn(input):
   return np.random.randn(*input.shape)
 
-@not_idempotent
 @disable_parakeet
 def _make_randint(input, low=0, high=10):
   return np.random.randint(low, high, size=input.shape)
 
-@not_idempotent
 @disable_parakeet
 def _make_sparse_rand(input, 
                       density=None, 
@@ -70,7 +66,8 @@ def _make_sparse_diagonal(tile, ex):
       data[j - ex.ul[0], j - ex.ul[1]] = 1
 
   return [(ex, data)]
-  
+
+@not_idempotent
 def rand(*shape, **kw):
   '''
   Return a random array sampled from the uniform distribution on [0, 1).
@@ -88,7 +85,7 @@ def rand(*shape, **kw):
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
              fn=_make_rand)
 
-
+@not_idempotent
 def randn(*shape, **kw):
   '''
   Return a random array sampled from the standard normal distribution.
@@ -103,6 +100,7 @@ def randn(*shape, **kw):
   for s in shape: assert isinstance(s, int)
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randn) 
 
+@not_idempotent
 def randint(*shape, **kw):
   '''
   Return a random integer array from the "discrete uniform" distribution in the interval [`low`, `high`).
@@ -119,6 +117,7 @@ def randint(*shape, **kw):
   for s in shape: assert isinstance(s, int)
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randint, fn_kw=kw) 
 
+@not_idempotent
 def sparse_rand(shape, 
                 density=0.001,
                 format='lil',
