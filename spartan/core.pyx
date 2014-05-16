@@ -202,7 +202,7 @@ class HeartbeatReq(Message):
   worker_id = Int
   worker_status = Instance(WorkerStatus)
 
-class UpdateAndApplyNewTileReq(Message):
+class UpdateAndStealTileReq(Message):
   #_members = ['worker_id', 'old_tile_id', 'new_tile_id']
   worker_id = Int
   old_tile_id = Instance(TileId)

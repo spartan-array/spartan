@@ -136,7 +136,16 @@ class Master(object):
       if now - self._worker_statuses[worker_id].last_report_time > FLAGS.heartbeat_interval * FLAGS.worker_failed_heartbeat_threshold:
         self.mark_failed_worker(worker_id)
        
-  def update_and_apply_new_tile(self, req, handle):
+  def maybe_steal_tile(self, req, handle):
+    '''
+    This is called when a worker has finished processing all of it's current tiles,
+    and is looking for more work to do. 
+    We check if there are any outstanding tiles on existing workers to steal from.
+    
+    Args:
+      req (UpdateAndStealTileReq):
+      handle (PendingRequest):
+    '''
     self._worker_statuses[req.worker_id].kernel_remain_tiles = []
     
     # update the migrated tile

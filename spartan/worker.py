@@ -261,8 +261,11 @@ class Worker(object):
       # wait for all kernel update operations to finish
       rpc.wait_for_all(futures) 
       
+      # We've finished processing our local set of tiles.  
+      # If we are load balancing, check with the master if it's possible to steal
+      # a tile from another worker.
       if FLAGS.load_balance:
-        tile_id = self._ctx.update_and_apply_new_tile(None, None).tile_id
+        tile_id = self._ctx.maybe_steal_tile(None, None).tile_id
         while tile_id is not None:
           blob = self._ctx.get(tile_id, None)
           map_result = req.mapper_fn(tile_id, blob, **req.kw)
@@ -273,7 +276,7 @@ class Worker(object):
           if map_result.futures is not None:
             rpc.wait_for_all(map_result.futures)
              
-          tile_id = self._ctx.update_and_apply_new_tile(tile_id, id).tile_id
+          tile_id = self._ctx.maybe_steal_tile(tile_id, id).tile_id
         
       finish_time = time.time()
       handle.done(results)
