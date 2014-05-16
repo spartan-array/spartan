@@ -93,8 +93,8 @@ class MapExpr(Expr):
   '''
   children = Instance(ListExpr)
   child_to_var = Instance(list)
-  op = Instance(LocalExpr) 
-
+  op = Instance(LocalExpr)
+    
   def pretty_str(self):
     return 'Map(%s, %s)' % (self.op.pretty_str(),
                             indent(self.children.pretty_str()))
