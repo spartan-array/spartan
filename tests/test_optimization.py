@@ -5,7 +5,7 @@ import numpy as np
 from scipy import sparse as sp
 
 class TestOptimization(test_common.ClusterTest):
-  def test_optimization_nonordered(self):
+  def _test_optimization_nonordered(self):
     na = np.random.rand(1000, 1000)
     nb = np.random.rand(1000, 1000)
     a = expr.from_numpy(na)
@@ -81,7 +81,7 @@ class TestOptimization(test_common.ClusterTest):
 
     Assert.all_eq(nq, q.optimized().glom(), tolerance = 1e-10)
 
-  def test_optimization_ordered(self):
+  def _test_optimization_ordered(self):
     na = np.random.rand(1000, 1000)
     nb = np.random.rand(1000, 1000)
     a = expr.from_numpy(na)
