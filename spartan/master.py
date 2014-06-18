@@ -37,7 +37,6 @@ class Master(object):
     
     self._worker_statuses = {}
     self._worker_scores = {}
-    self._worker_avg_score = 0
     self._available_workers = []
     
     self._arrays = weakref.WeakSet()
@@ -91,7 +90,6 @@ class Master(object):
     self.init_worker_score(id, req.worker_status)
     
     if len(self._workers) == self.num_workers:
-      self.update_avg_score()
       threading.Thread(target=self._initialize).start()
   
   def register_array(self, array):
@@ -120,22 +118,6 @@ class Master(object):
     
   def update_worker_score(self, worker_id, worker_status):
     self._worker_statuses[worker_id] = worker_status
-    
-#     completed_task_number = len(worker_status.task_reports)
-#     worker_speed = 0
-#     if completed_task_number > 0:  
-#       for task in worker_status.task_reports:
-#         worker_speed += task['finish_time'] -task['start_time']
-#       worker_speed = completed_task_number / worker_speed
-#     
-#       self._worker_scores[worker_id] = worker_speed
-#       self.update_avg_score()
-  
-  def update_avg_score(self):
-    avg_score = 0
-    for score in self._worker_scores.values():
-      avg_score += score
-    self._worker_avg_score = avg_score / len(self._worker_scores)
           
   def get_worker_scores(self):
     return sorted(self._worker_scores.iteritems(), key=lambda x: x[1], reverse=True)
@@ -153,12 +135,50 @@ class Master(object):
     for worker_id in self._available_workers:
       if now - self._worker_statuses[worker_id].last_report_time > FLAGS.heartbeat_interval * FLAGS.worker_failed_heartbeat_threshold:
         self.mark_failed_worker(worker_id)
-  
-  def is_slow_worker(self, worker_id):
-    if self._worker_scores[worker_id] < self._worker_avg_score * 0.5:
-      return True
-    return False
-  
+       
+  def maybe_steal_tile(self, req, handle):
+    '''
+    This is called when a worker has finished processing all of it's current tiles,
+    and is looking for more work to do. 
+    We check if there are any outstanding tiles on existing workers to steal from.
+    
+    Args:
+      req (UpdateAndStealTileReq):
+      handle (PendingRequest):
+    '''
+    self._worker_statuses[req.worker_id].kernel_remain_tiles = []
+    
+    # update the migrated tile
+    if req.old_tile_id is not None:
+      util.log_debug('worker(%s) update old_tile:%s new_tile:%s', req.worker_id, req.old_tile_id, req.new_tile_id)
+      for array in self._arrays:
+        ex = array.blob_to_ex.get(req.old_tile_id)
+        if ex is not None:
+          array.tiles[ex] = req.new_tile_id
+          array.blob_to_ex[req.new_tile_id] = ex
+          
+          del array.blob_to_ex[req.old_tile_id]
+          self._ctx.destroy(req.old_tile_id)
+          break
+    
+    # apply a new tile for execution    
+    slow_workers = sorted(self._worker_statuses.iteritems(), 
+                          key=lambda x: len(x[1].kernel_remain_tiles), 
+                          reverse=True)
+    for slow_worker in slow_workers:
+      if len(slow_worker[1].kernel_remain_tiles) == 0: break
+        
+      tile_id = slow_worker[1].kernel_remain_tiles[0]
+      if self._ctx.cancel_tile(slow_worker[0], tile_id):
+        util.log_debug('move tile:%s from worker(%s) to worker(%s)', tile_id, slow_worker[0], req.worker_id)
+        slow_worker[1].kernel_remain_tiles.remove(tile_id)
+        resp = core.TileIdMessage(tile_id=tile_id)
+        handle.done(resp)
+        return
+ 
+    resp = core.TileIdMessage(tile_id=None)
+    handle.done(resp)
+    
   def heartbeat(self, req, handle):
     '''RPC method.
     
@@ -173,16 +193,11 @@ class Master(object):
     #util.log_info('Receive worker %d heartbeat.', req.worker_id)
     if req.worker_id >= 0 and self._initialized:     
       self.update_worker_score(req.worker_id, req.worker_status)
-#       util.log_info('Worker scores:%s', self._worker_scores)
-#       if self.is_slow_worker(req.worker_id):
-#         fast_worker = max(self._worker_scores.iteritems(), key=lambda x: x[1])[0]
-#         util.log_info('Slow worker: %d migrate to fast worker %d', req.worker_id, fast_worker)
       self.mark_failed_workers()
-    #util.log_info('available workers:%s', self._available_workers)
+      #util.log_info('available workers:%s', self._available_workers)
     
     resp = core.EmptyMessage()
     handle.done(resp)
-    #util.log_info('Finish worker %d heartbeat', req.worker_id)
       
   def _initialize(self):
     '''Sends an initialization request to all workers and waits 

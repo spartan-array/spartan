@@ -44,13 +44,15 @@ def disable_parakeet(fn):
   _parakeet_blacklist.add(fn)
   return fn
 
-_not_idempotent = set()
-
 def not_idempotent(fn):
-  "Disable map fusion for ``fn``."
-  _not_idempotent.add(fn)
-  return fn
-
+  "Force the result of not_idempotent ``fn`` to be evaluated at once."
+  def wrapped(*args, **kw):
+    result = fn(*args, **kw)
+    if isinstance(result, Expr):
+      result.needs_cache = True
+      result.force()
+    return result
+  return wrapped
 
 class OptimizePass(object):
   def __init__(self):
@@ -129,11 +131,6 @@ class MapMapFusion(OptimizePass):
         or isinstance(expr.op, local.ParakeetExpr)):
       return expr.visit(self)
 
-    if expr.op.fn in _not_idempotent:
-      util.log_info('Not idempotent: %s', expr.op.fn)
-      return expr.visit(self)
-
-
     #util.log_info('Original: %s', expr.op)
     children = []
     child_to_var = []
@@ -178,7 +175,7 @@ class ReduceMapFusion(OptimizePass):
     for v in old_children:
       if not isinstance(v, (MapExpr, ParakeetExpr)):
         return expr.visit(self)
-
+      
     combined_op = LocalReduceExpr(fn=expr.op.fn,
                                   kw=expr.op.kw,
                                   deps=[expr.op.deps[0]])

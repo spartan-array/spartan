@@ -202,6 +202,26 @@ class BlobCtx(object):
     req = core.HeartbeatReq(worker_id=self.worker_id, worker_status=worker_status)
     return self._send_to_worker(MASTER_ID, 'heartbeat', req, wait=False, timeout=timeout)
   
+  def maybe_steal_tile(self, old_tile_id, new_tile_id):
+    '''
+    Update the migrated tile info to distarray in master, and apply a new tile for execution.
+    
+    :param old_tile_id: the previous tile_id of the migrated tile.
+    :param new_tile_id: the new tile_id of the migrated tile.
+    '''
+    req = core.UpdateAndStealTileReq(worker_id=self.worker_id, old_tile_id=old_tile_id, new_tile_id=new_tile_id)
+    return self._send_to_worker(MASTER_ID, 'maybe_steal_tile', req)
+
+  def cancel_tile(self, worker_id, tile_id):
+    '''
+    Cancel the tile from the kernel remain tile list. The tile will not be executed in the specific worker.
+    
+    :param worker_id: the worker that the tile should be removed from.
+    :param tile_id: tile_id of the tile to be canceled.
+    '''
+    req = core.TileIdMessage(tile_id=tile_id)
+    return self._send_to_worker(worker_id, 'cancel_tile', req)
+
   def create(self, data, hint=None, timeout=None):
     '''
     Create a new tile to hold ``data``.
