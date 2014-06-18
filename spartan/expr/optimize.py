@@ -316,7 +316,8 @@ class ParakeetGeneration(OptimizePass):
     # it is not worth to do code generation.
     if not has_fncallexpr and len(expr.op.deps) <= 2:
       return False
-    return True
+    else:
+      return True
 
   def visit_MapExpr(self, expr):
     # if we've already converted this to parakeet, stop now
@@ -375,6 +376,7 @@ class RotateSlice(OptimizePass):
   (a + b)[slice] -> broadcast(a, shape)[slice] + broadcast(b, shape)[slice]
   '''
   name = 'rotate_slice'
+  rotated = {}
 
   def visit_SliceExpr(self, slice_expr):
     'Rotate this slice with a child map expression.'
@@ -391,18 +393,42 @@ class RotateSlice(OptimizePass):
     Assert.iterable(map_expr.children)
     map_children = self.visit(map_expr.children)
 
+
     children = []
     for child_expr in map_children:
-      children.append(SliceExpr(src=child_expr,
-                                idx=slice_expr.idx,
-                                broadcast_to=map_shape))
+      child = SliceExpr(src=child_expr,
+                        idx=slice_expr.idx,
+                        broadcast_to=map_shape)
+      if isinstance(child_expr, MapExpr):
+        # If the child is a Map, RotateSlice should traverse it again. Some
+        # nodes may be traversed several times. For current implementation,
+        # traversing a node several times dones't cause any problem for
+        # RotationSlice.
+        if self.visited.get(child_expr, None) != None:
+          del self.visited[child_expr]
+        child = self.visit(child)
 
-    return expr_like(map_expr,
+      children.append(child)
+
+    if self.rotated.get(map_expr, None) == True:
+      # If this Map has been rotated, we should create a new MapExpr.
+      # An example is :
+      #    c = a + b
+      #    d = c[1:50]
+      #    e = c[2:51]
+      # In this example, RotateSlice first rotate c[2:51] to a and b.
+      # When RotateSlice rotates c[1:50] to a and b, it should create
+      # a new Map expr(+) for a[1:50] and b[1:50]
+      return MapExpr(children=ListExpr(vals=children),
+                     op=map_expr.op,
+                     child_to_var=map_expr.child_to_var)
+    else:
+      self.rotated[map_expr] = True
+      return expr_like(map_expr,
                      op=map_expr.op,
                      children=ListExpr(vals=children),
                      child_to_var=map_expr.child_to_var,
                      trace=map_expr.stack_trace)
-
 
 
 def apply_pass(klass, dag):
@@ -443,8 +469,8 @@ def add_optimization(klass, default):
 
 
 add_optimization(CollapsedCachedExpressions, True)
-add_optimization(MapMapFusion, True)
 add_optimization(RotateSlice, True)
+add_optimization(MapMapFusion, True)
 if parakeet is not None:
   add_optimization(ParakeetGeneration, True)
 add_optimization(ReduceMapFusion, True)
