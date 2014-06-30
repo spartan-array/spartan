@@ -13,7 +13,12 @@ array backend across multiple machines.
 
 #### From source
 
+    pip install --user dsltools
+    pip install --user pyzmq
     pip install --user cython
+    pip install --user parakeet
+    pip install --user scikit-learn
+    pip install --user traits
     git clone http://github.com/rjpower/spartan.git
     cd spartan
     python setup.py develop --user
