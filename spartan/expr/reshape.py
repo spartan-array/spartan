@@ -58,6 +58,7 @@ class Reshape(distarray.DistArray):
     self.shape = shape
     self.dtype = base.dtype
     self.sparse = self.base.sparse
+    self.tiles = self.base.tiles
     self.bad_tiles = []
     self._tile_shape = distarray.good_tile_shape(shape,
                                                  master.get().num_workers * 4)
@@ -101,6 +102,7 @@ class Reshape(distarray.DistArray):
     kw['array'] = self
     kw['user_fn'] = mapper_fn
 
+    assert getattr(self.base, 'tiles', None) != None, "Reshape's base must have tiles"
     if self._same_tiles:
       tiles = self.base.tiles.values()
     else:
