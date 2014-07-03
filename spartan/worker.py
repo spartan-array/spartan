@@ -22,7 +22,7 @@ import sys
 import threading
 import time
 
-from . import config, util, rpc, core, blob_ctx
+from . import config, util, rpc, core, blob_ctx, sparse
 from .config import FLAGS, StrFlag, IntFlag, BoolFlag
 from .rpc import zeromq, TimeoutException, rlock
 from .util import Assert
@@ -30,6 +30,7 @@ import psutil
 import weakref
 import os
 import numpy as np
+import scipy
 
 #timeout for hearbeat messsage
 HEARTBEAT_TIMEOUT=100
@@ -241,6 +242,7 @@ class Worker(object):
     try:
       blob_ctx.set(self._ctx)
       results = {}
+        
       for tile_id in req.blobs:
         if tile_id.worker == self.id:
           self._kernel_remain_tiles.append(tile_id)
@@ -260,11 +262,20 @@ class Worker(object):
       
       # wait for all kernel update operations to finish
       rpc.wait_for_all(futures) 
-      
+      if 'fn_kw' in req.kw and 'local_reduction' in req.kw['fn_kw']:
+        target = req.kw['target']
+        ex = results.values()[0]
+        new_rows, new_cols, new_data = sparse.generate_reduction_data()
+        v = scipy.sparse.coo_matrix((new_data, (new_rows, new_cols)), shape=target.shape, dtype=target.dtype)
+        target.update(ex, v)
+        
       # We've finished processing our local set of tiles.  
       # If we are load balancing, check with the master if it's possible to steal
       # a tile from another worker.
       if FLAGS.load_balance:
+        if 'fn_kw' in req.kw and 'local_reduction' in req.kw['fn_kw']:
+          del req.kw['fn_kw']['local_reduction']
+
         tile_id = self._ctx.maybe_steal_tile(None, None).tile_id
         while tile_id is not None:
           blob = self._ctx.get(tile_id, None)
@@ -277,15 +288,14 @@ class Worker(object):
             rpc.wait_for_all(map_result.futures)
              
           tile_id = self._ctx.maybe_steal_tile(tile_id, id).tile_id
-        
-      finish_time = time.time()
+      
       handle.done(results)
     except:
       util.log_warn('Exception occurred during kernel call', exc_info=1)
       self.worker_status.add_task_failure(req)
       handle.exception()
       
-    util.log_debug('worker(%s) kernel run time:%s', self.id, finish_time - start_time)
+    util.log_warn('worker(%s) kernel run time:%s', self.id, time.time() - start_time)
      
   def run_kernel(self, req, handle):
     '''

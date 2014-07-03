@@ -82,6 +82,7 @@ setup(
               language='c++', 
               extra_compile_args=["-std=c++0x"], 
               extra_link_args=["-std=c++11"]),
+              #extra_link_args=["-x c++"]),
     Extension('spartan.array.extent', ['spartan/array/extent' + suffix]),
     Extension('spartan.array.tile', ['spartan/array/tile' + suffix]),
   ],

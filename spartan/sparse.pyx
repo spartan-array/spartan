@@ -8,6 +8,7 @@ import scipy.sparse
 cimport numpy as np
 cimport cython
 from datetime import datetime
+from spartan import util
 
 ctypedef np.float32_t DTYPE_FLT
 ctypedef np.int32_t DTYPE_INT
@@ -17,6 +18,8 @@ cdef public enum Reducers:
   REDUCE_MUL = 1
   REDUCE_NONE = 2
   
+cdef unordered_map[DTYPE_INT, DTYPE_FLT]* result = new unordered_map[DTYPE_INT, DTYPE_FLT]()
+ 
 @cython.boundscheck(False) # turn of bounds-checking for entire function
 cpdef sparse_to_dense_update(np.ndarray[ndim=2, dtype=DTYPE_FLT] target, 
                              np.ndarray[ndim=2, dtype=np.uint8_t, cast=True] mask, 
@@ -36,7 +39,7 @@ cpdef sparse_to_dense_update(np.ndarray[ndim=2, dtype=DTYPE_FLT] target,
         target[rows[i], cols[i]] = target[rows[i], cols[i]] + data[i]
       elif reducer == REDUCE_MUL:
         target[rows[i], cols[i]] = target[rows[i], cols[i]] * data[i]
-    
+          
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
 def dot_coo_dense_dict(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not None):
     """Multiply a sparse coo matrix by a dense vector
@@ -99,6 +102,62 @@ def dot_coo_dense_dict(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not Non
 
     return scipy.sparse.coo_matrix((new_data, (new_rows, new_cols)), shape=(X.shape[0], 1))
 
+@cython.boundscheck(False)
+cpdef generate_reduction_data():
+    cdef int size = result.size()
+    
+    util.log_warn('reduction: local_result:%s', size)
+    
+    cdef np.ndarray[DTYPE_INT] new_rows = numpy.zeros(size, dtype=numpy.int32)
+    cdef np.ndarray[DTYPE_INT] new_cols = numpy.zeros(size, dtype=numpy.int32)
+    cdef np.ndarray[DTYPE_FLT] new_data = numpy.zeros(size, dtype=numpy.float32)
+  
+    cdef unordered_map[DTYPE_INT, DTYPE_FLT].iterator iter = result.begin()
+    cdef int i = 0
+    while iter != result.end():
+        new_rows[i] = deref(iter).first
+        i = i + 1
+        inc(iter)
+    
+    new_rows.sort()
+    
+    for i in xrange(size):
+      new_data[i] = result[0][new_rows[i]]
+        
+    result.clear()
+    
+    return new_rows, new_cols, new_data
+  
+@cython.boundscheck(False) # turn of bounds-checking for entire function   
+cpdef dot_coo_dense_unordered_map_new(X, np.ndarray[ndim=2, dtype=DTYPE_FLT] W):
+    """Multiply a sparse coo matrix by a dense vector
+    
+    Parameters
+    ----------
+    X : scipy.sparse.coo_matrix
+        A sparse matrix, of size N x M
+    W : np.ndarray[dtype=DTYPE_FLT, ndim=1]
+        A dense vector, of size M.
+        
+    Returns
+    -------
+    A : coo matrix, the result of multiplying X by W.
+    """
+
+    #if X.shape[1] != W.shape[0] and W.shape[1] != 1:
+    #    raise ValueError('Matrices are not aligned!')
+      
+    cdef np.ndarray[DTYPE_INT, ndim=1] rows = X.row
+    cdef np.ndarray[DTYPE_INT, ndim=1] cols = X.col
+    cdef np.ndarray[DTYPE_FLT, ndim=1] data = X.data
+    
+    cdef int i
+          
+    for i in xrange(rows.size):
+        result[0][rows[i]] += data[i] * W[cols[i], 0]
+    
+    return None
+  
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
 def dot_coo_dense_unordered_map(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not None):
     """Multiply a sparse coo matrix by a dense vector

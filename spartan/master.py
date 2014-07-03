@@ -170,7 +170,7 @@ class Master(object):
         
       tile_id = slow_worker[1].kernel_remain_tiles[0]
       if self._ctx.cancel_tile(slow_worker[0], tile_id):
-        util.log_debug('move tile:%s from worker(%s) to worker(%s)', tile_id, slow_worker[0], req.worker_id)
+        util.log_warn('move tile:%s from worker(%s) to worker(%s)', tile_id, slow_worker[0], req.worker_id)
         slow_worker[1].kernel_remain_tiles.remove(tile_id)
         resp = core.TileIdMessage(tile_id=tile_id)
         handle.done(resp)
