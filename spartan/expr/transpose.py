@@ -13,10 +13,12 @@ from ..core import LocalKernelResult
 from .shuffle import target_mapper
 from traits.api import Instance, PythonValue
 
-def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
-  base_ex = array.base.extent_for_blob(tile_id)
-  ex = extent.create(base_ex.ul[::-1], base_ex.lr[::-1], array.shape)
-  return user_fn(ex, **kw)
+def _tile_mapper(ex, **kw):
+  user_fn = kw['_fn']
+  fn_kw = kw['_fn_kw']
+  base = kw['_base']
+  base_ex = extent.create(ex.ul[::-1], ex.lr[::-1], base.shape)
+  return user_fn(base_ex, **fn_kw)
 
 class Transpose(distarray.DistArray):
   '''Transpose the underlying array base.
@@ -36,21 +38,17 @@ class Transpose(distarray.DistArray):
     self.shape = self.base.shape[::-1]
     self.dtype = base.dtype
     self.sparse = self.base.sparse
+    self.tiles = base.tiles
     self.bad_tiles = []
 
   def tile_shape(self):
     return self.base.tile_shape()[::-1]
 
   def foreach_tile(self, mapper_fn, kw=None):
-    ctx = blob_ctx.get()
-
-    if kw is None: kw = {}
-    kw['array'] = self
-    kw['user_fn'] = mapper_fn
-
-    return ctx.map(self.base.tiles.values(),
-                   mapper_fn = _tile_mapper,
-                   kw=kw)
+    return self.base.foreach_tile(mapper_fn = _tile_mapper,
+                                  kw = {'_fn_kw' : kw,
+                                        '_base' : self,
+                                        '_fn' : mapper_fn})
 
   def fetch(self, ex):
     base_ex = extent.create(ex.ul[::-1], ex.lr[::-1], self.base.shape)
