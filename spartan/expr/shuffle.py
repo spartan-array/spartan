@@ -57,12 +57,11 @@ def target_mapper(ex, map_fn=None, source=None, target=None, fn_kw=None):
   futures = rpc.FutureGroup()
   if result is not None:
     for ex, v in result:
-      if v is not None:
-        #update_time, _ = util.timeit(lambda: target.update(ex, v))
-        futures.append(target.update(ex, v, wait=False))
+      #update_time, _ = util.timeit(lambda: target.update(ex, v))
+      futures.append(target.update(ex, v, wait=False))
   
 #   util.log_warn('%s futures', len(futures))
-  return LocalKernelResult(result=ex, futures=futures)
+  return LocalKernelResult(result=[], futures=futures)
 
 
 

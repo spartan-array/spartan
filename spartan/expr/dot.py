@@ -13,7 +13,7 @@ from .shuffle import target_mapper, notarget_mapper
 from ..core import LocalKernelResult
 from traits.api import PythonValue, HasTraits
 
-def _dot_mapper(inputs, ex, av, bv, local_reduction=None):
+def _dot_mapper(inputs, ex, av, bv):
   # read current tile of array 'a'
   ex_a = ex
   # fetch all column tiles of b that correspond to tile a's rows, i.e.
@@ -42,10 +42,7 @@ def _dot_mapper(inputs, ex, av, bv, local_reduction=None):
   #result = a.dot(b)
 
   if isinstance(a, sp.coo_matrix) and b.shape[1] == 1:
-    if local_reduction is None:
-      result = sparse.dot_coo_dense_unordered_map(a, b)
-    else:
-      result = sparse.dot_coo_dense_unordered_map_new(a, b)
+    result = sparse.dot_coo_dense_unordered_map(a, b)
   else:
     result = a.dot(b)
 
@@ -115,8 +112,7 @@ class DotExpr(Expr):
       target = distarray.create((av.shape[0], bv.shape[1]), dtype=av.dtype,
                                 tile_hint=tile_hint, reducer=np.add,
                                 sparse=sparse)
-      #fn_kw = dict(av = av, bv = bv)
-      fn_kw = dict(av = av, bv = bv, local_reduction=True)
+      fn_kw = dict(av = av, bv = bv)
       av.foreach_tile(mapper_fn = target_mapper,
                       kw = dict(map_fn=_dot_mapper,
                                 source=av,
