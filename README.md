@@ -5,6 +5,9 @@ build up array expressions (using Numpy-like operations).  These
 expressions are then compiled and optimized and run on a distributed
 array backend across multiple machines.
 
+Check out the
+[turorial on the wiki.](https://github.com/spartan-array/spartan/wiki/Tutorial)
+
 ## Installation
 
 #### From PyPi (not necessarily up-to-date)
@@ -19,7 +22,7 @@ array backend across multiple machines.
     pip install --user parakeet
     pip install --user scikit-learn
     pip install --user traits
-    git clone http://github.com/rjpower/spartan.git
+    git clone https://github.com/spartan-array/spartan.git
     cd spartan
     python setup.py develop --user
 
