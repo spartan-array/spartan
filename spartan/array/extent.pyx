@@ -94,8 +94,6 @@ cdef class TileExtent(object):
 
   def __hash__(self):
     return hash(self.ul)
-    #return hash(self.ul[-2:])
-    #return ravelled_pos(self.ul, self.array_shape)
     
   def __richcmp__(self, other, operation):
     if operation == 0 or operation == 4: # smaller or bigger

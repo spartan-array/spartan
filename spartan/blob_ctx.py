@@ -160,10 +160,6 @@ class BlobCtx(object):
     else:
       return self._send(tile_id, 'get_flatten', req, wait=False)
     
-#   def update(self, tile_id, data, reducer, wait=True):
-#     req = core.UpdateReq(id=tile_id, data=data, reducer=reducer)
-#     return self._send(tile_id, 'update', req, wait=wait)
-
   def update(self, tile_id, region, data, reducer, wait=True, timeout=None):
     '''
     Update ``region`` of ``tile_id`` with ``data``.

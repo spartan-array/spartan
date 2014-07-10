@@ -334,7 +334,6 @@ class DistArrayImpl(DistArray):
       tgt = np.ma.MaskedArray(np.ndarray(region.shape, dtype=self.dtype))
       tgt.mask = 0
     elif output_type == SPARSE:
-      #tgt = scipy.sparse.lil_matrix(region.shape, dtype=self.dtype)
       tgt = scipy.sparse.coo_matrix(region.shape, dtype=self.dtype)
       tgt = sparse.convert_sparse_array(tgt)
     else:
@@ -399,11 +398,6 @@ class DistArrayImpl(DistArray):
     result = sparse.multiple_slice(data, slices)
     
     for (tile_id, dst_slice, update_data) in result:
-        #update_data = sparse.slice(data, src_slice)       
-        #if update_data is not None:
-      #update_tile = tile.from_intersection(dst_key, intersection, data[src_slice])
-      #util.log_info('%s %s %s %s', dst_key.shape, intersection.shape, tile_id, update_tile)
-      #util.log_info("Updating %d tile %s with dst_ex %s intersection %s with data %s slice %s", len(splits), tile_id, dst_extent, intersection, data.nonzero()[0], data[src_slice].nonzero()[0])
       futures.append(ctx.update(tile_id,
                                 dst_slice, 
                                 update_data, 
@@ -526,9 +520,7 @@ def from_table(extents):
     key, tile_id = extents.iteritems().next()
     util.log_debug('%s :: %s', key, tile_id)
     
-    #dtype = blob_ctx.get().run_on_tile(tile_id, lambda t: t.dtype).wait()
     dtype, sparse = blob_ctx.get().tile_op(tile_id, lambda t: (t.dtype, t.type == tile.TYPE_SPARSE)).result
-    #dtype = None
   else:
     # empty table; default dtype.
     dtype = np.float
@@ -548,7 +540,6 @@ class LocalWrapper(DistArray):
     self.bad_tiles = []
     self._ex = extent.from_slice(np.index_exp[:], self.shape)
     Assert.isinstance(data, (np.ndarray, int, float))
-    #assert not isinstance(data, core.TileId)
     #print 'Wrapping: %s %s (%s)' % (data, type(data), np.isscalar(data))
     #print 'DATA: %s' % type(self._data)
 

@@ -272,7 +272,7 @@ def _parakeet_codegen(op):
     'import parakeet',
     'import spartan.expr',
     'import numpy',
-    'from spartan import mathlib',
+    'from spartan.expr import mathlib',
     'from spartan import util',
   ]
 
