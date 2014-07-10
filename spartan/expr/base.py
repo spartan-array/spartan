@@ -521,7 +521,7 @@ class DictExpr(CollectionExpr):
 
   def pretty_str(self):
     return '{ %s } ' % ',\n'.join(
-      ['%s : %s' % (k, v.pretty_str()) for k, v in self.vals])
+      ['%s : %s' % (k, repr(v)) for k, v in self.vals.iteritems()])
 
   def dependencies(self):
     return self.vals
