@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 /**
  * A `TileId` uniquely identifies a tile in a Spartan execution.
@@ -73,7 +74,7 @@ struct WorkerStatus {
         kernel_remain_tiles.clear();
     }
 
-    std::string to_string() {
+    std::string to_string() const {
         std::string str =  "WS:total_phy_mem:" + std::to_string(total_physical_memory) +
             " num_processors:" + std::to_string(num_processors) +
             " mem_usage:" + std::to_string(mem_usage) + " cpu_usage:" + std::to_string(cpu_usage) +
