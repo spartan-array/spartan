@@ -1,0 +1,28 @@
+#include "../core.h"
+
+%%
+
+namespace spartan
+
+abstract service Master {
+  fast reg(RegisterReq req | )
+  maybe_steal_tile(UpdateAndStealTileReq req | TileIdMessage resp)
+  heartbeat(HeartbeatReq req | )
+}
+
+abstract service Worker {
+  fast initialize(InitializeReq req | )
+  fast get_tile_info(TileIdMessage req | RunKernelResp resp)
+  create(CreateTileReq req | TileIdMessage resp)
+  fast destroy(DestroyReq req | )
+  update(UpdateReq req | )
+  get(GetReq req | GetResp resp)
+  get_flatten(GetReq req | GetResp resp)
+  cancel_tile(TileIdMessage req | i8 resp)
+  run_kernel(RunKernelReq req | RunKernelResp resp)
+  fast shutdown( | )
+}
+
+%%
+
+

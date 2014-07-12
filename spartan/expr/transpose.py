@@ -4,7 +4,6 @@ Transpose operation and expr.
 
 import numpy as np
 import scipy.sparse as sp
-from spartan import rpc
 from .base import Expr, lazify
 from .. import blob_ctx, util
 from ..util import is_iterable, Assert
