@@ -6,7 +6,8 @@
 #include <string>
 #include <sstream>
 #include <map>
-#include "config.h"
+#include "config_base.h"
+using config_base;
 
 
 Flags FLAGS; 
