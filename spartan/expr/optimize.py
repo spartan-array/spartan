@@ -475,5 +475,3 @@ if parakeet is not None:
   add_optimization(ParakeetGeneration, True)
 add_optimization(ReduceMapFusion, True)
 
-
-FLAGS.add(BoolFlag('optimization', default=True))

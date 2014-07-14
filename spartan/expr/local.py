@@ -177,6 +177,3 @@ class ParakeetExpr(LocalExpr):
     else:
       return fn(**kw_args)
 
-from spartan.config import FLAGS, BoolFlag
-FLAGS.add(BoolFlag('use_cuda', default=False))
-

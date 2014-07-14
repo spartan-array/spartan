@@ -41,7 +41,6 @@ class Flag(object):
   def _str(self):
     return str(self.val)
 
-
 class IntFlag(Flag):
   def parse(self, str):
     self.val = int(str)
@@ -69,13 +68,11 @@ class BoolFlag(Flag):
   def _str(self):
     return str(int(self.val))
 
-
 LOG_STR = {logging.DEBUG: 'DEBUG',
            logging.INFO: 'INFO',
            logging.WARN: 'WARN',
            logging.ERROR: 'ERROR',
            logging.FATAL: 'FATAL'}
-
 
 class LogLevelFlag(Flag):
   def parse(self, str):
@@ -84,10 +81,38 @@ class LogLevelFlag(Flag):
   def _str(self):
     return LOG_STR[self.val]
 
+class HostListFlag(config.Flag):
+  def parse(self, str):
+    hosts = []
+    for host in str.split(','):
+      hostname, count = host.split(':')
+      hosts.append((hostname, int(count)))
+    self.val = hosts
 
+  def _str(self):
+    return ','.join(['%s:%d' % (host, count) for host, count in self.val])
+
+class AssignMode(object):
+  BY_CORE = 1
+  BY_NODE = 2
+
+class AssignModeFlag(config.Flag):
+  def parse(self, option_str):
+    self.val = getattr(AssignMode, option_str)
+
+  def _str(self):
+    if self.val == AssignMode.BY_CORE: return 'BY_CORE'
+    return 'BY_NODE'
 
 class Flags(object):
   def __init__(self):
+    from config_base import get_flag_info
+    for flag in get_flag_info():
+      flag_obj = globals[flag[0]](flag[1], help=flag[3])
+      if flag[2] != '':
+        flag_obj.parse(flag[2])
+      self.add(flag_obj)
+
     self._parsed = False
     self._vals = {}
 
@@ -118,26 +143,6 @@ class Flags(object):
 
   def __iter__(self):
     return iter(self._vals.items())
-
-
-FLAGS = Flags()
-
-FLAGS.add(BoolFlag('print_options', default=False))
-FLAGS.add(BoolFlag('profile_worker', default=False))
-FLAGS.add(BoolFlag('profile_master', default=False))
-FLAGS.add(BoolFlag('cluster', default=False))
-FLAGS.add(LogLevelFlag('log_level', logging.INFO))
-FLAGS.add(IntFlag('num_workers', default=3))
-FLAGS.add(IntFlag('port_base', default=10000, help='Port master should listen on'))
-FLAGS.add(StrFlag('tile_assignment_strategy', default='round_robin', help='Decide tile to worker mapping (round_robin, random, performance)'))
-FLAGS.add(StrFlag('checkpoint_path', default='/tmp/spartan/checkpoint/', help='Path for saving checkpoint information'))
-FLAGS.add(IntFlag('default_rpc_timeout', default=60))
-FLAGS.add(IntFlag('max_zeromq_sockets', default=4096))
-
-FLAGS.add(BoolFlag('opt_keep_stack', default=False))
-FLAGS.add(BoolFlag('capture_expr_stack', default=False))
-FLAGS.add(BoolFlag('dump_timers', default=False))
-FLAGS.add(BoolFlag('load_balance', default=False))
 
 # print flags in sorted order
 # from http://stackoverflow.com/questions/12268602/sort-argparse-help-alphabetically

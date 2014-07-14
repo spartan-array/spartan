@@ -16,10 +16,8 @@ import time
 import traceback
 import numpy as np
 
-from spartan.config import FLAGS, BoolFlag
+from spartan.config import FLAGS
 
-
-FLAGS.add(BoolFlag('dump_timers', default=False))
 
 HOSTNAME = socket.gethostname()
 PID = os.getpid()

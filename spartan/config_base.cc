@@ -6,9 +6,8 @@
 #include <string>
 #include <sstream>
 #include <map>
+#include <Python.h>
 #include "config_base.h"
-using config_base;
-
 
 Flags FLAGS; 
 void init_flags(void) 
@@ -49,6 +48,8 @@ void init_flags(void)
     FLAGS.add(new BoolFlag("opt_expression_cache", "true", "Enable expression caching."));
 
     FLAGS.add(new BoolFlag("dump_timers", "false"));
+
+    FLAGS.add(new BoolFlag("use_cuda", "false"));
 }
 
 std::map<std::string, std::string> parse_argv(int argc, const char **argv)
@@ -72,6 +73,41 @@ std::map<std::string, std::string> parse_argv(int argc, const char **argv)
 
     return argv_map;
 }
+
+static PyObject* get_flags_info(PyObject *self, PyObject *args)
+{
+    if (!FLAGS.is_parsed()) {
+        init_flags();
+        FLAGS.set_parsed();
+    }
+
+    PyObject *list = PyList_New(FLAGS.get_flag_count());
+    Flag* flag;
+    int index = 0;
+    FLAGS.reset_next();
+    while ((flag = FLAGS.next()) != NULL) {
+        PyObject *o = Py_BuildValue("ssss",
+                                    flag->class_name.c_str(),
+                                    flag->name.c_str(),
+                                    flag->val_str.c_str(),
+                                    flag->help.c_str());
+        PyList_SET_ITEM(list, index++, o);
+    }
+
+    return list;
+}
+
+static PyMethodDef config_base_modules[] = {
+    {"get_flags_info", get_flags_info, METH_VARARGS, "Get all flags information"},
+    {NULL, NULL, 0, NULL}
+};
+
+PyMODINIT_FUNC
+initconfig_base(void)
+{
+    (void) Py_InitModule("config_base", config_base_modules);
+}
+
 
 /**
  * There are some assumptions for this function:

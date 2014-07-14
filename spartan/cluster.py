@@ -19,46 +19,9 @@ import shutil
 from spartan import rpc
 from spartan import config, util
 import spartan
-from spartan.config import FLAGS, BoolFlag, IntFlag
+from spartan.config import FLAGS
 import spartan.master
 import spartan.worker
-
-
-class HostListFlag(config.Flag):
-  def parse(self, str):
-    hosts = []
-    for host in str.split(','):
-      hostname, count = host.split(':')
-      hosts.append((hostname, int(count)))
-    self.val = hosts
-
-  def _str(self):
-    return ','.join(['%s:%d' % (host, count) for host, count in self.val])
-
-class AssignMode(object):
-  BY_CORE = 1
-  BY_NODE = 2
-
-class AssignModeFlag(config.Flag):
-  def parse(self, option_str):
-    self.val = getattr(AssignMode, option_str)
-
-  def _str(self):
-    if self.val == AssignMode.BY_CORE: return 'BY_CORE'
-    return 'BY_NODE'
-
-FLAGS.add(HostListFlag('hosts', default=[('localhost', 8)]))
-FLAGS.add(BoolFlag('xterm', default=False, help='Run workers in xterm'))
-FLAGS.add(BoolFlag('oprofile', default=False, help='Run workers inside of operf'))
-FLAGS.add(AssignModeFlag('assign_mode', default=AssignMode.BY_NODE))
-FLAGS.add(BoolFlag('use_single_core', default=True))
-
-FLAGS.add(BoolFlag(
-  'use_threads',
-  help='When running locally, use threads instead of forking. (slow, for debugging)',
-  default=True))
-FLAGS.add(IntFlag('heartbeat_interval', default=3, help='Heartbeat Interval in each worker'))
-FLAGS.add(IntFlag('worker_failed_heartbeat_threshold', default=10, help='the max number of heartbeat that a worker can delay'))
 
 def start_remote_worker(worker, st, ed):
   '''

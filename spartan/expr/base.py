@@ -18,8 +18,6 @@ from ..config import FLAGS, BoolFlag
 from ..rpc import TimeoutException
 from traits.api import Any, Instance, Int, PythonValue
 
-FLAGS.add(BoolFlag('opt_expression_cache', True, 'Enable expression caching.'))
-
 class NotShapeable(Exception):
   '''
   Thrown when the shape for an expression cannot be computed without 
