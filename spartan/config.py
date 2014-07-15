@@ -81,7 +81,7 @@ class LogLevelFlag(Flag):
   def _str(self):
     return LOG_STR[self.val]
 
-class HostListFlag(config.Flag):
+class HostListFlag(Flag):
   def parse(self, str):
     hosts = []
     for host in str.split(','):
@@ -96,7 +96,7 @@ class AssignMode(object):
   BY_CORE = 1
   BY_NODE = 2
 
-class AssignModeFlag(config.Flag):
+class AssignModeFlag(Flag):
   def parse(self, option_str):
     self.val = getattr(AssignMode, option_str)
 
@@ -106,15 +106,17 @@ class AssignModeFlag(config.Flag):
 
 class Flags(object):
   def __init__(self):
-    from config_base import get_flag_info
-    for flag in get_flag_info():
-      flag_obj = globals[flag[0]](flag[1], help=flag[3])
-      if flag[2] != '':
-        flag_obj.parse(flag[2])
-      self.add(flag_obj)
-
     self._parsed = False
     self._vals = {}
+
+    from config_base import get_flags_info
+    flags_info = get_flags_info()
+    for flag in flags_info:
+      flag_obj = globals()[flag[0]](flag[1], help=flag[3])
+      self.add(flag_obj)
+      if flag[2] != '':
+        flag_obj.parse(flag[2])
+
 
   def add(self, flag):
     self._vals[flag.name] = flag
@@ -143,6 +145,8 @@ class Flags(object):
 
   def __iter__(self):
     return iter(self._vals.items())
+
+FLAGS = Flags()
 
 # print flags in sorted order
 # from http://stackoverflow.com/questions/12268602/sort-argparse-help-alphabetically

@@ -108,7 +108,6 @@ initconfig_base(void)
     (void) Py_InitModule("config_base", config_base_modules);
 }
 
-
 /**
  * There are some assumptions for this function:
  *   1. This is only called from workers (the master should call python version).

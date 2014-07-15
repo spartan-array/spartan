@@ -19,7 +19,7 @@ import shutil
 from spartan import rpc
 from spartan import config, util
 import spartan
-from spartan.config import FLAGS
+from spartan.config import FLAGS, AssignMode
 import spartan.master
 import spartan.worker
 

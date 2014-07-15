@@ -16,6 +16,7 @@ import numpy as np
 from spartan import util
 from spartan.util import Assert
 from spartan.node import Node, indent
+from spartan.config import FLAGS
 from traits.api import Str, List, Function, PythonValue, Int
 
 var_id = iter(xrange(1000000))
