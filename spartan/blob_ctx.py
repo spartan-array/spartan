@@ -134,6 +134,7 @@ class BlobCtx(object):
       wait (boolean): Wait for this operation to finish before returning.
       timeout (float):
     '''
+    util.log_warn('subslice:%s', subslice)
     Assert.isinstance(tile_id, core.TileId)
     req = core.GetReq(id=tile_id, subslice=subslice)
 

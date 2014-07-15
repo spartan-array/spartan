@@ -5,6 +5,8 @@
 #include <vector>
 #include <map>
 
+#include "rpc/marshal.h"
+
 /**
  * A `TileId` uniquely identifies a tile in a Spartan execution.
  *
@@ -18,10 +20,6 @@ struct TileId {
 
     TileId() {}
 
-    int32_t hash() const {
-        return worker ^ id;
-    }
-
     bool operator==(const TileId & other) const {
         return worker == other.worker && id == other.id;
     }
@@ -30,6 +28,15 @@ struct TileId {
         return "B(" + std::to_string(worker) + "." + std::to_string(id) + ")";
     }
 };
+
+namespace std {
+    template <>
+    struct hash<TileId> {
+        std::size_t operator()(const TileId& k) const {
+            return (size_t)(k.worker ^ k.id);
+        }
+    };
+}
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const TileId& o) {
     m << o.worker;
@@ -106,6 +113,45 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, WorkerStatus& o) {
     return m;
 }
 
+struct Slice {
+    int64_t start;
+    int64_t stop;
+    int64_t step;
+
+    Slice(int64_t sta, int64_t sto, int64_t ste): start(sta), stop(sto), step(ste) {}
+    Slice() {}
+};
+
+inline rpc::Marshal& operator <<(rpc::Marshal& m, const Slice& o) {
+    m << o.start;
+    m << o.stop;
+    m << o.step;
+    return m;
+}
+
+inline rpc::Marshal& operator >>(rpc::Marshal& m, Slice& o) {
+    m >> o.start;
+    m >> o.stop;
+    m >> o.step;
+    return m;
+}
+
+struct SubSlice {
+    std::vector<Slice> slices;
+    SubSlice() {}
+};
+
+inline rpc::Marshal& operator <<(rpc::Marshal& m, const SubSlice& o) {
+    m << o.slices;
+    return m;
+}
+
+inline rpc::Marshal& operator >>(rpc::Marshal& m, SubSlice& o) {
+    m >> o.slices;
+    return m;
+}
+
+
 struct EmptyMessage {
 };
 
@@ -119,30 +165,27 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, EmptyMessage& o) {
 
 struct RegisterReq {
     std::string host;
-    int32_t port;
     WorkerStatus worker_status;
-    RegisterReq(std::string h, int32_t p, WorkerStatus& ws): host(h), port(p), worker_status(ws) {}
+    RegisterReq(const std::string h, const WorkerStatus& ws): host(h), worker_status(ws) {}
     RegisterReq() {}
 };
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const RegisterReq& o) {
     m << o.host;
-    m << o.port;
     m << o.worker_status;
     return m;
 }
 
 inline rpc::Marshal& operator >>(rpc::Marshal& m, RegisterReq& o) {
     m >> o.host;
-    m >> o.port;
     m >> o.worker_status;
     return m;
 }
 
 struct InitializeReq {
     int32_t id;
-    std::map<int32_t, std::string> peers;
-    InitializeReq(int32_t i, std::map<int32_t, std::string>& p): id(i), peers(p) {}
+    std::unordered_map<int32_t, std::string> peers;
+    InitializeReq(int32_t i, const std::unordered_map<int32_t, std::string>& p): id(i), peers(p) {}
     InitializeReq() {}
 };
 
@@ -160,8 +203,8 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, InitializeReq& o) {
 
 struct GetReq {
     TileId id;
-    std::string subslice;
-    GetReq(TileId& i, std::string& s): id(i), subslice(s) {}
+    SubSlice subslice;
+    GetReq(const TileId& i, const SubSlice& s): id(i), subslice(s) {}
     GetReq() {}
 };
 
@@ -182,7 +225,8 @@ struct GetResp {
     std::string& data;
     std::string new_data;
 
-    GetResp(TileId& i, std::string& d): id(i), data(d) {}
+    GetResp(const TileId& i, std::string& d): id(i), data(d) {}
+    GetResp(std::string& d): data(d) {}
     GetResp(): data(new_data) {}
 };
 
@@ -199,9 +243,10 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, GetResp& o) {
 }
 
 struct DestroyReq {
-    std::vector<TileId> ids;
+    std::vector<TileId>& ids;
+    std::vector<TileId> new_ids;
     DestroyReq(std::vector<TileId>& i): ids(i) {}
-    DestroyReq() {}
+    DestroyReq(): ids(new_ids) {}
 };
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const DestroyReq& o) {
@@ -216,12 +261,12 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, DestroyReq& o) {
 
 struct UpdateReq {
     TileId id;
-    std::string region;
+    SubSlice region;
     std::string& data;
     std::string new_data;
     int32_t reducer;
 
-    UpdateReq(TileId& i, std::string& r, std::string& d, int32_t red): id(i), region(r), data(d), reducer(red) {}
+    UpdateReq(const TileId& i, const SubSlice& r, std::string& d, int32_t red): id(i), region(r), data(d), reducer(red) {}
     UpdateReq(): data(new_data) {}
 };
 
@@ -242,12 +287,13 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, UpdateReq& o) {
 }
 
 struct RunKernelReq {
-    std::vector<TileId> blobs;
+    std::vector<TileId>& blobs;
+    std::vector<TileId> new_blobs;
     std::string& fn;
     std::string new_fn;
 
     RunKernelReq(std::vector<TileId>& b, std::string& f): blobs(b), fn(f) {}
-    RunKernelReq(): fn(new_fn) {}
+    RunKernelReq(): blobs(new_blobs), fn(new_fn) {}
 };
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const RunKernelReq& o) {
@@ -258,15 +304,16 @@ inline rpc::Marshal& operator <<(rpc::Marshal& m, const RunKernelReq& o) {
 
 inline rpc::Marshal& operator >>(rpc::Marshal& m, RunKernelReq& o) {
     m >> o.blobs;
-    m << o.fn;
+    m >> o.fn;
     return m;
 }
 
 struct RunKernelResp {
-    std::string result;
+    std::string& result;
+    std::string new_result;
 
     RunKernelResp(std::string& r): result(r) {}
-    RunKernelResp() {}
+    RunKernelResp(): result(new_result) {}
 };
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const RunKernelResp& o) {
@@ -282,7 +329,7 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, RunKernelResp& o) {
 struct CreateTileReq {
     TileId tile_id;
     //Tile data;
-    CreateTileReq(TileId& tid): tile_id(tid) {}
+    CreateTileReq(const TileId& tid): tile_id(tid) {}
     CreateTileReq() {}
 };
 
@@ -299,7 +346,7 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, CreateTileReq& o) {
 struct TileIdMessage {
     TileId tile_id;
 
-    TileIdMessage(TileId& tid): tile_id(tid) {}
+    TileIdMessage(const TileId& tid): tile_id(tid) {}
     TileIdMessage() {}
 };
 
@@ -317,7 +364,7 @@ struct HeartbeatReq {
     int32_t worker_id;
     WorkerStatus worker_status;
 
-    HeartbeatReq(int32_t wid, WorkerStatus& ws): worker_id(wid), worker_status(ws) {}
+    HeartbeatReq(int32_t wid, const WorkerStatus& ws): worker_id(wid), worker_status(ws) {}
     HeartbeatReq() {}
 };
 
@@ -338,7 +385,7 @@ struct UpdateAndStealTileReq {
     TileId old_tile_id;
     TileId new_tile_id;
 
-    UpdateAndStealTileReq(int32_t wid, TileId& oid, TileId& nid): worker_id(wid), old_tile_id(oid), new_tile_id(nid) {}
+    UpdateAndStealTileReq(int32_t wid, const TileId& oid, const TileId& nid): worker_id(wid), old_tile_id(oid), new_tile_id(nid) {}
     UpdateAndStealTileReq() {}
 };
 

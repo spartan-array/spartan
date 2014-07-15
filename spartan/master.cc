@@ -26,7 +26,12 @@ int main(int argc, char* argv[]) {
     Pthread_mutex_init(&g_stop_mutex, nullptr);
     Pthread_cond_init(&g_stop_cond, nullptr);
 
-    Master *w = new Master();
+    int32_t num_workers = 1;
+    if (argc >= 2) {
+        num_workers = atoi(argv[1]);
+    }
+
+    Master *w = new Master(num_workers);
     rpc::Server *server = new rpc::Server();
     server->reg(w);
 
