@@ -104,19 +104,29 @@ class AssignModeFlag(Flag):
     if self.val == AssignMode.BY_CORE: return 'BY_CORE'
     return 'BY_NODE'
 
+from libcpp.vector cimport vector
+from libc.string cimport const_char
+from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
+cdef extern from "cconfig.h":
+  cdef void get_flags_info(vector[const_char *] *list)
+  cdef void config_parse(int argc, const_char **argv)
+
 class Flags(object):
   def __init__(self):
     self._parsed = False
     self._vals = {}
 
-    from config_base import get_flags_info
-    flags_info = get_flags_info()
-    for flag in flags_info:
-      flag_obj = globals()[flag[0]](flag[1], help=flag[3])
+    cdef vector[const char*] *flags_info = new vector[const char*]()
+    get_flags_info(flags_info)
+    for i in range(0, flags_info.size(), step = 4):
+      flag_class = flags_info[i]
+      name = flags_info[i + 1]
+      default = flags_info[i + 2]
+      help_str = flags_info[i + 3]
+      flag_obj = globals()[flag_class](name, help=help_str)
       self.add(flag_obj)
-      if flag[2] != '':
-        flag_obj.parse(flag[2])
-
+      if default != '':
+        flag_obj.parse(default)
 
   def add(self, flag):
     self._vals[flag.name] = flag
@@ -162,13 +172,6 @@ class SortingHelpFormatter(HelpFormatter):
 def parse(argv):
   '''Parse configuration from flags and/or configuration file.'''
 
-  # load flags defined in other modules (is there a better way to do this?)
-  import spartan.expr.local
-  import spartan.expr.optimize
-  import spartan.cluster
-  import spartan.worker
-  import spartan.util
-
   if FLAGS._parsed:
     return
 
@@ -212,6 +215,14 @@ def parse(argv):
     if getattr(parsed_flags, name) is not None:
       #print >>sys.stderr, 'Parsing: %s : %s' % (name, getattr(parsed_flags, name))
       flag.parse(getattr(parsed_flags, name))
+
+  # Sorry, we need to do ugly code here to make sure we sync with C++'s FLAGS
+  cdef bytes py_bytes
+  cdef const_char **argv_str = <const_char**> PyMem_Malloc(len(argv) * sizeof(const_char*))
+  for i in range(len(argv)):
+    py_bytes = argv[i].encode()
+    argv_str[i] = py_bytes
+  config_parse(len(argv), argv_str)
 
   # reset loggers so that basic config works
   logging.root = logging.RootLogger(logging.WARNING)

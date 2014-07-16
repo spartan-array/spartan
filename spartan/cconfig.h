@@ -9,15 +9,15 @@
 #include <cassert>
 
 
-class Flag {
+class CFlag {
 public:
     std::string class_name;
     std::string name;
     std::string help;
     std::string val_str;
 
-    Flag() : name(""), help("") {};
-    Flag(std::string name, std::string default_val = "", std::string help = "") {
+    CFlag() : name(""), help("") {};
+    CFlag(std::string name, std::string default_val = "", std::string help = "") {
         this->name = name;
         this->help = help;
         this->val_str = default_val;
@@ -27,11 +27,11 @@ public:
     virtual void parse(std::string str) {return;};
 };
 
-class IntFlag : public Flag {
+class IntFlag : public CFlag {
 public:
     int val;
     IntFlag(std::string name, std::string default_val = "", std::string help = "")
-        : Flag(name, default_val, help) {
+        : CFlag(name, default_val, help) {
         parse(default_val);
         class_name = "IntFlag";
     };
@@ -42,11 +42,11 @@ public:
     int get(void) {return val;};
 };
 
-class StrFlag : public Flag {
+class StrFlag : public CFlag {
 public:
     std::string val;
     StrFlag(std::string name, std::string default_val = "", std::string help = "")
-        : Flag(name, default_val, help) {
+        : CFlag(name, default_val, help) {
         parse(default_val);
         class_name = "StrFlag";
     };
@@ -56,11 +56,11 @@ public:
     std::string get(void) {return val;};
 };
 
-class BoolFlag : public Flag {
+class BoolFlag : public CFlag {
 public:
     bool val;
     BoolFlag(std::string name, std::string default_val = "", std::string help = "")
-        : Flag(name, default_val, help) {
+        : CFlag(name, default_val, help) {
         parse(default_val);
         class_name = "BoolFlag";
     };
@@ -81,11 +81,12 @@ struct host {
     std::string name;
     int count;
 };
-class HostListFlag : public Flag {
+
+class HostListFlag : public CFlag {
 public:
     std::vector <struct host> val;
     HostListFlag(std::string name, std::string default_val = "", std::string help = "")
-        : Flag(name, default_val, help) {
+        : CFlag(name, default_val, help) {
         parse(default_val);
         class_name = "HostListFlag";
     };
@@ -121,12 +122,12 @@ enum LogLevel {
     LOGLEVEL_FATAL = 5,
 };
 
-class AssignModeFlag : public Flag {
+class AssignModeFlag : public CFlag {
 public:
     AssignMode val;
 
     AssignModeFlag(std::string name, std::string default_val = "", std::string help = "")
-        : Flag(name, default_val, help) {
+        : CFlag(name, default_val, help) {
         parse(default_val);
         class_name = "AssignModeFlag";
     };
@@ -142,11 +143,11 @@ public:
     AssignMode get(void) {return val;};
 };
 
-class LogLevelFlag : public Flag {
+class LogLevelFlag : public CFlag {
 public:
     LogLevel val;
     LogLevelFlag(std::string name, std::string default_val = "", std::string help = "")
-        : Flag(name, default_val, help) {
+        : CFlag(name, default_val, help) {
         parse(default_val);
         class_name = "LogLevelFlag";
     };
@@ -168,25 +169,25 @@ public:
     LogLevel get(void) {return val;};
 };
 
-class Flags {
+class CFlags {
 private:
     bool parsed;
-    std::map<std::string, Flag*> vals;
-    std::map<std::string, Flag*>::iterator next_it;
+    std::map<std::string, CFlag*> vals;
+    std::map<std::string, CFlag*>::iterator next_it;
 
 public:
-    Flags(void) {
+    CFlags(void) {
         parsed = false;
         next_it = vals.begin();
     };
 
-    ~Flags() {};
+    ~CFlags() {};
 
-    void add(Flag *flag) {
+    void add(CFlag *flag) {
         vals[flag->name] = flag;
     };
 
-    Flag* get(std::string keyword) {
+    CFlag* get(std::string keyword) {
         if (vals.find(keyword) != vals.end()) {
             return vals[keyword];
         } else {
@@ -194,11 +195,11 @@ public:
         }
     };
 
-    Flag* next(void) {
+    CFlag* next(void) {
         if (next_it == vals.end()) {
             return NULL;
         } else {
-            Flag *ret = next_it->second;
+            CFlag *ret = next_it->second;
             next_it++;
             return ret;
         }
@@ -223,5 +224,9 @@ public:
 };
 
 void init_flags(void);
-extern Flags FLAGS;
+
+void get_flags_info(std::vector<const char*>* list);
+void config_parse(int argc, const char **argv);
+
+extern CFlags FLAGS;
 #endif

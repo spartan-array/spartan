@@ -6,12 +6,16 @@
 #include <string>
 #include <sstream>
 #include <map>
-#include <Python.h>
-#include "config_base.h"
+#include <vector>
+#include "cconfig.h"
 
-Flags FLAGS; 
+CFlags FLAGS; 
 void init_flags(void) 
 {
+    static bool done = false;
+    if (done) 
+        return;
+
     FLAGS.add(new BoolFlag("print_options", "false"));
     FLAGS.add(new BoolFlag("profile_worker", "false"));
     FLAGS.add(new BoolFlag("profile_master", "false"));
@@ -74,40 +78,6 @@ std::map<std::string, std::string> parse_argv(int argc, const char **argv)
     return argv_map;
 }
 
-static PyObject* get_flags_info(PyObject *self, PyObject *args)
-{
-    if (!FLAGS.is_parsed()) {
-        init_flags();
-        FLAGS.set_parsed();
-    }
-
-    PyObject *list = PyList_New(FLAGS.get_flag_count());
-    Flag* flag;
-    int index = 0;
-    FLAGS.reset_next();
-    while ((flag = FLAGS.next()) != NULL) {
-        PyObject *o = Py_BuildValue("ssss",
-                                    flag->class_name.c_str(),
-                                    flag->name.c_str(),
-                                    flag->val_str.c_str(),
-                                    flag->help.c_str());
-        PyList_SET_ITEM(list, index++, o);
-    }
-
-    return list;
-}
-
-static PyMethodDef config_base_modules[] = {
-    {"get_flags_info", get_flags_info, METH_VARARGS, "Get all flags information"},
-    {NULL, NULL, 0, NULL}
-};
-
-PyMODINIT_FUNC
-initconfig_base(void)
-{
-    (void) Py_InitModule("config_base", config_base_modules);
-}
-
 /**
  * There are some assumptions for this function:
  *   1. This is only called from workers (the master should call python version).
@@ -119,7 +89,6 @@ initconfig_base(void)
  *      arguments. And the master add configurations in the config file to 
  *      arguments. (See cluster.py)
  */
-#include <iostream>
 void config_parse(int argc, const char **argv)
 {
     if (FLAGS.is_parsed()) {
@@ -129,7 +98,7 @@ void config_parse(int argc, const char **argv)
     init_flags();
     FLAGS.set_parsed();
 
-    Flag* flag;
+    CFlag* flag;
     std::map<std::string, std::string> argv_map;
     std::string val;
    
@@ -138,6 +107,20 @@ void config_parse(int argc, const char **argv)
         if ((flag = FLAGS.get(it->first)) != NULL) {
             flag->parse(it->second);
         }
+    }
+}
+
+void get_flags_info(std::vector<const char*>* list)
+{
+    CFlag* flag;
+
+    init_flags();
+    FLAGS.reset_next();
+    while ((flag = FLAGS.next()) != NULL) {
+        list->push_back(flag->class_name.c_str());
+        list->push_back(flag->name.c_str());
+        list->push_back(flag->val_str.c_str());
+        list->push_back(flag->help.c_str());
     }
 }
 
