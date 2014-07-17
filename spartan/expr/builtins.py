@@ -317,14 +317,23 @@ def _arange_mapper(inputs, ex, start, stop, step, dtype=None):
 
 def arange(shape, start=0, stop=None, step=1, dtype=np.float, tile_hint=None):
   '''
-  An extended version of `np.arange`.  
-  
+  An extended version of `np.arange`.
+
   Returns a new array of the given shape and dtype. Values of the
   array are equivalent to running: ``np.arange(np.prod(shape)).reshape(shape)``.
-  
-  :param shape:
-  :param dtype:
+
+  :param shape: tuple
+    e.x. (10, ) and (3, 5)
+  :param start: number, optional
+    Start of interval, including this value. The default start value is 0.
+  :param stop: number, optional
+    End of interval, excluding this value.
+  :param step: number, optional
+    Spacing between values. The default step size is 1.
+  :param dtype: dtype
+    The type of the output array.
   :param tile_hint:
+
   :rtype: `Expr`
   '''
   if stop is None:
