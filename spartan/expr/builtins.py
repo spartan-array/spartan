@@ -315,7 +315,7 @@ def _arange_mapper(inputs, ex, start, stop, step, dtype=None):
   yield (ex, np.arange(ex_start, ex_stop, step, dtype=dtype).reshape(ex.shape))
 
 
-def arange(shape, start=0, stop=None, step=1, dtype=np.float, tile_hint=None):
+def arange(shape=None, start=0, stop=None, step=1, dtype=np.float, tile_hint=None):
   '''
   An extended version of `np.arange`.
 
@@ -336,6 +336,12 @@ def arange(shape, start=0, stop=None, step=1, dtype=np.float, tile_hint=None):
 
   :rtype: `Expr`
   '''
+  if shape is None and stop is None:
+    raise ValueError('Shape or stop expected, none supplied.')
+
+  if shape is not None and stop is not None:
+    raise ValueError('Only shape OR stop can be supplied, not both')
+
   if stop is None:
     stop = step*(np.prod(shape) + start)
     #util.log_info('stop: %d', stop)
