@@ -13,10 +13,8 @@ class BuiltinTest(test_common.ClusterTest):
 
     # These tests (and functionality) should be added to give expected
     # NumPy semantics.
-    #Assert.all_eq(spartan.arange1d(-1).glom(), np.arange(-1))
-    #Assert.all_eq(spartan.arange1d(0).glom(), np.arange(0))
-    #Assert.all_eq(spartan.arange1d(1).glom(), np.arange(1))
-    #Assert.all_eq(spartan.arange1d(10), np.arange(10))
+    #Assert.all_eq(spartan.arange1d(-1, 2).force().glom(), np.arange(-1,2))
+    #Assert.all_eq(spartan.arange1d(0, 0).force().glom(), np.arange(0, 0))
 
   def _test_bincount(self):
     src = np.asarray([1, 1, 1, 2, 2, 5, 5, 10])
