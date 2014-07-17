@@ -343,14 +343,14 @@ def arange1d(start, stop, step=1, dtype=np.float, tile_hint=None):
                     kw={'start': start, 'step':step})
 
 
-def _arange_mapper(inputs, ex, dtype=None):
+def _arange_mapper(inputs, ex, start, stop, step, dtype=None):
   pos = extent.ravelled_pos(ex.ul, ex.array_shape)
   #util.log_info('Extent: %s, shape:%s, pos: %s', ex, ex.shape, pos)
   sz = np.prod(ex.shape)
   yield (ex, np.arange(pos, pos + sz, dtype=dtype).reshape(ex.shape))
 
 
-def arange(shape, dtype=np.float, tile_hint=None):
+def arange(shape, start=0, stop=None, step=1, dtype=np.float, tile_hint=None):
   '''
   An extended version of `np.arange`.  
   
@@ -362,9 +362,13 @@ def arange(shape, dtype=np.float, tile_hint=None):
   :param tile_hint:
   :rtype: `Expr`
   '''
+  if stop is None:
+    stop = step*(np.prod(shape) + start)
+    #util.log_info('stop: %d', stop)
+
   return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
-                 fn=_arange_mapper,
-                 kw={'dtype': dtype})
+                 fn=_arange_mapper, kw={'start': start, 'stop': stop,
+                                        'step': step, 'dtype': dtype})
 
 
 def _sum_local(ex, data, axis):
