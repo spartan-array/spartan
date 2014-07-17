@@ -333,6 +333,14 @@ class Assert(object):
   def not_null(expr):
     assert expr is not None, expr
 
+  @staticmethod
+  def raises_exception(exception, function, *args, **kwargs):
+    try:
+      function(*args, **kwargs)
+    except exception:
+      pass
+    assert False, '%s expected, no error was raised.' % exception.__name__
+
 
 def trace_fn(fn):
   '''Function decorator: log on entry and exit to ``fn``.'''
