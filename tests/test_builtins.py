@@ -15,18 +15,17 @@ class BuiltinTest(test_common.ClusterTest):
     # Arange with shape, start
     Assert.all_eq(spartan.arange((10, ), start=-1).force().glom(), np.arange(-1, 9))
     Assert.all_eq(spartan.arange((10, ), start=1).force().glom(), np.arange(1, 11))
+    Assert.all_eq(spartan.arange((3, 5), start=-1).force().glom(), np.arange(-1, 14).reshape((3, 5)))
 
-    # Arange with shape, start, stop
+    # Arange with shape, step
+    Assert.all_eq(spartan.arange((10, ), step=2).force().glom(), np.arange(0, 20, 2))
+    Assert.all_eq(spartan.arange((3, 5), step=2).force().glom(), np.arange(0, 30, 2).reshape((3, 5)))
 
-    # Arange with shape, start, stop, step
-    #Assert.all_eq(spartan.arange((10, ), 
-    #Assert.all_eq(spartan.arange(0, 10, 2).force().glom(), np.arange(0, 10, 2))
-    #Assert.all_eq(spartan.arange(0, 1, 2).force().glom(), np.arange(0, 1, 2))
+    # Arange with shape, start, step
+    Assert.all_eq(spartan.arange((10, ), start=-1, step=2).force().glom(), np.arange(-1, 19, 2))
+    Assert.all_eq(spartan.arange((10, ), start=1, step=2).force().glom(), np.arange(1, 21, 2))
+    Assert.all_eq(spartan.arange((3, 5), start=1, step=2).force().glom(), np.arange(1, 31, 2).reshape((3, 5)))
 
-    # These tests (and functionality) should be added to give expected
-    # NumPy semantics.
-    #Assert.all_eq(spartan.arange(-1, 2).force().glom(), np.arange(-1,2))
-    #Assert.all_eq(spartan.arange(0, 0).force().glom(), np.arange(0, 0))
 
   def _test_bincount(self):
     src = np.asarray([1, 1, 1, 2, 2, 5, 5, 10])
