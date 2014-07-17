@@ -345,9 +345,12 @@ def arange1d(start, stop, step=1, dtype=np.float, tile_hint=None):
 
 def _arange_mapper(inputs, ex, start, stop, step, dtype=None):
   pos = extent.ravelled_pos(ex.ul, ex.array_shape)
+  ex_start = pos*step + start
+  ex_stop = np.prod(ex.shape)*step + ex_start
   #util.log_info('Extent: %s, shape:%s, pos: %s', ex, ex.shape, pos)
-  sz = np.prod(ex.shape)
-  yield (ex, np.arange(pos, pos + sz, dtype=dtype).reshape(ex.shape))
+  #util.log_info('Extent: %s, start: %s, stop: %s, step: %s', ex, ex_start, ex_stop, step)
+
+  yield (ex, np.arange(ex_start, ex_stop, step, dtype=dtype).reshape(ex.shape))
 
 
 def arange(shape, start=0, stop=None, step=1, dtype=np.float, tile_hint=None):
