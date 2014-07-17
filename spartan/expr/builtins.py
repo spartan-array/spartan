@@ -304,44 +304,6 @@ def ones(shape, dtype=np.float, tile_hint=None):
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
              fn=_make_ones)
 
-def _arange1d_mapper(source, extent, start, step):
-  # The output data.
-  data = np.ndarray(extent.shape)
-
-  index = 0
-  for x in range(extent.ul[0], extent.lr[0]):
-    data[index] = x*step + start
-    index += 1
-
-  yield extent, data
-
-
-def arange1d(start, stop, step=1, dtype=np.float, tile_hint=None):
-  '''Return evenly spaced values within a given interval.
-
-  This is a distributed alternative to NumPy's arange function.
-
-  See https://github.com/spartan-array/spartan/issues/158 for discussion on
-  future of arange and arange1d.
-
-  :param start: start of interval, inclusive.
-  :param stop: end of interval, exclusive.
-  :param step: spacing between values
-  :param dtype: type of output array.
-  :param tile_hint
-
-  Returns:
-    `Expr`
-  '''
-  # Create a dummy DistArray to shuffle.
-  length = (stop - start) / float(step)
-  length = int(np.ceil(length))
-  dummy = ndarray((length, ))
-
-  # Shuffle: Parallelizes range and returns a ShuffleExpr.
-  return shuffle(dummy, fn=_arange1d_mapper, tile_hint=tile_hint,
-                    kw={'start': start, 'step':step})
-
 
 def _arange_mapper(inputs, ex, start, stop, step, dtype=None):
   pos = extent.ravelled_pos(ex.ul, ex.array_shape)
