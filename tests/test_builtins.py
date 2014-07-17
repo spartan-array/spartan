@@ -44,22 +44,32 @@ class BuiltinTest(test_common.ClusterTest):
         np.arange(1, 31, 2).reshape((3, 5)))
 
     # Arange with stop.
-    # Arange with start, stop
-    # Arange with start, stop, step
+    Assert.all_eq(spartan.arange(stop=10).glom(), np.arange(10))
 
-  def _test_bincount(self):
+    # Arange with start, stop
+    Assert.all_eq(spartan.arange(None, -1, 10).glom(), np.arange(-1, 10))
+    Assert.all_eq(spartan.arange(None, 1, 10).glom(), np.arange(1, 10))
+
+    # Arange with start, stop, step
+    Assert.all_eq(spartan.arange(None, -1, 19, 2).glom(), np.arange(-1, 19, 2))
+    Assert.all_eq(spartan.arange(None, 1, 21, 2).glom(), np.arange(1, 21, 2))
+
+
+  def test_bincount(self):
     src = np.asarray([1, 1, 1, 2, 2, 5, 5, 10])
     Assert.all_eq(
         spartan.bincount(spartan.from_numpy(src)).glom(),
         np.bincount(src))
 
-  def _test_max(self):
+
+  def test_max(self):
     src = np.asarray([1, 1, 1, 2, 2, 5, 5, 10])
     Assert.all_eq(
         spartan.max(spartan.from_numpy(src)).glom(),
         np.max(src))
 
-  def _test_min(self):
+
+  def test_min(self):
     src = np.asarray([1, 1, 1, 2, 2, 5, 5, 10])
     Assert.all_eq(
         spartan.min(spartan.from_numpy(src)).glom(),
