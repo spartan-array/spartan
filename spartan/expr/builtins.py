@@ -339,6 +339,12 @@ def arange(shape=None, start=0, stop=None, step=1, dtype=np.float, tile_hint=Non
   :param tile_hint:
 
   :rtype: `Expr`
+
+  Examples:
+  sp.arange((3, 5)) == np.arange(15).reshape((3, 5))
+  sp.arange(None, stop=10) == np.arange(10)
+  sp.arange((3, 5), -1) == np.arange(-1, 14).reshape((3, 5))
+  sp.arange((3, 5), step=2) == np.arange(0, 30, 2).reshape((3, 5))
   '''
   if shape is None and stop is None:
     raise ValueError('Shape or stop expected, none supplied.')
