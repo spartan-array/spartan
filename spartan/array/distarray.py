@@ -146,6 +146,10 @@ class DistArray(object):
     '''
     return np.prod(self.shape)
 
+  def __len__(self):
+    ''' Alias of real_size(self). '''
+    return self.real_size()
+
   def __repr__(self):
     return '%s(id=%s, shape=%s, dtype=%s)' % (self.__class__.__name__, id(self), self.shape, self.dtype)
   
