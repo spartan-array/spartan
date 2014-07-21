@@ -6,7 +6,7 @@ import test_common
 from spartan.util import Assert
 
 class BuiltinTest(test_common.ClusterTest):
-  def test_arange(self):
+  def test_arange_shape(self):
     # Arange with no parameters.
     Assert.raises_exception(ValueError, spartan.arange)
 
@@ -43,6 +43,8 @@ class BuiltinTest(test_common.ClusterTest):
         spartan.arange((3, 5), 1, step=2).glom(),
         np.arange(1, 31, 2).reshape((3, 5)))
 
+
+  def test_arange_stop(self):
     # Arange with stop.
     Assert.all_eq(spartan.arange(stop=10).glom(), np.arange(10))
 
@@ -77,4 +79,4 @@ class BuiltinTest(test_common.ClusterTest):
 
 
 if __name__ == '__main__':
-  _test_common.run(__file__)
+  test_common.run(__file__)
