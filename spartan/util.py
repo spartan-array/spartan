@@ -338,7 +338,7 @@ class Assert(object):
     try:
       function(*args, **kwargs)
     except exception:
-      pass
+      return
     assert False, '%s expected, no error was raised.' % exception.__name__
 
 
