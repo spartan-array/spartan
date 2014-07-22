@@ -515,6 +515,80 @@ def mean(x, axis=None):
     return sum(x, axis) / x.shape[axis]
 
 
+def _std_mapper(array, ex, axis):
+  '''Helper function for std.
+
+  Calculate the global tile index and use it to calculate a range of rows/cols
+  for which to calculate the standard deviation.
+
+  Example: array: (80, 121). tile_shape: (4, 121), axis: 0 (col).
+  ex = (16, 0) -> (20, 121). col range = 24:30 (6 columns per tile, this is the
+  4th worker).
+  '''
+  index = 0
+  if array.shape[1] == array.tile_shape()[1]:
+    num_tiles = util.divup(array.shape[0], array.tile_shape()[0])
+  else:
+    num_tiles = util.divup(array.shape[1], array.tile_shape()[1])
+  result = None
+  if axis == 0:
+    # Column-wise.
+    # Starting column. (120/20 * (ex.ul[0] / 4), that + 6)
+    start = (array.shape[1]/num_tiles) * (ex.ul[0] / (array.shape[0]/num_tiles))
+    stop = start + array.shape[1]/num_tiles
+
+    dst_shape = (stop - start, )
+    dst_array_shape = (array.shape[1],)
+    result = np.ndarray(dst_shape)
+
+    dst_ex = extent.create((start, ), (stop, ), dst_array_shape)
+    for col in xrange(start, stop):
+      new_ex = extent.create((0, col), (array.shape[0], col + 1), array.shape)
+      data = array.fetch(new_ex)
+      result[index] = np.std(data)
+      index += 1
+  else:
+    # Row-wise.
+    # start = row
+    start = ex.ul[0]
+    stop = start + array.shape[0]/num_tiles
+
+    dst_shape = (stop - start, )
+    dst_array_shape = (array.shape[0], )
+    result = np.ndarray(dst_shape)
+
+    dst_ex = extent.create((start, ), (stop, ), dst_array_shape)
+    for row in xrange(start, stop):
+      new_ex = extent.create((row, 0), (row + 1, array.shape[1]), array.shape)
+      data = array.fetch(new_ex)
+      result[index] = np.std(data)
+      index += 1
+
+  yield (dst_ex, result)
+
+
+def std(a, axis=None):
+  '''Compute the standard deviation along the specified axis.
+
+  Returns the standard deviation of the array elements. The standard deviation
+  is computed for the flattened array by default, otherwise over the specified
+  axis.
+
+  :param a: array_like
+    Calculate the standard deviation of these values.
+  :axis: int, optional
+    Axis along which the standard deviation is computed. The default is to
+    compute the standard deviation of the flattened array.
+
+  :rtype standard_deviation: Expr
+  '''
+  a_casted = a.astype(np.float)
+  if axis is None:
+    return sqrt(mean(abs(a_casted - mean(a_casted)) ** 2))  #.optimized()
+
+  return shuffle(a_casted, _std_mapper, kw={'axis': axis})
+
+
 def _to_structured_array(*vals):
   '''Create a structured array from the given input arrays.
   
