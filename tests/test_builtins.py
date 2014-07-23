@@ -6,7 +6,7 @@ import test_common
 from spartan.util import Assert
 
 class BuiltinTest(test_common.ClusterTest):
-  def _test_arange_shape(self):
+  def test_arange_shape(self):
     # Arange with no parameters.
     Assert.raises_exception(ValueError, spartan.arange)
 
@@ -44,7 +44,7 @@ class BuiltinTest(test_common.ClusterTest):
         np.arange(1, 31, 2).reshape((3, 5)))
 
 
-  def _test_arange_stop(self):
+  def test_arange_stop(self):
     # Arange with stop.
     Assert.all_eq(spartan.arange(stop=10).glom(), np.arange(10))
 
@@ -57,7 +57,7 @@ class BuiltinTest(test_common.ClusterTest):
     Assert.all_eq(spartan.arange(None, 1, 21, 2).glom(), np.arange(1, 21, 2))
 
 
-  def _test_bincount(self):
+  def test_bincount(self):
     src = np.asarray([1, 1, 1, 2, 2, 5, 5, 10])
     Assert.all_eq(
         spartan.bincount(spartan.from_numpy(src)).glom(),
@@ -81,14 +81,14 @@ class BuiltinTest(test_common.ClusterTest):
         np.diagonal(np_big))
 
 
-  def _test_max(self):
+  def test_max(self):
     src = np.asarray([1, 1, 1, 2, 2, 5, 5, 10])
     Assert.all_eq(
         spartan.max(spartan.from_numpy(src)).glom(),
         np.max(src))
 
 
-  def _test_min(self):
+  def test_min(self):
     src = np.asarray([1, 1, 1, 2, 2, 5, 5, 10])
     Assert.all_eq(
         spartan.min(spartan.from_numpy(src)).glom(),

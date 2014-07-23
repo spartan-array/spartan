@@ -190,6 +190,45 @@ def diag(array):
   '''
   return shuffle(array, diag_mapper)
 
+
+def _diagonal_mapper(array, ex):
+  if ex.ul[0] >= ex.ul[1] and ex.ul[0] < ex.lr[1]:  # Below the diagonal.
+    above, below = False, True
+  elif ex.ul[1] >= ex.ul[0] and ex.ul[1] < ex.lr[0]:  # Above the diagonal.
+    above, below = True, False
+  else:  # Not on the diagonal.
+    return
+
+  start = ex.ul[above]
+  stop = __builtin__.min(ex.lr[above], ex.lr[below])
+  result = np.ndarray((stop - start, ))
+
+  data = array.fetch(ex)
+  index = 0
+  for i in range(start, stop):
+    result[index] = data[i - ex.ul[0], i - ex.ul[1]]
+    index += 1
+
+  res_ex = extent.create((start, ), (stop, ), (__builtin__.min(array.shape), ))
+  yield (res_ex, result)
+
+
+def diagonal(a):
+  '''Return specified diagonals.
+
+  :param a: array_like
+    Array from which the diagonals are taken.
+  :rtype ArrayExpr
+
+  Raises
+  ------
+  ValueError
+    If the dimension of `a` is less than 2.
+
+  '''
+  return shuffle(a, _diagonal_mapper)
+
+
 def _normalize_mapper(array, ex, axis, norm_value):
   '''
   Normalize a region of an array.
