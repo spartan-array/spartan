@@ -698,7 +698,9 @@ def multiply(a, b):
 def add(a, b): return map((a, b), fn=np.add)
 
 def sub(a, b): return map((a, b), fn=np.subtract)
-  
+
+def maximum(a, b): return map((a, b), np.maximum)
+
 def ln(v): return map(v, fn=np.log)
 
 def log(v): return map(v, fn=np.log)
