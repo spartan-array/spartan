@@ -515,6 +515,15 @@ def mean(x, axis=None):
     return sum(x, axis) / x.shape[axis]
 
 
+def _num_tiles(array):
+  '''Calculate the number of tiles for a given DistArray.'''
+  num_tiles = util.divup(array.shape[0], array.tile_shape()[0])
+  remaining = (array.shape[1] - array.tile_shape()[1]) * num_tiles
+  num_tiles += util.divup(remaining, array.tile_shape()[1])
+  util.log_info('arr: %s, tile: %s, num_tiles: %d', array.shape, array.tile_shape(), num_tiles)
+  return num_tiles
+
+
 def _std_mapper(array, ex, axis):
   '''Helper function for std.
 
@@ -525,46 +534,26 @@ def _std_mapper(array, ex, axis):
   ex = (16, 0) -> (20, 121). col range = 24:30 (6 columns per tile, this is the
   4th worker).
   '''
+  num_tiles = _num_tiles(array)
+  arr_index = axis == 0
+
+  start = util.divup(array.shape[arr_index], num_tiles) * ex.ul[0]
+  stop = start + util.divup(array.shape[arr_index], num_tiles)
+  result = np.ndarray((stop - start, ))
+
   index = 0
-  if array.shape[1] == array.tile_shape()[1]:
-    num_tiles = util.divup(array.shape[0], array.tile_shape()[0])
-  else:
-    num_tiles = util.divup(array.shape[1], array.tile_shape()[1])
-  result = None
-  if axis == 0:
-    # Column-wise.
-    # Starting column. (120/20 * (ex.ul[0] / 4), that + 6)
-    start = (array.shape[1]/num_tiles) * (ex.ul[0] / (array.shape[0]/num_tiles))
-    stop = start + array.shape[1]/num_tiles
+  for dim in xrange(start, stop):
+    if axis == 0:
+      new_ex = extent.create((0, dim), (array.shape[0], dim + 1), array.shape)
+    else:
+      new_ex = extent.create((dim, 0), (dim + 1, array.shape[1]), array.shape)
 
-    dst_shape = (stop - start, )
-    dst_array_shape = (array.shape[1],)
-    result = np.ndarray(dst_shape)
+    data = array.fetch(new_ex)
+    result[index] = np.std(data)
+    index += 1
 
-    dst_ex = extent.create((start, ), (stop, ), dst_array_shape)
-    for col in xrange(start, stop):
-      new_ex = extent.create((0, col), (array.shape[0], col + 1), array.shape)
-      data = array.fetch(new_ex)
-      result[index] = np.std(data)
-      index += 1
-  else:
-    # Row-wise.
-    # start = row
-    start = ex.ul[0]
-    stop = start + array.shape[0]/num_tiles
-
-    dst_shape = (stop - start, )
-    dst_array_shape = (array.shape[0], )
-    result = np.ndarray(dst_shape)
-
-    dst_ex = extent.create((start, ), (stop, ), dst_array_shape)
-    for row in xrange(start, stop):
-      new_ex = extent.create((row, 0), (row + 1, array.shape[1]), array.shape)
-      data = array.fetch(new_ex)
-      result[index] = np.std(data)
-      index += 1
-
-  yield (dst_ex, result)
+  res_ex = extent.create((start, ), (stop, ), (array.shape[arr_index], ))
+  yield (res_ex, result)
 
 
 def std(a, axis=None):
