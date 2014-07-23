@@ -519,9 +519,7 @@ def _num_tiles(array):
   '''Calculate the number of tiles for a given DistArray.'''
   num_tiles = util.divup(array.shape[0], array.tile_shape()[0])
   remaining = (array.shape[1] - array.tile_shape()[1]) * num_tiles
-  num_tiles += util.divup(remaining, array.tile_shape()[1])
-  util.log_info('arr: %s, tile: %s, num_tiles: %d', array.shape, array.tile_shape(), num_tiles)
-  return num_tiles
+  return num_tiles + util.divup(remaining, array.tile_shape()[1])
 
 
 def _std_mapper(array, ex, axis):
@@ -536,11 +534,17 @@ def _std_mapper(array, ex, axis):
   '''
   num_tiles = _num_tiles(array)
   arr_index = axis == 0
+  dims_per_tile = util.divup(array.shape[arr_index], num_tiles)
 
-  start = util.divup(array.shape[arr_index], num_tiles) * ex.ul[0]
-  stop = start + util.divup(array.shape[arr_index], num_tiles)
+  start = dims_per_tile * ex.ul[0]
+  if start >= array.shape[arr_index]:
+    return
+
+  stop = start + dims_per_tile
+  if stop > array.shape[arr_index]:
+    stop = array.shape[arr_index]
+
   result = np.ndarray((stop - start, ))
-
   index = 0
   for dim in xrange(start, stop):
     if axis == 0:
