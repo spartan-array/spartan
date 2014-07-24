@@ -225,7 +225,7 @@ public:
 
 void init_flags(void);
 
-void get_flags_info(std::vector<const char*>* list);
+std::vector<const char*> get_flags_info(void);
 void config_parse(int argc, const char **argv);
 
 extern CFlags FLAGS;

@@ -41,6 +41,7 @@ class Flag(object):
   def _str(self):
     return str(self.val)
 
+
 class IntFlag(Flag):
   def parse(self, str):
     self.val = int(str)
@@ -68,11 +69,13 @@ class BoolFlag(Flag):
   def _str(self):
     return str(int(self.val))
 
+
 LOG_STR = {logging.DEBUG: 'DEBUG',
            logging.INFO: 'INFO',
            logging.WARN: 'WARN',
            logging.ERROR: 'ERROR',
            logging.FATAL: 'FATAL'}
+
 
 class LogLevelFlag(Flag):
   def parse(self, str):
@@ -108,7 +111,7 @@ from libcpp.vector cimport vector
 from libc.string cimport const_char
 from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 cdef extern from "cconfig.h":
-  cdef void get_flags_info(vector[const_char *] *list)
+  cdef vector[const_char *] get_flags_info()
   cdef void config_parse(int argc, const_char **argv)
 
 class Flags(object):
@@ -116,16 +119,16 @@ class Flags(object):
     self._parsed = False
     self._vals = {}
 
-    cdef vector[const char*] *flags_info = new vector[const char*]()
-    get_flags_info(flags_info)
-    for i in range(0, flags_info.size(), step = 4):
+    cdef vector[const char*] flags_info
+    flags_info = get_flags_info()
+    for i in range(0, flags_info.size(), 4):
       flag_class = flags_info[i]
       name = flags_info[i + 1]
       default = flags_info[i + 2]
       help_str = flags_info[i + 3]
       flag_obj = globals()[flag_class](name, help=help_str)
       self.add(flag_obj)
-      if default != '':
+      if str(default) != '':
         flag_obj.parse(default)
 
   def add(self, flag):
@@ -156,7 +159,25 @@ class Flags(object):
   def __iter__(self):
     return iter(self._vals.items())
 
+
 FLAGS = Flags()
+
+FLAGS.add(BoolFlag('print_options', default=False))
+FLAGS.add(BoolFlag('profile_worker', default=False))
+FLAGS.add(BoolFlag('profile_master', default=False))
+FLAGS.add(BoolFlag('cluster', default=False))
+FLAGS.add(LogLevelFlag('log_level', logging.INFO))
+FLAGS.add(IntFlag('num_workers', default=3))
+FLAGS.add(IntFlag('port_base', default=10000, help='Port master should listen on'))
+FLAGS.add(StrFlag('tile_assignment_strategy', default='round_robin', help='Decide tile to worker mapping (round_robin, random, performance)'))
+FLAGS.add(StrFlag('checkpoint_path', default='/tmp/spartan/checkpoint/', help='Path for saving checkpoint information'))
+FLAGS.add(IntFlag('default_rpc_timeout', default=60))
+FLAGS.add(IntFlag('max_zeromq_sockets', default=4096))
+
+FLAGS.add(BoolFlag('opt_keep_stack', default=False))
+FLAGS.add(BoolFlag('capture_expr_stack', default=False))
+FLAGS.add(BoolFlag('dump_timers', default=False))
+FLAGS.add(BoolFlag('load_balance', default=False))
 
 # print flags in sorted order
 # from http://stackoverflow.com/questions/12268602/sort-argparse-help-alphabetically
@@ -171,6 +192,13 @@ class SortingHelpFormatter(HelpFormatter):
 
 def parse(argv):
   '''Parse configuration from flags and/or configuration file.'''
+
+  # load flags defined in other modules (is there a better way to do this?)
+  import spartan.expr.local
+  import spartan.expr.optimize
+  import spartan.cluster
+  import spartan.worker
+  import spartan.util
 
   if FLAGS._parsed:
     return
@@ -215,14 +243,6 @@ def parse(argv):
     if getattr(parsed_flags, name) is not None:
       #print >>sys.stderr, 'Parsing: %s : %s' % (name, getattr(parsed_flags, name))
       flag.parse(getattr(parsed_flags, name))
-
-  # Sorry, we need to do ugly code here to make sure we sync with C++'s FLAGS
-  cdef bytes py_bytes
-  cdef const_char **argv_str = <const_char**> PyMem_Malloc(len(argv) * sizeof(const_char*))
-  for i in range(len(argv)):
-    py_bytes = argv[i].encode()
-    argv_str[i] = py_bytes
-  config_parse(len(argv), argv_str)
 
   # reset loggers so that basic config works
   logging.root = logging.RootLogger(logging.WARNING)

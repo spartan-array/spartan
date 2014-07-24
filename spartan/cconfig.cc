@@ -65,6 +65,9 @@ std::map<std::string, std::string> parse_argv(int argc, const char **argv)
     int i;
     
     for (i = 0; i < argc; i++) {
+        if (flag[0] != '-') {
+           continue; 
+        }
         flag = std::string(argv[i]);
         split = flag.find('=');
         name = flag.substr(2, split - 2);
@@ -102,7 +105,7 @@ void config_parse(int argc, const char **argv)
     std::map<std::string, std::string> argv_map;
     std::string val;
    
-    argv_map = parse_argv(argc - 1, &argv[1]);
+    argv_map = parse_argv(argc, &argv[0]);
     for (std::map<std::string, std::string>::iterator it = argv_map.begin(); it != argv_map.end(); ++it) {
         if ((flag = FLAGS.get(it->first)) != NULL) {
             flag->parse(it->second);
@@ -110,18 +113,21 @@ void config_parse(int argc, const char **argv)
     }
 }
 
-void get_flags_info(std::vector<const char*>* list)
+//void get_flags_info(std::vector<const char*>* list)
+std::vector<const char*> get_flags_info(void)
 {
+    std::vector<const char*> list;
     CFlag* flag;
 
     init_flags();
     FLAGS.reset_next();
     while ((flag = FLAGS.next()) != NULL) {
-        list->push_back(flag->class_name.c_str());
-        list->push_back(flag->name.c_str());
-        list->push_back(flag->val_str.c_str());
-        list->push_back(flag->help.c_str());
+        list.push_back(flag->class_name.c_str());
+        list.push_back(flag->name.c_str());
+        list.push_back(flag->val_str.c_str());
+        list.push_back(flag->help.c_str());
     }
+    return list;
 }
 
 #ifdef __UNIT_TEST__
