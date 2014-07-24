@@ -64,6 +64,23 @@ class BuiltinTest(test_common.ClusterTest):
         np.bincount(src))
 
 
+  def test_diagonal(self):
+    np_2d = np.random.randn(2, 2)
+    Assert.all_eq(
+        spartan.diagonal(spartan.from_numpy(np_2d)).glom(),
+        np.diagonal(np_2d))
+
+    np_not_square = np.random.randn(15, 10)
+    Assert.all_eq(
+        spartan.diagonal(spartan.from_numpy(np_not_square)).glom(),
+        np.diagonal(np_not_square))
+
+    np_big = np.random.randn(16, 16)
+    Assert.all_eq(
+        spartan.diagonal(spartan.from_numpy(np_big)).glom(),
+        np.diagonal(np_big))
+
+
   def test_max(self):
     src = np.asarray([1, 1, 1, 2, 2, 5, 5, 10])
     Assert.all_eq(
