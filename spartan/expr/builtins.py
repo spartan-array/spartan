@@ -739,6 +739,102 @@ def bincount(v):
       kw = { 'minlength' : maxval + 1})
 
 
+def _translate_extent(ex, a, offsets=None):
+  '''Translate the extent ex into a new extent into a.'''
+  if offsets is None:
+    offsets = [0, 0]
+
+  lr = [x - off for x, off in zip(ex.lr, offsets)]
+  ul = [0] * len(ex.ul)
+  for index in range(len(ul)):
+    tmp = ex.ul[index] - offsets[index]
+    if tmp < 0:
+      tmp = 0
+    elif tmp >= a.shape[index]:
+      return None
+    ul[index] = tmp
+
+
+  for ul_dim, a_dim in zip(ul, a.shape):
+    if ul_dim >= a_dim:
+      return None
+
+  new_lr = [0] * len(a.shape)
+  for index, (lr_dim, a_dim) in enumerate(zip(lr, a.shape)):
+    if lr_dim < a_dim:
+      new_lr[index] = lr_dim
+    else:
+      new_lr[index] = a_dim
+
+  new_ex = extent.create(ul, new_lr, a.shape)
+  #util.log_warn('ex: %s, ex_a: %s', ex, new_ex)
+  return new_ex
+
+
+def _concatenate_mapper(array, ex, a, b, axis):
+  result = np.ndarray(ex.shape)
+  data_a = None
+  data_b = None
+
+  # Fetch only the required data from a and b.
+  ex_a = _translate_extent(ex, a)
+  if ex_a is not None:
+    data_a = a.fetch(ex_a)
+
+  # Translate extent for b.
+  if axis == 0:
+    ex_b = _translate_extent(ex, b, [a.shape[0], 0])
+  else:
+    ex_b = _translate_extent(ex, b, [0, a.shape[1]])
+  if ex_b is not None:
+    data_b = b.fetch(ex_b)
+
+  util.log_warn('ex: %s, ex_a: %s, ex_b: %s', ex, ex_a, ex_b)
+  index_r, index_c = 0, 0
+  for row in xrange(ex.lr[0] - ex.ul[0]):
+    if len(a.shape) == 1:
+      #util.log_info('ex: %s, row: %d', ex, row)
+      if data_a is None:
+        result[index_r] = data_b[row]
+      elif row < len(data_a):
+        result[index_r] = data_a[row]
+      else:
+        result[index_r] = data_b[row - len(data_a)]
+      index_r += 1
+      continue
+
+    for col in xrange(ex.lr[1] - ex.ul[1]):
+      #util.log_info('a: %s, b: %s, r: %d, c: %d', data_a, data_b, index_r, index_c)
+      if data_a is None:
+        result[index_r, index_c] = data_b[row, col]
+      elif row < data_a.shape[0] and col < data_a.shape[1]:
+        result[index_r, index_c] = data_a[row, col]
+      else:
+        result[index_r, index_c] = data_b[row - data_a.shape[0], col - data_a.shape[1]]
+      index_c += 1
+    index_r += 1
+
+  yield ex, result
+
+
+def concatenate(a, b, axis=0):
+  '''Join two arrays together.'''
+  # Calculate the shape of the resulting matrix and check dimensions.
+  new_shape = [0] * len(a.shape)
+  for index, (dim1, dim2) in enumerate(zip(a.shape, b.shape)):
+    if index == axis:
+      new_shape[index] = dim1 + dim2
+      continue
+    new_shape[index] = dim1
+    if dim1 != dim2:
+      raise ValueError('all the input array dimensions except for the' \
+          'concatenation axis must match exactly')
+
+  return shuffle(distarray.create(new_shape),
+                 _concatenate_mapper,
+                 kw={'a': a, 'b': b, 'axis': axis})
+
+
 try:
   import scipy.stats
 
