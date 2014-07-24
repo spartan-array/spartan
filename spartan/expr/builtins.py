@@ -744,31 +744,21 @@ def _translate_extent(ex, a, offsets=None):
   if offsets is None:
     offsets = [0, 0]
 
-  lr = [x - off for x, off in zip(ex.lr, offsets)]
   ul = [0] * len(ex.ul)
+  lr = [0] * len(ex.lr)
   for index in range(len(ul)):
-    tmp = ex.ul[index] - offsets[index]
-    if tmp < 0:
-      tmp = 0
-    elif tmp >= a.shape[index]:
+    tmp_ul = ex.ul[index] - offsets[index]
+    tmp_lr = ex.lr[index] - offsets[index]
+    if tmp_ul >= a.shape[index] or tmp_lr < 0:
       return None
-    ul[index] = tmp
+    if tmp_lr < 0:
+      tmp_lr = 0
+    if tmp_lr > a.shape[index]:
+      tmp_lr = a.shape[index]
 
+    ul[index], lr[index] = tmp_ul, tmp_lr
 
-  for ul_dim, a_dim in zip(ul, a.shape):
-    if ul_dim >= a_dim:
-      return None
-
-  new_lr = [0] * len(a.shape)
-  for index, (lr_dim, a_dim) in enumerate(zip(lr, a.shape)):
-    if lr_dim < a_dim:
-      new_lr[index] = lr_dim
-    else:
-      new_lr[index] = a_dim
-
-  new_ex = extent.create(ul, new_lr, a.shape)
-  #util.log_warn('ex: %s, ex_a: %s', ex, new_ex)
-  return new_ex
+  return extent.create(ul, lr, a.shape)
 
 
 def _concatenate_mapper(array, ex, a, b, axis):
