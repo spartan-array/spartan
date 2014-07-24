@@ -515,6 +515,73 @@ def mean(x, axis=None):
     return sum(x, axis) / x.shape[axis]
 
 
+def _num_tiles(array):
+  '''Calculate the number of tiles for a given DistArray.'''
+  num_tiles = util.divup(array.shape[0], array.tile_shape()[0])
+  remaining = (array.shape[1] - array.tile_shape()[1]) * num_tiles
+  return num_tiles + util.divup(remaining, array.tile_shape()[1])
+
+
+def _std_mapper(array, ex, axis):
+  '''Helper function for std.
+
+  Calculate the global tile index and use it to calculate a range of rows/cols
+  for which to calculate the standard deviation.
+
+  Example: array: (80, 121). tile_shape: (4, 121), axis: 0 (col).
+  ex = (16, 0) -> (20, 121). col range = 24:30 (6 columns per tile, this is the
+  4th worker).
+  '''
+  num_tiles = _num_tiles(array)
+  arr_index = axis == 0
+  dims_per_tile = util.divup(array.shape[arr_index], num_tiles)
+
+  start = dims_per_tile * ex.ul[0]
+  if start >= array.shape[arr_index]:
+    return
+
+  stop = start + dims_per_tile
+  if stop > array.shape[arr_index]:
+    stop = array.shape[arr_index]
+
+  result = np.ndarray((stop - start, ))
+  index = 0
+  for dim in xrange(start, stop):
+    if axis == 0:
+      new_ex = extent.create((0, dim), (array.shape[0], dim + 1), array.shape)
+    else:
+      new_ex = extent.create((dim, 0), (dim + 1, array.shape[1]), array.shape)
+
+    data = array.fetch(new_ex)
+    result[index] = np.std(data)
+    index += 1
+
+  res_ex = extent.create((start, ), (stop, ), (array.shape[arr_index], ))
+  yield (res_ex, result)
+
+
+def std(a, axis=None):
+  '''Compute the standard deviation along the specified axis.
+
+  Returns the standard deviation of the array elements. The standard deviation
+  is computed for the flattened array by default, otherwise over the specified
+  axis.
+
+  :param a: array_like
+    Calculate the standard deviation of these values.
+  :axis: int, optional
+    Axis along which the standard deviation is computed. The default is to
+    compute the standard deviation of the flattened array.
+
+  :rtype standard_deviation: Expr
+  '''
+  a_casted = a.astype(np.float)
+  if axis is None:
+    return sqrt(mean(abs(a_casted - mean(a_casted)) ** 2))  #.optimized()
+
+  return shuffle(a_casted, _std_mapper, kw={'axis': axis})
+
+
 def _to_structured_array(*vals):
   '''Create a structured array from the given input arrays.
   
