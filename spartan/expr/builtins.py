@@ -220,7 +220,7 @@ def diagonal(a):
 
   :param a: array_like
     Array from which the diagonals are taken.
-  :rtype ArrayExpr
+  :rtype ShuffleExpr
 
   Raises
   ------
@@ -228,6 +228,9 @@ def diagonal(a):
     If the dimension of `a` is less than 2.
 
   '''
+  if len(a.shape) < 2:
+    raise ValueError("diag requires an array of at least two dimensions")
+
   return shuffle(a, _diagonal_mapper)
 
 
