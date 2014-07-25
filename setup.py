@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from setuptools import setup, Extension
+from Cython.Build import cythonize
 import os
 
 cmdclass = {}
@@ -65,22 +66,22 @@ setup(
     Extension('spartan.core', ['spartan/core' + suffix]),
     Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core' + suffix]),
     Extension('spartan.examples.cf.helper', ['spartan/examples/cf/helper' + suffix]),
-    Extension('spartan.rpc.serialization_buffer', 
+    Extension('spartan.rpc.serialization_buffer',
               ['spartan/rpc/serialization_buffer' + suffix]),
     Extension('spartan.cloudpickle', ['spartan/cloudpickle' + suffix]),
-    Extension('spartan.rpc.serialization', 
+    Extension('spartan.rpc.serialization',
               ['spartan/rpc/serialization' + suffix],
-              language='c++', 
-              extra_compile_args=["-std=c++0x"], 
+              language='c++',
+              extra_compile_args=["-std=c++0x"],
               extra_link_args=["-std=c++11"]),
     Extension('spartan.rpc.rlock',
               ['spartan/rpc/rlock' + suffix], language="c++"),
-    Extension('spartan.examples.sklearn.util.graph_shortest_path', 
+    Extension('spartan.examples.sklearn.util.graph_shortest_path',
       ['spartan/examples/sklearn/util/graph_shortest_path' + suffix]),
-    Extension('spartan.sparse', 
-              ['spartan/sparse' + suffix], 
-              language='c++', 
-              extra_compile_args=["-std=c++0x"], 
+    Extension('spartan.sparse',
+              ['spartan/sparse' + suffix],
+              language='c++',
+              extra_compile_args=["-std=c++0x"],
               extra_link_args=["-std=c++11"]),
     Extension('spartan.array.extent', ['spartan/array/extent' + suffix, 'spartan/array/cextent.cc'], language='c++'),
     Extension('spartan.config', ['spartan/config' + suffix, 'spartan/cconfig.cc'], language='c++'),

@@ -148,7 +148,6 @@ cdef class TileExtent(object):
 #import traceback
 counts = collections.defaultdict(int)
 
-from time import time
 cdef c_create(unsigned long long *ul, 
               unsigned long long *lr, 
               unsigned long long *array_shape, 
@@ -181,7 +180,7 @@ cpdef create(ul, lr, array_shape):
   if array_shape is not None:
     for i in xrange(ndim):
       array_shape_mem[i] = array_shape[i]
-  
+
   if array_shape is None:
     return c_create(ul_mem, lr_mem, NULL, ndim)
   else:
