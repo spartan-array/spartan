@@ -249,18 +249,16 @@ CExtent* offset_from(CExtent* base, CExtent* other)
     return extent_create(ul, lr, other->array_shape, base->ndim);
 }
 
-Slice* offset_slice(CExtent* base, CExtent* other)
+void offset_slice(CExtent* base, CExtent* other, Slice slice[])
 {
     Slice* slices;
 
-    slices = new Slice[base->ndim];
+    slice = new Slice[base->ndim];
     for (unsigned i = 0; i < base->ndim; i++) {
-        slices[i].start = other->ul[i] - base->ul[i];
-        slices[i].stop = other->lr[i] - base->lr[i];
-        slices[i].step = 1;
+        slice[i].start = other->ul[i] - base->ul[i];
+        slice[i].stop = other->lr[i] - base->lr[i];
+        slice[i].step = 1;
     }
-
-    return slices;
 }
 
 CExtent* from_slice(Slice idx[], unsigned long long shape[], unsigned ndim)
@@ -314,10 +312,14 @@ CExtent* index_for_reduction(CExtent *index, int axis)
     return drop_axis(index, axis);
 }
 
-bool shapes_match(unsigned long long offset[],  unsigned long long data[], unsigned ndim)
+bool shapes_match(CExtent *ex_a,  CExtent *ex_b)
 {
-    for (unsigned i = 0; i < ndim; i++) {
-        if (offset[i] != data[i]) {
+    if (ex_a->ndim != ex_b->ndim) {
+        return false;
+    }
+
+    for (unsigned i = 0; i < ex_a->ndim; i++) {
+        if (ex_a->shape[i] != ex_b->shape[i]) {
            return false; 
         }
     }

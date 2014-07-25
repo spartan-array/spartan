@@ -83,7 +83,7 @@ CExtent* compute_slice_cy(CExtent* base, long long idx[], unsigned idx_len);
 
 CExtent* offset_from(CExtent* base, CExtent* other);
 
-Slice* offset_slice(CExtent* base, CExtent* other);
+void offset_slice(CExtent* base, CExtent* other, Slice slice[]);
 
 CExtent* from_slice(Slice idx[], unsigned long long shape[], unsigned ndim);
 CExtent* from_slice_cy(long long idx[], 
@@ -97,7 +97,7 @@ void shape_for_reduction(unsigned long long input_shape[],
 
 CExtent* index_for_reduction(CExtent *index, int axis);
 
-bool shapes_match(unsigned long long offset[],  unsigned long long data[], unsigned ndim);
+bool shapes_match(CExtent *ex_a,  CExtent *ex_b);
 
 CExtent* drop_axis(CExtent* ex, int axis);
 
