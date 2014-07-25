@@ -190,6 +190,45 @@ def diag(array):
   '''
   return shuffle(array, diag_mapper)
 
+
+def _diagonal_mapper(array, ex):
+  if ex.ul[0] >= ex.ul[1] and ex.ul[0] < ex.lr[1]:  # Below the diagonal.
+    above, below = False, True
+  elif ex.ul[1] >= ex.ul[0] and ex.ul[1] < ex.lr[0]:  # Above the diagonal.
+    above, below = True, False
+  else:  # Not on the diagonal.
+    return
+
+  start = ex.ul[above]
+  stop = __builtin__.min(ex.lr[above], ex.lr[below])
+  result = np.ndarray((stop - start, ))
+
+  data = array.fetch(ex)
+  index = 0
+  for i in range(start, stop):
+    result[index] = data[i - ex.ul[0], i - ex.ul[1]]
+    index += 1
+
+  res_ex = extent.create((start, ), (stop, ), (__builtin__.min(array.shape), ))
+  yield (res_ex, result)
+
+
+def diagonal(a):
+  '''Return specified diagonals.
+
+  :param a: array_like
+    Array from which the diagonals are taken.
+  :rtype ArrayExpr
+
+  Raises
+  ------
+  ValueError
+    If the dimension of `a` is less than 2.
+
+  '''
+  return shuffle(a, _diagonal_mapper)
+
+
 def _normalize_mapper(array, ex, axis, norm_value):
   '''
   Normalize a region of an array.
@@ -305,28 +344,64 @@ def ones(shape, dtype=np.float, tile_hint=None):
              fn=_make_ones)
 
 
-def _arange_mapper(inputs, ex, dtype=None):
+def _arange_mapper(inputs, ex, start, stop, step, dtype=None):
   pos = extent.ravelled_pos(ex.ul, ex.array_shape)
-  #util.log_info('Extent: %s, shape:%s, pos: %s', ex, ex.shape, pos)
-  sz = np.prod(ex.shape)
-  yield (ex, np.arange(pos, pos + sz, dtype=dtype).reshape(ex.shape))
+  ex_start = pos*step + start
+  ex_stop = np.prod(ex.shape)*step + ex_start
+
+  yield (ex, np.arange(ex_start, ex_stop, step, dtype=dtype).reshape(ex.shape))
 
 
-def arange(shape, dtype=np.float, tile_hint=None):
+def arange(shape=None, start=0, stop=None, step=1, dtype=np.float, tile_hint=None):
   '''
-  An extended version of `np.arange`.  
-  
+  An extended version of `np.arange`.
+
   Returns a new array of the given shape and dtype. Values of the
   array are equivalent to running: ``np.arange(np.prod(shape)).reshape(shape)``.
-  
-  :param shape:
-  :param dtype:
+
+  Shape xor stop must be supplied. If shape is supplied, stop is calculated
+  using the shape, start, and step (if start and step are given). If stop is
+  supplied, then the resulting Expr is a 1d array with length calculated via
+  start, stop, and step.
+
+  :param shape: tuple, optional
+    The shape of the resulting Expr: e.x.(10, ) and (3, 5). Shape xor stop
+    must be supplied.
+  :param start: number, optional
+    Start of interval, including this value. The default start value is 0.
+  :param stop: number, optional
+    End of interval, excluding this value. Shape xor stop must be supplied.
+  :param step: number, optional
+    Spacing between values. The default step size is 1.
+  :param dtype: dtype
+    The type of the output array.
   :param tile_hint:
+
   :rtype: `Expr`
+
+  Examples:
+  sp.arange((3, 5)) == np.arange(15).reshape((3, 5))
+  sp.arange(None, stop=10) == np.arange(10)
+  sp.arange((3, 5), -1) == np.arange(-1, 14).reshape((3, 5))
+  sp.arange((3, 5), step=2) == np.arange(0, 30, 2).reshape((3, 5))
   '''
+  if shape is None and stop is None:
+    raise ValueError('Shape or stop expected, none supplied.')
+
+  if shape is not None and stop is not None:
+    raise ValueError('Only shape OR stop can be supplied, not both')
+
+  if shape is None:
+    # Produces 1d array based on start, stop, step
+    length = int(np.ceil((stop - start) / float(step)))
+    shape = (length, )
+
+  if stop is None:
+    stop = step*(np.prod(shape) + start)
+
   return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
-                 fn=_arange_mapper,
-                 kw={'dtype': dtype})
+                 fn=_arange_mapper, kw={'start': start, 'stop': stop,
+                                        'step': step, 'dtype': dtype})
 
 
 def _sum_local(ex, data, axis):
@@ -477,6 +552,73 @@ def mean(x, axis=None):
     return sum(x, axis) / np.prod(x.shape)
   else:
     return sum(x, axis) / x.shape[axis]
+
+
+def _num_tiles(array):
+  '''Calculate the number of tiles for a given DistArray.'''
+  num_tiles = util.divup(array.shape[0], array.tile_shape()[0])
+  remaining = (array.shape[1] - array.tile_shape()[1]) * num_tiles
+  return num_tiles + util.divup(remaining, array.tile_shape()[1])
+
+
+def _std_mapper(array, ex, axis):
+  '''Helper function for std.
+
+  Calculate the global tile index and use it to calculate a range of rows/cols
+  for which to calculate the standard deviation.
+
+  Example: array: (80, 121). tile_shape: (4, 121), axis: 0 (col).
+  ex = (16, 0) -> (20, 121). col range = 24:30 (6 columns per tile, this is the
+  4th worker).
+  '''
+  num_tiles = _num_tiles(array)
+  arr_index = axis == 0
+  dims_per_tile = util.divup(array.shape[arr_index], num_tiles)
+
+  start = dims_per_tile * ex.ul[0]
+  if start >= array.shape[arr_index]:
+    return
+
+  stop = start + dims_per_tile
+  if stop > array.shape[arr_index]:
+    stop = array.shape[arr_index]
+
+  result = np.ndarray((stop - start, ))
+  index = 0
+  for dim in xrange(start, stop):
+    if axis == 0:
+      new_ex = extent.create((0, dim), (array.shape[0], dim + 1), array.shape)
+    else:
+      new_ex = extent.create((dim, 0), (dim + 1, array.shape[1]), array.shape)
+
+    data = array.fetch(new_ex)
+    result[index] = np.std(data)
+    index += 1
+
+  res_ex = extent.create((start, ), (stop, ), (array.shape[arr_index], ))
+  yield (res_ex, result)
+
+
+def std(a, axis=None):
+  '''Compute the standard deviation along the specified axis.
+
+  Returns the standard deviation of the array elements. The standard deviation
+  is computed for the flattened array by default, otherwise over the specified
+  axis.
+
+  :param a: array_like
+    Calculate the standard deviation of these values.
+  :axis: int, optional
+    Axis along which the standard deviation is computed. The default is to
+    compute the standard deviation of the flattened array.
+
+  :rtype standard_deviation: Expr
+  '''
+  a_casted = a.astype(np.float)
+  if axis is None:
+    return sqrt(mean(abs(a_casted - mean(a_casted)) ** 2))  #.optimized()
+
+  return shuffle(a_casted, _std_mapper, kw={'axis': axis})
 
 
 def _to_structured_array(*vals):
@@ -662,7 +804,9 @@ def multiply(a, b):
 def add(a, b): return map((a, b), fn=np.add)
 
 def sub(a, b): return map((a, b), fn=np.subtract)
-  
+
+def maximum(a, b): return map((a, b), np.maximum)
+
 def ln(v): return map(v, fn=np.log)
 
 def log(v): return map(v, fn=np.log)

@@ -285,6 +285,11 @@ class Assert(object):
     return
 
   @staticmethod
+  def float_close(a, b):
+    '''Test floating point equality.'''
+    Assert.all_close(np.array(a), np.array(b))
+
+  @staticmethod
   def eq(a, b, fmt='', *args):
     assert a == b, 'Failed: %s == %s (%s)' % (a, b, fmt % args)
 
@@ -332,6 +337,14 @@ class Assert(object):
   @staticmethod
   def not_null(expr):
     assert expr is not None, expr
+
+  @staticmethod
+  def raises_exception(exception, function, *args, **kwargs):
+    try:
+      function(*args, **kwargs)
+    except exception:
+      return
+    assert False, '%s expected, no error was raised.' % exception.__name__
 
 
 def trace_fn(fn):
