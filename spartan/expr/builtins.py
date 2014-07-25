@@ -739,11 +739,9 @@ def bincount(v):
       kw = { 'minlength' : maxval + 1})
 
 
-def _translate_extent(ex, a, offsets=None):
+def _translate_extent(ex, a, roffset=0, coffset=0):
   '''Translate the extent ex into a new extent into a.'''
-  if offsets is None:
-    offsets = [0, 0]
-
+  offsets = (roffset, coffset)
   ul = [0] * len(ex.ul)
   lr = [0] * len(ex.lr)
   for index in range(len(ul)):
@@ -751,8 +749,8 @@ def _translate_extent(ex, a, offsets=None):
     tmp_lr = ex.lr[index] - offsets[index]
     if tmp_ul >= a.shape[index] or tmp_lr < 0:
       return None
-    if tmp_lr < 0:
-      tmp_lr = 0
+    if tmp_ul < 0:
+      tmp_ul = 0
     if tmp_lr > a.shape[index]:
       tmp_lr = a.shape[index]
 
@@ -762,9 +760,9 @@ def _translate_extent(ex, a, offsets=None):
 
 
 def _concatenate_mapper(array, ex, a, b, axis):
-  result = np.ndarray(ex.shape)
   data_a = None
   data_b = None
+  result = np.ndarray(ex.shape)
 
   # Fetch only the required data from a and b.
   ex_a = _translate_extent(ex, a)
@@ -773,36 +771,21 @@ def _concatenate_mapper(array, ex, a, b, axis):
 
   # Translate extent for b.
   if axis == 0:
-    ex_b = _translate_extent(ex, b, [a.shape[0], 0])
+    ex_b = _translate_extent(ex, b, a.shape[0])
   else:
-    ex_b = _translate_extent(ex, b, [0, a.shape[1]])
+    ex_b = _translate_extent(ex, b, 0, a.shape[1])
   if ex_b is not None:
     data_b = b.fetch(ex_b)
 
-  util.log_warn('ex: %s, ex_a: %s, ex_b: %s', ex, ex_a, ex_b)
-  index_r, index_c = 0, 0
+  res_idx = 0
   for row in xrange(ex.lr[0] - ex.ul[0]):
-    if len(a.shape) == 1:
-      #util.log_info('ex: %s, row: %d', ex, row)
-      if data_a is None:
-        result[index_r] = data_b[row]
-      elif row < len(data_a):
-        result[index_r] = data_a[row]
-      else:
-        result[index_r] = data_b[row - len(data_a)]
-      index_r += 1
-      continue
-
-    for col in xrange(ex.lr[1] - ex.ul[1]):
-      #util.log_info('a: %s, b: %s, r: %d, c: %d', data_a, data_b, index_r, index_c)
-      if data_a is None:
-        result[index_r, index_c] = data_b[row, col]
-      elif row < data_a.shape[0] and col < data_a.shape[1]:
-        result[index_r, index_c] = data_a[row, col]
-      else:
-        result[index_r, index_c] = data_b[row - data_a.shape[0], col - data_a.shape[1]]
-      index_c += 1
-    index_r += 1
+    if data_a is None:
+      result[res_idx] = data_b[row]
+    elif data_b is None:
+      result[res_idx] = data_a[row]
+    else:
+      result[res_idx] = np.concatenate((data_a[row], data_b[row]), axis)
+    res_idx += 1
 
   yield ex, result
 
