@@ -12,6 +12,8 @@ def benchmark_nbody(ctx, timer):
   galaxy = nbody.random_galaxy(NUM_BODIES)
   nbody.simulate(galaxy, TIMESTEPS)
   r = sp.sum(galaxy['x'] + galaxy['y'] + galaxy['z'])
+  util.log_info('r: %s', r.glom())
+
 
 if __name__ == '__main__':
   test_common.run(__file__)
