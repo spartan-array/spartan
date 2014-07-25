@@ -847,6 +847,75 @@ def bincount(v):
       kw = { 'minlength' : maxval + 1})
 
 
+def _translate_extent(ex, a, roffset=0, coffset=0):
+  '''Translate the extent ex into a new extent into a.'''
+  offsets = (roffset, coffset)
+  ul = [0] * len(ex.ul)
+  lr = [0] * len(ex.lr)
+  for index in range(len(ul)):
+    tmp_ul = ex.ul[index] - offsets[index]
+    tmp_lr = ex.lr[index] - offsets[index]
+    if tmp_ul >= a.shape[index] or tmp_lr < 0:
+      return None
+    if tmp_ul < 0:
+      tmp_ul = 0
+    if tmp_lr > a.shape[index]:
+      tmp_lr = a.shape[index]
+
+    ul[index], lr[index] = tmp_ul, tmp_lr
+
+  return extent.create(ul, lr, a.shape)
+
+
+def _concatenate_mapper(array, ex, a, b, axis):
+  data_a = None
+  data_b = None
+  result = np.ndarray(ex.shape)
+
+  # Fetch only the required data from a and b.
+  ex_a = _translate_extent(ex, a)
+  if ex_a is not None:
+    data_a = a.fetch(ex_a)
+
+  # Translate extent for b.
+  if axis == 0:
+    ex_b = _translate_extent(ex, b, a.shape[0])
+  else:
+    ex_b = _translate_extent(ex, b, 0, a.shape[1])
+  if ex_b is not None:
+    data_b = b.fetch(ex_b)
+
+  res_idx = 0
+  for row in xrange(ex.lr[0] - ex.ul[0]):
+    if data_a is None:
+      result[res_idx] = data_b[row]
+    elif data_b is None:
+      result[res_idx] = data_a[row]
+    else:
+      result[res_idx] = np.concatenate((data_a[row], data_b[row]), axis)
+    res_idx += 1
+
+  yield ex, result
+
+
+def concatenate(a, b, axis=0):
+  '''Join two arrays together.'''
+  # Calculate the shape of the resulting matrix and check dimensions.
+  new_shape = [0] * len(a.shape)
+  for index, (dim1, dim2) in enumerate(zip(a.shape, b.shape)):
+    if index == axis:
+      new_shape[index] = dim1 + dim2
+      continue
+    new_shape[index] = dim1
+    if dim1 != dim2:
+      raise ValueError('all the input array dimensions except for the' \
+          'concatenation axis must match exactly')
+
+  return shuffle(distarray.create(new_shape),
+                 _concatenate_mapper,
+                 kw={'a': a, 'b': b, 'axis': axis})
+
+
 try:
   import scipy.stats
 
