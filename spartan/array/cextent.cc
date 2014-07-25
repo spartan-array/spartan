@@ -6,24 +6,10 @@ CExtent::CExtent(unsigned ndim, bool has_array_shape)
 {
     this->ndim = ndim;
     this->has_array_shape = has_array_shape;
-    //ul = new unsigned long long[ndim];
-    //lr = new unsigned long long[ndim];
-    //shape = new unsigned long long[ndim];
-    //if (has_array_shape) {
-        //array_shape = new unsigned long long[ndim];
-    //} else {
-        //array_shape = NULL;
-    //}
 }
 
 CExtent::~CExtent()
 {
-    //delete ul;
-    //delete lr;
-    //delete shape;
-    //if (has_array_shape) {
-        //delete array_shape;
-    //}
 }
 
 void CExtent::init_info(void)
@@ -97,7 +83,6 @@ CExtent* extent_create(unsigned long long ul[],
 {
     CExtent *ex = new CExtent(ndim, (array_shape != NULL));    
 
-    //std::cout << __func__ << std::endl;
     ex->size = 1;
     for (unsigned i = 0; i < ndim; i++) {
         if (ul[i] >= lr[i]) {
@@ -116,7 +101,6 @@ CExtent* extent_create(unsigned long long ul[],
             ex->array_shape[i] = array_shape[i]; 
         }
     }
-    //ex->init_info();
     return ex;
 }
 
@@ -124,7 +108,6 @@ CExtent* extent_from_shape(unsigned long long shape[], unsigned ndim)
 {
     unsigned long long ul[MAX_NDIM], lr[MAX_NDIM];
 
-    //std::cout << __func__ << std::endl;
     for (unsigned i = 0; i < ndim; i++) {
        ul[i] = 0;
        lr[i] = shape[i];
@@ -138,7 +121,6 @@ void unravelled_pos(unsigned long long idx,
                     unsigned ndim, 
                     unsigned long long pos[]) // output
 {
-    //std::cout << __func__ << std::endl;
     for (int i = ndim - 1; i >= 0; i--) {
         pos[i] = idx % array_shape[i];
         idx /= ndim;
@@ -152,7 +134,6 @@ unsigned long long ravelled_pos(unsigned long long idx[],
     unsigned rpos = 0;
     unsigned mul = 1;
 
-    //std::cout << __func__ << std::endl;
     for (int i = ndim - 1; i >= 0; i--) {
         rpos += mul * idx[i];
         mul *= array_shape[i];
@@ -164,7 +145,6 @@ unsigned long long ravelled_pos(unsigned long long idx[],
 bool all_nonzero_shape(unsigned long long shape[],
                        unsigned ndim)
 {
-    //std::cout << __func__ << std::endl;
     for (unsigned i = 0; i < ndim; i++) {
         if (shape[i] == 0)
             return false;
@@ -179,7 +159,6 @@ void find_rect(unsigned long long ravelled_ul,
                unsigned long long rect_ravelled_ul[], // output
                unsigned long long rect_ravelled_lr[]) // output
 {
-    //std::cout << __func__ << std::endl;
     if (shape[ndim - 1] == 1 || 
         ravelled_ul / shape[ndim - 1] == ravelled_lr / shape[ndim - 1]) {
         *rect_ravelled_ul = ravelled_ul;
@@ -199,13 +178,14 @@ CExtent* intersection(CExtent* a, CExtent* b)
     unsigned long long ul[MAX_NDIM];
     unsigned long long lr[MAX_NDIM];
 
-    //std::cout << __func__ << std::endl;
     if (a == NULL || b == NULL) {
        return NULL; 
     }
     for (unsigned i = 0; i < a->ndim ; i++) {
-        if (a->array_shape[i] != b->array_shape[i])
-            assert (0);
+        if ((a->has_array_shape xor a->has_array_shape) ||
+            (a->has_array_shape && a->array_shape[i] != b->array_shape[i])) {
+            assert(0);
+        }
         if (b->lr[i] < a->ul[i]) return NULL;
         if (a->lr[i] < b->ul[i]) return NULL;
         ul[i] = (a->ul[i] >= b->ul[i]) ? a->ul[i] : b->ul[i];
@@ -220,7 +200,6 @@ CExtent* intersection(CExtent* a, CExtent* b)
  */
 CExtent* find_overlapping(CExtent* extent, CExtent* region)
 {
-    //std::cout << __func__ << std::endl;
     return intersection(extent, region);
 }
 
@@ -229,7 +208,6 @@ CExtent* compute_slice(CExtent* base, Slice idx[], unsigned idx_len)
     unsigned long long ul[MAX_NDIM];
     unsigned long long lr[MAX_NDIM];
 
-    //std::cout << __func__ << std::endl;
     for (unsigned i = 0; i < base->ndim; i++) {
         if (i >= idx_len) {
             ul[i] = base->ul[i];
@@ -249,7 +227,6 @@ CExtent* compute_slice_cy(CExtent* base, long long idx[], unsigned idx_len)
 {
     Slice slices[MAX_NDIM];
 
-    //std::cout << __func__ << std::endl;
     for (unsigned i = 0; i < idx_len; i++) {
         slices[i].start = idx[i * 2]; 
         slices[i].stop = idx[i * 2 + 1]; 
@@ -262,7 +239,6 @@ CExtent* offset_from(CExtent* base, CExtent* other)
     unsigned long long ul[MAX_NDIM];
     unsigned long long lr[MAX_NDIM];
 
-    //std::cout << __func__ << std::endl;
     for (unsigned i = 0; i < base->ndim; i++) {
         if (other->ul[i] < base->ul[i] || other->lr[i] > base->lr[i]) {
             return NULL;
@@ -277,7 +253,6 @@ Slice* offset_slice(CExtent* base, CExtent* other)
 {
     Slice* slices;
 
-    //std::cout << __func__ << std::endl;
     slices = new Slice[base->ndim];
     for (unsigned i = 0; i < base->ndim; i++) {
         slices[i].start = other->ul[i] - base->ul[i];
@@ -292,7 +267,6 @@ CExtent* from_slice(Slice idx[], unsigned long long shape[], unsigned ndim)
 {
     unsigned long long ul[MAX_NDIM], lr[MAX_NDIM];
 
-    //std::cout << __func__ << std::endl;
     for (unsigned i = 0; i < ndim; i++) {
         unsigned long long dim = shape[i];
         if (idx[i].start >= dim) assert(0);
@@ -312,7 +286,6 @@ CExtent* from_slice_cy(long long idx[],
 {
     Slice slices[MAX_NDIM];
 
-    //std::cout << __func__ << std::endl;
     for (unsigned i = 0; i < ndim; i++) {
         slices[i].start = idx[i * 2]; 
         slices[i].stop = idx[i * 2 + 1]; 
@@ -327,7 +300,6 @@ void shape_for_reduction(unsigned long long input_shape[],
                          unsigned long long shape[]) // oputput
 {
     unsigned i;
-    //std::cout << __func__ << std::endl;
     for (i = 0; i < axis; i++) {
         shape[i] = input_shape[i];
     }
@@ -339,13 +311,11 @@ void shape_for_reduction(unsigned long long input_shape[],
 
 CExtent* index_for_reduction(CExtent *index, int axis)
 {
-    //std::cout << __func__ << std::endl;
     return drop_axis(index, axis);
 }
 
 bool shapes_match(unsigned long long offset[],  unsigned long long data[], unsigned ndim)
 {
-    //std::cout << __func__ << std::endl;
     for (unsigned i = 0; i < ndim; i++) {
         if (offset[i] != data[i]) {
            return false; 
@@ -360,7 +330,6 @@ CExtent* drop_axis(CExtent* ex, int axis)
     unsigned long long ul[MAX_NDIM], lr[MAX_NDIM], shape[MAX_NDIM];
     int i;
 
-    //std::cout << __func__ << std::endl;
     if (axis < 0) {
         axis = ex->ndim + axis;
     }
@@ -385,7 +354,6 @@ void find_shape(CExtent **extents, int num_ex,
 {
     int i, j;
 
-    //std::cout << __func__ << std::endl;
     for (i = 0; i < extents[0]->ndim; i++) {
        shape[i] = 1; 
     }
@@ -402,7 +370,6 @@ void find_shape(CExtent **extents, int num_ex,
 
 bool is_complete(unsigned long long shape[], unsigned ndim, Slice slices[])
 {
-    //std::cout << __func__ << std::endl;
     for (unsigned i = 0; i < ndim; i++) {
         if (slices[i].start != 0) return false;
         if (slices[i].stop != shape[i]) return false;
