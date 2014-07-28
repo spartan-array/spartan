@@ -1,21 +1,7 @@
 #ifndef __EXTENT_H__
 #define __EXTENT_H__
 #include <stddef.h>
-#include "slice.h"
-class Slice {
-public:
-    long long start;
-    long long stop;
-    long long step;
-
-    Slice() {};
-    Slice(long long start, long long stop, long long step) {
-        this->start = start; 
-        this->stop = stop;
-        this->step = step;
-    };
-};
-
+#include "cslice.h"
 const int MAX_NDIM = 32;
 class CExtent {
 public:
@@ -36,7 +22,7 @@ public:
     void init_info(void);
     Slice* to_slice(void); 
     unsigned long long ravelled_pos(void);
-    unsigned to_global(unsigned long long idx, int *axis);
+    unsigned to_global(unsigned long long idx, int axis);
     CExtent* add_dim(void);
     CExtent* clone(void);
 };

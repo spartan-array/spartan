@@ -42,11 +42,11 @@ unsigned long long CExtent::ravelled_pos(void)
     return ::ravelled_pos(ul, array_shape, ndim);
 }
 
-unsigned CExtent::to_global(unsigned long long idx, int *axis) 
+unsigned CExtent::to_global(unsigned long long idx, int axis)
 {
     unsigned long long local_idx[MAX_NDIM];
-    if (axis != NULL) {
-       return idx + ul[*axis];
+    if (axis >= 0) {
+       return idx + ul[axis];
     }
 
     unravelled_pos(idx, shape, ndim, local_idx);
@@ -374,7 +374,7 @@ bool is_complete(unsigned long long shape[], unsigned ndim, Slice slices[])
 {
     for (unsigned i = 0; i < ndim; i++) {
         if (slices[i].start != 0) return false;
-        if (slices[i].stop != shape[i]) return false;
+        if (slices[i].stop < shape[i]) return false;
     }
 
     return true;
