@@ -151,7 +151,6 @@ private:
 public:
     CBlobCtx(int32_t wid, std::unordered_map<int32_t, spartan::WorkerProxy*>* peers, CWorker* l_worker = NULL):
         worker_id(wid), local_worker(l_worker), num_workers(peers->size()), workers(peers) {
-        RPC_TIMEOUT = 1000;
     }
 
     ~CBlobCtx() {}
@@ -262,10 +261,6 @@ public:
         RunKernelReq req(tile_ids, mapper_fn);
         _send_all<RunKernelReq, RunKernelResp>(&spartan::WorkerProxy::async_run_kernel,
                                                req, resp);
-
-        for (auto& re : *resp) {
-            Log_debug("receive re:%s", (re->result).c_str());
-        }
         return resp;
     }
 

@@ -22,15 +22,15 @@ private:
     std::string _addr;
     bool _initialized, _running;
 
-    spartan::MasterProxy* _master;
-    std::unordered_map<int32_t, spartan::WorkerProxy*> _peers;
-    CBlobCtx* _ctx;
-    std::unordered_map<TileId, CTile> _blobs;
-    int32_t _id_counter;
-    std::vector<TileId> _kernel_remain_tiles;
-    WorkerStatus* _worker_status;
-    base::SpinLock _blob_lock;
-    base::SpinLock _kernel_lock;
+    spartan::MasterProxy* _master; // rpc client to master
+    std::unordered_map<int32_t, spartan::WorkerProxy*> _peers; // rpc client to other workers
+    CBlobCtx* _ctx; // simple rpc interface
+    std::unordered_map<TileId, CTile> _blobs; // all the tiles in this worker
+    int32_t _id_counter; // TileId counter in local worker
+    std::vector<TileId> _kernel_remain_tiles; // current remain tiles waiting for kernel processing
+    WorkerStatus* _worker_status; // worker status of this worker which will be send to master in each heartbeat
+    base::SpinLock _blob_lock; // lock for _blobs
+    base::SpinLock _kernel_lock; // lock for _kernel_remain_tiles
 
     rpc::PollMgr* _clt_poll;
     rpc::ClientPool* _clt_pool;

@@ -14,7 +14,6 @@ from simplerpc import future
 from simplerpc.future import Future, FutureGroup
 from simplerpc import Server, Client
 from .. import cloudpickle, util
-from . import serialization_buffer
 
 def set_default_timeout(seconds):
   future.set_default_timeout(seconds)
@@ -63,6 +62,6 @@ def serialize(obj):
     return cloudpickle.dumps(obj, -1)
     
 def read(f):
-  return cPickle.load(f)
+  return cPickle.loads(f)
 
 

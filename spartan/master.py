@@ -5,9 +5,6 @@ Spartan computations consist of a master and one or more workers.
 The master tracks the location of array data, manages worker health,
 and runs user operations on workers.
 '''
-import sys
-import os
-import argparse
 import atexit
 import threading
 import weakref
@@ -220,9 +217,3 @@ class Master(MasterService):
 
     blob_ctx.set(self._ctx)
 
-if __name__ == "__main__":
-    parse(sys.argv)
-    master = Master(FLAGS.port_base, FLAGS.num_workers)
-    master.wait_for_initialization()
-    while True:
-      time.sleep(1)

@@ -28,6 +28,8 @@ def deserialize(obj):
     for field in fields:
         if field[1] in ['std::string', 'string']:
             data = getattr(obj, field[0])
+            if len(data) == 0: continue
+
             if data.find('Traceback') >= 0:
                 raise RPCException(data)
             try:
