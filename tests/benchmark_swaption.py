@@ -22,12 +22,15 @@ def benchmark_swaption(ctx, timer):
   # Parameter values for a series of swaptions.
   lamb_all = [0.2, 0.2, 0.15, 0.1]
 
-  swaptions = swaption.simlulate(ts_all, te_all, lamb_all)
+  swaptions = swaption.simulate(ts_all, te_all, lamb_all)
 
   if VERBOSE:
     k = 1
-    for te, ts in zip(te_all, ts_all):
+    for ts, te in zip(ts_all, te_all):
       for i in xrange(len(ts)):
         util.log_info("Ts %i Te %i price %.2f (%.2f)", ts[j], te,
             swaptions[0, k], swaptions[1, k])
         k += 1
+
+if __name__ == '__main__':
+  test_common.run(__file__)
