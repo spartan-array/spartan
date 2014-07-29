@@ -160,14 +160,15 @@ def sparse_diagonal(shape,
                     tile_hint=None):
   return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True), _make_sparse_diagonal)
 
+
 def _diag_mapper(array, ex):
-  '''
-  Create a diagonal array section for this extent.
+  '''Create a diagonal array section for this extent.
+
   If the extent does not lie on the diagonal, a zero array is returned.
-  
-  Args:
-    array (DistArray):
-    ex (Extent): Region being processed.
+
+  :param array: DistArray
+  :param ex: Extent
+    Region being processed.
   '''
   dst_ul = (ex.ul[0], 0)
   dst_lr = (ex.lr[0], array.shape[0])
@@ -178,17 +179,18 @@ def _diag_mapper(array, ex):
   result = np.zeros((ex.lr[0] - ex.ul[0], array.shape[0]))
   for i in range(0, ex.lr[0]-ex.ul[0]):
     result[i, i + ex.ul[0]] = data[i]
-  yield (dst_ex, result)    
+  yield (dst_ex, result)
+
 
 def diag(array):
   '''
   Create a diagonal array with the given data on the diagonal
   the shape should be array.shape[0] * array.shape[0]
-  
-  Args:
-    array: the given data which need to be filled on the diagonal
+
+  :param array: DistArray
+    The data to fill the diagonal.
   '''
-  return shuffle(array, diag_mapper)
+  return shuffle(array, _diag_mapper)
 
 
 def _diagonal_mapper(array, ex):
@@ -218,7 +220,7 @@ def diagonal(a):
 
   :param a: array_like
     Array from which the diagonals are taken.
-  :rtype ArrayExpr
+  :rtype ShuffleExpr
 
   Raises
   ------
@@ -226,6 +228,9 @@ def diagonal(a):
     If the dimension of `a` is less than 2.
 
   '''
+  if len(a.shape) < 2:
+    raise ValueError("diag requires an array of at least two dimensions")
+
   return shuffle(a, _diagonal_mapper)
 
 
@@ -845,6 +850,75 @@ def bincount(v):
       _bincount_mapper, 
       target=target,
       kw = { 'minlength' : maxval + 1})
+
+
+def _translate_extent(ex, a, roffset=0, coffset=0):
+  '''Translate the extent ex into a new extent into a.'''
+  offsets = (roffset, coffset)
+  ul = [0] * len(ex.ul)
+  lr = [0] * len(ex.lr)
+  for index in range(len(ul)):
+    tmp_ul = ex.ul[index] - offsets[index]
+    tmp_lr = ex.lr[index] - offsets[index]
+    if tmp_ul >= a.shape[index] or tmp_lr < 0:
+      return None
+    if tmp_ul < 0:
+      tmp_ul = 0
+    if tmp_lr > a.shape[index]:
+      tmp_lr = a.shape[index]
+
+    ul[index], lr[index] = tmp_ul, tmp_lr
+
+  return extent.create(ul, lr, a.shape)
+
+
+def _concatenate_mapper(array, ex, a, b, axis):
+  data_a = None
+  data_b = None
+  result = np.ndarray(ex.shape)
+
+  # Fetch only the required data from a and b.
+  ex_a = _translate_extent(ex, a)
+  if ex_a is not None:
+    data_a = a.fetch(ex_a)
+
+  # Translate extent for b.
+  if axis == 0:
+    ex_b = _translate_extent(ex, b, a.shape[0])
+  else:
+    ex_b = _translate_extent(ex, b, 0, a.shape[1])
+  if ex_b is not None:
+    data_b = b.fetch(ex_b)
+
+  res_idx = 0
+  for row in xrange(ex.lr[0] - ex.ul[0]):
+    if data_a is None:
+      result[res_idx] = data_b[row]
+    elif data_b is None:
+      result[res_idx] = data_a[row]
+    else:
+      result[res_idx] = np.concatenate((data_a[row], data_b[row]), axis)
+    res_idx += 1
+
+  yield ex, result
+
+
+def concatenate(a, b, axis=0):
+  '''Join two arrays together.'''
+  # Calculate the shape of the resulting matrix and check dimensions.
+  new_shape = [0] * len(a.shape)
+  for index, (dim1, dim2) in enumerate(zip(a.shape, b.shape)):
+    if index == axis:
+      new_shape[index] = dim1 + dim2
+      continue
+    new_shape[index] = dim1
+    if dim1 != dim2:
+      raise ValueError('all the input array dimensions except for the' \
+          'concatenation axis must match exactly')
+
+  return shuffle(distarray.create(new_shape),
+                 _concatenate_mapper,
+                 kw={'a': a, 'b': b, 'axis': axis})
 
 
 try:
