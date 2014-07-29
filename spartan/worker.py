@@ -336,6 +336,8 @@ class Worker(object):
     '''
     last_heartbeat = time.time()
     while self._running:
+      if time == None:
+        return
       now = time.time()
       if now - last_heartbeat < FLAGS.heartbeat_interval or not self._initialized:
         time.sleep(0.1)
@@ -373,6 +375,9 @@ def _start_worker(master, local_id):
   master = rpc.connect(*master)
   worker = Worker(master)
   worker.wait_for_shutdown()
+
+  if FLAGS == None:
+    return
 
   if FLAGS.dump_timers:
     util.TIMER.dump()

@@ -505,21 +505,20 @@ def from_table(extents):
   Shape is computed as the maximum range of all extents.
   
   Dtype is taken from the dtype of the tiles.
-  
+
   :param table:
   '''
   Assert.no_duplicates(extents)
-  
+
   if not extents:
     shape = tuple()
   else:
     shape = extent.find_shape(extents.keys())
-  
+
   if len(extents) > 0:
     # fetch one tile from the table to figure out the dtype
     key, tile_id = extents.iteritems().next()
     util.log_debug('%s :: %s', key, tile_id)
-    
     dtype, sparse = blob_ctx.get().tile_op(tile_id, lambda t: (t.dtype, t.type == tile.TYPE_SPARSE)).result
   else:
     # empty table; default dtype.
@@ -539,7 +538,7 @@ class LocalWrapper(DistArray):
     self.sparse = False
     self.bad_tiles = []
     self._ex = extent.from_slice(np.index_exp[:], self.shape)
-    Assert.isinstance(data, (np.ndarray, int, float))
+    Assert.isinstance(data, (np.ndarray, int, long, float))
     #print 'Wrapping: %s %s (%s)' % (data, type(data), np.isscalar(data))
     #print 'DATA: %s' % type(self._data)
 

@@ -81,7 +81,7 @@ def rand(*shape, **kw):
 
   assert len(kw) == 0, 'Unknown keywords %s' % kw
 
-  for s in shape: assert isinstance(s, int)
+  for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
              fn=_make_rand)
 
@@ -97,7 +97,7 @@ def randn(*shape, **kw):
     tile_hint = kw['tile_hint']
     del kw['tile_hint']
   
-  for s in shape: assert isinstance(s, int)
+  for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randn) 
 
 @not_idempotent
@@ -114,7 +114,7 @@ def randint(*shape, **kw):
     tile_hint = kw['tile_hint']
     del kw['tile_hint']
 
-  for s in shape: assert isinstance(s, int)
+  for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randint, fn_kw=kw) 
 
 @not_idempotent
@@ -137,7 +137,7 @@ def sparse_rand(shape,
     Expr:
   '''
   
-  for s in shape: assert isinstance(s, int)
+  for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True),
              fn=_make_sparse_rand,
              fn_kw = { 'dtype' : dtype, 
@@ -503,7 +503,8 @@ def _dual_reducer(ex, tile, axis, idx_f=None, val_f=None):
   local_idx = idx_f(tile[:], axis)
   local_val = val_f(tile[:], axis)
 
-  global_idx = ex.to_global(local_idx, axis)
+  #global_idx = ex.to_global(local_idx, axis)
+  global_idx = extent.to_global(ex, local_idx, axis)
   new_idx = index_for_reduction(ex, axis)
   new_val = _to_structured_array(('idx', global_idx), ('val', local_val))
 

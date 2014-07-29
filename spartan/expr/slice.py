@@ -98,7 +98,7 @@ class SliceExpr(base.Expr):
     assert not isinstance(self.idx, base.TupleExpr)
 
   def compute_shape(self):
-    if isinstance(self.idx, (int, slice, tuple)):
+    if isinstance(self.idx, (int, long, slice, tuple)):
       src_shape = self.src.compute_shape()
       ex = extent.from_shape(src_shape)
       slice_ex = extent.compute_slice(ex, self.idx)

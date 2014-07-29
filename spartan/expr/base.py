@@ -373,7 +373,7 @@ class Expr(Node):
     from .slice import SliceExpr
     from .filter import FilterExpr
 
-    if isinstance(idx, (int, tuple, slice)):
+    if isinstance(idx, (int, long, tuple, slice)):
       return SliceExpr(src=self, idx=idx)
     else:
       return FilterExpr(src=self, idx=idx)

@@ -9,10 +9,6 @@ public:
     unsigned long long lr[MAX_NDIM];
     unsigned long long array_shape[MAX_NDIM];
     unsigned long long shape[MAX_NDIM];
-    //unsigned long long *ul;
-    //unsigned long long *lr;
-    //unsigned long long *array_shape;
-    //unsigned long long *shape;
     unsigned long long size;
     unsigned ndim;
     bool has_array_shape;
@@ -22,7 +18,7 @@ public:
     void init_info(void);
     Slice* to_slice(void); 
     unsigned long long ravelled_pos(void);
-    unsigned to_global(unsigned long long idx, int axis);
+    unsigned to_global(unsigned long long idx);
     CExtent* add_dim(void);
     CExtent* clone(void);
 };

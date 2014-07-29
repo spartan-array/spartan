@@ -50,9 +50,7 @@ def _reduce_mapper(ex, children, child_to_var, op, axis, output):
   ctx = LocalCtx(inputs=local_values)
 
   local_reduction = op.evaluate(ctx)
-  print ex, axis
   dst_extent = extent.index_for_reduction(ex, axis)
-  print dst_extent, dst_extent.size
   
   # HACK -- scipy.sparse matrices output DENSE values
   # with the WRONG shape.  Fix shapes here that have

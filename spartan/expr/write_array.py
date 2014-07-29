@@ -29,7 +29,6 @@ from traits.api import PythonValue
 
 def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
   intersection = extent.intersection(ex, sregion)
-
   futures = rpc.FutureGroup()
   if intersection != None:
     dst_lr = np.asarray(intersection.lr) - np.asarray(sregion.ul)

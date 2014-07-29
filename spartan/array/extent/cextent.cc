@@ -42,12 +42,14 @@ unsigned long long CExtent::ravelled_pos(void)
     return ::ravelled_pos(ul, array_shape, ndim);
 }
 
-unsigned CExtent::to_global(unsigned long long idx, int axis)
+unsigned CExtent::to_global(unsigned long long idx/*, int axis*/)
 {
     unsigned long long local_idx[MAX_NDIM];
+    /* The originaly Python pass a numpy.ndarray if axis != None
     if (axis >= 0) {
+        assert(0);
        return idx + ul[axis];
-    }
+    }*/
 
     unravelled_pos(idx, shape, ndim, local_idx);
     for (unsigned i = 0; i < ndim; i++) {
@@ -86,6 +88,9 @@ CExtent* extent_create(unsigned long long ul[],
     ex->size = 1;
     for (unsigned i = 0; i < ndim; i++) {
         if (ul[i] >= lr[i]) {
+            if (ul[i] > lr[i]) {
+                 std::cout << __func__ << " OOps " << i << " " << ul[i] << " " << lr[i] << std::endl;
+            }
            delete ex;
            return NULL;
         }
@@ -123,7 +128,7 @@ void unravelled_pos(unsigned long long idx,
 {
     for (int i = ndim - 1; i >= 0; i--) {
         pos[i] = idx % array_shape[i];
-        idx /= ndim;
+        idx /= array_shape[i];
     }
 }
 
@@ -182,7 +187,7 @@ CExtent* intersection(CExtent* a, CExtent* b)
        return NULL; 
     }
     for (unsigned i = 0; i < a->ndim ; i++) {
-        if ((a->has_array_shape xor a->has_array_shape) ||
+        if ((a->has_array_shape xor b->has_array_shape) ||
             (a->has_array_shape && a->array_shape[i] != b->array_shape[i])) {
             assert(0);
         }
@@ -251,12 +256,9 @@ CExtent* offset_from(CExtent* base, CExtent* other)
 
 void offset_slice(CExtent* base, CExtent* other, Slice slice[])
 {
-    Slice* slices;
-
-    slice = new Slice[base->ndim];
     for (unsigned i = 0; i < base->ndim; i++) {
         slice[i].start = other->ul[i] - base->ul[i];
-        slice[i].stop = other->lr[i] - base->lr[i];
+        slice[i].stop = other->lr[i] - base->ul[i];
         slice[i].step = 1;
     }
 }
@@ -268,7 +270,7 @@ CExtent* from_slice(Slice idx[], unsigned long long shape[], unsigned ndim)
     for (unsigned i = 0; i < ndim; i++) {
         unsigned long long dim = shape[i];
         if (idx[i].start >= dim) assert(0);
-        if (idx[i].stop >= dim) assert(0);
+        if (idx[i].stop > dim) assert(0);
         if (idx[i].start < 0) idx[i].start += dim;
         if (idx[i].stop < 0) idx[i].stop += dim;
         ul[i] = idx[i].start;
@@ -312,6 +314,7 @@ CExtent* index_for_reduction(CExtent *index, int axis)
     return drop_axis(index, axis);
 }
 
+/*
 bool shapes_match(CExtent *ex_a,  CExtent *ex_b)
 {
     if (ex_a->ndim != ex_b->ndim) {
@@ -326,6 +329,7 @@ bool shapes_match(CExtent *ex_a,  CExtent *ex_b)
 
     return true;
 }
+*/
 
 CExtent* drop_axis(CExtent* ex, int axis)
 {
@@ -363,8 +367,8 @@ void find_shape(CExtent **extents, int num_ex,
     for (i = 0; i < num_ex; i++) {
         CExtent *ex = extents[i];
         for (j = 0; j < ex->ndim; j++) {
-            if (shape[i] < ex->lr[i]) {
-                shape[i] = ex->lr[i];
+            if (shape[j] < ex->lr[j]) {
+                shape[j] = ex->lr[j];
             }
         }
     }
