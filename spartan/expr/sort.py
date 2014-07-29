@@ -5,7 +5,7 @@ from .tile_operation import tile_operation
 from .shuffle import shuffle
 from .base import force
 from .. import util
-from .. import rpc
+from .. import fastrpc
 from .. import blob_ctx
 
 def _sample_sort_mapper(array, ex, sample_rate, local_sorted_array):
@@ -52,7 +52,7 @@ def _fetch_sort_mapper(array, ex, partition_counts):
   id = sorted_exts.index(ex)
 
   ctx = blob_ctx.get()
-  futures = rpc.FutureGroup()
+  futures = fastrpc.FutureGroup()
   dst_idx = 0
   for ex in sorted_exts:
     tile_id = array.tiles[ex]
@@ -63,7 +63,7 @@ def _fetch_sort_mapper(array, ex, partition_counts):
       fetch_slice = tuple([slice(partition_counts[tile_id][0][id], partition_counts[tile_id][0][id+1], None)])
       futures.append(ctx.get_flatten(tile_id, fetch_slice, wait=False))
  
-  result = np.concatenate([resp.data for resp in futures.wait()], axis=None)
+  result = np.concatenate([resp.data for resp in futures.result], axis=None)
   yield extent.create((dst_idx,), (dst_idx+result.size,), (np.prod(array.shape),)), np.sort(result, axis=None)
   
 def sort(array, sample_rate=0.1):

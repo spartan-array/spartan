@@ -1,4 +1,4 @@
-#include "../core.h"
+#include "../ccore.h"
 
 %%
 
@@ -12,7 +12,7 @@ abstract service Master {
 
 abstract service Worker {
   fast initialize(InitializeReq req | EmptyMessage resp)
-  fast get_tile_info(TileIdMessage req | RunKernelResp resp)
+  fast get_tile_info(TileIdMessage req | TileInfoResp resp)
   create(CreateTileReq req | TileIdMessage resp)
   fast destroy(DestroyReq req | EmptyMessage resp)
   update(UpdateReq req | EmptyMessage resp)

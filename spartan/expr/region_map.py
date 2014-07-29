@@ -42,7 +42,7 @@ def _region_mapper(ex, orig_array=None, _slice_fn=None, _slice_extent=None, fn_k
       result[subslice] = _slice_fn(result[subslice], orig_array, ex, **fn_kw)
       
       result_tile = tile.from_data(result)
-      tile_id = blob_ctx.get().create(result_tile).wait().tile_id
+      tile_id = blob_ctx.get().create(result_tile).result.tile_id
      
       return core.LocalKernelResult(result=[(ex, tile_id)])
     

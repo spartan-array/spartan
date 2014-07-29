@@ -1,0 +1,44 @@
+C++ utilities
+Santa Zhang (santa1987@gmail.com)
+
+What is included
+================
+
+This is a library of C++ code that I found frequently useful. In it you will find:
+
+  * Integer types with explicit size: `i8, i16, i32, i64...` (shorter than int*_t)
+  * Inherit from `NoCopy` and you got a non-copiable class
+  * Inherit from `RefCounted` and you got a class with reference counting
+  * `Counter, Timer, Rand`, easy to use
+  * `Enumerator` to represent a stream of data
+  * A `verify()` macro to check invariants and print stack trace on failure
+  * `Log::debug, Log::info...` for logging at different verbosity levels
+  * String manipulation: `streq, startswith, endswith, strsplit...`
+  * `Pthread_*` macros to call pthread functions and also verify their return value
+  * `SpinLock, Mutex, ScopedLock, CondVar`, thread-safe `Queue`, and `ThreadPool`
+  * Defer an action with `RunLater`
+  * A much smaller testing framework than Google Test (with same flavor)
+
+
+How to build
+============
+
+As simple as:
+
+    ./waf configure
+    ./waf
+
+After build finished, you will have `libbase.a` in the `build` folder.
+
+Optionally you can test it:
+
+    ./build/unittest
+
+
+How to use
+==========
+
+    #include "base/all.h"
+    using namespace base;
+
+Yup. That's it. Check the code in `test` folder for examples.

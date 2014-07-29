@@ -1,0 +1,7 @@
+namespace floodtest;
+
+service Flood {
+    fast update_node_list(vector<string> nodes);
+    fast flood();
+    udp fast flood_udp();
+};

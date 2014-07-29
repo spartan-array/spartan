@@ -8,7 +8,7 @@ import scipy.sparse
 import numpy as np
 
 from . import tile, extent
-from .. import util, core, blob_ctx, rpc, sparse
+from .. import util, core, blob_ctx, fastrpc, sparse
 from ..core import LocalKernelResult
 from ..util import Assert
 from ..config import FLAGS
@@ -305,7 +305,7 @@ class DistArrayImpl(DistArray):
     #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
     #util.log_info('Fetching %d tiles', len(splits))
 
-    futures = []
+    futures = fastrpc.FutureGroup()
     for ex, intersection in splits:
       tile_id = self.tiles[ex]
       futures.append(ctx.get(tile_id, extent.offset_slice(ex, intersection), wait=False))
@@ -313,7 +313,7 @@ class DistArrayImpl(DistArray):
     # stitch results back together
     # if we have any masked tiles, then we need to create a masked array.
     # otherwise, create a dense array.
-    results = [r.data for r in rpc.wait_for_all(futures)]
+    results = [r.data for r in futures.result]
    
     DENSE = 0
     MASKED = 1
@@ -370,7 +370,7 @@ class DistArrayImpl(DistArray):
       return ctx.update(tile_id, dst_slice, data, self.reducer_fn, wait=wait)
     
     
-    futures = []
+    futures = fastrpc.FutureGroup()
     slices = []
     
     if region.shape == self.shape:
@@ -405,9 +405,9 @@ class DistArrayImpl(DistArray):
                                 wait=False))
 
     if wait:
-      rpc.wait_for_all(futures)
+      futures.wait()
     else:
-      return rpc.FutureGroup(futures)
+      return futures
 
 def create(shape,
            dtype=np.float,
@@ -459,7 +459,7 @@ def create(shape,
       tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype, tile_type=tile_type))
       
   for ex in extents:
-    tiles[ex] = tiles[ex].wait().tile_id
+    tiles[ex] = tiles[ex].result.tile_id
 
   #for ex, i in extents.iteritems():
   #  util.log_warn("i:%d ex:%s, tile_id:%s", i, ex, tiles[ex])
@@ -491,7 +491,7 @@ def from_replica(X):
                   hint=worker_id+1)
       
   for ex in tiles:
-    tiles[ex] = tiles[ex].wait().tile_id
+    tiles[ex] = tiles[ex].result.tile_id
     
   array = DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
   master.get().register_array(array)
@@ -520,7 +520,9 @@ def from_table(extents):
     key, tile_id = extents.iteritems().next()
     util.log_debug('%s :: %s', key, tile_id)
     
-    dtype, sparse = blob_ctx.get().tile_op(tile_id, lambda t: (t.dtype, t.type == tile.TYPE_SPARSE)).result
+    resp = blob_ctx.get().get_tile_info(tile_id)
+    dtype = getattr(np, resp.dtype)
+    sparse = resp.sparse
   else:
     # empty table; default dtype.
     dtype = np.float

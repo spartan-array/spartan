@@ -157,7 +157,6 @@ def parse(argv):
   import spartan.expr.local
   import spartan.expr.optimize
   import spartan.cluster
-  import spartan.worker
   import spartan.util
 
   if FLAGS._parsed:
@@ -207,7 +206,7 @@ def parse(argv):
   # reset loggers so that basic config works
   logging.root = logging.RootLogger(logging.WARNING)
   logging.basicConfig(
-    format='%(created)f %(hostname)s:%(pid)s %(filename)s:%(lineno)s [%(funcName)s] %(message)s',
+          format='%(levelname)s %(asctime)s %(filename)s:%(lineno)s | %(hostname)s[%(pid)s] %(funcName)s: %(message)s',
     level=FLAGS.log_level,
     stream=sys.stderr)
 

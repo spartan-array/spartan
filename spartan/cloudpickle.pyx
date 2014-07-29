@@ -62,7 +62,7 @@ import traceback
 import re
 cimport cython
 from cpython cimport bool
-from spartan.rpc.serialization_buffer import Writer
+from spartan.fastrpc.serialization_buffer import Writer
 
 # Keep in synch with cPickle.  This is the highest protocol number we
 # know how to read.

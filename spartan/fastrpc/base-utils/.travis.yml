@@ -1,0 +1,12 @@
+env:
+    - DEBUG=0
+    - DEBUG=1
+
+script:
+    - ./waf configure
+    - ./waf
+    - ./build/unittest
+
+after_success:
+    - sudo apt-get -qq install valgrind
+    - valgrind --leak-check=full --show-reachable=yes ./build/unittest

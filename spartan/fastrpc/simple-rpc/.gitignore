@@ -1,0 +1,13 @@
+.waf*
+/build
+.lock-waf*
+*.pyc
+.cproject
+.project
+.settings
+*.tar*
+*.sublime*
+*.swp
+*.prof
+*.pb.cc
+*.pb.h

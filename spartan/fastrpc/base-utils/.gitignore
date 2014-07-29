@@ -1,0 +1,11 @@
+.waf*
+/build
+.lock-waf*
+*.pyc
+.cproject
+.project
+.settings
+*.tar*
+*.sublime*
+*.swp
+*.prof
