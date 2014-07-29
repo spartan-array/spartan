@@ -29,8 +29,7 @@ def assign(a, idx, value):
   region = extent.from_slice(idx, a.shape)
 
   # Ensure value is an array
-  if not isinstance(value, np.ndarray):
-    # TODO(rgardner): Does this work for DistArrays?
+  if np.isscalar(value):
     a_value = np.ndarray(region.shape)
     a_value[:] = value
     value = a_value
