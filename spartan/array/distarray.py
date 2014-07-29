@@ -148,7 +148,7 @@ class DistArray(object):
 
   def __len__(self):
     ''' Alias of real_size(self). '''
-    return self.real_size()
+    return self.shape[0]
 
   def __repr__(self):
     return '%s(id=%s, shape=%s, dtype=%s)' % (self.__class__.__name__, id(self), self.shape, self.dtype)
@@ -178,6 +178,7 @@ class DistArray(object):
     if np.isscalar(idx):
       result = self.select(slice(idx, idx + 1))
       return result[0]
+
 
     ex = extent.from_slice(idx, self.shape)
     #util.log_info('Select: %s + %s -> %s', idx, self.shape, ex)
