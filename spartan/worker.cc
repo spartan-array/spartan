@@ -230,10 +230,10 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
         PyRun_SimpleString("from spartan.fastrpc import read, serialize, FutureGroup");
 
         PyDict_SetItemString(pLocal, "worker_ctx", Py_BuildValue("k", _ctx));
-        PyDict_SetItemString(pLocal, "fn", Py_BuildValue("s", req.fn.c_str()));
+        PyDict_SetItemString(pLocal, "fn", Py_BuildValue("s#", req.fn.c_str(), req.fn.size()));
 
         PyRun_String(init_cmd, Py_file_input, pLocal, pLocal);
-        PyRun_SimpleString("print mapper_fn, kw\nprint mapper_fn(*kw)\n");
+        PyRun_SimpleString("print mapper_fn(*kw)\n");
         PyRun_SimpleString("ctx = blob_ctx.get()\n");
     }
 
