@@ -14,17 +14,17 @@ public:
     std::string class_name;
     std::string name;
     std::string help;
-    std::string val_str;
+    std::string val;
 
     CFlag() : name(""), help("") {};
     CFlag(std::string name, std::string default_val = "", std::string help = "") {
         this->name = name;
         this->help = help;
-        this->val_str = default_val;
+        this->val = default_val;
     };
 
-    std::string get_val_str(void) {return val_str;};
     virtual void parse(std::string str) {return;};
+    virtual void* get(void) {return &val;};
 };
 
 class IntFlag : public CFlag {
@@ -39,12 +39,11 @@ public:
         std::istringstream(str) >> val;
     };
 
-    int get(void) {return val;};
+    void* get(void) {return &val;};
 };
 
 class StrFlag : public CFlag {
 public:
-    std::string val;
     StrFlag(std::string name, std::string default_val = "", std::string help = "")
         : CFlag(name, default_val, help) {
         parse(default_val);
@@ -53,7 +52,7 @@ public:
     void parse(std::string str) {
         val = str;
     }
-    std::string get(void) {return val;};
+    void* get(void) {return &val;};
 };
 
 class BoolFlag : public CFlag {
@@ -74,7 +73,7 @@ public:
            assert (0);
         }
     };
-    bool get(void) {return val;};
+    void* get(void) {return &val;};
 };
 
 struct host {
@@ -93,7 +92,7 @@ public:
     void parse(std::string str) {
         std::istringstream ss(str);
         std::string host;
-
+        val.clear();
         while (std::getline(ss, host, ',')) {
             std::string hostname;
             int hostcount;
@@ -107,6 +106,7 @@ public:
         }
     };
     struct host get(int index) {return val[index];};
+    void* get(void) {return &val;};
 };
 
 enum AssignMode {
@@ -140,7 +140,7 @@ public:
             assert(0);
         }
     };
-    AssignMode get(void) {return val;};
+    void* get(void) {return &val;};
 };
 
 class LogLevelFlag : public CFlag {
@@ -166,7 +166,7 @@ public:
             assert(0);
         }
     };
-    LogLevel get(void) {return val;};
+    void* get(void) {return &val;};
 };
 
 class CFlags {
@@ -193,6 +193,12 @@ public:
         } else {
             return NULL;
         }
+    };
+
+    template<typename T>
+    T& get_val(std::string keyword) {
+        assert (vals.find(keyword) != vals.end());
+        return *((T*)vals[keyword]->get());
     };
 
     CFlag* next(void) {

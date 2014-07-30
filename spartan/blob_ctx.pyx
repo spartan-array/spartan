@@ -50,10 +50,10 @@ cdef extern from "ccore.h":
 
 cdef extern from "cblob_ctx.h":
   cdef cppclass CBlobCtx:
-    unsigned long py_get(TileId*, SubSlice*, GetResp*)
-    unsigned long py_get_flatten(TileId*, SubSlice*, GetResp*)
-    unsigned long py_update(TileId*, SubSlice*, string*, int)
-    unsigned long py_create(CTile*, TileIdMessage*)
+    unsigned long py_get(TileId*, SubSlice*, GetResp*) nogil
+    unsigned long py_get_flatten(TileId*, SubSlice*, GetResp*) nogil
+    unsigned long py_update(TileId*, SubSlice*, string*, int) nogil
+    unsigned long py_create(CTile*, TileIdMessage*) nogil
 
 ID_COUNTER = iter(xrange(10000000))
 

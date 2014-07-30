@@ -126,7 +126,7 @@ std::vector<const char*> get_flags_info(void)
     while ((flag = FLAGS.next()) != NULL) {
         list.push_back(flag->class_name.c_str());
         list.push_back(flag->name.c_str());
-        list.push_back(flag->val_str.c_str());
+        list.push_back(flag->val.c_str());
         list.push_back(flag->help.c_str());
     }
     return list;
@@ -137,6 +137,15 @@ std::vector<const char*> get_flags_info(void)
 int main(int argc, char *argv[])
 {
     config_parse(argc, argv);
+    std::cout << FLAGS.get_val<int>("count") << std::endl;
+    std::cout << FLAGS.get_val<std::string>("master") << std::endl;
+    std::cout << FLAGS.get_val<bool>("cluster") << std::endl;
+    std::vector<struct host> v = FLAGS.get_val<std::vector<struct host>>("hosts");
+    for (auto& h : v) {
+        std::cout << h.name << ":" << h.count << std::endl;
+    }
+    std::cout << FLAGS.get_val<AssignMode>("assign_mode") << std::endl;
+    std::cout << FLAGS.get_val<LogLevel>("log_level") << std::endl;
     return 0;
 }
 #endif

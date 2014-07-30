@@ -110,9 +110,7 @@ void CWorker::wait_for_shutdown() {
  */
 
 void CWorker::initialize(const InitializeReq& req, EmptyMessage* resp) {
-    Log_debug("CWorker %d initializing...", req.id);
     id = req.id;
-
     for (auto& it : req.peers) {
         _peers[it.first] = new spartan::WorkerProxy(_clt_pool->get_client(it.second));
     }
@@ -141,7 +139,7 @@ void CWorker::create(const CreateTileReq& req, TileIdMessage* resp) {
 void CWorker::destroy(const DestroyReq& req, EmptyMessage* resp) {
     lock(_blob_lock);
     for (auto& tid : req.ids) {
-        Log_debug("destroy tile:%s", tid.to_string().c_str());
+        //Log_debug("destroy tile:%s", tid.to_string().c_str());
         if (tid.worker == id)
             _blobs.erase(tid);
     }
@@ -185,26 +183,22 @@ void CWorker::get_flatten(const GetReq& req, GetResp* resp) {
 
 void CWorker::cancel_tile(const TileIdMessage& req, rpc::i8* resp) {
     Log_info("receive cancel_tile %s", req.tile_id.to_string().c_str());
+    *resp = 0;
     lock(_kernel_lock);
-    if (_kernel_remain_tiles.size() > 0) {
-        assert(_kernel_remain_tiles.front() == req.tile_id);
+    if (_kernel_remain_tiles.size() > 0 && _kernel_remain_tiles.front() == req.tile_id) {
         _kernel_remain_tiles.erase(_kernel_remain_tiles.begin());
         *resp = 1;
-    } else {
-        *resp = 0;
     }
     unlock(_kernel_lock);
 }
 
 void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
-    Log_debug("receive run_kernel req");
-
+    lock(_blob_lock);
     for (auto& tid : req.blobs) {
         if (tid.worker == id)
             _kernel_remain_tiles.push_back(tid);
     }
-
-    //if (_kernel_remain_tiles.size() == 0) return;
+    unlock(_blob_lock);
 
     // TODO:sort _kernel_remain_tiles according to tile size
     // self._kernel_remain_tiles.sort()
@@ -215,9 +209,10 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
                       "futures=FutureGroup()\n";
 
     char mapper_cmd[] = "tile_id = core.TileId(*tid)\n"
-        "map_result = mapper_fn(tile_id, blob, **kw)\n"
-        "results[tile_id]=map_result.result\n"
-        "if map_result.futures is not None:\n\tfutures.append(map_result.futures)\n";
+                        "map_result = mapper_fn(tile_id, blob, **kw)\n"
+                        "results[tile_id]=map_result.result\n"
+                        "if map_result.futures is not None:\n"
+                        "\tfutures.append(map_result.futures)\n";
 
     PyObject *pMain, *pLocal;
     {
@@ -233,15 +228,22 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
         PyDict_SetItemString(pLocal, "fn", Py_BuildValue("s#", req.fn.c_str(), req.fn.size()));
 
         PyRun_String(init_cmd, Py_file_input, pLocal, pLocal);
+
         PyRun_SimpleString("print mapper_fn(*kw)\n");
         PyRun_SimpleString("ctx = blob_ctx.get()\n");
     }
 
-    while (_kernel_remain_tiles.size() > 0) {
+    TileId tid;
+    while (true) {
         lock(_kernel_lock);
-        TileId& tid = _kernel_remain_tiles.back();
-        _kernel_remain_tiles.pop_back();
-        unlock(_kernel_lock);
+        if (_kernel_remain_tiles.size() > 0) {
+            tid = _kernel_remain_tiles.back();
+            _kernel_remain_tiles.pop_back();
+            unlock(_kernel_lock);
+        } else {
+            unlock(_kernel_lock);
+            break;
+        }
 
         //CTile blob = _blobs[tid];
 
@@ -285,7 +287,7 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
     */
     {
         GILHelper gil_helper;
-        PyRun_String("returnstr = serialize(results)\n", Py_file_input, pLocal, pLocal);
+        PyRun_SimpleString("returnstr = serialize(results)\n");
         PyObject* re = PyDict_GetItemString(pLocal, "returnstr");
         resp->result = std::string(PyString_AsString(re), PyString_Size(re));
     }
@@ -295,8 +297,8 @@ void start_worker(int32_t port, int argc, char** argv) {
     std::string w_addr = "0.0.0.0:" + std::to_string(port);
     Log_info("start worker pid %d at %s", getpid(), w_addr.c_str());
 
-    CWorker* w = new CWorker(((StrFlag*)FLAGS.get("master"))->get(), w_addr,
-                             ((IntFlag*)FLAGS.get("heartbeat_interval"))->get());
+    CWorker* w = new CWorker(FLAGS.get_val<std::string>("master"), w_addr,
+                             FLAGS.get_val<int>("heartbeat_interval"));
 
     // start rpc server
     rpc::PollMgr* poll = new rpc::PollMgr;
@@ -335,9 +337,9 @@ void start_worker(int32_t port, int argc, char** argv) {
 int main(int argc, char* argv[]) {
     config_parse(argc, argv);
 
-    base::LOG_LEVEL = ((LogLevelFlag*)FLAGS.get("log_level"))->get();
-    int num_workers = ((IntFlag*)FLAGS.get("count"))->get();
-    int port_base = ((IntFlag*)FLAGS.get("port_base"))->get() + 1;
+    base::LOG_LEVEL = FLAGS.get_val<LogLevel>("log_level");
+    int num_workers = FLAGS.get_val<int>("count");
+    int port_base = FLAGS.get_val<int>("port_base") + 1;
 
     // start #num_workers workers in this host
     for (int i = 0; i < num_workers; i++) {
