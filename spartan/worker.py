@@ -284,9 +284,13 @@ class Worker(object):
 
       # Some expression reuse tiles from previous distarray. In such cases, 
       # the results contain tile_id this worker already has.
+      result_tile_id_set = set()
+      for result in results.iteritems():
+        for _blob in result[1]:
+          result_tile_id_set.add(_blob[1])
+
       with self._lock:
-        result_tile_id_set = set(results.iterkeys())
-        for tile_id in result_tile_id_set.union(original_tile_id_set):
+        for tile_id in result_tile_id_set.intersection(original_tile_id_set):
           self._blobs[tile_id].refcnt += 1
 
       finish_time = time.time()
