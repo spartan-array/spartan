@@ -160,14 +160,15 @@ def sparse_diagonal(shape,
                     tile_hint=None):
   return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True), _make_sparse_diagonal)
 
+
 def _diag_mapper(array, ex):
-  '''
-  Create a diagonal array section for this extent.
+  '''Create a diagonal array section for this extent.
+
   If the extent does not lie on the diagonal, a zero array is returned.
-  
-  Args:
-    array (DistArray):
-    ex (Extent): Region being processed.
+
+  :param array: DistArray
+  :param ex: Extent
+    Region being processed.
   '''
   dst_ul = (ex.ul[0], 0)
   dst_lr = (ex.lr[0], array.shape[0])
@@ -178,17 +179,18 @@ def _diag_mapper(array, ex):
   result = np.zeros((ex.lr[0] - ex.ul[0], array.shape[0]))
   for i in range(0, ex.lr[0]-ex.ul[0]):
     result[i, i + ex.ul[0]] = data[i]
-  yield (dst_ex, result)    
+  yield (dst_ex, result)
+
 
 def diag(array):
   '''
   Create a diagonal array with the given data on the diagonal
   the shape should be array.shape[0] * array.shape[0]
-  
-  Args:
-    array: the given data which need to be filled on the diagonal
+
+  :param array: DistArray
+    The data to fill the diagonal.
   '''
-  return shuffle(array, diag_mapper)
+  return shuffle(array, _diag_mapper)
 
 
 def _diagonal_mapper(array, ex):
@@ -218,7 +220,7 @@ def diagonal(a):
 
   :param a: array_like
     Array from which the diagonals are taken.
-  :rtype ArrayExpr
+  :rtype ShuffleExpr
 
   Raises
   ------
@@ -226,6 +228,9 @@ def diagonal(a):
     If the dimension of `a` is less than 2.
 
   '''
+  if len(a.shape) < 2:
+    raise ValueError("diag requires an array of at least two dimensions")
+
   return shuffle(a, _diagonal_mapper)
 
 
