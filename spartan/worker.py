@@ -286,8 +286,9 @@ class Worker(object):
       # the results contain tile_id this worker already has.
       result_tile_id_set = set()
       for result in results.iteritems():
-        for _blob in result[1]:
-          result_tile_id_set.add(_blob[1])
+        if result[1] is not None:
+          for _blob in result[1]:
+            result_tile_id_set.add(_blob[1])
 
       with self._lock:
         for tile_id in result_tile_id_set.intersection(original_tile_id_set):
