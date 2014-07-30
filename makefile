@@ -17,7 +17,6 @@ OBJS_TEST = $(MAINDIR)/test.o
 APPS = rpc worker
 
 all: $(APPS)
-		#export LD_LIBRARY_PATH=/home/chenqi/workspace/spartan/spartan/fastrpc/simple-rpc/build/:$(LD_LIBRARY_PATH)
 
 .cc.o:
 		$(CC) $(CFLAGS) $< -c -o $@
