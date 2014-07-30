@@ -141,7 +141,7 @@ class Worker(object):
       else:
         id = req.tile_id
       self._blobs[id] = req.data
-        
+
     resp = core.TileIdMessage(tile_id=id)
     handle.done(resp)
 
