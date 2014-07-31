@@ -264,7 +264,7 @@ class Worker(object):
       
       # wait for all kernel update operations to finish
       rpc.wait_for_all(futures) 
-
+      
       # We've finished processing our local set of tiles.  
       # If we are load balancing, check with the master if it's possible to steal
       # a tile from another worker.
@@ -301,7 +301,7 @@ class Worker(object):
       self.worker_status.add_task_failure(req)
       handle.exception()
       
-    util.log_debug('worker(%s) kernel run time:%s', self.id, time.time() - start_time)
+    util.log_debug('worker(%s) kernel run time:%s', self.id, finish_time - start_time)
      
   def run_kernel(self, req, handle):
     '''
