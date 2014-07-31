@@ -138,6 +138,9 @@ class DistArray(object):
   def foreach_tile(self, mapper_fn, kw):
     raise NotImplementedError
 
+  def extent_for_blob(self, id):
+    raise NotImplementedError
+
   def real_size(self):
     '''The actual number of elements contained by this array.
 

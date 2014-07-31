@@ -114,6 +114,14 @@ class Reshape(distarray.DistArray):
 
     return blob_ctx.get().map(tiles, mapper_fn = _tile_mapper, kw=kw)
 
+  def extent_for_blob(self, id):
+    base_ex = self.base.blob_to_ex[id]
+    ravelled_ul, ravelled_lr = _ravelled_ex(base_ex.ul, base_ex.lr, self.base.shape)
+    unravelled_ul, unravelled_lr = _unravelled_ex(ravelled_ul,
+                                                  ravelled_lr,
+                                                  self.shape)
+    return extent.create(unravelled_ul, np.array(unravelled_lr) + 1, self.shape)
+ 
   def fetch(self, ex):
     ravelled_ul, ravelled_lr = _ravelled_ex(ex.ul, ex.lr, self.shape)
     base_ravelled_ul, base_ravelled_lr = extent.find_rect(ravelled_ul,
