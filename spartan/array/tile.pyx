@@ -40,6 +40,7 @@ class Tile(object):
     self.type = tile_type
     self.mask = mask
     self.data = data
+    self.refcnt = 1
 
     if data is not None:
       Assert.eq(data.shape, shape)

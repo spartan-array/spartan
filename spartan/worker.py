@@ -140,8 +140,8 @@ class Worker(object):
         id = self._ctx.new_tile_id()
       else:
         id = req.tile_id
-  
       self._blobs[id] = req.data
+
     resp = core.TileIdMessage(tile_id=id)
     handle.done(resp)
 
@@ -160,7 +160,10 @@ class Worker(object):
     with self._lock:
       for id in req.ids:
         if id in self._blobs:
-          del self._blobs[id]
+          blob = self._blobs[id]
+          blob.refcnt -= 1
+          if blob.refcnt == 0:
+            del self._blobs[id]
           #util.log_info('Destroyed blob %s', id)
 
     #util.log_info('Destroy...')
@@ -238,6 +241,7 @@ class Worker(object):
     '''
     start_time = time.time()
     futures = []
+    original_tile_id_set = set(self._blobs.iterkeys())
     try:
       blob_ctx.set(self._ctx)
       results = {}
@@ -277,7 +281,20 @@ class Worker(object):
             rpc.wait_for_all(map_result.futures)
              
           tile_id = self._ctx.maybe_steal_tile(tile_id, id).tile_id
-      
+
+      # Some expression reuse tiles from previous distarray. In such cases, 
+      # the results contain tile_id this worker already has.
+      result_tile_id_set = set()
+      for result in results.iteritems():
+        if result[1] is not None:
+          for _blob in result[1]:
+            result_tile_id_set.add(_blob[1])
+
+      with self._lock:
+        for tile_id in result_tile_id_set.intersection(original_tile_id_set):
+          self._blobs[tile_id].refcnt += 1
+
+      finish_time = time.time()
       handle.done(results)
     except:
       util.log_warn('Exception occurred during kernel call', exc_info=1)
