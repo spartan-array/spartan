@@ -74,6 +74,10 @@ class Slice(distarray.DistArray):
                                         '_slice_extent' : self.slice,
                                         '_slice_fn' : mapper_fn })
 
+  def extent_for_blob(self, id):
+    base_ex = self.base.blob_to_ex[id]
+    return extent.intersection(self.slice, base_ex)
+ 
   def fetch(self, idx):
     offset = extent.compute_slice(self.slice, idx.to_slice())
     return self.base.fetch(offset)
