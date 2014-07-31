@@ -4,14 +4,13 @@
 
 import numpy as np
 
-from .. import util
-from ..array import distarray, extent
+from ..array import extent
 from .region_map import region_map
 
 
 def _assign_mapper(tile, array, ex, value):
   '''Helper function for assign.'''
-  return tile
+  return value
 
 
 def assign(a, idx, value):

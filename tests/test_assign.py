@@ -13,9 +13,9 @@ class BuiltinTest(test_common.ClusterTest):
     b = np.ones((10, ))
     region = np.s_[10, ]
 
-    sp_a = assign(from_numpy(a), region, b)
+    sp_a = assign(from_numpy(a), region, b).glom()
     a[region] = b
-    Assert.all_eq(sp_a.glom(), a)
+    Assert.all_eq(sp_a, a)
 
 
   def test_assign_expr(self):
@@ -23,25 +23,28 @@ class BuiltinTest(test_common.ClusterTest):
     a = np.zeros((20, 10))
     b = np.ones((10, ))
     region_a = np.s_[10, ]
-    sp_a = assign(from_numpy(a), region_a, from_numpy(b))
+
+    sp_a = assign(from_numpy(a), region_a, from_numpy(b)).glom()
     a[region_a] = b
-    Assert.all_eq(sp_a.glom(), a)
+    Assert.all_eq(sp_a, a)
 
     # Larger matrix
     c = np.zeros((200, 100))
     d = np.ones((100, ))
     region_c = np.s_[50, ]
-    sp_c = assign(from_numpy(c), region_c, from_numpy(d))
+
+    sp_c = assign(from_numpy(c), region_c, from_numpy(d)).glom()
     c[region_c] = d
-    Assert.all_eq(sp_c.glom(), c)
+    Assert.all_eq(sp_c, c)
 
     # Worst case region
     e = np.zeros((200, 100))
     f = np.ones((3, 50))
     region_e = np.s_[99:102, 25:75]
-    sp_e = assign(from_numpy(e), region_e, from_numpy(f))
+
+    sp_e = assign(from_numpy(e), region_e, from_numpy(f)).glom()
     e[region_e] = f
-    Assert.all_eq(sp_e.glom(), e)
+    Assert.all_eq(sp_e, e)
 
 
 if __name__ == '__main__':
