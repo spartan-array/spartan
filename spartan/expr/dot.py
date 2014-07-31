@@ -48,7 +48,7 @@ def _dot_mapper(inputs, ex, av, bv):
 
   target_shape = (av.shape[0], bv.shape[1])
   ul = np.asarray([ex_a.ul[0], 0])
-  lr = ul + target_shape
+  lr = ul + (a.shape[0], b.shape[1])
   target_ex = extent.create(ul, lr, target_shape)
 
   # util.log_info('A: %s', a.dtype)
