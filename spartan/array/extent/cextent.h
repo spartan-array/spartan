@@ -1,7 +1,7 @@
 #ifndef __EXTENT_H__
 #define __EXTENT_H__
 #include <stddef.h>
-#include "cslice.h"
+#include "../carray/cslice.h"
 const int MAX_NDIM = 32;
 class CExtent {
 public:

@@ -36,69 +36,45 @@ cpdef sparse_to_dense_update(np.ndarray[ndim=2, dtype=DTYPE_FLT] target,
         target[rows[i], cols[i]] = target[rows[i], cols[i]] + data[i]
       elif reducer == REDUCE_MUL:
         target[rows[i], cols[i]] = target[rows[i], cols[i]] * data[i]
-    
+
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
-def dot_coo_dense_dict(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not None):
-    """Multiply a sparse coo matrix by a dense vector
-    
-    Parameters
-    ----------
-    X : scipy.sparse.coo_matrix
-        A sparse matrix, of size N x M
-    W : np.ndarray[dtype=DTYPE_FLT, ndim=1]
-        A dense vector, of size M.
-        
-    Returns
-    -------
-    A : coo matrix, the result of multiplying X by W.
-    """
+def compute_sparse_update(data, update, slices, reducer = None):
+  '''
+  csr_matrix and csc_matrix can't support fancing indexing like
+  data[slices] = update. This API uses hstack and vstack to implement update.
+  This is a out-place update and can only support slicing with step is 1.
+  '''
+  if data.shape[0] > data.shape[1]:
+    data = data.tocsc()
+    update = update.tocsc()
+    if reducer is not None:
+      update = reducer(data[slices], update).tocsc()
+  else:
+    data = data.tocsr()
+    update = update.tocsr()
+    if reducer is not None:
+      update = reducer(data[slices], update).tocsr()
 
-    if X.shape[1] != W.shape[0] and W.shape[1] != 1:
-        raise ValueError('Matrices are not aligned!')
-      
-    cdef np.ndarray[DTYPE_INT, ndim=1] rows = X.row
-    cdef np.ndarray[DTYPE_INT, ndim=1] cols = X.col
-    cdef np.ndarray[DTYPE_FLT, ndim=1] data = X.data
-    
-    #cdef map[DTYPE_INT, DTYPE_FLT] result
-    cdef dict result = {}
-    #cdef np.ndarray[DTYPE_FLT] result
-    #result = numpy.zeros(X.shape[0], dtype=numpy.float64)
-    
-    cdef int i   
-    for i in xrange(rows.shape[0]):
-        #result[rows[i]] += data[i] * W[cols[i], 0]
-        if not result.has_key(rows[i]):
-            result[rows[i]] = data[i] * W[cols[i], 0]
-        else:
-            result[rows[i]] += data[i] * W[cols[i], 0]
-    
-    cdef int size = len(result)
-    #cdef int size = result.size()
-    cdef np.ndarray[DTYPE_INT] new_rows = numpy.zeros(size, dtype=numpy.int32)
-    cdef np.ndarray[DTYPE_INT] new_cols = numpy.zeros(size, dtype=numpy.int32)
-    cdef np.ndarray[DTYPE_FLT] new_data = numpy.zeros(size, dtype=numpy.float32)
+  upper_slice = (__builtins__.slice(0, slices[0].start),
+                 __builtins__.slice(0, data.shape[1]))
+  midleft_slice = (__builtins__.slice(slices[0].start, slices[0].stop),
+                   __builtins__.slice(0, slices[1].start))
+  midright_slice = (__builtins__.slice(slices[0].start, slices[0].stop),
+                    __builtins__.slice(slices[1].stop, data.shape[1]))
+  lower_slice = (__builtins__.slice(slices[0].stop, data.shape[0]),
+                 __builtins__.slice(0, data.shape[1]))
 
-    result_list = sorted(result.iteritems(), key=lambda d:d[0])
+  if slices[1].start > 0:
+    update = scipy.sparse.hstack((data[midleft_slice], update), dtype = data.dtype)
+  if slices[1].stop < data.shape[1]:
+    update = scipy.sparse.hstack((update, data[midright_slice]), dtype = data.dtype)
+  if slices[0].start > 0:
+    update = scipy.sparse.vstack((data[upper_slice], update), dtype = data.dtype)
+  if slices[0].stop < data.shape[0]:
+    update = scipy.sparse.vstack((update, data[lower_slice]), dtype = data.dtype)
+
+  return update
     
-    i = 0
-    for (key, val) in result_list:
-        new_rows[i] = key
-        new_data[i] = val
-        i = i + 1
-
-    #cdef pair[DTYPE_INT, DTYPE_FLT] entry
-    #cdef map[DTYPE_INT, DTYPE_FLT].iterator iter = result.begin()
-    #i = 0
-    #while iter != result.end():
-    #    entry = deref(iter)
-    #    new_rows[i] = entry.first
-    #    new_data[i] = entry.second
-    #    i = i + 1
-    #    inc(iter)
-
-    return scipy.sparse.coo_matrix((new_data, (new_rows, new_cols)), shape=(X.shape[0], 1))
-
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
 def dot_coo_dense_unordered_map(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not None):
     """Multiply a sparse coo matrix by a dense vector
@@ -157,56 +133,18 @@ def dot_coo_dense_unordered_map(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] 
  
     return scipy.sparse.coo_matrix((new_data, (new_rows, new_cols)), shape=(X.shape[0], 1))
 
-@cython.boundscheck(False) # turn of bounds-checking for entire function   
-def dot_coo_dense_vec(X not None, np.ndarray[ndim=2, dtype=DTYPE_FLT] W not None):
-    """Multiply a sparse coo matrix by a dense vector
-    
-    Parameters
-    ----------
-    X : scipy.sparse.coo_matrix
-        A sparse matrix, of size N x M
-    W : np.ndarray[dtype=DTYPE_FLT, ndim=1]
-        A dense vector, of size M.
-        
-    Returns
-    -------
-    A : coo matrix, the result of multiplying X by W.
-    """
-
-    if X.shape[1] != W.shape[0] and W.shape[1] != 1:
-        raise ValueError('Matrices are not aligned!')
-      
-    cdef np.ndarray[DTYPE_INT, ndim=1] rows = X.row
-    cdef np.ndarray[DTYPE_INT, ndim=1] cols = X.col
-    cdef np.ndarray[DTYPE_FLT, ndim=1] data = X.data
-    
-    cdef np.ndarray[DTYPE_FLT] result
-    result = numpy.zeros(X.shape[0], dtype=numpy.float32)
-    
-    cdef int i   
-    for i in xrange(rows.shape[0]):
-        result[rows[i]] += data[i] * W[cols[i], 0]
-    
-    cdef np.ndarray[DTYPE_INT] new_rows = result.nonzero()[0].astype(numpy.int32)
-    cdef np.ndarray[DTYPE_INT] new_cols = numpy.zeros(new_rows.size, dtype=numpy.int32)
-    cdef np.ndarray[DTYPE_FLT] new_data = result[new_rows]
-
-    return scipy.sparse.coo_matrix((new_data, (new_rows, new_cols)), shape=(X.shape[0], 1))
-
-@cython.boundscheck(False) # turn of bounds-checking for entire function   
-def slice(X not None, tuple slices):
-    if slices is None:
-        return X
-
-    if isinstance(X, scipy.sparse.coo_matrix) and X.shape[1] == 1:
-        return slice_coo(X, slices)
-    elif scipy.sparse.issparse(X):
-        result = X[slices].tocoo()
-        if result.getnnz() == 0:
-            return None
-        return result
+@cython.boundscheck(False) # turn of bounds-checking for entire function
+def convert_sparse_array(array, use_getitem = True):
+  if array.shape[0] > array.shape[1]:
+    if not use_getitem and array.nnz < array.shape[0]:
+      return array.tocoo()
     else:
-        return X[slices]
+      return array.tocsc()
+  else:
+    if not use_getitem and array.nnz < array.shape[1]:
+      return array.tocoo()
+    else:
+      return array.tocsr()
 
 @cython.boundscheck(False) # turn of bounds-checking for entire function   
 def slice_coo(X not None, tuple slices):
@@ -227,57 +165,6 @@ def slice_coo(X not None, tuple slices):
     return scipy.sparse.coo_matrix((data[idx_begin:idx_end], (rows[idx_begin:idx_end]-row_begin, cols[idx_begin:idx_end])), shape=tuple([slice.stop-slice.start for slice in slices]))
 
 @cython.boundscheck(False) # turn of bounds-checking for entire function
-def convert_sparse_array(array, use_getitem = True):
-  if array.shape[0] > array.shape[1]:
-    if not use_getitem and array.nnz < array.shape[0]:
-      return array.tocoo()
-    else:
-      return array.tocsc()
-  else:
-    if not use_getitem and array.nnz < array.shape[1]:
-      return array.tocoo()
-    else:
-      return array.tocsr()
-
-@cython.boundscheck(False) # turn of bounds-checking for entire function   
-def compute_sparse_update(data, update, slices, reducer = None):
-  '''
-  csr_matrix and csc_matrix can't support fancing indexing like
-  data[slices] = update. This API uses hstack and vstack to implement update.
-  This is a out-place update and can only support slicing with step is 1.
-  '''
-  if data.shape[0] > data.shape[1]:
-    data = data.tocsc()
-    update = update.tocsc()
-    if reducer is not None:
-      update = reducer(data[slices], update).tocsc()
-  else:
-    data = data.tocsr()
-    update = update.tocsr()
-    if reducer is not None:
-      update = reducer(data[slices], update).tocsr()
-
-  upper_slice = (__builtins__.slice(0, slices[0].start),
-                 __builtins__.slice(0, data.shape[1]))
-  midleft_slice = (__builtins__.slice(slices[0].start, slices[0].stop),
-                   __builtins__.slice(0, slices[1].start))
-  midright_slice = (__builtins__.slice(slices[0].start, slices[0].stop),
-                    __builtins__.slice(slices[1].stop, data.shape[1]))
-  lower_slice = (__builtins__.slice(slices[0].stop, data.shape[0]),
-                 __builtins__.slice(0, data.shape[1]))
-
-  if slices[1].start > 0:
-    update = scipy.sparse.hstack((data[midleft_slice], update), dtype = data.dtype)
-  if slices[1].stop < data.shape[1]:
-    update = scipy.sparse.hstack((update, data[midright_slice]), dtype = data.dtype)
-  if slices[0].start > 0:
-    update = scipy.sparse.vstack((data[upper_slice], update), dtype = data.dtype)
-  if slices[0].stop < data.shape[0]:
-    update = scipy.sparse.vstack((update, data[lower_slice]), dtype = data.dtype)
-
-  return update
-
-@cython.boundscheck(False) # turn of bounds-checking for entire function
 def multiple_slice(X not None, list slices):
     if len(slices) == 0:
         return []
@@ -290,7 +177,7 @@ def multiple_slice(X not None, list slices):
             result = X[src_slice]
             if result.getnnz() == 0:
                 continue
-            result = convert_sparse_array(result, use_getitem = False)
+            #result = convert_sparse_array(result, use_getitem = False)
             l.append((tile_id, dst_slice, result))
         return l
     else:

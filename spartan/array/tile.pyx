@@ -74,7 +74,7 @@ class Tile(object):
         shape = self.shape if subslice == None else tuple([slice.stop - slice.start for slice in subslice])
         return scipy.sparse.coo_matrix(shape, self.dtype)
         
-      return np.ndarray(self.shape, self.dtype)[subslice]
+      return np.empty(self.shape, self.dtype)[subslice]
 
     # scalars are just returned directly.
     if len(self.data.shape) == 0:
@@ -221,15 +221,8 @@ def merge(old_tile, subslice, update, reducer):
     if old_tile.type == TYPE_DENSE:
       #util.log_debug('Update sparse to dense')
       update_coo = update.tocoo()
-      sparse.sparse_to_dense_update(old_tile.data, old_tile.mask, update_coo.row, update_coo.col, update_coo.data,
-                                        sparse.REDUCE_ADD)
-      #util.log_info('Update %s', update)
-      #util.log_info('Update COO %s', update_coo) 
-      #util.log_info('New mask: %s', old_tile.mask)
-      #if reducer is not None:
-      #  old_tile.data[subslice] = reducer(old_tile.data[subslice], update)
-      #else:
-      #  old_tile.data[subslice] = update.todense()
+      sparse.sparse_to_dense_update(old_tile.data, old_tile.mask, update_coo.row,
+                                    update_coo.col, update_coo.data, sparse.REDUCE_ADD)
       old_tile.mask[subslice] = True
     else:
       if old_tile.shape == update.shape:
@@ -252,10 +245,6 @@ def merge(old_tile, subslice, update, reducer):
     # accumulate:
     # old_data[subslice] = reduce(old_data[subslice], data) 
 
-    #util.log_info('%s %s', old_tile.mask, new_tile.mask)
-    #util.log_info('REPLACE: %s', replaced)
-    #util.log_info('UPDATE: %s', updated)
-    
     # If the update shape is the same as the tile, 
     # then avoid doing a (possibly expensive) slice update. 
     if old_tile.data.shape == update.shape:
