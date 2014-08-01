@@ -10,7 +10,27 @@ from .region_map import region_map
 
 def _assign_mapper(tile, array, ex, value):
   '''Helper function for assign.'''
-  return value
+  if np.isscalar(value):
+    return value
+
+  from ..util import log_info
+  from .base import Expr
+
+  if len(ex.shape) == 1:
+    region = slice(ex.ul[0], ex.lr[0])
+    return value[ex.to_slice]
+
+  if len(value.shape) == 1:
+    if ex.shape[1] > value.shape[0]:
+      return value
+    region = slice(ex.ul[1], ex.lr[1])
+    return value[region]
+
+  if ex.shape[1] > value.shape[1]:
+    return value
+
+  region = slice(ex.ul[1], ex.lr[1])
+  return value[0][region]
 
 
 def assign(a, idx, value):
