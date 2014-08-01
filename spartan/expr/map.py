@@ -64,7 +64,7 @@ def tile_mapper(ex, children, child_to_var, op, source_array=None):
       if sp.issparse(v):
         local_values[k] = v.todense()
     
-  # Set extent and information for user functions
+  # Set extent and array information for user functions
   if hasattr(op.fn, 'func_code'):
     if 'ex' in op.fn.func_code.co_varnames or 'extent' in op.fn.func_code.co_varnames:
       op.deps.append(LocalInput(idx='extent'))
