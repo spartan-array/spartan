@@ -31,7 +31,7 @@ def benchmark_cholesky(ctx, timer):
   t1 = datetime.now()
   L = cholesky(A).glom()
   t2 = datetime.now()
-  #assert np.all(np.isclose(A.glom(), np.dot(L, L.T.conj())))
+  assert np.all(np.isclose(A.glom(), np.dot(L, L.T.conj())))
   cost_time = millis(t1,t2)
   print "total cost time:%s ms, per iter cost time:%s ms" % (cost_time, cost_time/n)
 
