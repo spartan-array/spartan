@@ -69,25 +69,32 @@ def simulate(ts_all, te_all, lamb_all):
         f_kn = f_kn_new
 
       # PRODUCT
+      print "PRODUCT"
       # Value of zero coupon bonds.
       zcb = ones((int((te - ts)/DELTA) + 1, 2*N))
       for j in xrange(zcb.shape[0] - 1):
         # XXX(rgardner): Expressions are read only.
         #zcb[j + 1, :] = zcb[j, :] / (1 + DELTA*f_kn[j, :])
         tmp = zcb[j, :] / (1 + DELTA*f_kn[j, :])
-        zcb = assign(zcb, np.s_[j + 1, :], tmp)
+        zcb = assign(zcb, np.s_[j + 1], tmp[0])
 
       # Swaption price at maturity.
       tmp = THETA*DELTA*expr.sum(zcb[1:, :], 0)
       swap_ts = maximum(1 - zcb[-1, :] - tmp, 0)
 
+      print "SPOT MEASURE"
       # Spot measure used for discounting.
       b_ts = ones((2*N, ))
+      f_kk.force()
       for j in xrange(int(ts/DELTA)):
-        b_ts *= (1 + DELTA*f_kk[j, :])
+        tmp = 1 + DELTA*f_kk[j]
+        #print b_ts * tmp
+        b_ts *= tmp
+        print b_ts.glom()
 
       print swap_ts.glom()
       print b_ts.glom()
+      exit(1)
       # Swaption prce at time 0.
       swaption = swap_ts/b_ts
 
