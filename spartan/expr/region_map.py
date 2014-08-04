@@ -1,9 +1,10 @@
 from .map import map
 from ..array import extent
 from .optimize import disable_parakeet
+from .base import Expr
 
 @disable_parakeet
-def _region_mapper(input, ex, array, region=None, user_fn=None, fn_kw=None):
+def _region_mapper(input, ex, array, region, user_fn, fn_kw=None):
   '''
   Run when mapping over a region.
   Computes the intersection of the current tile and a global region.
@@ -46,8 +47,11 @@ def region_map(array, region, fn, fn_kw=None):
   Returns:
     MapExpr: An expression node.
   '''
-  if isinstance(region, extent.TileExtent):
-    region = list([region])
+  if isinstance(region, extent.TileExtent): region = list([region])
+  if fn_kw is not None:
+    for k, v in fn_kw.iteritems():
+      if isinstance(v, Expr):
+        fn_kw[k] = v.evaluate()
   
   kw = {'fn_kw': fn_kw, 'user_fn': fn, 'region': region}
   return map(array, fn=_region_mapper, fn_kw=kw)

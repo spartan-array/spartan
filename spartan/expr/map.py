@@ -66,13 +66,15 @@ def tile_mapper(ex, children, child_to_var, op, source_array=None):
     
   # Set extent and array information for user functions
   if hasattr(op.fn, 'func_code'):
-    if 'ex' in op.fn.func_code.co_varnames or 'extent' in op.fn.func_code.co_varnames:
-      op.deps.append(LocalInput(idx='extent'))
+    if 'ex' in op.fn.func_code.co_varnames:
       local_values['extent'] = ex
+      if len([d for d in op.deps if d.idx == 'extent']) == 0:
+        op.deps.append(LocalInput(idx='extent'))
     
     if 'array' in op.fn.func_code.co_varnames:
-      op.deps.append(LocalInput(idx='array'))
       local_values['array'] = source_array
+      if len([d for d in op.deps if d.idx == 'array']) == 0:
+        op.deps.append(LocalInput(idx='array'))
     
   #local_values = dict([(k, v.fetch(ex)) for (k, v) in children.iteritems()])
   #util.log_info('Local %s', [type(v) for v in local_values.values()])
