@@ -78,6 +78,11 @@ def move(galaxy, dt):
   '''Move the bodies.
   First find forces and change velocity and then move positions.
   '''
+  # `.reshape(tuple([1] + list(...)))` is the spartan way of doing
+  #   `ndarray[np.newaxis, :]` in numpy. While syntactically different, both
+  #   add a dimension of length 1 before the other dimensions.
+  #   e.g. (5, 5) becomes (1, 5, 5)
+
   # Calculate all distances component wise (with sign).
   dx_new = galaxy['x'].reshape(tuple([1] + list(galaxy['x'].shape)))
   dy_new = galaxy['y'].reshape(tuple([1] + list(galaxy['y'].shape)))
@@ -86,7 +91,7 @@ def move(galaxy, dt):
   dy = (galaxy['y'] - transpose(dy_new)) * -1
   dz = (galaxy['z'] - transpose(dz_new)) * -1
 
-  # Euclidian distances (all bodys).
+  # Euclidean distances (all bodies).
   r = sqrt(dx**2 + dy**2 + dz**2)
   set_diagonal(r, 1.0)
 

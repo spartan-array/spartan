@@ -249,7 +249,7 @@ class Expr(Node):
       self.stack_trace = ExprTrace()
 
     eval_cache.register(self.expr_id)
-    self.needs_cache = self.needs_cache and FLAGS.optimization and FLAGS.opt_expression_cache
+    self.needs_cache = self.needs_cache and FLAGS.opt_expression_cache
     
   def evaluate(self):
     '''
