@@ -5,7 +5,7 @@ import test_common
 from spartan.config import FLAGS
 from spartan.examples import nbody
 
-NUM_BODIES = 10
+NUM_BODIES = 1000
 TIMESTEPS = 20
 
 
@@ -20,6 +20,7 @@ def nbody_wrapper():
 
 
 def benchmark_nbody(ctx, timer):
+  FLAGS.optimization = 1
   timer.time_op('nbody', lambda: nbody_wrapper())
 
 
