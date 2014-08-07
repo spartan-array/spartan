@@ -5,7 +5,7 @@ import test_common
 from spartan.examples import nbody
 
 NUM_BODIES = 1000
-TIMESTEPS = 20
+TIMESTEPS = 50
 
 
 def nbody_wrapper():
