@@ -12,39 +12,72 @@ class BuiltinTest(test_common.ClusterTest):
     a = np.zeros((20, 10))
     b = np.ones((10, ))
     region = np.s_[10, ]
-
     sp_a = assign(from_numpy(a), region, b).glom()
     a[region] = b
     Assert.all_eq(sp_a, a)
 
 
+  def test_assign_1d(self):
+    b = np.random.randn(100)
+    sp_b = from_numpy(b)
+
+    #a[:] = b[:] copy entire array
+    a = np.random.randn(100)
+    region_a = np.s_[0:100]
+    region_b = np.s_[0:100]
+    sp_a = assign(from_numpy(a), region_a, sp_b[region_b]).glom()
+    a[region_a] = b[region_b]
+    Assert.all_eq(sp_a, a)
+
+    # a[0] = b[1] copy one value
+    a = np.random.randn(100)
+    region_a = np.s_[0]
+    region_b = np.s_[1]
+    sp_a = assign(from_numpy(a), region_a, sp_b[region_b]).glom()
+    a[region_a] = b[region_b]
+    Assert.all_eq(sp_a, a)
+
+    # a[0:10] = b[20:30] copy range of values
+    a = np.random.randn(100)
+    region_a = np.s_[0:10]
+    region_b = np.s_[20:30]
+    sp_a = assign(from_numpy(a), region_a, sp_b[region_b]).glom()
+    a[region_a] = b[region_b]
+    Assert.all_eq(sp_a, a)
+
+    # a[30:60] = b[:30] copy range of values, not starting from 0.
+    a = np.random.randn(100)
+    region_a = np.s_[0:10]
+    region_b = np.s_[20:30]
+    sp_a = assign(from_numpy(a), region_a, sp_b[region_b]).glom()
+    a[region_a] = b[region_b]
+    Assert.all_eq(sp_a, a)
+
+
   def test_assign_expr(self):
     # Small matrix
-    a = np.zeros((20, 10))
-    b = np.ones((10, ))
+    a = np.random.randn(20, 10)
+    b = np.random.randn(10)
     region_a = np.s_[10, ]
-
     sp_a = assign(from_numpy(a), region_a, from_numpy(b)).glom()
     a[region_a] = b
     Assert.all_eq(sp_a, a)
 
     # Larger matrix
-    c = np.zeros((200, 100))
-    d = np.ones((100, ))
-    region_c = np.s_[50, ]
-
-    sp_c = assign(from_numpy(c), region_c, from_numpy(d)).glom()
-    c[region_c] = d
-    Assert.all_eq(sp_c, c)
+    a = np.random.randn(200, 100)
+    b = np.random.randn(100)
+    region_a = np.s_[50, ]
+    sp_a = assign(from_numpy(a), region_a, from_numpy(b)).glom()
+    a[region_a] = b
+    Assert.all_eq(sp_a, a)
 
     # Worst case region
-    e = np.zeros((200, 100))
-    f = np.ones((3, 50))
-    region_e = np.s_[99:102, 25:75]
-
-    sp_e = assign(from_numpy(e), region_e, from_numpy(f)).glom()
-    e[region_e] = f
-    Assert.all_eq(sp_e, e)
+    a = np.random.randn(200, 100)
+    b = np.random.randn(3, 50)
+    region_a = np.s_[99:102, 25:75]
+    sp_a = assign(from_numpy(a), region_a, from_numpy(b)).glom()
+    a[region_a] = b
+    Assert.all_eq(sp_a, a)
 
 
 if __name__ == '__main__':
