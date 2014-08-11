@@ -28,7 +28,7 @@ from . import broadcast
 
 from scipy import sparse as sp
 
-def tile_mapper(ex, children, child_to_var, op):
+def tile_mapper(ex, children, child_to_var, op, source_array=None):
   '''
   Run for each tile of a `Map` operation.
   
@@ -64,6 +64,18 @@ def tile_mapper(ex, children, child_to_var, op):
       if sp.issparse(v):
         local_values[k] = v.todense()
     
+  # Set extent and array information for user functions
+  if hasattr(op, 'fn') and hasattr(op.fn, 'func_code'):
+    if 'ex' in op.fn.func_code.co_varnames:
+      local_values['extent'] = ex
+      if len([d for d in op.deps if d.idx == 'extent']) == 0:
+        op.deps.append(LocalInput(idx='extent'))
+    
+    if 'array' in op.fn.func_code.co_varnames:
+      local_values['array'] = source_array
+      if len([d for d in op.deps if d.idx == 'array']) == 0:
+        op.deps.append(LocalInput(idx='array'))
+    
   #local_values = dict([(k, v.fetch(ex)) for (k, v) in children.iteritems()])
   #util.log_info('Local %s', [type(v) for v in local_values.values()])
   #util.log_info('Local %s', local_values)
@@ -73,6 +85,9 @@ def tile_mapper(ex, children, child_to_var, op):
 
   #util.log_info('Inputs: %s', local_values)
   result = op.evaluate(op_ctx)
+  
+  if result is None:
+    return LocalKernelResult(result=[(ex, source_array.tiles[ex])])
   
   #util.log_info('Result: %s', result)
   Assert.eq(ex.shape, result.shape, 
@@ -99,17 +114,32 @@ class MapExpr(Expr):
     return 'Map(%s, %s)' % (self.op.pretty_str(),
                             indent(self.children.pretty_str()))
 
+
   def compute_shape(self):
     '''MapTiles retains the shape of inputs.
 
     Broadcasting results in a map taking the shape of the largest input.
+
+    Right align matrices according to numpy broadcasting rules. See `broadcast`
+    in spartan/expr/broadcast.py for reference.
+
     '''
-    shapes = [i.shape for i in self.children]
+    orig_shapes = [list(x.shape) for x in self.children]
+    dims = [len(shape) for shape in orig_shapes]
+    max_dim = max(dims)
+    new_shapes = []
+
+    # prepend filler dimensions for smaller arrays
+    for shp in orig_shapes:
+      diff = max_dim - len(shp)
+      new_shapes.append([1] * diff + shp)
+
     output_shape = collections.defaultdict(int)
-    for s in shapes:
+    for s in new_shapes:
       for i, v in enumerate(s):
         output_shape[i] = max(output_shape[i], v)
     return tuple([output_shape[i] for i in range(len(output_shape))])
+
 
   def _evaluate(self, ctx, deps):
     children = deps['children']
@@ -127,7 +157,7 @@ class MapExpr(Expr):
 
     return largest.map_to_array(
               tile_mapper, 
-              kw = {'children':children, 'child_to_var':child_to_var, 'op':op})
+              kw = {'source_array':largest, 'children':children, 'child_to_var':child_to_var, 'op':op})
 
 def map(inputs, fn, numpy_expr=None, fn_kw=None):
   '''
