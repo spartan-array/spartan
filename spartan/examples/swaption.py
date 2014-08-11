@@ -14,9 +14,8 @@ import spartan
 #from time import time
 
 from spartan import expr
-from spartan.util import divup, log_info
-from spartan.expr import (arange, assign, astype, concatenate, exp,
-    maximum, mean, ones, randn, sqrt, std, randn, zeros)
+from spartan.expr import (arange, assign, concatenate, exp, maximum, mean,
+    ones, randn, sqrt, std, zeros)
 
 # Parameter Values.
 DELTA = 0.5
@@ -39,6 +38,8 @@ def simulate(ts_all, te_all, lamb_all, num_paths):
     End dates for a series of swaptions.
   :param lamb_all: DistArray
     Parameter values for a series of swaptions.
+  :param num_paths: Int
+    Number of paths used in random walk.
 
   :rtype: DistArray
 
