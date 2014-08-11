@@ -9,7 +9,7 @@ import test_common
 from spartan import util
 from spartan.examples import swaption
 
-VERBOSE = True
+NUM_PATHS = 10
 
 
 def benchmark_swaption(ctx, timer):
@@ -22,15 +22,12 @@ def benchmark_swaption(ctx, timer):
   # Parameter values for a series of swaptions.
   lamb_all = [0.2, 0.2, 0.15, 0.1]
 
-  swaptions = swaption.simulate(ts_all, te_all, lamb_all)
+  swaptions = swaption.simulate(ts_all, te_all, lamb_all, NUM_PATHS)
 
-  if VERBOSE:
-    k = 1
-    for ts, te in zip(ts_all, te_all):
-      for i in xrange(len(ts)):
-        util.log_info("Ts %i Te %i price %.2f (%.2f)", ts[j], te,
-            swaptions[0, k], swaptions[1, k])
-        k += 1
+  for swap in swaptions:
+    for data in swap:
+      print data.glom()
+
 
 if __name__ == '__main__':
   test_common.run(__file__)
