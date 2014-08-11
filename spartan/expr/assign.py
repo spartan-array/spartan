@@ -10,7 +10,7 @@ from .region_map import region_map
 
 def _assign_mapper(tile, array, ex, start, value):
   '''Helper function for assign.'''
- if np.isscalar(value) or isinstance(value, np.ndarray):
+  if np.isscalar(value) or isinstance(value, np.ndarray):
     return value
 
   value_ul = [0] * min(len(ex.shape), len(value.shape))
