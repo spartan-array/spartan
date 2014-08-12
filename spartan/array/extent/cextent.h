@@ -1,52 +1,54 @@
 #ifndef __EXTENT_H__
 #define __EXTENT_H__
 #include <stddef.h>
+#include <Python.h>
+#include <numpy/arrayobject.h>
+#include <numpy/ndarrayobject.h>
+#include <numpy/numpyconfig.h>
 #include "../carray/cslice.h"
-const int MAX_NDIM = 32;
+
 class CExtent {
 public:
-    unsigned long long ul[MAX_NDIM];
-    unsigned long long lr[MAX_NDIM];
-    unsigned long long array_shape[MAX_NDIM];
-    unsigned long long shape[MAX_NDIM];
-    unsigned long long size;
-    unsigned ndim;
+    npy_intp ul[NPY_MAXDIMS];
+    npy_intp lr[NPY_MAXDIMS];
+    npy_intp array_shape[NPY_MAXDIMS];
+    npy_intp shape[NPY_MAXDIMS];
+    npy_intp size;
+    int ndim;
     bool has_array_shape;
 
-    CExtent(unsigned ndim, bool has_array_shape);
+    CExtent(int ndim, bool has_array_shape);
     ~CExtent();
     void init_info(void);
-    Slice* to_slice(void); 
-    unsigned long long ravelled_pos(void);
-    unsigned to_global(unsigned long long idx);
+    CSliceIdx* to_slice(void); 
+    npy_intp ravelled_pos(void);
+    npy_intp to_global(npy_intp idx);
     CExtent* add_dim(void);
     CExtent* clone(void);
 };
 
-CExtent* extent_create(unsigned long long ul[], 
-                       unsigned long long lr[],
-                       unsigned long long array_shape[],
-                       unsigned ndim);
+CExtent* extent_create(npy_intp ul[], 
+                       npy_intp lr[],
+                       npy_intp array_shape[],
+                       int ndim);
 
-CExtent* extent_from_shape(unsigned long long shape[], unsigned ndim);
+CExtent* extent_from_shape(npy_intp shape[], int ndim);
 
-void unravelled_pos(unsigned long long idx, 
-                    unsigned long long array_shape[], 
-                    unsigned ndim, 
-                    unsigned long long pos[]); // output
+void unravelled_pos(npy_intp idx, 
+                    npy_intp array_shape[], 
+                    int ndim, 
+                    npy_intp pos[]); // output
 
-unsigned long long ravelled_pos(unsigned long long idx[],
-                                unsigned long long array_shape[],
-                                unsigned ndim);
+npy_intp ravelled_pos(npy_intp idx[], npy_intp array_shape[], int ndim);
 
-bool all_nonzero_shape(unsigned long long shape[], unsigned ndim);
+bool all_nonzero_shape(npy_intp shape[], int ndim);
 
-void find_rect(unsigned long long ravelled_ul,
-               unsigned long long ravelled_lr,
-               unsigned long long shape[],
-               unsigned ndim,
-               unsigned long long rect_ravelled_ul[], // output
-               unsigned long long rect_ravelled_lr[]); // output
+void find_rect(npy_intp ravelled_ul,
+               npy_intp ravelled_lr,
+               npy_intp shape[],
+               int ndim,
+               npy_intp rect_ravelled_ul[], // output
+               npy_intp rect_ravelled_lr[]); // output
 
 CExtent* intersection(CExtent* a, CExtent* b);
 
@@ -60,22 +62,18 @@ CExtent* find_overlapping(CExtent* extent, CExtent* region);
  * This API uses a two dimensions array to simulate a tuple of slices.
  * idx[i][0] is ith's start and idx[i][1] is ith's stop.
  */
-CExtent* compute_slice(CExtent* base, Slice idx[], unsigned idx_len);
-CExtent* compute_slice_cy(CExtent* base, long long idx[], unsigned idx_len);
+CExtent* compute_slice(CExtent* base, CSliceIdx& idx);
 
 CExtent* offset_from(CExtent* base, CExtent* other);
 
-void offset_slice(CExtent* base, CExtent* other, Slice slice[]);
+void offset_slice(CExtent* base, CExtent* other, CSlice slice[]);
 
-CExtent* from_slice(Slice idx[], unsigned long long shape[], unsigned ndim);
-CExtent* from_slice_cy(long long idx[], 
-                       unsigned long long shape[], 
-                       unsigned ndim);
+CExtent* from_slice(CSliceIdx &idx, npy_intp shape[], int ndim);
 
-void shape_for_reduction(unsigned long long input_shape[],
-                         unsigned ndim, 
-                         unsigned axis,
-                         unsigned long long shape[]); // oputput
+void shape_for_reduction(npy_intp input_shape[],
+                         int ndim, 
+                         int axis,
+                         npy_intp shape[]); // oputput
 
 CExtent* index_for_reduction(CExtent *index, int axis);
 
@@ -84,7 +82,7 @@ bool shapes_match(CExtent *ex_a,  CExtent *ex_b);
 CExtent* drop_axis(CExtent* ex, int axis);
 
 void find_shape(CExtent **extents, int num_ex,
-                unsigned long long shape[]); // output
+                npy_intp shape[]); // output
 
-bool is_complete(unsigned long long shape[], unsigned ndim, Slice slices[]);
+bool is_complete(npy_intp shape[], int ndim, CSliceIdx &idx);
 #endif

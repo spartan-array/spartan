@@ -2,7 +2,7 @@
 #include "cextent.h"
 
 #include <iostream>
-CExtent::CExtent(unsigned ndim, bool has_array_shape) 
+CExtent::CExtent(int ndim, bool has_array_shape) 
 {
     this->ndim = ndim;
     this->has_array_shape = has_array_shape;
@@ -15,7 +15,7 @@ CExtent::~CExtent()
 void CExtent::init_info(void)
 {
     size = 1;
-    for (unsigned i = 0; i < ndim; i++) {
+    for (int i = 0; i < ndim; i++) {
         shape[i] = lr[i] - ul[i];
         if (shape[i] == 0) {
             shape[i] = 1; 
@@ -24,27 +24,25 @@ void CExtent::init_info(void)
     }      
 }
 
-Slice* CExtent::to_slice(void) 
+CSliceIdx* CExtent::to_slice(void) 
 {
-   Slice* slices; 
+   CSliceIdx* slices; 
 
-   for (unsigned i = 0; i < ndim; i++) {
-        slices[i].start = ul[i];
-        slices[i].stop = lr[i];
-        slices[i].step = 1;
+   for (int i = 0; i < ndim; i++) {
+        slices->get_slice(i).set_data(ul[i], lr[i], 1);
    }
 
    return slices;
 }
 
-unsigned long long CExtent::ravelled_pos(void)
+npy_intp CExtent::ravelled_pos(void)
 {
     return ::ravelled_pos(ul, array_shape, ndim);
 }
 
-unsigned CExtent::to_global(unsigned long long idx/*, int axis*/)
+npy_intp CExtent::to_global(npy_intp idx/*, int axis*/)
 {
-    unsigned long long local_idx[MAX_NDIM];
+    npy_intp local_idx[NPY_MAXDIMS];
     /* The originaly Python pass a numpy.ndarray if axis != None
     if (axis >= 0) {
         assert(0);
@@ -52,7 +50,7 @@ unsigned CExtent::to_global(unsigned long long idx/*, int axis*/)
     }*/
 
     unravelled_pos(idx, shape, ndim, local_idx);
-    for (unsigned i = 0; i < ndim; i++) {
+    for (int i = 0; i < ndim; i++) {
         local_idx[i] += ul[i]; 
     }
     return ::ravelled_pos(local_idx, array_shape, ndim);
@@ -60,9 +58,9 @@ unsigned CExtent::to_global(unsigned long long idx/*, int axis*/)
 
 CExtent* CExtent::add_dim(void) 
 {
-    unsigned long long ul[MAX_NDIM], lr[MAX_NDIM], array_shape[MAX_NDIM];
+    npy_intp ul[NPY_MAXDIMS], lr[NPY_MAXDIMS], array_shape[NPY_MAXDIMS];
 
-    for (unsigned i = 0; i < ndim; i++) {
+    for (int i = 0; i < ndim; i++) {
         ul[i] = this->ul[i];
         lr[i] = this->lr[i];
         array_shape[i] = this->array_shape[i];
@@ -78,15 +76,15 @@ CExtent* CExtent::clone(void) {
     return extent_create(ul, lr, array_shape, ndim);
 };
 
-CExtent* extent_create(unsigned long long ul[], 
-                      unsigned long long lr[],
-                      unsigned long long array_shape[],
-                      unsigned ndim)
+CExtent* extent_create(npy_intp ul[], 
+                       npy_intp lr[],
+                       npy_intp array_shape[],
+                       int ndim)
 {
     CExtent *ex = new CExtent(ndim, (array_shape != NULL));    
 
     ex->size = 1;
-    for (unsigned i = 0; i < ndim; i++) {
+    for (int i = 0; i < ndim; i++) {
         if (ul[i] >= lr[i]) {
             if (ul[i] > lr[i]) {
                  std::cout << __func__ << " OOps " << i << " " << ul[i] << " " << lr[i] << std::endl;
@@ -109,11 +107,11 @@ CExtent* extent_create(unsigned long long ul[],
     return ex;
 }
 
-CExtent* extent_from_shape(unsigned long long shape[], unsigned ndim)
+CExtent* extent_from_shape(npy_intp shape[], int ndim)
 {
-    unsigned long long ul[MAX_NDIM], lr[MAX_NDIM];
+    npy_intp ul[NPY_MAXDIMS], lr[NPY_MAXDIMS];
 
-    for (unsigned i = 0; i < ndim; i++) {
+    for (int i = 0; i < ndim; i++) {
        ul[i] = 0;
        lr[i] = shape[i];
     }
@@ -121,10 +119,10 @@ CExtent* extent_from_shape(unsigned long long shape[], unsigned ndim)
     return extent_create(ul, lr, shape, ndim);
 }
 
-void unravelled_pos(unsigned long long idx, 
-                    unsigned long long array_shape[], 
-                    unsigned ndim, 
-                    unsigned long long pos[]) // output
+void unravelled_pos(npy_intp idx, 
+                    npy_intp array_shape[], 
+                    int ndim, 
+                    npy_intp pos[]) // output
 {
     for (int i = ndim - 1; i >= 0; i--) {
         pos[i] = idx % array_shape[i];
@@ -132,12 +130,12 @@ void unravelled_pos(unsigned long long idx,
     }
 }
 
-unsigned long long ravelled_pos(unsigned long long idx[],
-                                unsigned long long array_shape[],
-                                unsigned ndim)
+npy_intp ravelled_pos(npy_intp idx[],
+                                npy_intp array_shape[],
+                                int ndim)
 {
-    unsigned rpos = 0;
-    unsigned mul = 1;
+    npy_intp rpos = 0;
+    int mul = 1;
 
     for (int i = ndim - 1; i >= 0; i--) {
         rpos += mul * idx[i];
@@ -147,22 +145,21 @@ unsigned long long ravelled_pos(unsigned long long idx[],
     return rpos;
 }
 
-bool all_nonzero_shape(unsigned long long shape[],
-                       unsigned ndim)
+bool all_nonzero_shape(npy_intp shape[], int ndim)
 {
-    for (unsigned i = 0; i < ndim; i++) {
+    for (int i = 0; i < ndim; i++) {
         if (shape[i] == 0)
             return false;
     }
     return true;
 }
 
-void find_rect(unsigned long long ravelled_ul,
-               unsigned long long ravelled_lr,
-               unsigned long long shape[],
-               unsigned ndim,
-               unsigned long long rect_ravelled_ul[], // output
-               unsigned long long rect_ravelled_lr[]) // output
+void find_rect(npy_intp ravelled_ul,
+               npy_intp ravelled_lr,
+               npy_intp shape[],
+               int ndim,
+               npy_intp rect_ravelled_ul[], // output
+               npy_intp rect_ravelled_lr[]) // output
 {
     if (shape[ndim - 1] == 1 || 
         ravelled_ul / shape[ndim - 1] == ravelled_lr / shape[ndim - 1]) {
@@ -170,7 +167,7 @@ void find_rect(unsigned long long ravelled_ul,
         *rect_ravelled_lr = ravelled_lr;
     } else {
         int div = 1;
-        for (unsigned i = 1; i < ndim; i++) {
+        for (int i = 1; i < ndim; i++) {
             div *= i; 
         }
         *rect_ravelled_ul = ravelled_ul - (ravelled_ul % div);
@@ -180,13 +177,13 @@ void find_rect(unsigned long long ravelled_ul,
 
 CExtent* intersection(CExtent* a, CExtent* b)
 {
-    unsigned long long ul[MAX_NDIM];
-    unsigned long long lr[MAX_NDIM];
+    npy_intp ul[NPY_MAXDIMS];
+    npy_intp lr[NPY_MAXDIMS];
 
     if (a == NULL || b == NULL) {
        return NULL; 
     }
-    for (unsigned i = 0; i < a->ndim ; i++) {
+    for (int i = 0; i < a->ndim ; i++) {
         if ((a->has_array_shape xor b->has_array_shape) ||
             (a->has_array_shape && a->array_shape[i] != b->array_shape[i])) {
             assert(0);
@@ -208,43 +205,45 @@ CExtent* find_overlapping(CExtent* extent, CExtent* region)
     return intersection(extent, region);
 }
 
-CExtent* compute_slice(CExtent* base, Slice idx[], unsigned idx_len)
+CExtent* compute_slice(CExtent* base, CSliceIdx& idx)
 {
-    unsigned long long ul[MAX_NDIM];
-    unsigned long long lr[MAX_NDIM];
+    npy_intp ul[NPY_MAXDIMS];
+    npy_intp lr[NPY_MAXDIMS];
 
-    for (unsigned i = 0; i < base->ndim; i++) {
-        if (i >= idx_len) {
+    for (int i = 0; i < base->ndim; i++) {
+        if (i >= idx.get_nd()) {
             ul[i] = base->ul[i];
             lr[i] = base->lr[i];
         } else {
-            unsigned long long dim = base->shape[i];
-            if (idx[i].start < 0) idx[i].start += dim;
-            if (idx[i].stop < 0) idx[i].stop += dim;
-            ul[i] = base->ul[i] + idx[i].start;
-            lr[i] = base->ul[i] + idx[i].stop;
+            npy_intp dim = base->shape[i];
+            npy_intp start = idx.get_slice(i).start;
+            npy_intp stop = idx.get_slice(i).stop;
+            if (idx.get_slice(i).start < 0) start += dim;
+            if (idx.get_slice(i).stop < 0) stop += dim;
+            ul[i] = base->ul[i] + start;
+            lr[i] = base->ul[i] + stop;
         }
     }
     return extent_create(ul, lr, base->array_shape, base->ndim);
 }
 
-CExtent* compute_slice_cy(CExtent* base, long long idx[], unsigned idx_len)
-{
-    Slice slices[MAX_NDIM];
+//CExtent* compute_slice_cy(CExtent* base, long long idx[], int idx_len)
+//{
+    //CSlice slices[NPY_MAXDIMS];
 
-    for (unsigned i = 0; i < idx_len; i++) {
-        slices[i].start = idx[i * 2]; 
-        slices[i].stop = idx[i * 2 + 1]; 
-    }
-    return compute_slice(base, slices, idx_len);
-}
+    //for (int i = 0; i < idx_len; i++) {
+        //slices[i].start = idx[i * 2]; 
+        //slices[i].stop = idx[i * 2 + 1]; 
+    //}
+    //return compute_slice(base, slices, idx_len);
+//}
 
 CExtent* offset_from(CExtent* base, CExtent* other)
 {
-    unsigned long long ul[MAX_NDIM];
-    unsigned long long lr[MAX_NDIM];
+    npy_intp ul[NPY_MAXDIMS];
+    npy_intp lr[NPY_MAXDIMS];
 
-    for (unsigned i = 0; i < base->ndim; i++) {
+    for (int i = 0; i < base->ndim; i++) {
         if (other->ul[i] < base->ul[i] || other->lr[i] > base->lr[i]) {
             return NULL;
         }
@@ -254,52 +253,51 @@ CExtent* offset_from(CExtent* base, CExtent* other)
     return extent_create(ul, lr, other->array_shape, base->ndim);
 }
 
-void offset_slice(CExtent* base, CExtent* other, Slice slice[])
+void offset_slice(CExtent* base, CExtent* other, CSlice slice[])
 {
-    for (unsigned i = 0; i < base->ndim; i++) {
+    for (int i = 0; i < base->ndim; i++) {
         slice[i].start = other->ul[i] - base->ul[i];
         slice[i].stop = other->lr[i] - base->ul[i];
         slice[i].step = 1;
     }
 }
 
-CExtent* from_slice(Slice idx[], unsigned long long shape[], unsigned ndim)
+CExtent* from_slice(CSliceIdx &idx, npy_intp shape[], int ndim)
 {
-    unsigned long long ul[MAX_NDIM], lr[MAX_NDIM];
+    npy_intp ul[NPY_MAXDIMS], lr[NPY_MAXDIMS];
 
-    for (unsigned i = 0; i < ndim; i++) {
-        unsigned long long dim = shape[i];
-        if (idx[i].start >= dim) assert(0);
-        if (idx[i].stop > dim) assert(0);
-        if (idx[i].start < 0) idx[i].start += dim;
-        if (idx[i].stop < 0) idx[i].stop += dim;
-        ul[i] = idx[i].start;
-        lr[i] = idx[i].stop;
+    for (int i = 0; i < ndim; i++) {
+        npy_intp dim = shape[i];
+        if (idx.get_slice(i).start >= dim) assert(0);
+        if (idx.get_slice(i).stop > dim) assert(0);
+        if (idx.get_slice(i).start < 0) idx.get_slice(i).start += dim;
+        if (idx.get_slice(i).stop < 0) idx.get_slice(i).stop += dim;
+        ul[i] = idx.get_slice(i).start;
+        lr[i] = idx.get_slice(i).stop;
     }
 
     return extent_create(ul, lr, shape, ndim);
 }
 
-CExtent* from_slice_cy(long long idx[], 
-                       unsigned long long shape[], 
-                       unsigned ndim)
+//CExtent* from_slice_cy(long long idx[], 
+                       //npy_intp shape[], 
+                       //int ndim)
+//{
+    //CSlice slices[NPY_MAXDIMS];
+
+    //for (int i = 0; i < ndim; i++) {
+        //slices[i].start = idx[i * 2]; 
+        //slices[i].stop = idx[i * 2 + 1]; 
+    //}
+    //return from_slice(slices, shape, ndim);
+//}
+
+void shape_for_reduction(npy_intp input_shape[],
+                         int ndim, 
+                         int axis,
+                         npy_intp shape[]) // oputput
 {
-    Slice slices[MAX_NDIM];
-
-    for (unsigned i = 0; i < ndim; i++) {
-        slices[i].start = idx[i * 2]; 
-        slices[i].stop = idx[i * 2 + 1]; 
-    }
-    return from_slice(slices, shape, ndim);
-}
-
-
-void shape_for_reduction(unsigned long long input_shape[],
-                         unsigned ndim, 
-                         unsigned axis,
-                         unsigned long long shape[]) // oputput
-{
-    unsigned i;
+    int i;
     for (i = 0; i < axis; i++) {
         shape[i] = input_shape[i];
     }
@@ -321,7 +319,7 @@ bool shapes_match(CExtent *ex_a,  CExtent *ex_b)
         return false;
     }
 
-    for (unsigned i = 0; i < ex_a->ndim; i++) {
+    for (int i = 0; i < ex_a->ndim; i++) {
         if (ex_a->shape[i] != ex_b->shape[i]) {
            return false; 
         }
@@ -333,7 +331,7 @@ bool shapes_match(CExtent *ex_a,  CExtent *ex_b)
 
 CExtent* drop_axis(CExtent* ex, int axis)
 {
-    unsigned long long ul[MAX_NDIM], lr[MAX_NDIM], shape[MAX_NDIM];
+    npy_intp ul[NPY_MAXDIMS], lr[NPY_MAXDIMS], shape[NPY_MAXDIMS];
     int i;
 
     if (axis < 0) {
@@ -356,7 +354,7 @@ CExtent* drop_axis(CExtent* ex, int axis)
 }
 
 void find_shape(CExtent **extents, int num_ex,
-                unsigned long long *shape) // output
+                npy_intp *shape) // output
 {
     int i, j;
 
@@ -374,13 +372,12 @@ void find_shape(CExtent **extents, int num_ex,
     }
 }
 
-bool is_complete(unsigned long long shape[], unsigned ndim, Slice slices[])
+bool is_complete(npy_intp shape[], int ndim, CSliceIdx &idx)
 {
-    for (unsigned i = 0; i < ndim; i++) {
-        if (slices[i].start != 0) return false;
-        if (slices[i].stop < shape[i]) return false;
+    for (int i = 0; i < ndim; i++) {
+        if (idx.get_slice(i).start != 0) return false;
+        if (idx.get_slice(i).stop < shape[i]) return false;
     }
 
     return true;
 }
-
