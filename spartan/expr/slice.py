@@ -55,6 +55,7 @@ class Slice(distarray.DistArray):
     self.base = darray
     self.slice = idx
     self.shape = self.slice.shape
+    self.tiles = self.base.tiles
     self.dtype = darray.dtype
     self.sparse = self.base.sparse
     self._tile_shape = distarray.good_tile_shape(self.shape,
