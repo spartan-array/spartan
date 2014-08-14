@@ -1,7 +1,8 @@
 #ifndef __CARRAY_H__
 #define __CARRAY_H__
 #include <Python.h>
-#include <numpy/numpyconfig.h>
+#include <numpy/arrayobject.h>
+#include <iostream>
 #include "../extent/cextent.h"
 
 extern int npy_type_size[]; 
@@ -39,13 +40,17 @@ npy_type_token_to_number(char token)
 #include <map>
 class NpyMemManager {
 public:
-    NpyMemManager(void) : ptr(NULL) {};
-    NpyMemManager(char* ptr) {
+    NpyMemManager(void) : ptr(NULL), own_by_npy(false) {};
+    NpyMemManager(char* ptr, bool own_by_npy = false) {
         std::map<char*, int>::iterator it;
 
         this->ptr = ptr;
+        this->own_by_npy = own_by_npy;
         if ((it = NpyMemManager::refcount.find(ptr)) == NpyMemManager::refcount.end()) {
-           refcount[ptr] = 1; 
+            refcount[ptr] = 1; 
+            if (own_by_npy) {
+                Py_INCREF(ptr);
+            }
         } else {
             it->second += 1;
         }
@@ -53,8 +58,14 @@ public:
     ~NpyMemManager(void) {
         int count = refcount[ptr]; 
         if (count == 1) {
+            std::cout << "Now we are deleteing a data region " << own_by_npy << std::endl;
             refcount.erase(ptr);
-            delete ptr;
+            if (own_by_npy) {
+                Py_DECREF(ptr);
+            } else {
+                delete ptr;
+            }
+            std::cout << "Now we are done" << std::endl;
         } else {
             refcount[ptr] -= 1;
         }
@@ -62,6 +73,7 @@ public:
     NpyMemManager operator=(const NpyMemManager& obj) {
         if (this != &obj) {
             this->ptr = obj.ptr;
+            this->own_by_npy = obj.own_by_npy;
             refcount[this->ptr] += 1;
         }
        return *this;
@@ -69,6 +81,7 @@ public:
 private:
     static std::map<char*, int> refcount;
     char* ptr;
+    bool own_by_npy;
 };
 
 typedef struct CArray_RPC_t {
@@ -85,8 +98,9 @@ public:
     CArray(void) : nd(0), type(NPY_INTLTR), type_size(sizeof(npy_int)) {};
     // For this constructor, CArray owns the data and will delete it in the destructor.
     CArray(npy_intp dimensions[], int nd, char type);
-    // For this constructor, CArray doesn't owns the data won't delete it.
-    CArray(npy_intp dimensions[], int nd, char type, char *data);
+    // For this constructor, CArray doesn't owns the data won't delete it, only Py_INCREF 
+    // or Py_DECREF the source.
+    CArray(npy_intp dimensions[], int nd, char type, char *data, PyArrayObject *source);
     // For this constructor, CArray uses the data and owns the source and will delete
     // it in the destructor. Note that source is a NpyMemManager. This means that it's
     // possible that many objects own the same source. NpyMemManager delete only delete

@@ -1,3 +1,9 @@
+#include <iostream>
+#include <Python.h>
+/* For Numpy C-API */
+#define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
+#define NO_IMPORT_ARRAY
+#include <numpy/arrayobject.h>
 #include "carray.h"
 
 int npy_type_size[] = {sizeof(npy_bool),
@@ -38,22 +44,26 @@ std::map<char*, int> NpyMemManager::refcount;
 
 CArray::CArray(npy_intp dimensions[], int nd, char type)
 {
+    std::cout << __func__ << 'A' << ' ' << (unsigned)type << ' ' << (char)type << std::endl;
     init(dimensions, nd, type);
     data = (char*) malloc(size);
+    std::cout << __func__ << 'A' << ' ' << (void*)data << std::endl;
     assert(this->data != NULL);
     memset(data, 0, size);
     data_source = new NpyMemManager(data);
 }
 
-CArray::CArray(npy_intp dimensions[], int nd, char type, char *data)
+CArray::CArray(npy_intp dimensions[], int nd, char type, char *data, PyArrayObject *source)
 {
+    std::cout << __func__ << 'B' << ' ' << (unsigned)type << ' ' << (char)type << std::endl;
     init(dimensions, nd, type);
     this->data = data;
-    data_source = NULL;
+    data_source = new NpyMemManager((char*)source, true);
 }
 
 CArray::CArray(npy_intp dimensions[], int nd, char type, char *data, NpyMemManager *source)
 {
+    std::cout << __func__ << 'C' << ' ' << (unsigned)type << ' ' << (char)type << std::endl;
     init(dimensions, nd, type);
     this->data = data;
     data_source = source;
@@ -61,6 +71,7 @@ CArray::CArray(npy_intp dimensions[], int nd, char type, char *data, NpyMemManag
 
 CArray::CArray(CArray_RPC *rpc, NpyMemManager *source)
 {
+    std::cout << __func__ << 'D' << ' ' << (unsigned)type << ' ' << std::endl;
     init(rpc->dimensions, (int)rpc->nd, (char)rpc->item_type);
     data = rpc->data;
     data_source = source;
@@ -75,22 +86,25 @@ CArray::~CArray()
 void
 CArray::init(npy_intp dimensions[], int nd, char type)
 {
-    int i, type_size;
+    int i;
 
+    std::cout << __func__ << (unsigned)type << std::endl;
     type_size = npy_type_token_to_size(type);
+    std::cout << "type_size " << type_size << std::endl;
     this->nd = nd;
     this->type = type;
     npy_intp stride;
     size = type_size;
-    for (i = nd - 1; i >= 0; i++) {
+    for (i = nd - 1; i >= 0; i--) {
         this->dimensions[i] = dimensions[i];
         if (i == nd - 1) {
             this->strides[i] = type_size;
         } else {
-            this->strides[i] *=  this->strides[i + 1] * this->dimensions[i + 1];
+            this->strides[i] = this->strides[i + 1] * this->dimensions[i + 1];
         }
         size *= this->dimensions[i];
     }
+    std::cout << __func__ << "end" << std::endl;
 }
 
 
@@ -108,8 +122,10 @@ CArray::copy(char *dest, CExtent *ex)
             }
         }
     }
+    std::cout << __func__ << " " << full << " " << (void*)dest << " " << (void*)data << std::endl;
 
     if (full) { /* Special case, no slice */
+        std::cout << "copy " << size << std::endl;
         memcpy(dest, data, size);
     } else {
         npy_intp continous_size, all_size;
@@ -146,7 +162,7 @@ CArray::copy(char *dest, CExtent *ex)
             curr_pos = ravelled_pos(curr_idx, ex->array_shape, nd);
             memcpy(dest, source_data + curr_pos, continous_size);
 
-            for (i = last_sliced_dim; i >= 0; i++) {
+            for (i = last_sliced_dim; i >= 0; i--) {
                 curr_idx[i] += 1;
                 if (curr_idx[i] - ex->ul[i] < ex->shape[i]) {
                     break; 
@@ -172,26 +188,23 @@ static void _capsule_destructor(PyObject *o)
 PyObject*
 CArray::to_npy(void)
 {
-    npy_intp strides[NPY_MAXDIMS];
     NpyMemManager *manager = NULL;
     PyArrayObject *array;
     int type_num;
 
+    std::cout << "CArray::" << __func__ << " " << nd << " " << type_size << std::endl;
     type_num = npy_type_token_to_number(type);
-    for (int i = nd - 1; i >= 0; i--) {
-        if (i == nd - 1) {
-            strides[i] = type_size;
-        } else {
-            strides[i] = strides[i + 1] * dimensions[i + 1];
-        }
-    }
-    array = (PyArrayObject*)PyArray_New(NULL, nd, dimensions, type_num, strides, 
-                                        data, 0, NPY_ARRAY_ALIGNED, NULL);
+    std::cout << "Before PyArray_New " << type_num << " " << size << " " << (void*)&PyArray_Type << std::endl;
+    array = (PyArrayObject*)PyArray_New(&PyArray_Type, nd, dimensions, type_num, strides, 
+                                        data, size, NPY_CARRAY, NULL);
+    std::cout << "PyArray_New" << std::endl;
     assert(array != NULL);
     if (data_source != NULL) {
         manager = data_source;
     }
+    std::cout << "Before PyCapsule_New" << std::endl;
     PyObject *capsule = PyCapsule_New(manager, _CAPSULE_NAME, _capsule_destructor);
+    std::cout << "PyCapsule_New" << std::endl;
     assert(capsule);
     assert(PyArray_SetBaseObject(array, capsule) == 0);
 
@@ -201,12 +214,13 @@ CArray::to_npy(void)
 void
 CArray::to_carray_rpc(CArray_RPC *rpc, CExtent *ex)
 {
+    std::cout << __func__ << type_size << " " << type << " " << nd <<std::endl;
     rpc->item_size = type_size;
     rpc->item_type = type;
     rpc->size = size;
+    rpc->nd = nd;
     for (int i = 0; i < nd; ++i) {
         rpc->dimensions[i] = dimensions[i];    
     }
-    rpc->nd = nd;
     copy(rpc->data, ex);
 }

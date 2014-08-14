@@ -8,36 +8,46 @@ def _npdata_to_tuple (data):
   if sp.issparse(data):
     ret.append(Tile.TILE_SPARSE)
     if isinstance(data, sp.coo_matrix):
+      ret.append((data.row, data.col, data.data))
       ret.append(Tile.TILE_SPARSE_COO)
-      ret.append([data.row, data.col, data.data])
     elif isinstance(data, sp.csc_matrix):
+      ret.append((data.indices, data.inptr, data.data))
       ret.append(Tile.TILE_SPARSE_CSC)
-      ret.append([data.indices, data.inptr, data.data])
     elif isinstance(data, sp.csr_matrix):
+      ret.append((data.indices, data.inptr, data.data))
       ret.append(Tile.TILE_SPARSE_CSR)
-      ret.append([data.indices, data.inptr, data.data])
   elif isinstance(data, ma.MaskedArray):
     ret.append(Tile.TILE_MASKED)
-    ret.append([data.data, data.mask])
+    ret.append((data.data, data.mask))
   else:
     ret.append(Tile.TILE_DENSE)
-    ret.append([data])
+    ret.append((data,))
 
   return ret
 
-'''
-  We implement the following APIs by Python. The main reason is they all need 
-  some Scipy/Numpy APIs that can't be directly called from C/C++. It will be
-  intricate to maintain C/C++ version of these APIs. 
-
-  Note that update API is attached to Tile in __init__.py to become a method
-  of Tile. DONT call it as a `function`.
-'''
 class TilePy(Tile):
+  ''' Wrapper class of Tile.
+      If a operation needs to communicate with Python, NumPy and Scipy,
+      it is pointless to implemented in pure c++. This class provides
+      simpler implementation for such operations.
+  '''
   def __init__(self, shape, dtype, tile_type, sparse_type, data):
-    super(TilePy, self).__init__(shape, np.dtype(dtype).char, tile_type, sparse_type, data, None)
+    print '__init__', dtype
+    super(TilePy, self).__init__(shape, np.dtype(dtype).char, tile_type, sparse_type, data)
+    self.builtin_reducers = {}
+    self.builtin_reducers[np.add] = Tile.TILE_REDUCER_ADD
+    self.builtin_reducers[np.multiply] = Tile.TILE_REDUCER_MUL
+    self.builtin_reducers[np.maximum] = Tile.TILE_REDUCER_MAXIMUM
+    self.builtin_reducers[np.minimum] = Tile.TILE_REDUCER_MINIMUM
   
-  def update(self, sublice, data, reducer):
+  def get(self, subslice, local=False):
+    if local:
+      return self.data[subslice]
+    else:
+      return super(TilePy, self).get(subslice)
+
+  def update(self, subslice, data, reducer):
+    print 'TilePy.update'
     internal_data = _npdata_to_tuple(data)
     tile_type = internal_data[0]
     if len(internal_data) == 2:
@@ -47,34 +57,47 @@ class TilePy(Tile):
       sparse_type = internal_data[1]
       tile_data = internal_data[2]
       
+    if self.builtin_reducers.get(reducer, None) is None:
+      _reducer = reducer
+    else:
+      _reducer = self.builtin_reducers[reducer]
+    print "DATATATATATATATATATATA", data, self
     self._update(subslice, tile_type, sparse_type, 
-                 tile_data, reducer)
+                 tile_data, _reducer)
+    return self
+
+  @property
+  def dtype(self):
+    return np.dtype(super(TilePy, self).dtype)
 
 def from_data(data):
   internal_data = _npdata_to_tuple(data)
   tile_type = internal_data[0]
+  tile_data = internal_data[1]
 
-  if len(internal_data) == 2:
+  if len(internal_data) < 3:
     sparse_type = Tile.TILE_SPARSE_NONE
-    tile_data = internal_data[1]
   else:
-    sparse_type = internal_data[1]
-    tile_data = internal_data[2]
+    sparse_type = internal_data[2]
+
   shape = data.shape
+  print 'from_data', data.dtype
   dtype = data.dtype.char
-  
-  return Tile(shape,
-              dtype,
-              tile_type,
-              sparse_type,
-              tile_data)
+ 
+  assert isinstance(tile_data, tuple), (type(tile_data))
+  return TilePy(shape,
+                dtype,
+                tile_type,
+                sparse_type,
+                tile_data)
 
 def from_shape(shape, dtype, tile_type, sparse_type=Tile.TILE_SPARSE_COO):
-  return Tile(shape,
-              np.dtype(dtype).char,
-              tile_type,
-              sparse_type,
-              None)
+  print 'well', shape, dtype, tile_type, sparse_type
+  return TilePy(shape,
+                np.dtype(dtype).char,
+                tile_type,
+                sparse_type,
+                None)
 
 # DONT use this API. This API is only for internal usage.
 def _internal_update(data, subslice, update, reducer):

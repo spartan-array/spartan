@@ -1,5 +1,7 @@
 #include <Python.h>
 #include <structmember.h>
+#define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
+#include <numpy/arrayobject.h>
 #include <iostream>
 #include "ctile.h"
 
@@ -60,7 +62,7 @@ static void
 Tile_dealloc(PyObject *o)
 {
     Tile *self = (Tile*) o; 
-    std::cout << __func__ << self->c_tile << std::endl;
+    std::cout << __func__ << " " << o << " " << self->c_tile << std::endl;
     delete self->c_tile;
     self->ob_type->tp_free((PyObject*)self);
 }
@@ -100,7 +102,7 @@ Tile_reduce(PyObject* o)
     }
 
     std::cout << "__reduce__" << std::endl;
-    mod = PyImport_ImportModule("tile");
+    mod = PyImport_ImportModule("spartan.array.tile");
     obj = PyObject_GetAttrString(mod, "from_shape");
     Py_DECREF(mod);
     PyTuple_SetItem(tuple, 0, shape);
@@ -118,9 +120,8 @@ Tile_get(PyObject* o, PyObject* args)
 {
     Tile *self = (Tile*)o;
     PyObject *slice;
-    CSlice c_slice[NPY_MAXDIMS];
 
-    //std::cout << __func__ << std::endl;
+    std::cout << __func__ << (void*)&PyArray_Type << std::endl;
     if (!PyArg_ParseTuple(args, "O",  &slice))
         return NULL;
 
@@ -130,10 +131,11 @@ Tile_get(PyObject* o, PyObject* args)
     CTile *ctile = new CTile(rpc);
     PyObject *ret = ctile->to_npy();
 
+    std::cout << __func__ << " end" << std::endl;
     if (ret == NULL) {
-            free(rpc);
+        free(rpc);
     } else {
-            return ret;
+        return ret;
     }
 }
 
@@ -144,7 +146,7 @@ Tile__update(PyObject* o, PyObject* args)
     PyObject *slice, *data, *tile_type, *sparse_type, *reducer;
     CSlice cslice[NPY_MAXDIMS];
 
-    //std::cout << __func__ << std::endl;
+    std::cout << __func__ << std::endl;
     if (!PyArg_ParseTuple(args, "OOOOO", &slice, &tile_type, &sparse_type, &data, &reducer))
         return NULL;
 
@@ -162,12 +164,14 @@ Tile__update(PyObject* o, PyObject* args)
         PyArrayObject *dense = (PyArrayObject*)PyTuple_GetItem(data, 0);
         CTile tile(dense->dimensions, dense->nd, dense->descr->type, ttype, CTILE_SPARSE_NONE);
         CArray *dense_array = new CArray(dense->dimensions, dense->nd,
-                                         dense->descr->type, dense->data);
+                                         dense->descr->type, dense->data,
+                                         dense);
         CArray *mask_array = NULL;
         if (ttype == CTILE_MASKED) {
             PyArrayObject *mask = (PyArrayObject*)PyTuple_GetItem(data, 1);
             mask_array = new CArray(mask->dimensions, mask->nd,
-                                    mask->descr->type, mask->data);
+                                    mask->descr->type, mask->data,
+                                    mask);
         }
         tile.set_data(dense_array, mask_array);
         self->c_tile->update(cslice_idx, tile, npy_reducer);
@@ -176,7 +180,8 @@ Tile__update(PyObject* o, PyObject* args)
         for (int i = 0; i < 3; i++) {
             PyArrayObject *sparse = (PyArrayObject*)PyTuple_GetItem(data, i);
             sparse_array[i] = new CArray(sparse->dimensions, sparse->nd,
-                                         sparse->descr->type, sparse->data);
+                                         sparse->descr->type, sparse->data,
+                                         sparse);
         }
         CExtent *ex = from_slice(cslice_idx, self->c_tile->get_dimensions(),
                                  self->c_tile->get_nd());
@@ -186,6 +191,7 @@ Tile__update(PyObject* o, PyObject* args)
         self->c_tile->update(cslice_idx, tile, npy_reducer);
     }
 
+    Py_INCREF(o);
     return o;
 }
 
@@ -193,10 +199,10 @@ static int
 Tile_init(PyObject *o, PyObject *args, PyObject *kwds)
 {
     Tile *self = (Tile*)o;
-    PyObject *shape, *dtype_obj, *tile_type, *sparse_type, *data, *test;
+    PyObject *shape, *dtype_obj, *tile_type, *sparse_type, *data;
 
-    std::cout << __func__ << std::endl;
-    if (!PyArg_ParseTuple(args, "OOOOOO", &shape, &dtype_obj, &tile_type, &sparse_type, &data, &test))
+    std::cout << __func__ << " " << (void*) o << std::endl;
+    if (!PyArg_ParseTuple(args, "OOOOO", &shape, &dtype_obj, &tile_type, &sparse_type, &data))
         return -1;
     
     int nd = PyTuple_Size(shape);
@@ -214,30 +220,68 @@ Tile_init(PyObject *o, PyObject *args, PyObject *kwds)
     CTile *tile = new CTile(dimensions, nd, dtype[0], ttype, stype);
     std::cout << __func__ << "2" << std::endl;
     if (data != Py_None) {
+        assert(PyTuple_Check(data) != 0);
         if (ttype != CTILE_SPARSE) {
             PyArrayObject *dense = (PyArrayObject*)PyTuple_GetItem(data, 0);
+            std::cout << __func__ << "2.1" << std::endl;
             CArray *dense_array = new CArray(dense->dimensions, dense->nd,
-                                             dense->descr->type, dense->data);
+                                             dense->descr->type, dense->data,
+                                             dense);
+            std::cout << __func__ << "2.2" << std::endl;
             CArray *mask_array = NULL;
             if (ttype == CTILE_MASKED) {
                 PyArrayObject *mask = (PyArrayObject*)PyTuple_GetItem(data, 1);
                 mask_array = new CArray(mask->dimensions, mask->nd,
-                                        mask->descr->type, mask->data);
+                                        mask->descr->type, mask->data,
+                                        mask);
+                std::cout << __func__ << "2.3" << std::endl;
             }
+            std::cout << __func__ << "2.4" << std::endl;
             tile->set_data(dense_array, mask_array);
+            std::cout << __func__ << "2.5" << std::endl;
         } else {
             CArray *sparse_array[3];
             for (int i = 0; i < 3; i++) {
                 PyArrayObject *sparse = (PyArrayObject*)PyTuple_GetItem(data, i);
                 sparse_array[i] = new CArray(sparse->dimensions, sparse->nd,
-                                             sparse->descr->type, sparse->data);
+                                             sparse->descr->type, sparse->data,
+                                             sparse);
             }
             tile->set_data(sparse_array);
         }
     }
-    std::cout << __func__ << "4" << std::endl;
+    std::cout << __func__ << "3" << std::endl;
     self->c_tile = tile;
     return 0;
+}
+
+static PyObject* 
+Tile_repr(PyObject *o)
+{
+    Tile *self = (Tile*)o;
+
+    return PyString_FromFormat("%p %p", (void*)self, (void*)self->c_tile);
+}
+
+static PyObject*
+Tile_gettype(Tile *self, void *closure)
+{
+    return PyInt_FromLong(self->c_tile->get_type());
+}
+
+static PyObject*
+Tile_getdtype(Tile *self, void *closure)
+{
+    char str[2] = {'\0', '\0'};
+
+    str[0] = self->c_tile->get_dtype();
+    return PyString_FromString(str);
+}
+
+static PyObject*
+Tile_getdata(Tile *self, void *closure)
+{
+    return self->c_tile->to_npy();
 }
 
 static PyMemberDef Tile_members[] = {
@@ -245,6 +289,9 @@ static PyMemberDef Tile_members[] = {
 };
 
 static PyGetSetDef Tile_getseters[] = {
+    {(char*)"type", (getter)Tile_gettype, NULL, (char*)"dtype", NULL},
+    {(char*)"dtype", (getter)Tile_getdtype, NULL, (char*)"dtype", NULL},
+    {(char*)"data", (getter)Tile_getdata, NULL, (char*)"data", NULL},
     {NULL} /* Sentinel */
 };
 
@@ -269,7 +316,7 @@ static PyTypeObject TileType = {
     0,                           /* tp_getattr */
     0,                           /* tp_setattr */
     0,                           /* tp_compare */
-    0,                           /* tp_repr */
+    Tile_repr,                   /* tp_repr */
     0,                           /* tp_as_number */
     0,                           /* tp_as_sequence */
     0,                           /* tp_as_mapping */
@@ -369,5 +416,7 @@ init_ctile_py_if(void)
 
     Py_INCREF(&TileType);
     PyModule_AddObject(m, "Tile", (PyObject *)&TileType);
-}
 
+    import_array();   /* required NumPy initialization */
+    std::cout << (void*)&PyArray_Type  << std::endl;
+}

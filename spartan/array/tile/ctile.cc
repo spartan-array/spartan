@@ -1,7 +1,8 @@
 #include <Python.h>
+/* For Numpy C-API */
+#define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
+#define NO_IMPORT_ARRAY
 #include <numpy/arrayobject.h>
-#include <numpy/ndarrayobject.h>
-#include <numpy/numpyconfig.h>
 #include <iostream>
 #include "ctile.h"
 #include "../carray/carray_reducer.h"
@@ -11,7 +12,7 @@ CTile::CTile(npy_intp dimensions[], int nd, char dtype,
 {
     int i;
 
-    std::cout << __func__ << sparse_type << std::endl;
+    std::cout << __func__ << " A" << (void*)&PyArray_Type << std::endl;
     initialized = false;
     type = (CTILE_TYPE)tile_type;
     this->sparse_type = (CTILE_SPARSE_TYPE)sparse_type;
@@ -30,6 +31,7 @@ CTile::CTile(npy_intp dimensions[], int nd, char dtype,
 
 CTile::CTile(CTile_RPC *rpc)
 {
+    std::cout << __func__ << " B" << std::endl;
     type = (CTILE_TYPE)rpc->type;
     sparse_type = (CTILE_SPARSE_TYPE)rpc->type;
     initialized = rpc->initialized;
@@ -38,6 +40,10 @@ CTile::CTile(CTile_RPC *rpc)
         dimensions[i] = rpc->dimensions[i];
     }
     dtype = rpc->item_type;
+
+    if (!initialized) {
+        return;
+    }
 
     CArray_RPC *data;
     if (type != CTILE_SPARSE) {
@@ -81,6 +87,7 @@ CTile::set_data(CArray *dense, CArray *mask)
     }
     this->dense = dense;
     this->mask = mask;
+    initialized = true;
     return true;
 }
 
@@ -93,12 +100,17 @@ CTile::set_data(CArray **sparse)
     for (int i = 0; i < 3; i++) {
         this->sparse[i] = sparse[i];
     }
+    initialized = true;
     return true;
 }
 
 void
 CTile::initialize(void)
 {
+    std::cout << __func__ << std::endl;
+    for (int i = 0; i < nd ; i++) {
+        std::cout << __func__ << " " << dimensions[i] << std::endl;
+    }
     if (type == CTILE_SPARSE) {
          sparse[0] = new CArray(dimensions, 1, NPY_INTPLTR);
          sparse[1] = new CArray(dimensions, 1, NPY_INTPLTR);
@@ -109,6 +121,7 @@ CTile::initialize(void)
             mask = new CArray(dimensions, nd, dtype);
         }
     }
+    initialized = true;
 }
 
 CExtent*
@@ -129,7 +142,10 @@ CTile::reduce(CSliceIdx &idx, CTile &update, REDUCER reducer)
     CExtent *ex = slice_to_ex(idx);
     bool trivial = is_idx_complete(idx);
 
-    if (type == CTILE_DENSE || type == CTILE_MASKED) { 
+    std::cout << __func__ << " reducer = " << (unsigned)reducer << " " << trivial << std::endl;
+    if (nd == 0) { // Special case
+        scalar_outer_loop(dense, update.dense, reducer);
+    } else if (type == CTILE_DENSE || type == CTILE_MASKED) { 
         if ((update.type == CTILE_DENSE && update.type == CTILE_MASKED) ||
              update.type == CTILE_DENSE) { 
             // Don't have to update mask in both cases.
@@ -161,7 +177,8 @@ CTile::reduce(CSliceIdx &idx, CTile &update, REDUCER reducer)
 void 
 CTile::update(CSliceIdx &idx, CTile &update_data, npy_intp reducer)
 {
-    if (initialized) {
+    std::cout << __func__ << " reducer = " << (unsigned)reducer << std::endl;
+    if (!initialized) {
         initialize(); 
     }
     if (reducer >= REDUCER_BEGIN && reducer <= REDUCER_END) {
@@ -170,7 +187,7 @@ CTile::update(CSliceIdx &idx, CTile &update_data, npy_intp reducer)
         PyObject *old, *update, *subslice, *reducer_npy;
 
         PyObject *mod, *object;
-        mod = PyImport_ImportModule("spartan.tile");
+        mod = PyImport_ImportModule("spartan.array.tile");
         assert(mod != NULL);
         object = PyObject_GetAttrString(mod, "_internal_update");
         assert(object != NULL);
@@ -201,37 +218,46 @@ CTile::get(CSliceIdx &idx)
 char*
 CTile::to_tile_rpc(CSliceIdx &idx)
 {
+    std::cout << __func__ << std::endl;
+
     CExtent *ex = slice_to_ex(idx);
     CTile_RPC rpc;
 
     rpc.type = type;
     rpc.sparse_type = sparse_type;
-    rpc.initialized = 1;
+    rpc.initialized = initialized;
     rpc.nd = nd;
     rpc.item_type = dtype;
     memcpy(rpc.dimensions, dimensions, sizeof(npy_int64) * NPY_MAXDIMS);
 
+    std::cout << __func__ << " A " << std::endl;
     CTile_RPC *base; 
     npy_intp size = sizeof(CTile_RPC);
     if (!initialized) {
+        std::cout << __func__ << " B " << std::endl;
         rpc.initialized = 0;
         base = (CTile_RPC*) malloc(sizeof(CTile_RPC) + sizeof(CArray_RPC));
         assert(base != NULL);
         memcpy(base, &rpc, sizeof(CTile_RPC));
         return (char*)base;
     } else if (type != CTILE_SPARSE) {
+        std::cout << __func__ << " C " << std::endl;
         CArray_RPC *data;
         npy_intp dense_size = ex->size * dense->get_type_size();
-        npy_intp mask_size = ex->size * mask->get_type_size();
 
+        std::cout << __func__ << " D " << std::endl;
         if (type == CTILE_DENSE) {
             size += dense_size + sizeof(CArray_RPC);
         } else {
+            npy_intp mask_size = ex->size * mask->get_type_size();
             size += dense_size + mask_size + sizeof(CArray_RPC) * 2;
         }
+        std::cout << __func__ << " E = " <<  size << " " << dense_size << std::endl;
         base = (CTile_RPC*) malloc(size);
+        std::cout << "base = " << base << " array = " << base->array << " data = " << (void*)base->array[0].data << std::endl;
         assert(base != NULL);
         memcpy(base, &rpc, sizeof(CTile_RPC));
+        std::cout << __func__ << " F " << std::endl;
 
         if (type == CTILE_DENSE) {
             data = base->array;
@@ -244,6 +270,7 @@ CTile::to_tile_rpc(CSliceIdx &idx)
             mask->to_carray_rpc(data, ex);
             base->count = 2;
         }
+        std::cout << __func__ << " G " << std::endl;
 
         return (char*)base;
     } else {
@@ -301,11 +328,14 @@ CTile::to_tile_rpc(CSliceIdx &idx)
 PyObject*
 CTile::to_npy(void)
 {
+    std::cout << "CTile::" << __func__ << std::endl;
     if (!initialized) {
+        std::cout << "get a uninitialized tile" << std::endl;
         PyObject *mod, *object, *npy_dimensions;
         npy_dimensions = PyTuple_New(nd);
+        assert(npy_dimensions != NULL);
         for (int i = 0; i < nd; i++) {
-            PyTuple_SET_ITEM(npy_dimensions, 0, PyLong_FromLongLong(dimensions[i]));  
+            PyTuple_SET_ITEM(npy_dimensions, i, PyLong_FromLongLong(dimensions[i]));  
         }
         if (type != CTILE_SPARSE) {
             mod = PyImport_ImportModule("numpy");
@@ -325,7 +355,10 @@ CTile::to_npy(void)
             }
             assert(object != NULL);
         }
-        return PyObject_CallFunctionObjArgs(object, dimensions, NULL);
+        std::cout << "Before creating a matric " << mod << " " << object << std::endl;
+        PyObject *ret = PyObject_CallFunctionObjArgs(object, npy_dimensions, NULL);
+        std::cout << "After creating a matric" << std::endl;
+        return ret;
     } else if (type == CTILE_DENSE) {
         return dense->to_npy();
     } else if (type == CTILE_MASKED) {

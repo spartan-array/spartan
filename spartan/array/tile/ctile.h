@@ -1,5 +1,7 @@
 #ifndef __CTILE_H__
 #define __CTILE_H__
+#include <Python.h>
+#include <numpy/arrayobject.h>
 #include "../carray/cslice.h"
 #include "../carray/carray.h"
 #include "../carray/carray_reducer.h"
