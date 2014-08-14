@@ -564,7 +564,7 @@ class AutomaticTiling(OptimizePass):
     elif isinstance(expr, (Val, AsArray)) and isinstance(expr.val, DistArray) or isinstance(expr, DistArray):
       # already partitioned array
       array = expr if isinstance(expr, DistArray) else expr.val
-      self.nodes[self.cur_node_id] = self.node_type(expr, array.tile_shape()[0] != array.shape[0], False, 1, [], [])
+      self.nodes[self.cur_node_id] = self.node_type(expr, array.tile_shape()[0] == array.shape[0], False, 1, [], [])
       expr_node_ids.append(self.cur_node_id)
       self.add_edge(0, self.cur_node_id, edge_limit = 1, edge_cost=0)
       self.cur_node_id += 1
@@ -820,7 +820,7 @@ class AutomaticTiling(OptimizePass):
         tiling_types = (0, 1)
         self.split_nodes.append((self.cur_node_id, self.cur_node_id + 1))
       else:
-        tiling_types = (1-self.nodes[child_ids[0]].tiling,)  
+        tiling_types = (1-self.nodes[child_ids[0]].tiling,)
       
       for i in xrange(len(tiling_types)):
         self.nodes[self.cur_node_id] = self.node_type(expr, tiling_types[i], bool(len(tiling_types)-1), limit, [], [])

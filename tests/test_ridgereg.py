@@ -31,7 +31,7 @@ def test_ridgereg(ctx):
   print "#worker:", ctx.num_workers
   N_EXAMPLES = 1000000 * 64
   N_DIM = 4
-  ITERATION = 1
+  ITERATION = 3
   
   FLAGS.opt_auto_tiling = 1
   
