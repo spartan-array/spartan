@@ -19,6 +19,7 @@ from ..array.extent import index_for_reduction, shapes_match
 from ..util import Assert
 from .base import force
 from .map import map
+from .extent_map import extent_map
 from .ndarray import ndarray
 from .optimize import disable_parakeet, not_idempotent
 from .reduce import reduce
@@ -349,12 +350,13 @@ def ones(shape, dtype=np.float, tile_hint=None):
              fn=_make_ones)
 
 
-def _arange_mapper(inputs, ex, start, stop, step, dtype=None):
+def _arange_mapper(tile, ex, array, start, stop, step, dtype=None):
+  ex = extent.from_tuple(ex)
   pos = extent.ravelled_pos(ex.ul, ex.array_shape)
   ex_start = pos*step + start
   ex_stop = np.prod(ex.shape)*step + ex_start
 
-  yield (ex, np.arange(ex_start, ex_stop, step, dtype=dtype).reshape(ex.shape))
+  return np.arange(ex_start, ex_stop, step, dtype=dtype).reshape(ex.shape)
 
 
 def arange(shape=None, start=0, stop=None, step=1, dtype=np.float, tile_hint=None):
@@ -404,9 +406,9 @@ def arange(shape=None, start=0, stop=None, step=1, dtype=np.float, tile_hint=Non
   if stop is None:
     stop = step*(np.prod(shape) + start)
 
-  return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
-                 fn=_arange_mapper, kw={'start': start, 'stop': stop,
-                                        'step': step, 'dtype': dtype})
+  return extent_map(ndarray(shape, dtype, tile_hint), _arange_mapper,
+                    fn_kw={'start': start, 'stop': stop,
+                           'step': step, 'dtype': dtype})
 
 
 def _sum_local(ex, data, axis):
