@@ -9,7 +9,7 @@ from .base import Expr, lazify
 from traits.api import Instance, Function, PythonValue, HasTraits
 from .base import DictExpr, NotShapeable
 
-def shuffle(v, fn, tile_hint=None, target=None, kw=None):
+def shuffle(v, fn, tile_hint=None, cost_hint=None, shape_hint=None, target=None, kw=None):
   '''
   Evaluate ``fn`` over each extent of ``v``.
   
@@ -32,6 +32,8 @@ def shuffle(v, fn, tile_hint=None, target=None, kw=None):
   return ShuffleExpr(array=v,
                      map_fn=fn,
                      tile_hint=tile_hint,
+                     cost_hint=cost_hint,
+                     shape_hint=shape_hint,
                      target=target,
                      fn_kw=kw)
 
@@ -99,11 +101,13 @@ class ShuffleExpr(Expr):
   array = PythonValue(None, desc="DistArray or Expr")
   map_fn = Function
   target = PythonValue(None, desc="DistArray or Expr") 
-  tile_hint = PythonValue(None, desc="Tuple or None")
+  tile_hint = PythonValue(None, desc="Int or None")
+  cost_hint = PythonValue(None, desc='Dict or None')
+  shape_hint = PythonValue(None, desc='Tuple or None')
   fn_kw = Instance(DictExpr) 
   
   def __str__(self):
-    return 'shuffle[%d](%s, %s)' % (self.expr_id, self.map_fn, self.array)
+    return 'shuffle[%d](%s, %s, hint=%s)' % (self.expr_id, self.map_fn, self.array, self.tile_hint)
 
   def _evaluate(self, ctx, deps):
     v = deps['array']
@@ -125,6 +129,8 @@ class ShuffleExpr(Expr):
   def compute_shape(self):
     if self.target != None:
       return self.target.shape
+    elif self.shape_hint != None:
+      return self.shape_hint
     else:
       # We don't know the shape after shuffle.
       raise NotShapeable

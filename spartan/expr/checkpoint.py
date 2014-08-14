@@ -8,7 +8,7 @@ from .. import blob_ctx
 from traits.api import Bool, Str, Instance, PythonValue, HasTraits
 
 class CheckpointExpr(Expr):
-  children = Instance(Expr) 
+  src = Instance(Expr) 
   path = Str 
   mode = Str
   ready = Bool 
@@ -38,7 +38,7 @@ class CheckpointExpr(Expr):
       return None
      
   def _evaluate(self, ctx, deps): 
-    result = deps['children']
+    result = deps['src']
     if self.mode == 'disk':
       save(result, "%s" % self.expr_id, path = self.path, iszip = False) 
         
@@ -53,4 +53,4 @@ def checkpoint(x, mode='disk'):
   :param mode: 'disk' or 'replica'
   :rtype: `Expr`
   '''
-  return CheckpointExpr(children=lazify(x), path=FLAGS.checkpoint_path, mode=mode, ready=False)
+  return CheckpointExpr(src=lazify(x), path=FLAGS.checkpoint_path, mode=mode, ready=False)

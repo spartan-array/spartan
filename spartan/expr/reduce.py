@@ -91,8 +91,8 @@ class ReduceExpr(Expr):
     return extent.shape_for_reduction(input_shape, self.axis)
   
   def pretty_str(self):
-    return 'Reduce(%s, axis=%s, %s)' % (self.op.fn.__name__, self.axis,
-                                        indent(self.children.pretty_str()))
+    return 'Reduce(%s, axis=%s, %s, hint=%s)' % (self.op.fn.__name__, self.axis,
+                                        indent(self.children.pretty_str()), self.tile_hint)
   
   def _evaluate(self, ctx, deps):
     children = deps['children']

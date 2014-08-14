@@ -190,7 +190,7 @@ def diag(array):
   :param array: DistArray
     The data to fill the diagonal.
   '''
-  return shuffle(array, _diag_mapper)
+  return shuffle(array, _diag_mapper, shape_hint=(array.shape[0], array.shape[0]))
 
 
 def _diagonal_mapper(array, ex):
@@ -231,7 +231,7 @@ def diagonal(a):
   if len(a.shape) < 2:
     raise ValueError("diag requires an array of at least two dimensions")
 
-  return shuffle(a, _diagonal_mapper)
+  return shuffle(a, _diagonal_mapper, shape_hint=(__builtin__.min(a.shape), ))
 
 
 def _normalize_mapper(array, ex, axis, norm_value):
@@ -534,8 +534,8 @@ def scan(array, reduce_fn=None, scan_fn=None, accum_fn=None, axis=None):
   :param axis: Either an integer or ``None``.
   '''
   reduce_result = shuffle(array, fn=_scan_reduce_mapper, kw={'axis': axis,
-                                                             'reduce_fn': reduce_fn})
-  fetch_result = reduce_result.glom()
+                                                             'reduce_fn': reduce_fn}, shape_hint=array.shape)
+  fetch_result = reduce_result.optimized().glom()
   if scan_fn is not None:
     fetch_result = scan_fn(fetch_result, axis=axis)
   
@@ -757,7 +757,7 @@ def ravel(v):
   See `numpy.ndarray.ravel`.
   :param v: `Expr` or `DistArray`
   '''
-  return shuffle(v, _ravel_mapper)
+  return shuffle(v, _ravel_mapper, shape_hint=(np.prod(v.shape),))
         
 def multiply(a, b):
   assert a.shape == b.shape
@@ -803,10 +803,12 @@ def bincount(v):
   maxval = max(v).glom()
   assert minval > 0
   target = ndarray((maxval + 1,), dtype=np.int64, reduce_fn=np.add)
+  cost = np.prod(target.shape)
   return shuffle(v, 
       _bincount_mapper, 
       target=target,
-      kw = { 'minlength' : maxval + 1})
+      kw = { 'minlength' : maxval + 1},
+      cost_hint={target:(cost, cost)})
 
 
 def _translate_extent(ex, a, roffset=0, coffset=0):
@@ -873,9 +875,9 @@ def concatenate(a, b, axis=0):
       raise ValueError('all the input array dimensions except for the' \
           'concatenation axis must match exactly')
 
-  return shuffle(distarray.create(new_shape),
+  return shuffle(ndarray(new_shape),
                  _concatenate_mapper,
-                 kw={'a': a, 'b': b, 'axis': axis})
+                 kw={'a': a, 'b': b, 'axis': axis}, shape_hint=new_shape)
 
 
 try:

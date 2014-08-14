@@ -84,6 +84,11 @@ setup(
               extra_link_args=["-std=c++11"]),
     Extension('spartan.array.extent', ['spartan/array/extent' + suffix]),
     Extension('spartan.array.tile', ['spartan/array/tile' + suffix]),
+    Extension('spartan.expr.maxflow', 
+              sources = ['spartan/expr/maxflow.cc'],
+              language='c++',
+              extra_compile_args=["-std=c++0x"],
+              extra_link_args=["-std=c++11", "-lpython2.7"]),
   ],
   cmdclass=cmdclass,
 )

@@ -1,7 +1,8 @@
 from spartan.examples import ridge_regression
 import test_common
-from test_common import millis
+from test_common import millis, with_ctx
 from spartan import expr, util
+from spartan.config import FLAGS
 import time
 
 N_EXAMPLES = 100
@@ -25,6 +26,23 @@ def benchmark_ridgereg(ctx, timer):
   total = time.time() - start
   util.log_warn("time cost : %s s" % (total*1.0/ITERATION,))
 
+@with_ctx
+def test_ridgereg(ctx):
+  print "#worker:", ctx.num_workers
+  N_EXAMPLES = 1000000 * 64
+  N_DIM = 4
+  ITERATION = 1
+  
+  FLAGS.opt_auto_tiling = 1
+  
+  x = expr.rand(N_EXAMPLES, N_DIM)
+  y = expr.rand(N_EXAMPLES, 1)
+  start = time.time() 
+  ridge_regression.ridge_regression(x, y, 1, ITERATION)
+  
+  total = time.time() - start
+  util.log_warn("time cost : %s s" % (total*1.0/ITERATION,))
+  
 if __name__ == '__main__':
   test_common.run(__file__)
  
