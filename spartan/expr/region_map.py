@@ -32,7 +32,7 @@ def _region_mapper(tile, ex, array, region, user_fn, fn_kw=None):
     if intersection:
       result = tile.copy()
       subslice = extent.offset_slice(ex, intersection)
-      result[subslice] = user_fn(result[subslice], array, ex, **fn_kw)
+      result[subslice] = user_fn(result[subslice], ex, array, **fn_kw)
       return result
 
   return None

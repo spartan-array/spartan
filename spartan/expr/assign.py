@@ -8,7 +8,7 @@ from ..array import extent
 from .region_map import region_map
 
 
-def _assign_mapper(tile, array, ex, start, value):
+def _assign_mapper(tile, ex, array, start, value):
   '''Helper function for assign.'''
   if np.isscalar(value) or isinstance(value, np.ndarray):
     return value
