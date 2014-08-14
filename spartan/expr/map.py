@@ -36,7 +36,7 @@ def get_local_values(ex, children, child_to_var):
       # When working with a broadcasted array, it is more efficient to fetch
       #   the section of the non-broadcasted array and have NumPy broadcast
       #   internally, than to broadcast ahead of time.
-      local_val = child.fetch_base_tiles(ex)
+      local_val = child.fetch_base_tile(ex)
     else:
       local_val = child.fetch(ex)
     local_values[childv] = local_val
