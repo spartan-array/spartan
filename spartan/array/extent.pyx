@@ -76,13 +76,16 @@ cdef class TileExtent(object):
 
   def __reduce__(self):
     return create, (self.ul, self.lr, self.array_shape)
-  
+
   def to_slice(self):
     result = []
     for i in range(self._ul_len):
       result.append(slice(self.ul[i], self.lr[i], None))
     return tuple(result)
-  
+
+  def to_tuple(self):
+    return (self.ul, self.lr, self.array_shape)
+
   def __repr__(self):
     return 'extent(' + ','.join('%s:%s' % (a, b) for a, b in zip(self.ul, self.lr)) + ')'
 
@@ -354,6 +357,10 @@ def from_slice(idx, shape):
     lr[i] = indices[1]
     
   return c_create(ul, lr, shape, ul_len)
+
+def from_tuple(tuple tup):
+  '''tup = (ul, lr, array_shape)'''
+  return create(tup[0], tup[1], tup[2])
 
 cpdef intersection(TileExtent a, TileExtent b):
   '''
