@@ -158,11 +158,11 @@ class TestOptimization(test_common.ClusterTest):
     # Our sum seems to reduce precision
     Assert.all_eq(ns, s.optimized().glom(), tolerance = 1e-6)
 
-  def test_optimization_extent_map(self):
+  def test_optimization_map_with_location(self):
     def mapper(tile, ex, array):
       return tile + 10
 
-    a = expr.extent_map(expr.ones((5, 5)), mapper) + expr.ones((5, 5))
+    a = expr.map_with_location(expr.ones((5, 5)), mapper) + expr.ones((5, 5))
     Assert.isinstance(a.optimized().op, expr.local.ParakeetExpr)
 
   def test_optimization_region_map(self):
