@@ -44,7 +44,9 @@ class LocalExpr(Node):
 
   def add_dep(self, v):
     self.deps.append(v)
-    assert len(self.deps) <= 2, v
+    # self.deps will be at most 3. (value) -> LocalMapExpr, (value, extent) ->
+    #   LocalReduceExpr, and (value, extent, array) -> LocalMapExtentExpr.
+    assert len(self.deps) <= 3, v
 
   def input_names(self):
     return util.flatten([v.input_names() for v in self.deps], unique=True)
