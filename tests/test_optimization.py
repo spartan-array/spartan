@@ -1,4 +1,4 @@
-from spartan import expr
+from spartan import array, expr
 from spartan.util import Assert
 import test_common
 import numpy as np
@@ -158,12 +158,19 @@ class TestOptimization(test_common.ClusterTest):
     # Our sum seems to reduce precision
     Assert.all_eq(ns, s.optimized().glom(), tolerance = 1e-6)
 
-  def test_extent_map(self):
+  def test_optimization_extent_map(self):
     def mapper(tile, ex, array):
       return tile + 10
 
     a = expr.extent_map(expr.ones((5, 5)), mapper) + expr.ones((5, 5))
     Assert.isinstance(a.optimized().op, expr.local.ParakeetExpr)
 
-  def test_region_map(self):
-    pass
+  def test_optimization_region_map(self):
+    def mapper(tile, ex, array):
+      return tile + 10
+
+    ex = array.extent.create((0, 0), (1, 5), (5, 5))
+    a = expr.region_map(expr.ones((5, 5)), ex, mapper) + expr.ones((5, 5))*10
+
+    for child in a.optimized().op.deps:
+      Assert.true(not isinstance(child, expr.local.LocalInput))
