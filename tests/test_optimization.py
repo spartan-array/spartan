@@ -1,8 +1,8 @@
-from spartan import expr, util
+from spartan import expr
 from spartan.util import Assert
 import test_common
 import numpy as np
-from scipy import sparse as sp
+
 
 class TestOptimization(test_common.ClusterTest):
   def _test_optimization_nonordered(self):
@@ -158,4 +158,12 @@ class TestOptimization(test_common.ClusterTest):
     # Our sum seems to reduce precision
     Assert.all_eq(ns, s.optimized().glom(), tolerance = 1e-6)
 
+  def test_extent_map(self):
+    def mapper(tile, ex, array):
+      return tile + 10
 
+    a = expr.extent_map(expr.ones((5, 5)), mapper) + expr.ones((5, 5))
+    Assert.isinstance(a.optimized().op, expr.local.ParakeetExpr)
+
+  def test_region_map(self):
+    pass
