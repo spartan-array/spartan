@@ -350,13 +350,15 @@ def ones(shape, dtype=np.float, tile_hint=None):
              fn=_make_ones)
 
 
+@disable_parakeet
 def _arange_mapper(tile, ex, array, start, stop, step, dtype=None):
-  ex = extent.from_tuple(ex)
-  pos = extent.ravelled_pos(ex.ul, ex.array_shape)
+  shape = tuple([lr - ul for ul, lr in zip(ex[0], ex[1])])
+  pos = extent.ravelled_pos(ex[0], ex[2])
   ex_start = pos*step + start
-  ex_stop = np.prod(ex.shape)*step + ex_start
+  ex_stop = np.prod(shape)*step + ex_start
 
-  return np.arange(ex_start, ex_stop, step, dtype=dtype).reshape(ex.shape)
+  # np.reshape is not supported by parakeet.
+  return np.arange(ex_start, ex_stop, step, dtype=dtype).reshape(shape)
 
 
 def arange(shape=None, start=0, stop=None, step=1, dtype=np.float, tile_hint=None):
