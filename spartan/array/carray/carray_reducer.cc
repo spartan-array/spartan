@@ -20,105 +20,598 @@
 #include "carray_reducer.h"
 #include "../extent/cextent.h"
 
-typedef npy_int _R_TYPE_;
-const char _R_TYPELTR_ = NPY_INTLTR;
+typedef npy_int _RP_TYPE_;
+const char _RP_TYPELTR_ = NPY_INTLTR;
 
 /**
  * Scalar reducer
  */
-/*_R_BEGIN_*/
+
 void
-_R_NAME__scalar_replace(char **args)
+BOOL_scalar_replace(char **args)
 {
     char *ip1 = args[0], *ip2 = args[1];
 
-    _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-    _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-    *((_R_TYPE_*)ip1) = in2;
+    npy_bool in1 = *((npy_bool*)ip1);
+    npy_bool in2 = *((npy_bool*)ip2);
+    *((npy_bool*)ip1) = in2;
 }
 
 void
-_R_NAME__scalar_add(char **args)
+BOOL_scalar_add(char **args)
 {
     char *ip1 = args[0], *ip2 = args[1];
 
-    _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-    _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-    *((_R_TYPE_*)ip1) = in1 + in2;
+    npy_bool in1 = *((npy_bool*)ip1);
+    npy_bool in2 = *((npy_bool*)ip2);
+    *((npy_bool*)ip1) = in1 + in2;
 }
 
 void
-_R_NAME__scalar_multiply(char **args)
+BOOL_scalar_multiply(char **args)
 {
     char *ip1 = args[0], *ip2 = args[1];
 
-    _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-    _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-    *((_R_TYPE_*)ip1) = in1 * in2;
+    npy_bool in1 = *((npy_bool*)ip1);
+    npy_bool in2 = *((npy_bool*)ip2);
+    *((npy_bool*)ip1) = in1 * in2;
 }
 
 void
-_R_NAME__scalar_maximum(char **args)
+BOOL_scalar_maximum(char **args)
 {
     char *ip1 = args[0], *ip2 = args[1];
 
-    _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-    _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-    *((_R_TYPE_*)ip1) = (in1 >= in2) ? in1 : in2;
+    npy_bool in1 = *((npy_bool*)ip1);
+    npy_bool in2 = *((npy_bool*)ip2);
+    *((npy_bool*)ip1) = (in1 >= in2) ? in1 : in2;
 }
 
 void
-_R_NAME__scalar_minimum(char **args)
+BOOL_scalar_minimum(char **args)
 {
     char *ip1 = args[0], *ip2 = args[1];
 
-    _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-    _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-    *((_R_TYPE_*)ip1) = (in1 < in2) ? in1 : in2;
+    npy_bool in1 = *((npy_bool*)ip1);
+    npy_bool in2 = *((npy_bool*)ip2);
+    *((npy_bool*)ip1) = (in1 < in2) ? in1 : in2;
+}
+
+/*
+void
+BOOL_scalar_and(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_bool in1 = *((npy_bool*)ip1);
+    npy_bool in2 = *((npy_bool*)ip2);
+    *((npy_bool*)ip1) = in1 & in2;
 }
 
 void
-_R_NAME__scalar_and(char **args)
+BOOL_scalar_or(char **args)
 {
     char *ip1 = args[0], *ip2 = args[1];
 
-    _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-    _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-    *((_R_TYPE_*)ip1) = in1 & in2;
+    npy_bool in1 = *((npy_bool*)ip1);
+    npy_bool in2 = *((npy_bool*)ip2);
+    *((npy_bool*)ip1) = in1 | in2;
 }
 
 void
-_R_NAME__scalar_or(char **args)
+BOOL_scalar_xor(char **args)
 {
     char *ip1 = args[0], *ip2 = args[1];
 
-    _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-    _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-    *((_R_TYPE_*)ip1) = in1 | in2;
+    npy_bool in1 = *((npy_bool*)ip1);
+    npy_bool in2 = *((npy_bool*)ip2);
+    *((npy_bool*)ip1) = in1 xor in2;
+}
+*/
+
+void
+INT_scalar_replace(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_int in1 = *((npy_int*)ip1);
+    npy_int in2 = *((npy_int*)ip2);
+    *((npy_int*)ip1) = in2;
 }
 
 void
-_R_NAME__scalar_xor(char **args)
+INT_scalar_add(char **args)
 {
     char *ip1 = args[0], *ip2 = args[1];
 
-    _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-    _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-    *((_R_TYPE_*)ip1) = in1 xor in2;
+    npy_int in1 = *((npy_int*)ip1);
+    npy_int in2 = *((npy_int*)ip2);
+    *((npy_int*)ip1) = in1 + in2;
 }
-/*_R_END_*/
+
+void
+INT_scalar_multiply(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_int in1 = *((npy_int*)ip1);
+    npy_int in2 = *((npy_int*)ip2);
+    *((npy_int*)ip1) = in1 * in2;
+}
+
+void
+INT_scalar_maximum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_int in1 = *((npy_int*)ip1);
+    npy_int in2 = *((npy_int*)ip2);
+    *((npy_int*)ip1) = (in1 >= in2) ? in1 : in2;
+}
+
+void
+INT_scalar_minimum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_int in1 = *((npy_int*)ip1);
+    npy_int in2 = *((npy_int*)ip2);
+    *((npy_int*)ip1) = (in1 < in2) ? in1 : in2;
+}
+
+/*
+void
+INT_scalar_and(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_int in1 = *((npy_int*)ip1);
+    npy_int in2 = *((npy_int*)ip2);
+    *((npy_int*)ip1) = in1 & in2;
+}
+
+void
+INT_scalar_or(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_int in1 = *((npy_int*)ip1);
+    npy_int in2 = *((npy_int*)ip2);
+    *((npy_int*)ip1) = in1 | in2;
+}
+
+void
+INT_scalar_xor(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_int in1 = *((npy_int*)ip1);
+    npy_int in2 = *((npy_int*)ip2);
+    *((npy_int*)ip1) = in1 xor in2;
+}
+*/
+
+void
+UINT_scalar_replace(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_uint in1 = *((npy_uint*)ip1);
+    npy_uint in2 = *((npy_uint*)ip2);
+    *((npy_uint*)ip1) = in2;
+}
+
+void
+UINT_scalar_add(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_uint in1 = *((npy_uint*)ip1);
+    npy_uint in2 = *((npy_uint*)ip2);
+    *((npy_uint*)ip1) = in1 + in2;
+}
+
+void
+UINT_scalar_multiply(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_uint in1 = *((npy_uint*)ip1);
+    npy_uint in2 = *((npy_uint*)ip2);
+    *((npy_uint*)ip1) = in1 * in2;
+}
+
+void
+UINT_scalar_maximum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_uint in1 = *((npy_uint*)ip1);
+    npy_uint in2 = *((npy_uint*)ip2);
+    *((npy_uint*)ip1) = (in1 >= in2) ? in1 : in2;
+}
+
+void
+UINT_scalar_minimum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_uint in1 = *((npy_uint*)ip1);
+    npy_uint in2 = *((npy_uint*)ip2);
+    *((npy_uint*)ip1) = (in1 < in2) ? in1 : in2;
+}
+
+/*
+void
+UINT_scalar_and(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_uint in1 = *((npy_uint*)ip1);
+    npy_uint in2 = *((npy_uint*)ip2);
+    *((npy_uint*)ip1) = in1 & in2;
+}
+
+void
+UINT_scalar_or(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_uint in1 = *((npy_uint*)ip1);
+    npy_uint in2 = *((npy_uint*)ip2);
+    *((npy_uint*)ip1) = in1 | in2;
+}
+
+void
+UINT_scalar_xor(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_uint in1 = *((npy_uint*)ip1);
+    npy_uint in2 = *((npy_uint*)ip2);
+    *((npy_uint*)ip1) = in1 xor in2;
+}
+*/
+
+void
+LONGLONG_scalar_replace(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_longlong in1 = *((npy_longlong*)ip1);
+    npy_longlong in2 = *((npy_longlong*)ip2);
+    *((npy_longlong*)ip1) = in2;
+}
+
+void
+LONGLONG_scalar_add(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_longlong in1 = *((npy_longlong*)ip1);
+    npy_longlong in2 = *((npy_longlong*)ip2);
+    *((npy_longlong*)ip1) = in1 + in2;
+}
+
+void
+LONGLONG_scalar_multiply(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_longlong in1 = *((npy_longlong*)ip1);
+    npy_longlong in2 = *((npy_longlong*)ip2);
+    *((npy_longlong*)ip1) = in1 * in2;
+}
+
+void
+LONGLONG_scalar_maximum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_longlong in1 = *((npy_longlong*)ip1);
+    npy_longlong in2 = *((npy_longlong*)ip2);
+    *((npy_longlong*)ip1) = (in1 >= in2) ? in1 : in2;
+}
+
+void
+LONGLONG_scalar_minimum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_longlong in1 = *((npy_longlong*)ip1);
+    npy_longlong in2 = *((npy_longlong*)ip2);
+    *((npy_longlong*)ip1) = (in1 < in2) ? in1 : in2;
+}
+
+/*
+void
+LONGLONG_scalar_and(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_longlong in1 = *((npy_longlong*)ip1);
+    npy_longlong in2 = *((npy_longlong*)ip2);
+    *((npy_longlong*)ip1) = in1 & in2;
+}
+
+void
+LONGLONG_scalar_or(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_longlong in1 = *((npy_longlong*)ip1);
+    npy_longlong in2 = *((npy_longlong*)ip2);
+    *((npy_longlong*)ip1) = in1 | in2;
+}
+
+void
+LONGLONG_scalar_xor(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_longlong in1 = *((npy_longlong*)ip1);
+    npy_longlong in2 = *((npy_longlong*)ip2);
+    *((npy_longlong*)ip1) = in1 xor in2;
+}
+*/
+
+void
+ULONGLONG_scalar_replace(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+    npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+    *((npy_ulonglong*)ip1) = in2;
+}
+
+void
+ULONGLONG_scalar_add(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+    npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+    *((npy_ulonglong*)ip1) = in1 + in2;
+}
+
+void
+ULONGLONG_scalar_multiply(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+    npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+    *((npy_ulonglong*)ip1) = in1 * in2;
+}
+
+void
+ULONGLONG_scalar_maximum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+    npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+    *((npy_ulonglong*)ip1) = (in1 >= in2) ? in1 : in2;
+}
+
+void
+ULONGLONG_scalar_minimum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+    npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+    *((npy_ulonglong*)ip1) = (in1 < in2) ? in1 : in2;
+}
+
+/*
+void
+ULONGLONG_scalar_and(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+    npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+    *((npy_ulonglong*)ip1) = in1 & in2;
+}
+
+void
+ULONGLONG_scalar_or(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+    npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+    *((npy_ulonglong*)ip1) = in1 | in2;
+}
+
+void
+ULONGLONG_scalar_xor(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+    npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+    *((npy_ulonglong*)ip1) = in1 xor in2;
+}
+*/
+
+void
+FLOAT_scalar_replace(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_float in1 = *((npy_float*)ip1);
+    npy_float in2 = *((npy_float*)ip2);
+    *((npy_float*)ip1) = in2;
+}
+
+void
+FLOAT_scalar_add(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_float in1 = *((npy_float*)ip1);
+    npy_float in2 = *((npy_float*)ip2);
+    *((npy_float*)ip1) = in1 + in2;
+}
+
+void
+FLOAT_scalar_multiply(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_float in1 = *((npy_float*)ip1);
+    npy_float in2 = *((npy_float*)ip2);
+    *((npy_float*)ip1) = in1 * in2;
+}
+
+void
+FLOAT_scalar_maximum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_float in1 = *((npy_float*)ip1);
+    npy_float in2 = *((npy_float*)ip2);
+    *((npy_float*)ip1) = (in1 >= in2) ? in1 : in2;
+}
+
+void
+FLOAT_scalar_minimum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_float in1 = *((npy_float*)ip1);
+    npy_float in2 = *((npy_float*)ip2);
+    *((npy_float*)ip1) = (in1 < in2) ? in1 : in2;
+}
+
+/*
+void
+FLOAT_scalar_and(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_float in1 = *((npy_float*)ip1);
+    npy_float in2 = *((npy_float*)ip2);
+    *((npy_float*)ip1) = in1 & in2;
+}
+
+void
+FLOAT_scalar_or(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_float in1 = *((npy_float*)ip1);
+    npy_float in2 = *((npy_float*)ip2);
+    *((npy_float*)ip1) = in1 | in2;
+}
+
+void
+FLOAT_scalar_xor(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_float in1 = *((npy_float*)ip1);
+    npy_float in2 = *((npy_float*)ip2);
+    *((npy_float*)ip1) = in1 xor in2;
+}
+*/
+
+void
+DOUBLE_scalar_replace(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_double in1 = *((npy_double*)ip1);
+    npy_double in2 = *((npy_double*)ip2);
+    *((npy_double*)ip1) = in2;
+}
+
+void
+DOUBLE_scalar_add(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_double in1 = *((npy_double*)ip1);
+    npy_double in2 = *((npy_double*)ip2);
+    *((npy_double*)ip1) = in1 + in2;
+}
+
+void
+DOUBLE_scalar_multiply(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_double in1 = *((npy_double*)ip1);
+    npy_double in2 = *((npy_double*)ip2);
+    *((npy_double*)ip1) = in1 * in2;
+}
+
+void
+DOUBLE_scalar_maximum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_double in1 = *((npy_double*)ip1);
+    npy_double in2 = *((npy_double*)ip2);
+    *((npy_double*)ip1) = (in1 >= in2) ? in1 : in2;
+}
+
+void
+DOUBLE_scalar_minimum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_double in1 = *((npy_double*)ip1);
+    npy_double in2 = *((npy_double*)ip2);
+    *((npy_double*)ip1) = (in1 < in2) ? in1 : in2;
+}
+
+/*
+void
+DOUBLE_scalar_and(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_double in1 = *((npy_double*)ip1);
+    npy_double in2 = *((npy_double*)ip2);
+    *((npy_double*)ip1) = in1 & in2;
+}
+
+void
+DOUBLE_scalar_or(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_double in1 = *((npy_double*)ip1);
+    npy_double in2 = *((npy_double*)ip2);
+    *((npy_double*)ip1) = in1 | in2;
+}
+
+void
+DOUBLE_scalar_xor(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_double in1 = *((npy_double*)ip1);
+    npy_double in2 = *((npy_double*)ip2);
+    *((npy_double*)ip1) = in1 xor in2;
+}
+*/
+
 
 typedef void (*scalar_reducer)(char**);
-scalar_reducer scalar_replace_functions[] = {/*_R_BEGIN_*/_R_NAME__scalar_replace, /*_R_END_*/NULL};
-scalar_reducer scalar_add_functions[] = {/*_R_BEGIN_*/_R_NAME__scalar_add, /*_R_END_*/NULL};
-scalar_reducer scalar_multiply_functions[] = {/*_R_BEGIN_*/_R_NAME__scalar_multiply, /*_R_END_*/NULL};
-scalar_reducer scalar_maximum_functions[] = {/*_R_BEGIN_*/_R_NAME__scalar_maximum, /*_R_END_*/NULL};
-scalar_reducer scalar_minimum_functions[] = {/*_R_BEGIN_*/_R_NAME__scalar_minimum, /*_R_END_*/NULL};
-scalar_reducer scalar_and_functions[] = {/*_R_BEGIN_*/_R_NAME__scalar_and, /*_R_END_*/NULL};
-scalar_reducer scalar_or_functions[] = {/*_R_BEGIN_*/_R_NAME__scalar_or, /*_R_END_*/NULL};
-scalar_reducer scalar_xor_functions[] = {/*_R_BEGIN_*/_R_NAME__scalar_xor, NULL};
-
-char scalar_funcs_type[] = {/*_R_BEGIN_*/_R_TYPELTR_, /*_R_END_*/' '};
+scalar_reducer scalar_replace_functions[] = {BOOL_scalar_replace, INT_scalar_replace, UINT_scalar_replace, LONGLONG_scalar_replace, ULONGLONG_scalar_replace, FLOAT_scalar_replace, DOUBLE_scalar_replace, NULL};
+scalar_reducer scalar_add_functions[] = {BOOL_scalar_add, INT_scalar_add, UINT_scalar_add, LONGLONG_scalar_add, ULONGLONG_scalar_add, FLOAT_scalar_add, DOUBLE_scalar_add, NULL};
+scalar_reducer scalar_multiply_functions[] = {BOOL_scalar_multiply, INT_scalar_multiply, UINT_scalar_multiply, LONGLONG_scalar_multiply, ULONGLONG_scalar_multiply, FLOAT_scalar_multiply, DOUBLE_scalar_multiply, NULL};
+scalar_reducer scalar_maximum_functions[] = {BOOL_scalar_maximum, INT_scalar_maximum, UINT_scalar_maximum, LONGLONG_scalar_maximum, ULONGLONG_scalar_maximum, FLOAT_scalar_maximum, DOUBLE_scalar_maximum, NULL};
+scalar_reducer scalar_minimum_functions[] = {BOOL_scalar_minimum, INT_scalar_minimum, UINT_scalar_minimum, LONGLONG_scalar_minimum, ULONGLONG_scalar_minimum, FLOAT_scalar_minimum, DOUBLE_scalar_minimum, NULL};
+//scalar_reducer scalar_and_functions[] = {[>_RP_BEGIN_*/_RP_NAME__scalar_and, /*_RP_END_<]NULL};
+//scalar_reducer scalar_or_functions[] = {[>_RP_BEGIN_*/_RP_NAME__scalar_or, /*_RP_END_<]NULL};
+//scalar_reducer scalar_xor_functions[] = {[>_RP_BEGIN_*/_RP_NAME__scalar_xor, /*_RP_END_<]NULL};
+char scalar_funcs_type[] = {NPY_BOOLLTR, NPY_INTLTR, NPY_UINTLTR, NPY_LONGLONGLTR, NPY_ULONGLONGLTR, NPY_FLOATLTR, NPY_DOUBLELTR, ' '};
 /* This must be sync with REDUCER enumeration */
 scalar_reducer* scalar_functions[] = {
                                      scalar_replace_functions,  /* REDUCER_REPLACE */
@@ -126,9 +619,9 @@ scalar_reducer* scalar_functions[] = {
                                      scalar_multiply_functions, /* REDUCER_MUL */
                                      scalar_maximum_functions,  /* REDUCER_MAXIMUM */
                                      scalar_minimum_functions,  /* REDUCER_MINIMUM */
-                                     scalar_and_functions,      /* REDUCER_AND */
-                                     scalar_or_functions,       /* REDUCER_OR */
-                                     scalar_xor_functions,      /* REDUCER_XOR */
+                                     //scalar_and_functions,      [> REDUCER_AND <]
+                                     //scalar_or_functions,       [> REDUCER_OR <]
+                                     //scalar_xor_functions,      [> REDUCER_XOR <]
                                      NULL,
                                    };
 
@@ -164,98 +657,586 @@ scalar_outer_loop(CArray *ip1, CArray *ip2, REDUCER reducer)
     for(i = 0; i < n; i++, ip1 += sp, ip2 += sp)
 
 
-/*_R_BEGIN_*/
+
 void
-_R_NAME__dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
+BOOL_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
 {
     BINARY_DENSE_LOOP {
-        _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-        *((_R_TYPE_*)ip1) = in2;
+        npy_bool in2 = *((npy_bool*)ip2);
+        *((npy_bool*)ip1) = in2;
     }
 }
 
 void
-_R_NAME__dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
+BOOL_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
 {
     BINARY_DENSE_LOOP {
-        _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-        _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-        *((_R_TYPE_*)ip1) = in1 + in2;
+        npy_bool in1 = *((npy_bool*)ip1);
+        npy_bool in2 = *((npy_bool*)ip2);
+        *((npy_bool*)ip1) = in1 + in2;
     }
 }
 
 void
-_R_NAME__dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
+BOOL_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
 {
     BINARY_DENSE_LOOP {
-        _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-        _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-        *((_R_TYPE_*)ip1) = in1 * in2;
+        npy_bool in1 = *((npy_bool*)ip1);
+        npy_bool in2 = *((npy_bool*)ip2);
+        *((npy_bool*)ip1) = in1 * in2;
     }
 }
 
 void
-_R_NAME__dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
+BOOL_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
 {
     BINARY_DENSE_LOOP {
-        _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-        _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-        *((_R_TYPE_*)ip1) = in1 and in2;
+        npy_bool in1 = *((npy_bool*)ip1);
+        npy_bool in2 = *((npy_bool*)ip2);
+        *((npy_bool*)ip1) = (in1 >= in2) ? in1 : in2;
     }
 }
 
 void
-_R_NAME__dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
+BOOL_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
 {
     BINARY_DENSE_LOOP {
-        _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-        _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-        *((_R_TYPE_*)ip1) = in1 or in2;
+        npy_bool in1 = *((npy_bool*)ip1);
+        npy_bool in2 = *((npy_bool*)ip2);
+        *((npy_bool*)ip1) = (in1 <= in2) ? in1 : in2;
+    }
+}
+
+/*
+void
+BOOL_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_bool in1 = *((npy_bool*)ip1);
+        npy_bool in2 = *((npy_bool*)ip2);
+        *((npy_bool*)ip1) = in1 and in2;
     }
 }
 
 void
-_R_NAME__dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
+BOOL_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
 {
     BINARY_DENSE_LOOP {
-        _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-        _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-        *((_R_TYPE_*)ip1) = in1 xor in2;
+        npy_bool in1 = *((npy_bool*)ip1);
+        npy_bool in2 = *((npy_bool*)ip2);
+        *((npy_bool*)ip1) = in1 or in2;
     }
 }
 
 void
-_R_NAME__dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
+BOOL_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
 {
     BINARY_DENSE_LOOP {
-        _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-        _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-        *((_R_TYPE_*)ip1) = (in1 >= in2) ? in1 : in2;
+        npy_bool in1 = *((npy_bool*)ip1);
+        npy_bool in2 = *((npy_bool*)ip2);
+        *((npy_bool*)ip1) = in1 xor in2;
+    }
+}
+*/
+
+void
+INT_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_int in2 = *((npy_int*)ip2);
+        *((npy_int*)ip1) = in2;
     }
 }
 
 void
-_R_NAME__dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
+INT_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
 {
     BINARY_DENSE_LOOP {
-        _R_TYPE_ in1 = *((_R_TYPE_*)ip1);
-        _R_TYPE_ in2 = *((_R_TYPE_*)ip2);
-        *((_R_TYPE_*)ip1) = (in1 <= in2) ? in1 : in2;
+        npy_int in1 = *((npy_int*)ip1);
+        npy_int in2 = *((npy_int*)ip2);
+        *((npy_int*)ip1) = in1 + in2;
     }
 }
-/*_R_END_*/
+
+void
+INT_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_int in1 = *((npy_int*)ip1);
+        npy_int in2 = *((npy_int*)ip2);
+        *((npy_int*)ip1) = in1 * in2;
+    }
+}
+
+void
+INT_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_int in1 = *((npy_int*)ip1);
+        npy_int in2 = *((npy_int*)ip2);
+        *((npy_int*)ip1) = (in1 >= in2) ? in1 : in2;
+    }
+}
+
+void
+INT_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_int in1 = *((npy_int*)ip1);
+        npy_int in2 = *((npy_int*)ip2);
+        *((npy_int*)ip1) = (in1 <= in2) ? in1 : in2;
+    }
+}
+
+/*
+void
+INT_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_int in1 = *((npy_int*)ip1);
+        npy_int in2 = *((npy_int*)ip2);
+        *((npy_int*)ip1) = in1 and in2;
+    }
+}
+
+void
+INT_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_int in1 = *((npy_int*)ip1);
+        npy_int in2 = *((npy_int*)ip2);
+        *((npy_int*)ip1) = in1 or in2;
+    }
+}
+
+void
+INT_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_int in1 = *((npy_int*)ip1);
+        npy_int in2 = *((npy_int*)ip2);
+        *((npy_int*)ip1) = in1 xor in2;
+    }
+}
+*/
+
+void
+UINT_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_uint in2 = *((npy_uint*)ip2);
+        *((npy_uint*)ip1) = in2;
+    }
+}
+
+void
+UINT_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_uint in1 = *((npy_uint*)ip1);
+        npy_uint in2 = *((npy_uint*)ip2);
+        *((npy_uint*)ip1) = in1 + in2;
+    }
+}
+
+void
+UINT_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_uint in1 = *((npy_uint*)ip1);
+        npy_uint in2 = *((npy_uint*)ip2);
+        *((npy_uint*)ip1) = in1 * in2;
+    }
+}
+
+void
+UINT_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_uint in1 = *((npy_uint*)ip1);
+        npy_uint in2 = *((npy_uint*)ip2);
+        *((npy_uint*)ip1) = (in1 >= in2) ? in1 : in2;
+    }
+}
+
+void
+UINT_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_uint in1 = *((npy_uint*)ip1);
+        npy_uint in2 = *((npy_uint*)ip2);
+        *((npy_uint*)ip1) = (in1 <= in2) ? in1 : in2;
+    }
+}
+
+/*
+void
+UINT_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_uint in1 = *((npy_uint*)ip1);
+        npy_uint in2 = *((npy_uint*)ip2);
+        *((npy_uint*)ip1) = in1 and in2;
+    }
+}
+
+void
+UINT_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_uint in1 = *((npy_uint*)ip1);
+        npy_uint in2 = *((npy_uint*)ip2);
+        *((npy_uint*)ip1) = in1 or in2;
+    }
+}
+
+void
+UINT_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_uint in1 = *((npy_uint*)ip1);
+        npy_uint in2 = *((npy_uint*)ip2);
+        *((npy_uint*)ip1) = in1 xor in2;
+    }
+}
+*/
+
+void
+LONGLONG_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_longlong in2 = *((npy_longlong*)ip2);
+        *((npy_longlong*)ip1) = in2;
+    }
+}
+
+void
+LONGLONG_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_longlong in1 = *((npy_longlong*)ip1);
+        npy_longlong in2 = *((npy_longlong*)ip2);
+        *((npy_longlong*)ip1) = in1 + in2;
+    }
+}
+
+void
+LONGLONG_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_longlong in1 = *((npy_longlong*)ip1);
+        npy_longlong in2 = *((npy_longlong*)ip2);
+        *((npy_longlong*)ip1) = in1 * in2;
+    }
+}
+
+void
+LONGLONG_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_longlong in1 = *((npy_longlong*)ip1);
+        npy_longlong in2 = *((npy_longlong*)ip2);
+        *((npy_longlong*)ip1) = (in1 >= in2) ? in1 : in2;
+    }
+}
+
+void
+LONGLONG_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_longlong in1 = *((npy_longlong*)ip1);
+        npy_longlong in2 = *((npy_longlong*)ip2);
+        *((npy_longlong*)ip1) = (in1 <= in2) ? in1 : in2;
+    }
+}
+
+/*
+void
+LONGLONG_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_longlong in1 = *((npy_longlong*)ip1);
+        npy_longlong in2 = *((npy_longlong*)ip2);
+        *((npy_longlong*)ip1) = in1 and in2;
+    }
+}
+
+void
+LONGLONG_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_longlong in1 = *((npy_longlong*)ip1);
+        npy_longlong in2 = *((npy_longlong*)ip2);
+        *((npy_longlong*)ip1) = in1 or in2;
+    }
+}
+
+void
+LONGLONG_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_longlong in1 = *((npy_longlong*)ip1);
+        npy_longlong in2 = *((npy_longlong*)ip2);
+        *((npy_longlong*)ip1) = in1 xor in2;
+    }
+}
+*/
+
+void
+ULONGLONG_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+        *((npy_ulonglong*)ip1) = in2;
+    }
+}
+
+void
+ULONGLONG_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+        npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+        *((npy_ulonglong*)ip1) = in1 + in2;
+    }
+}
+
+void
+ULONGLONG_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+        npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+        *((npy_ulonglong*)ip1) = in1 * in2;
+    }
+}
+
+void
+ULONGLONG_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+        npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+        *((npy_ulonglong*)ip1) = (in1 >= in2) ? in1 : in2;
+    }
+}
+
+void
+ULONGLONG_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+        npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+        *((npy_ulonglong*)ip1) = (in1 <= in2) ? in1 : in2;
+    }
+}
+
+/*
+void
+ULONGLONG_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+        npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+        *((npy_ulonglong*)ip1) = in1 and in2;
+    }
+}
+
+void
+ULONGLONG_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+        npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+        *((npy_ulonglong*)ip1) = in1 or in2;
+    }
+}
+
+void
+ULONGLONG_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulonglong in1 = *((npy_ulonglong*)ip1);
+        npy_ulonglong in2 = *((npy_ulonglong*)ip2);
+        *((npy_ulonglong*)ip1) = in1 xor in2;
+    }
+}
+*/
+
+void
+FLOAT_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_float in2 = *((npy_float*)ip2);
+        *((npy_float*)ip1) = in2;
+    }
+}
+
+void
+FLOAT_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_float in1 = *((npy_float*)ip1);
+        npy_float in2 = *((npy_float*)ip2);
+        *((npy_float*)ip1) = in1 + in2;
+    }
+}
+
+void
+FLOAT_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_float in1 = *((npy_float*)ip1);
+        npy_float in2 = *((npy_float*)ip2);
+        *((npy_float*)ip1) = in1 * in2;
+    }
+}
+
+void
+FLOAT_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_float in1 = *((npy_float*)ip1);
+        npy_float in2 = *((npy_float*)ip2);
+        *((npy_float*)ip1) = (in1 >= in2) ? in1 : in2;
+    }
+}
+
+void
+FLOAT_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_float in1 = *((npy_float*)ip1);
+        npy_float in2 = *((npy_float*)ip2);
+        *((npy_float*)ip1) = (in1 <= in2) ? in1 : in2;
+    }
+}
+
+/*
+void
+FLOAT_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_float in1 = *((npy_float*)ip1);
+        npy_float in2 = *((npy_float*)ip2);
+        *((npy_float*)ip1) = in1 and in2;
+    }
+}
+
+void
+FLOAT_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_float in1 = *((npy_float*)ip1);
+        npy_float in2 = *((npy_float*)ip2);
+        *((npy_float*)ip1) = in1 or in2;
+    }
+}
+
+void
+FLOAT_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_float in1 = *((npy_float*)ip1);
+        npy_float in2 = *((npy_float*)ip2);
+        *((npy_float*)ip1) = in1 xor in2;
+    }
+}
+*/
+
+void
+DOUBLE_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_double in2 = *((npy_double*)ip2);
+        *((npy_double*)ip1) = in2;
+    }
+}
+
+void
+DOUBLE_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_double in1 = *((npy_double*)ip1);
+        npy_double in2 = *((npy_double*)ip2);
+        *((npy_double*)ip1) = in1 + in2;
+    }
+}
+
+void
+DOUBLE_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_double in1 = *((npy_double*)ip1);
+        npy_double in2 = *((npy_double*)ip2);
+        *((npy_double*)ip1) = in1 * in2;
+    }
+}
+
+void
+DOUBLE_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_double in1 = *((npy_double*)ip1);
+        npy_double in2 = *((npy_double*)ip2);
+        *((npy_double*)ip1) = (in1 >= in2) ? in1 : in2;
+    }
+}
+
+void
+DOUBLE_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_double in1 = *((npy_double*)ip1);
+        npy_double in2 = *((npy_double*)ip2);
+        *((npy_double*)ip1) = (in1 <= in2) ? in1 : in2;
+    }
+}
+
+/*
+void
+DOUBLE_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_double in1 = *((npy_double*)ip1);
+        npy_double in2 = *((npy_double*)ip2);
+        *((npy_double*)ip1) = in1 and in2;
+    }
+}
+
+void
+DOUBLE_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_double in1 = *((npy_double*)ip1);
+        npy_double in2 = *((npy_double*)ip2);
+        *((npy_double*)ip1) = in1 or in2;
+    }
+}
+
+void
+DOUBLE_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_double in1 = *((npy_double*)ip1);
+        npy_double in2 = *((npy_double*)ip2);
+        *((npy_double*)ip1) = in1 xor in2;
+    }
+}
+*/
+
 
 typedef void (*dense_reducer)(char**, npy_intp*, npy_intp*);
-dense_reducer dense_replace_functions[] = {/*_R_BEGIN*/_R_NAME__dense_replace, /*_R_END_*/NULL};
-dense_reducer dense_add_functions[] = {/*_R_BEGIN*/_R_NAME__dense_add, /*_R_END_*/NULL};
-dense_reducer dense_multiply_functions[] = {/*_R_BEGIN*/_R_NAME__dense_multiply, /*_R_END_*/NULL};
-dense_reducer dense_maximum_functions[] = {/*_R_BEGIN*/_R_NAME__dense_maximum, /*_R_END_*/NULL};
-dense_reducer dense_minimum_functions[] = {/*_R_BEGIN*/_R_NAME__dense_minimum, /*_R_END_*/NULL};
-dense_reducer dense_and_functions[] = {/*_R_BEGIN*/_R_NAME__dense_and, /*_R_END_*/NULL};
-dense_reducer dense_or_functions[] = {/*_R_BEGIN*/_R_NAME__dense_or, /*_R_END_*/NULL};
-dense_reducer dense_xor_functions[] = {/*_R_BEGIN*/_R_NAME__dense_xor, /*_R_END_*/NULL};
+dense_reducer dense_replace_functions[] = {BOOL_dense_replace, INT_dense_replace, UINT_dense_replace, LONGLONG_dense_replace, ULONGLONG_dense_replace, FLOAT_dense_replace, DOUBLE_dense_replace, NULL};
+dense_reducer dense_add_functions[] = {BOOL_dense_add, INT_dense_add, UINT_dense_add, LONGLONG_dense_add, ULONGLONG_dense_add, FLOAT_dense_add, DOUBLE_dense_add, NULL};
+dense_reducer dense_multiply_functions[] = {BOOL_dense_multiply, INT_dense_multiply, UINT_dense_multiply, LONGLONG_dense_multiply, ULONGLONG_dense_multiply, FLOAT_dense_multiply, DOUBLE_dense_multiply, NULL};
+dense_reducer dense_maximum_functions[] = {BOOL_dense_maximum, INT_dense_maximum, UINT_dense_maximum, LONGLONG_dense_maximum, ULONGLONG_dense_maximum, FLOAT_dense_maximum, DOUBLE_dense_maximum, NULL};
+dense_reducer dense_minimum_functions[] = {BOOL_dense_minimum, INT_dense_minimum, UINT_dense_minimum, LONGLONG_dense_minimum, ULONGLONG_dense_minimum, FLOAT_dense_minimum, DOUBLE_dense_minimum, NULL};
+//dense_reducer dense_and_functions[] = {[>_RP_BEGIN_*/_RP_NAME__dense_and, /*_RP_END_<]NULL};
+//dense_reducer dense_or_functions[] = {[>_RP_BEGIN_*/_RP_NAME__dense_or, /*_RP_END_<]NULL};
+//dense_reducer dense_xor_functions[] = {[>_RP_BEGIN_*/_RP_NAME__dense_xor, /*_RP_END_<]NULL};
 
-char dense_funcs_type[] = {/*_R_BEGIN_*/_R_TYPELTR_, /*_R_END_*/' '};
+char dense_funcs_type[] = {NPY_BOOLLTR, NPY_INTLTR, NPY_UINTLTR, NPY_LONGLONGLTR, NPY_ULONGLONGLTR, NPY_FLOATLTR, NPY_DOUBLELTR, ' '};
 /* This must be sync with REDUCER enumeration */
 dense_reducer* dense_functions[] = {
                                      dense_replace_functions,  /* REDUCER_REPLACE */
@@ -263,9 +1244,9 @@ dense_reducer* dense_functions[] = {
                                      dense_multiply_functions, /* REDUCER_MUL */
                                      dense_maximum_functions,  /* REDUCER_MAXIMUM */
                                      dense_minimum_functions,  /* REDUCER_MINIMUM */
-                                     dense_and_functions,      /* REDUCER_AND */
-                                     dense_or_functions,       /* REDUCER_OR */
-                                     dense_xor_functions,      /* REDUCER_XOR */
+                                     //dense_and_functions,      [> REDUCER_AND <]
+                                     //dense_or_functions,       [> REDUCER_OR <]
+                                     //dense_xor_functions,      [> REDUCER_XOR <]
                                      NULL,
                                    };
 
@@ -361,62 +1342,250 @@ trivial_dense_outer_loop(CArray *ip1, CArray *ip2, REDUCER reducer)
     npy_intp n = dimensions[2]; \
     npy_intp row_base = bases[0]; \
     npy_intp col_base = bases[1]; \
-    _R_TYPE_ row, col; \
+    _RP_TYPE_ row, col; \
     npy_intp i; \
     if (row_base == 0 && col_base == 0) { \
         for (i = 0 ; i < n ; i++, rp++, cp++, vp++) { \
-            row = *((_R_TYPE_*)(++rp)); \
-            col = *((_R_TYPE_*)(++cp)); \
+            row = *((_RP_TYPE_*)(++rp)); \
+            col = *((_RP_TYPE_*)(++cp)); \
             npy_intp pos = row * dense_row_stride + col * dense_col_stride;
 
 #define BINARY_BEGIN_SPARSE_ELSE \
         } \
     } else { \
         for (i = 0 ; i < n ; i++, rp++, cp++, vp++) { \
-            row = *((_R_TYPE_*)(rp)) + row_base; \
-            col = *((_R_TYPE_*)(cp)) + col_base; \
+            row = *((_RP_TYPE_*)(rp)) + row_base; \
+            col = *((_RP_TYPE_*)(cp)) + col_base; \
             npy_intp pos = row * dense_row_stride + col * dense_col_stride;\
 
 #define BINARY_SPARSE_LOOP_END\
         } \
     }
 
-/*_R_BEGIN_*/
+
 void
-_R_NAME__sparse_dense_add(char **args, npy_intp *dimensions, npy_intp *bases)
+BOOL_sparse_dense_add(char **args, npy_intp *dimensions, npy_intp *bases)
 {
 
     BINARY_BEGIN_SPARSE_LOOP
-    _R_TYPE_ dense_val = *((_R_TYPE_*)(dp + pos));
-    _R_TYPE_ sparse_val = *((_R_TYPE_*)(vp));
-    *((_R_TYPE_*)(dp + pos)) = dense_val + sparse_val;
+    npy_bool dense_val = *((npy_bool*)(dp + pos));
+    npy_bool sparse_val = *((npy_bool*)(vp));
+    *((npy_bool*)(dp + pos)) = dense_val + sparse_val;
     BINARY_BEGIN_SPARSE_ELSE
-    _R_TYPE_ dense_val = *((_R_TYPE_*)(dp + pos));
-    _R_TYPE_ sparse_val = *((_R_TYPE_*)(vp));
-    *((_R_TYPE_*)(dp + pos)) = dense_val + sparse_val;
+    npy_bool dense_val = *((npy_bool*)(dp + pos));
+    npy_bool sparse_val = *((npy_bool*)(vp));
+    *((npy_bool*)(dp + pos)) = dense_val + sparse_val;
     BINARY_SPARSE_LOOP_END
 }
 
+/*
 void
-_R_NAME__sparse_dense_or(char **args, npy_intp *dimensions, npy_intp *bases)
+BOOL_sparse_dense_or(char **args, npy_intp *dimensions, npy_intp *bases)
 {
     BINARY_BEGIN_SPARSE_LOOP
-    _R_TYPE_ dense_val = *((_R_TYPE_*)(dp + pos));
-    _R_TYPE_ sparse_val = *((_R_TYPE_*)(vp));
-    *((_R_TYPE_*)(dp + pos)) = dense_val or sparse_val;
+    npy_bool dense_val = *((npy_bool*)(dp + pos));
+    npy_bool sparse_val = *((npy_bool*)(vp));
+    *((npy_bool*)(dp + pos)) = dense_val or sparse_val;
     BINARY_BEGIN_SPARSE_ELSE
-    _R_TYPE_ dense_val = *((_R_TYPE_*)(dp + pos));
-    _R_TYPE_ sparse_val = *((_R_TYPE_*)(vp));
-    *((_R_TYPE_*)(dp + pos)) = dense_val or sparse_val;
+    npy_bool dense_val = *((npy_bool*)(dp + pos));
+    npy_bool sparse_val = *((npy_bool*)(vp));
+    *((npy_bool*)(dp + pos)) = dense_val or sparse_val;
     BINARY_SPARSE_LOOP_END
 }
-/*_R_END_*/
+*/
+
+void
+INT_sparse_dense_add(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_int dense_val = *((npy_int*)(dp + pos));
+    npy_int sparse_val = *((npy_int*)(vp));
+    *((npy_int*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_int dense_val = *((npy_int*)(dp + pos));
+    npy_int sparse_val = *((npy_int*)(vp));
+    *((npy_int*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+
+/*
+void
+INT_sparse_dense_or(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_int dense_val = *((npy_int*)(dp + pos));
+    npy_int sparse_val = *((npy_int*)(vp));
+    *((npy_int*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_int dense_val = *((npy_int*)(dp + pos));
+    npy_int sparse_val = *((npy_int*)(vp));
+    *((npy_int*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+*/
+
+void
+UINT_sparse_dense_add(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_uint dense_val = *((npy_uint*)(dp + pos));
+    npy_uint sparse_val = *((npy_uint*)(vp));
+    *((npy_uint*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_uint dense_val = *((npy_uint*)(dp + pos));
+    npy_uint sparse_val = *((npy_uint*)(vp));
+    *((npy_uint*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+
+/*
+void
+UINT_sparse_dense_or(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_uint dense_val = *((npy_uint*)(dp + pos));
+    npy_uint sparse_val = *((npy_uint*)(vp));
+    *((npy_uint*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_uint dense_val = *((npy_uint*)(dp + pos));
+    npy_uint sparse_val = *((npy_uint*)(vp));
+    *((npy_uint*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+*/
+
+void
+LONGLONG_sparse_dense_add(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_longlong dense_val = *((npy_longlong*)(dp + pos));
+    npy_longlong sparse_val = *((npy_longlong*)(vp));
+    *((npy_longlong*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_longlong dense_val = *((npy_longlong*)(dp + pos));
+    npy_longlong sparse_val = *((npy_longlong*)(vp));
+    *((npy_longlong*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+
+/*
+void
+LONGLONG_sparse_dense_or(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_longlong dense_val = *((npy_longlong*)(dp + pos));
+    npy_longlong sparse_val = *((npy_longlong*)(vp));
+    *((npy_longlong*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_longlong dense_val = *((npy_longlong*)(dp + pos));
+    npy_longlong sparse_val = *((npy_longlong*)(vp));
+    *((npy_longlong*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+*/
+
+void
+ULONGLONG_sparse_dense_add(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_ulonglong dense_val = *((npy_ulonglong*)(dp + pos));
+    npy_ulonglong sparse_val = *((npy_ulonglong*)(vp));
+    *((npy_ulonglong*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_ulonglong dense_val = *((npy_ulonglong*)(dp + pos));
+    npy_ulonglong sparse_val = *((npy_ulonglong*)(vp));
+    *((npy_ulonglong*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+
+/*
+void
+ULONGLONG_sparse_dense_or(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_ulonglong dense_val = *((npy_ulonglong*)(dp + pos));
+    npy_ulonglong sparse_val = *((npy_ulonglong*)(vp));
+    *((npy_ulonglong*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_ulonglong dense_val = *((npy_ulonglong*)(dp + pos));
+    npy_ulonglong sparse_val = *((npy_ulonglong*)(vp));
+    *((npy_ulonglong*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+*/
+
+void
+FLOAT_sparse_dense_add(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_float dense_val = *((npy_float*)(dp + pos));
+    npy_float sparse_val = *((npy_float*)(vp));
+    *((npy_float*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_float dense_val = *((npy_float*)(dp + pos));
+    npy_float sparse_val = *((npy_float*)(vp));
+    *((npy_float*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+
+/*
+void
+FLOAT_sparse_dense_or(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_float dense_val = *((npy_float*)(dp + pos));
+    npy_float sparse_val = *((npy_float*)(vp));
+    *((npy_float*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_float dense_val = *((npy_float*)(dp + pos));
+    npy_float sparse_val = *((npy_float*)(vp));
+    *((npy_float*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+*/
+
+void
+DOUBLE_sparse_dense_add(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_double dense_val = *((npy_double*)(dp + pos));
+    npy_double sparse_val = *((npy_double*)(vp));
+    *((npy_double*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_double dense_val = *((npy_double*)(dp + pos));
+    npy_double sparse_val = *((npy_double*)(vp));
+    *((npy_double*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+
+/*
+void
+DOUBLE_sparse_dense_or(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_double dense_val = *((npy_double*)(dp + pos));
+    npy_double sparse_val = *((npy_double*)(vp));
+    *((npy_double*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_double dense_val = *((npy_double*)(dp + pos));
+    npy_double sparse_val = *((npy_double*)(vp));
+    *((npy_double*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+*/
+
 
 typedef void (*sparse_dense_reducer)(char**, npy_intp*, npy_intp*);
-sparse_dense_reducer sparse_dense_add_functions[] = {_R_NAME__sparse_dense_add, NULL};
-sparse_dense_reducer sparse_dense_or_functions[] = {_R_NAME__sparse_dense_or, NULL};
+sparse_dense_reducer sparse_dense_add_functions[] = {BOOL_sparse_dense_add, INT_sparse_dense_add, UINT_sparse_dense_add, LONGLONG_sparse_dense_add, ULONGLONG_sparse_dense_add, FLOAT_sparse_dense_add, DOUBLE_sparse_dense_add, NULL};
+//sparse_dense_reducer sparse_dense_or_functions[] = {[>_RP_BEGIN_*/_RP_NAME__sparse_dense_or, /*_RP_END<]NULL};
 
-char sparse_funcs_type[] = {/*_R_BEGIN_*/_R_TYPELTR_, /*_R_END_*/' '};
+char sparse_funcs_type[] = {NPY_BOOLLTR, NPY_INTLTR, NPY_UINTLTR, NPY_LONGLONGLTR, NPY_ULONGLONGLTR, NPY_FLOATLTR, NPY_DOUBLELTR, ' '};
 /* This must be sync with REDUCER enumeration */
 /* Only support add and or now. These two are trivial to implement */
 sparse_dense_reducer* sparse_dense_functions[] = {
@@ -426,7 +1595,7 @@ sparse_dense_reducer* sparse_dense_functions[] = {
                                      NULL,                            /* REDUCER_MAXIMUM */
                                      NULL,                            /* REDUCER_MINIMUM */
                                      NULL,                            /* REDUCER_AND */
-                                     sparse_dense_or_functions,       /* REDUCER_OR */
+                                     //sparse_dense_or_functions,       [> REDUCER_OR <]
                                      NULL,                            /* REDUCER_XOR */
                                      NULL,
                                    };
