@@ -1,8 +1,10 @@
 from ..array import extent
 from .base import Expr
 from .extent_map import extent_map
+from .optimize import disable_parakeet
 
 
+@disable_parakeet
 def _region_mapper(tile, ex, array, region, user_fn, fn_kw=None):
   '''Run when mapping over a region.
 
@@ -41,7 +43,7 @@ def _region_mapper(tile, ex, array, region, user_fn, fn_kw=None):
 def region_map(array, region, fn, fn_kw=None):
   '''
   Map ``fn`` over a subset of ``array``.
-  This returns a new array of the same shape as the input. 
+  This returns a new array of the same shape as the input.
 
   For areas within the region list are replaced with the result of `fn`; areas outside of the
   region list keep the values from the original array.
