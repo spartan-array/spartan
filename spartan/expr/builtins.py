@@ -235,42 +235,47 @@ def diagonal(a):
   return shuffle(a, _diagonal_mapper)
 
 
-def _normalize_mapper(array, ex, axis, norm_value):
-  '''
-  Normalize a region of an array.
-  Returns a new, normalized region.
-  
-  Args:
-    array (DistArray):
-    ex (Extent): Region being processed.
-    axis: Either an integer or ``None``.
-  '''
-  data = array.fetch(ex)
-  if axis is None:
-    data /= norm_value
-  elif axis == 1:
-    for i in range(data.shape[0]):
-      data[i,:] /= norm_value[ex.ul[0] + i]
-  elif axis == 0:
-    for i in range(data.shape[1]):
-      data[:,i] /= norm_value[ex.ul[1] + i]
+def _normalize_mapper(tile, ex, array, axis, norm_value):
+  '''Normalize a region of an array.
 
-  yield (ex, data)
+  Returns a new, normalized region.
+
+  :param tile: np.ndarray
+    Data being processed.
+  :param axis: int, optional
+    The axis to normalize; defaults to flattened array.
+
+  '''
+  if axis is None:
+    tile /= norm_value
+  elif axis == 1:
+    for i in range(tile.shape[0]):
+      tile[i,:] /= norm_value[ex.ul[0] + i]
+  elif axis == 0:
+    for i in range(tile.shape[1]):
+      tile[:,i] /= norm_value[ex.ul[1] + i]
+
+  return tile
+
 
 def normalize(array, axis=None):
-  '''
-  Normalize the values of ``array`` over axis.
+  '''Normalize the values of ``array`` over axis.
+
   After normalization `sum(array, axis)` will be equal to 1.
-  
-  Args:
-    array (Expr): array need to be normalized
-    axis (int): Either an integer or ``None``.
-  
-  Returns:
-    `Expr`: Normalized array.
+
+  :param array: Expr
+    The array to be normalized.
+  :param axis: int, optional
+    The axis to normalize.``None`` will normalize the flattened array.
+
+  :rtype: MapExpr
+    Normalized array.
+
   '''
   axis_sum = sum(array, axis=axis).glom()
-  return shuffle(array, _normalize_mapper, kw=dict(axis=axis, norm_value=axis_sum))
+  return extent_map(array, _normalize_mapper,
+                    fn_kw={'axis': axis, 'norm_value': axis_sum})
+
 
 def norm(array, ord=2):
   '''
