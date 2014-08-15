@@ -1,0 +1,6 @@
+namespace rlog
+
+abstract service RLog {
+    log(i32 level, string source, i64 msg_id, string message | )
+    aggregate_qps(string metric_name, i32 increment | )
+}

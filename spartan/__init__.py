@@ -27,8 +27,11 @@ except:
 
 
 import sys
+import os
 
-import core
+sys.path += os.path.abspath(os.path.join(os.path.split(__file__)[0], "fastrpc/simple-rpc/pylib")),
+
+import simplerpc
 from .expr import *
 from . import config
 from .config import FLAGS

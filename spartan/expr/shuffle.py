@@ -1,4 +1,4 @@
-from spartan import rpc
+from spartan import fastrpc
 
 from .. import blob_ctx, util
 from ..array import distarray, tile
@@ -54,7 +54,7 @@ def target_mapper(ex, map_fn=None, source=None, target=None, fn_kw=None):
   '''
   result = list(map_fn(source, ex, **fn_kw))
   
-  futures = rpc.FutureGroup()
+  futures = fastrpc.FutureGroup()
   if result is not None:
     for ex, v in result:
       #update_time, _ = util.timeit(lambda: target.update(ex, v))
@@ -89,7 +89,7 @@ def notarget_mapper(ex, array=None, map_fn=None, source=None, fn_kw=None):
     for ex, v in user_result:
       Assert.eq(ex.shape, v.shape, 'Bad shape from %s' % map_fn)
       result_tile = tile.from_data(v)
-      tile_id = blob_ctx.get().create(result_tile).wait().tile_id
+      tile_id = blob_ctx.get().create(result_tile).result.tile_id
       results.append((ex, tile_id))
   
   return LocalKernelResult(result=results, futures=None)

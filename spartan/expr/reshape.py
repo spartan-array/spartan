@@ -5,7 +5,6 @@ Reshape operation and expr.
 import itertools
 import numpy as np
 import scipy.sparse as sp
-from spartan import rpc
 from .base import Expr, lazify
 from .. import master, blob_ctx, util
 from ..util import is_iterable, Assert
