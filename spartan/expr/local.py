@@ -44,9 +44,7 @@ class LocalExpr(Node):
 
   def add_dep(self, v):
     self.deps.append(v)
-    # self.deps will be at most 3. (value) -> LocalMapExpr, (value, extent) ->
-    #   LocalReduceExpr, and (value, extent, array) -> LocalMapExtentExpr.
-    assert len(self.deps) <= 3, v
+    assert len(self.deps) <= 2, v
 
   def input_names(self):
     return util.flatten([v.input_names() for v in self.deps], unique=True)
@@ -121,8 +119,8 @@ class FnCallExpr(LocalExpr):
 class LocalMapExpr(FnCallExpr):
   _op_type = 'map'
 
-class LocalMapExtentExpr(LocalMapExpr):
-  _op_type = 'map_extent'
+class LocalMapLocationExpr(LocalMapExpr):
+  _op_type = 'map_location'
 
 class LocalReduceExpr(FnCallExpr):
   _op_type = 'reduce'

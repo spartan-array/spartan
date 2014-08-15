@@ -26,7 +26,7 @@ from ..util import Assert
 from .base import ListExpr, Expr, as_array
 from .broadcast import Broadcast, broadcast
 from .local import (LocalInput, LocalCtx, LocalExpr, LocalMapExpr,
-    LocalMapExtentExpr, make_var)
+    LocalMapLocationExpr, make_var)
 
 
 def get_local_values(ex, children, child_to_var):
@@ -64,9 +64,8 @@ def tile_mapper(ex, children, child_to_var, op, source_array=None):
   :param op: `LocalExpr` to evaluate.
   '''
   local_values = get_local_values(ex, children, child_to_var)
-  if isinstance(op, LocalMapExtentExpr):
+  if isinstance(op, LocalMapLocationExpr):
     local_values['extent'] = ex.to_tuple()
-    local_values['array'] = source_array
 
   #util.log_info('MapTiles: %s', op)
   #util.log_info('Fetching %d inputs', len(children))

@@ -14,7 +14,7 @@ from ..config import FLAGS, BoolFlag
 from . import local
 from .filter import FilterExpr
 from .slice import SliceExpr
-from .local import LocalInput, LocalMapExpr, LocalMapExtentExpr, make_var, ParakeetExpr
+from .local import LocalInput, LocalMapExpr, LocalMapLocationExpr, make_var, ParakeetExpr
 from .reduce import ReduceExpr, LocalReduceExpr
 from ..util import Assert
 
@@ -131,8 +131,8 @@ class MapMapFusion(OptimizePass):
     #util.log_info('Original: %s', expr.op)
     children = []
     child_to_var = []
-    if isinstance(expr.op, LocalMapExtentExpr):
-      combined_op = LocalMapExtentExpr(fn=expr.op.fn,
+    if isinstance(expr.op, LocalMapLocationExpr):
+      combined_op = LocalMapLocationExpr(fn=expr.op.fn,
                                        kw=expr.op.kw,
                                        pretty_fn=expr.op.pretty_fn)
     else:
@@ -156,9 +156,8 @@ class MapMapFusion(OptimizePass):
         combined_op.add_dep(LocalInput(idx=key))
         child_to_var.append(key)
 
-    if isinstance(expr.op, LocalMapExtentExpr):
+    if isinstance(expr.op, LocalMapLocationExpr):
       combined_op.add_dep(LocalInput(idx='extent'))
-      combined_op.add_dep(LocalInput(idx='array'))
 
     return expr_like(expr,
                      children=ListExpr(vals=children),

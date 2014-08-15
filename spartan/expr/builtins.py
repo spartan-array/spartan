@@ -19,7 +19,7 @@ from ..array.extent import index_for_reduction, shapes_match
 from ..util import Assert
 from .base import force
 from .map import map
-from .extent_map import extent_map
+from .map_with_location import map_with_location
 from .ndarray import ndarray
 from .optimize import disable_parakeet, not_idempotent
 from .reduce import reduce
@@ -235,7 +235,7 @@ def diagonal(a):
   return shuffle(a, _diagonal_mapper)
 
 
-def _normalize_mapper(tile, ex, array, axis, norm_value):
+def _normalize_mapper(value, ex, axis, norm_value):
   '''Normalize a region of an array.
 
   Returns a new, normalized region.
@@ -247,15 +247,15 @@ def _normalize_mapper(tile, ex, array, axis, norm_value):
 
   '''
   if axis is None:
-    tile /= norm_value
+    value /= norm_value
   elif axis == 1:
-    for i in range(tile.shape[0]):
-      tile[i,:] /= norm_value[ex.ul[0] + i]
+    for i in range(value.shape[0]):
+      value[i,:] /= norm_value[ex.ul[0] + i]
   elif axis == 0:
-    for i in range(tile.shape[1]):
-      tile[:,i] /= norm_value[ex.ul[1] + i]
+    for i in range(value.shape[1]):
+      value[:,i] /= norm_value[ex.ul[1] + i]
 
-  return tile
+  return value
 
 
 def normalize(array, axis=None):
@@ -273,7 +273,7 @@ def normalize(array, axis=None):
 
   '''
   axis_sum = sum(array, axis=axis).glom()
-  return extent_map(array, _normalize_mapper,
+  return map_with_location(array, _normalize_mapper,
                     fn_kw={'axis': axis, 'norm_value': axis_sum})
 
 
@@ -356,7 +356,7 @@ def ones(shape, dtype=np.float, tile_hint=None):
 
 
 @disable_parakeet
-def _arange_mapper(tile, ex, array, start, stop, step, dtype=None):
+def _arange_mapper(value, ex, start, stop, step, dtype=None):
   shape = tuple([lr - ul for ul, lr in zip(ex[0], ex[1])])
   pos = extent.ravelled_pos(ex[0], ex[2])
   ex_start = pos*step + start
@@ -413,7 +413,7 @@ def arange(shape=None, start=0, stop=None, step=1, dtype=np.float, tile_hint=Non
   if stop is None:
     stop = step*(np.prod(shape) + start)
 
-  return extent_map(ndarray(shape, dtype, tile_hint), _arange_mapper,
+  return map_with_location(ndarray(shape, dtype, tile_hint), _arange_mapper,
                     fn_kw={'start': start, 'stop': stop,
                            'step': step, 'dtype': dtype})
 

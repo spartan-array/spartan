@@ -1,6 +1,6 @@
 from ..array import extent
 from .base import Expr
-from .extent_map import extent_map
+from .map_with_location import map_with_location
 from .optimize import disable_parakeet
 
 
@@ -65,5 +65,5 @@ def region_map(array, region, fn, fn_kw=None):
       if isinstance(v, Expr):
         fn_kw[k] = v.evaluate()
 
-  kw = {'fn_kw': fn_kw, 'user_fn': fn, 'region': region}
-  return extent_map(array, fn=_region_mapper, fn_kw=kw)
+  kw = {'fn_kw': fn_kw, 'user_fn': fn, 'array': array, 'region': region}
+  return map_with_location(array, fn=_region_mapper, fn_kw=kw)
