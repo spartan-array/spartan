@@ -789,7 +789,7 @@ class AutomaticTiling(OptimizePass):
       #print node_id, 'tiling:', node.tiling
       if node.tiling >= 0:
         _tiled_exprlist[node.expr.expr_id] = node.tiling
-        if isinstance(node.expr.typename(), ('NdArrayExpr', 'ReduceExpr', 'DotExpr')) and len(node.expr.shape) > 0:
+        if node.expr.typename() in ['NdArrayExpr', 'ReduceExpr', 'DotExpr'] and len(node.expr.shape) > 0:
           node.expr.tile_hint = list(node.expr.shape)
           node.expr.tile_hint[node.tiling] = int(math.ceil(float(node.expr.tile_hint[node.tiling]) / FLAGS.num_workers))
       
