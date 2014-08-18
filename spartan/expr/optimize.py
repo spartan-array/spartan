@@ -11,7 +11,7 @@ lower code to Parakeet.
 '''
 from collections import namedtuple
 import operator, math
-from maxflow import mincost_maxflow
+from tiling import mincost_tiling
 
 from ..config import FLAGS, BoolFlag
 from ..array.distarray import DistArray
@@ -786,7 +786,7 @@ class AutomaticTiling(OptimizePass):
     
     # compute best tiling for all exprs
     self.visited_nodes = set()
-    nodes = mincost_maxflow(self.cur_node_id - 1, self.generate_edges(), self.split_nodes.items())
+    nodes = mincost_tiling(self.cur_node_id - 1, self.generate_edges(), self.split_nodes.items())
 
     # give expr the best tiling hint
     for node_id in nodes:

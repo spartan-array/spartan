@@ -18,7 +18,7 @@ void add_edge(int u, int v, int cost) {
     edge[e].next = head[u]; head[u] = e++;
 }
 
-int find_mincost_flow(int s, int t, bool* vis) {
+int find_mincost_tiling(int s, int t, bool* vis) {
 	int mincost = 0, i, j, v, sp_v = -1;
 
 	for (i = head[s]; i != -1; i = edge[i].next) {
@@ -35,7 +35,7 @@ int find_mincost_flow(int s, int t, bool* vis) {
 				if (vis[v] or vis[sp_v])
 					mincost += (vis[v])? edge[i].cost : INF;
 				else {
-					dis[v] = find_mincost_flow(v, t, vis);
+					dis[v] = find_mincost_tiling(v, t, vis);
 					mincost += dis[v] + edge[i].cost;
 					vis[v] = true;
 				}
@@ -46,8 +46,8 @@ int find_mincost_flow(int s, int t, bool* vis) {
 					bool vis1[nMax], vis2[nMax];
 					memcpy(vis1, vis, t * sizeof(bool));
 					memcpy(vis2, vis, t * sizeof(bool));
-					dis[v] = find_mincost_flow(v, t, vis1);
-					dis[sp_v] = find_mincost_flow(sp_v, t, vis2);
+					dis[v] = find_mincost_tiling(v, t, vis1);
+					dis[sp_v] = find_mincost_tiling(sp_v, t, vis2);
 					if (dis[v] + edge[i].cost < dis[sp_v] + edge[j].cost) {
 						mincost += dis[v] + edge[i].cost;
 						memcpy(vis, vis1, t * sizeof(bool));
@@ -62,7 +62,7 @@ int find_mincost_flow(int s, int t, bool* vis) {
 		} else { // all must be chosen case
 			if (vis[v]) mincost += edge[i].cost;
 			else {
-				dis[v] = find_mincost_flow(v, t, vis);
+				dis[v] = find_mincost_tiling(v, t, vis);
 				mincost += dis[v] + edge[i].cost;
 				vis[v] = true;
 			}
@@ -71,7 +71,7 @@ int find_mincost_flow(int s, int t, bool* vis) {
 	return mincost;
 }
 
-static PyObject* mincost_maxflow(PyObject *self, PyObject *args) {
+static PyObject* mincost_tiling(PyObject *self, PyObject *args) {
 	PyObject *list, *ans;
 	Py_ssize_t pos;
 	int t, u, v, cost;
@@ -100,7 +100,7 @@ static PyObject* mincost_maxflow(PyObject *self, PyObject *args) {
 	}
 
 	memset(vis, false, sizeof(vis));
-	mincost = find_mincost_flow(0, t, vis);
+	mincost = find_mincost_tiling(0, t, vis);
 
 	ans = PySet_New(NULL);
 	for (u = 0; u < t; u++)
@@ -110,14 +110,14 @@ static PyObject* mincost_maxflow(PyObject *self, PyObject *args) {
 	return ans;
 }
 
-static PyMethodDef MaxFlowMethods[] = {
-	{"mincost_maxflow", mincost_maxflow, METH_VARARGS, NULL},
+static PyMethodDef TilingMethods[] = {
+	{"mincost_tiling", mincost_tiling, METH_VARARGS, NULL},
 	{NULL, NULL, 0, NULL}
 };
 
-PyMODINIT_FUNC initmaxflow(void) {
+PyMODINIT_FUNC inittiling(void) {
 	PyObject *m;
-	m = Py_InitModule("maxflow", MaxFlowMethods);
+	m = Py_InitModule("tiling", TilingMethods);
 	if (m == NULL) return;
 }
 
