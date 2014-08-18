@@ -26,7 +26,7 @@ THETA = 0.06
 def mu(f, lamb):
   '''Auxiliary function.'''
   tmp = lamb*(DELTA*f[1:, :]) / (1 + DELTA*f[1:, :])  # Andreasen style
-  return spartan.scan(tmp, None, np.cumsum, None, 0)
+  return spartan.scan(tmp, None, np.cumsum, 0)
 
 
 def simulate(ts_all, te_all, lamb_all, num_paths):
