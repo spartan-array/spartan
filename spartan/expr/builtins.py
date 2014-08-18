@@ -240,8 +240,10 @@ def _normalize_mapper(value, ex, axis, norm_value):
 
   Returns a new, normalized region.
 
-  :param tile: np.ndarray
+  :param value: np.ndarray
     Data being processed.
+  :param ex: tuple
+    The value's location in the global array (ul, lr, array_shape).
   :param axis: int, optional
     The axis to normalize; defaults to flattened array.
 
