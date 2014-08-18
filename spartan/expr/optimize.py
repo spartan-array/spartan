@@ -467,6 +467,15 @@ class AutomaticTiling(OptimizePass):
   node_type = namedtuple('node_type', ['expr', 'tiling', 'children', 'parents'])
   inited = False
   
+  def init(self, expr):
+    self.cur_node_id = 1
+    self.edges = {}
+    self.nodes = {0: self.node_type(None, -1, [], [])}
+    self.expr_to_nodes = {}
+    self.split_nodes = {}
+    self.init_expr = id(expr)
+    self.inited = True
+      
   def add_edge(self, edge_from, edge_to, edge_cost=0):
     #util.log_info('add_edge:%d %d cost:%d', edge_from, edge_to, edge_cost)
     self.edges[(edge_from, edge_to)] = edge_cost
@@ -477,7 +486,286 @@ class AutomaticTiling(OptimizePass):
     del self.edges[(edge_from, edge_to)]
     self.nodes[edge_from].parents.remove(edge_to)
     self.nodes[edge_to].children.remove(edge_from)
+  
+  def add_split_nodes(self, node1, node2):
+    self.split_nodes[node1] = node2
+    self.split_nodes[node2] = node1  
+  
+#   def reuse_visited_expr(self, expr):
+#     cached_expr_ids = self.expr_to_nodes[expr]
+#     #util.log_info('reuse expr:%s', cached_expr_ids)
+#     # check if we need to fix previous parents
+#     for node_id in cached_expr_ids:  
+#       node = self.nodes[node_id]
+#       for parent_id in node.parents:
+#         if parent_id in self.split_nodes:
+#           split_parent_id = self.split_nodes[parent_id]
+#           if split_parent_id in node.parents:
+#             self.nodes[self.cur_node_id] = self.node_type(self.nodes[parent_id].expr, -1, [], [])   
+#             self.add_edge(self.cur_node_id, parent_id, self.edges[(node_id, parent_id)])
+#             self.add_edge(self.cur_node_id, split_parent_id, self.edges[(node_id, split_parent_id)])
+#             self.add_edge(node_id, self.cur_node_id, 0)
+#             self.remove_edge(node_id, parent_id)
+#             self.remove_edge(node_id, split_parent_id)
+#             self.cur_node_id += 1
+#             break
+#     return cached_expr_ids 
+  
+  def visit_children(self, children, except_child = None):
+    child_ids = []
+    for child in children:
+      if isinstance(child, (Expr, DistArray)) and id(child) != id(except_child):
+        child_ids.extend(self.visit_default(child))          
+    return child_ids 
+  
+  def visit_NdArrayExpr(self, expr):
+    # new array need to be partitioned
+    if len(expr.shape) > 1 and expr.shape[1] > 1:
+      self.nodes[self.cur_node_id] = self.node_type(expr, -1, [], [])
+      self.add_edge(0, self.cur_node_id, 0)
+      self.cur_node_id += 1
+      
+      self.nodes[self.cur_node_id] = self.node_type(expr, 0, [], [])
+      self.add_edge(self.cur_node_id - 1, self.cur_node_id, 0)
+      self.cur_node_id += 1    
+      
+      self.nodes[self.cur_node_id] = self.node_type(expr, 1, [], [])
+      self.add_edge(self.cur_node_id - 2, self.cur_node_id, 0)
+      self.cur_node_id += 1
+      
+      self.add_split_nodes(self.cur_node_id - 2, self.cur_node_id - 1)
+      return [self.cur_node_id - 2, self.cur_node_id - 1]
+    else:
+      self.nodes[self.cur_node_id] = self.node_type(expr, 0, [], [])
+      self.add_edge(0, self.cur_node_id, 0)
+      self.cur_node_id += 1
+      return [self.cur_node_id - 1]
+  
+  def visit_MapExpr(self, expr):
+    largest = max(expr.children.vals, key=lambda v: reduce(operator.mul, v.shape, 1))
     
+    child_ids = self.visit_children([largest])      
+    other_child_ids = self.visit_children(expr.children.vals, largest)
+    
+    # one input map, reuse child expr
+    if len(other_child_ids) == 0: return child_ids
+
+    if child_ids[0] in self.split_nodes:
+      tiling_types = (0, 1)
+      self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
+      expr_node_ids = [self.cur_node_id, self.cur_node_id + 1]
+    else:
+      tiling_types = (self.nodes[child_ids[0]].tiling,)
+      expr_node_ids = [self.cur_node_id]
+     
+    for i in xrange(len(tiling_types)):
+      tiling_type = tiling_types[i]
+      self.nodes[self.cur_node_id] = self.node_type(expr, tiling_type, [], [])
+      self.add_edge(child_ids[i], self.cur_node_id, 0)
+      
+      for child_id in other_child_ids:
+        child = self.nodes[child_id]
+        e_cost = reduce(operator.mul, child.expr.shape, 1) if child.tiling != tiling_type else 0
+        self.add_edge(child_id, self.cur_node_id, e_cost)       
+      self.cur_node_id += 1 
+        
+    return expr_node_ids
+      
+  def visit_ReduceExpr(self, expr):
+    child_ids = self.visit_children(expr.children.vals)
+    cost = reduce(operator.mul, expr.shape, 1)  
+    self.nodes[self.cur_node_id] = self.node_type(expr, 0, [], [])
+    for child_id in child_ids:
+      child = self.nodes[child_id]
+      e_cost = 0 if expr.axis is None or (1-expr.axis) == child.tiling else cost
+      self.add_edge(child_id, self.cur_node_id, e_cost)
+    self.cur_node_id += 1
+    return [self.cur_node_id - 1]
+  
+  def visit_ShuffleExpr(self, expr):
+    if expr.cost_hint is None:
+      for child in expr.fn_kw.vals:
+        if isinstance(child, (Expr, DistArray)):
+          expr.cost_hint[child] = (0, reduce(operator.mul, child.shape, 1))
+      if expr.target is not None:
+        expr.cost_hint[expr.target] = (0, reduce(operator.mul, expr.target.shape, 1))
+      
+    child_ids = self.visit_children([expr.array])
+    other_child_ids = self.visit_children(expr.fn_kw.vals.values())
+    
+    # calc the copy cost
+    if len(other_child_ids) == 0:
+      expr_node_ids = child_ids
+    else:
+      if child_ids[0] in self.split_nodes:
+        tiling_types = (0, 1)
+        self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
+        expr_node_ids = [self.cur_node_id, self.cur_node_id + 1]
+      else:
+        tiling_types = (self.nodes[child_ids[0]].tiling,)
+        expr_node_ids = [self.cur_node_id]
+        
+      for i in xrange(len(tiling_types)):
+        tiling_type = tiling_types[i]
+        self.nodes[self.cur_node_id] = self.node_type(expr, tiling_type, [], [])
+        self.add_edge(child_ids[i], self.cur_node_id, 0)
+        
+        for child_id in other_child_ids:
+          child = self.nodes[child_id]
+          self.add_edge(child_id, self.cur_node_id, expr.cost_hint[child.expr][int(child.tiling != tiling_type)])       
+        self.cur_node_id += 1
+
+    # calculate update cost
+    if expr.target is not None:
+      other_child_ids = expr_node_ids
+      child_ids = self.visit_children([expr.target])
+      
+      if child_ids[0] in self.split_nodes:
+        tiling_types = (0, 1)
+        self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
+        expr_node_ids = [self.cur_node_id, self.cur_node_id + 1]
+      else:
+        tiling_types = (self.nodes[child_ids[0]].tiling,)
+        expr_node_ids = [self.cur_node_id]
+
+      for i in xrange(len(tiling_types)):
+        tiling_type = tiling_types[i]
+        self.nodes[self.cur_node_id] = self.node_type(expr, tiling_type, [], [])
+        self.add_edge(child_ids[i], self.cur_node_id, 0)
+        
+        for child_id in other_child_ids:
+          e_cost = expr.cost_hint[expr.target][int(self.nodes[child_id].tiling != tiling_type)]
+          self.add_edge(child_id, self.cur_node_id, e_cost)       
+        self.cur_node_id += 1
+      return expr_node_ids
+    
+    # fix result tiling
+    if len(expr.shape) == 1: expr.tile_hint = 0
+    
+    if expr.tile_hint is not None:
+      if len(expr_node_ids) > 1 or expr.shape != expr.array.shape:
+        self.nodes[self.cur_node_id] = self.node_type(expr, expr.tile_hint, [], [])
+        for child_id in expr_node_ids: self.add_edge(child_id, self.cur_node_id, 0)
+        self.cur_node_id += 1
+        return [self.cur_node_id - 1]
+    
+      self.nodes[expr_node_ids[0]] = self.nodes[expr_node_ids[0]]._replace(tiling=expr.tile_hint)    
+    elif expr.shape != expr.array.shape:
+      child_ids = expr_node_ids
+      expr_node_ids = []
+      for child_id in child_ids:
+        self.nodes[self.cur_node_id] = self.node_type(expr, self.nodes[child_id].tiling, [], [])
+        expr_node_ids.append(self.cur_node_id)
+        self.add_edge(child_id, self.cur_node_id, 0)
+        self.cur_node_id += 1
+      if len(expr_node_ids) > 1: self.add_split_nodes(*expr_node_ids)    
+    
+    return expr_node_ids
+    
+  def visit_DotExpr(self, expr):
+    child_ids = self.visit_children([expr.matrix_a])
+    other_child_ids = self.visit_children([expr.matrix_b])
+
+    # calc copy cost
+    if len(other_child_ids) != 0:
+      if child_ids[0] in self.split_nodes:
+        tiling_types = (0, 1)
+        self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
+        expr_node_ids = [self.cur_node_id, self.cur_node_id + 1]
+      else:
+        tiling_types = (self.nodes[child_ids[0]].tiling,)
+        expr_node_ids = [self.cur_node_id]
+        
+      for i in xrange(len(tiling_types)):
+        tiling_type = tiling_types[i]
+        self.nodes[self.cur_node_id] = self.node_type(expr, tiling_type, [], [])
+        self.add_edge(child_ids[i], self.cur_node_id, 0)
+        
+        for child_id in other_child_ids:
+          child = self.nodes[child_id]
+          e_cost = reduce(operator.mul, child.expr.shape, 1) if tiling_type == 0 or child.tiling == tiling_type else 0
+          self.add_edge(child_id, self.cur_node_id, e_cost)       
+        self.cur_node_id += 1
+      
+      child_ids = expr_node_ids
+      
+    # calc update cost  
+    if len(expr.shape) == 1 or expr.shape[1] == 1:
+      tiling_types = (0,)
+      expr_node_ids = [self.cur_node_id]
+    else:
+      tiling_types = (0, 1) 
+      self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
+      expr_node_ids = [self.cur_node_id, self.cur_node_id + 1]
+    
+    for tiling_type in tiling_types:
+      self.nodes[self.cur_node_id] = self.node_type(expr, tiling_type, [], [])
+      for child_id in child_ids:
+        e_cost = reduce(operator.mul, expr.shape, 1) if self.nodes[child_id].tiling != tiling_type else 0
+        self.add_edge(child_id, self.cur_node_id, e_cost)
+      self.cur_node_id += 1
+    return expr_node_ids
+  
+  def visit_WriteArrayExpr(self, expr):
+    child_ids = self.visit_children([expr.array])
+    if isinstance(expr.data, (Expr, DistArray)):
+      data_child_ids = self.visit_children([expr.data])
+      if child_ids[0] in self.split_nodes:
+        tiling_types = (0,1)
+        self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
+        expr_node_ids = [self.cur_node_id, self.cur_node_id + 1]
+      else:
+        tiling_types = (self.nodes[child_ids[0]].tiling,)
+        expr_node_ids = [self.cur_node_id]
+        
+      for i in xrange(len(tiling_types)):
+        self.nodes[self.cur_node_id] = self.node_type(expr, tiling_types[i], [], [])
+        self.add_edge(child_ids[i], self.cur_node_id, 0)
+        
+        for child_id in data_child_ids:
+          child = self.nodes[child_id]
+          e_cost = reduce(operator.mul, child.expr.shape, 1) if child.tiling != tiling_types[i] else 0
+          self.add_edge(child_id, self.cur_node_id, e_cost)       
+        self.cur_node_id += 1
+      return expr_node_ids
+
+    return child_ids 
+  
+  def visit_aligned_nodes(self, expr, reverse_cost=False):
+    array = expr.src if hasattr(expr, 'src') else expr.array
+    child_ids = self.visit_children([array])
+    if child_ids[0] in self.split_nodes:
+      tiling_types = (0, 1)
+      self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
+      expr_node_ids = [self.cur_node_id, self.cur_node_id + 1]
+    else:
+      tiling_types = (reverse_cost^self.nodes[child_ids[0]].tiling,)
+      expr_node_ids = [self.cur_node_id]
+    
+    for i in xrange(len(tiling_types)):
+      self.nodes[self.cur_node_id] = self.node_type(expr, tiling_types[i], [], [])
+      self.add_edge(child_ids[-(reverse_cost^i)], self.cur_node_id, 0)       
+      self.cur_node_id += 1
+    return expr_node_ids
+  
+  def visit_TransposeExpr(self, expr):
+    return self.visit_aligned_nodes(expr, reverse_cost=True)
+      
+  def visit_ReshapeExpr(self, expr):
+    return self.visit_aligned_nodes(expr, reverse_cost=True)
+  
+  def visit_SliceExpr(self, expr):
+    return self.visit_aligned_nodes(expr)
+
+  def visit_FilterExpr(self, expr):
+    return self.visit_children([expr.src])
+  
+  def visit_CheckpointExpr(self, expr):
+    return self.visit_children([expr.src])
+  
+  def visit_TileOpExpr(self, expr):
+    return self.visit_children([expr.array])
+  
   def generate_edges(self, s = 0):
     edges = []
     self.nodes[s].parents.sort(key=lambda x: reduce(operator.mul, self.nodes[x].expr.shape, 1))
@@ -488,51 +776,36 @@ class AutomaticTiling(OptimizePass):
         self.visited_nodes.add(parent_id)
     return edges
   
-  def add_split_nodes(self, node1, node2):
-    self.split_nodes[node1] = node2
-    self.split_nodes[node2] = node1  
-  
-  def visit_children(self, children, except_child = None):
-    child_ids = []
-    for child in children:
-      if isinstance(child, (Expr, DistArray)) and id(child) != id(except_child):
-        child_ids.extend(self.visit_default(child))          
-    return child_ids
-     
-  def reuse_visited_expr(self, expr):
-    cached_expr_ids = self.expr_to_nodes[expr]
-    #util.log_info('reuse expr:%s', cached_expr_ids)
-    # check if we need to fix previous parents
-    for node_id in cached_expr_ids:  
+  def calc_tiling(self, expr):
+    # add T node for graph
+    if self.cur_node_id - 1 in self.split_nodes:
+      self.nodes[self.cur_node_id] = self.node_type(expr, -1, [], [])
+      self.add_edge(self.cur_node_id - 2, self.cur_node_id, 0)
+      self.add_edge(self.cur_node_id - 1, self.cur_node_id, 0)
+      self.cur_node_id += 1
+    
+    # compute best tiling for all exprs
+    self.visited_nodes = set()
+    nodes = mincost_maxflow(self.cur_node_id - 1, self.generate_edges(), self.split_nodes.items())
+
+    # give expr the best tiling hint
+    for node_id in nodes:
       node = self.nodes[node_id]
-      for parent_id in node.parents:
-        if parent_id in self.split_nodes:
-          split_parent_id = self.split_nodes[parent_id]
-          if split_parent_id in node.parents:
-            self.nodes[self.cur_node_id] = self.node_type(self.nodes[parent_id].expr, -1, [], [])   
-            self.add_edge(self.cur_node_id, parent_id, self.edges[(node_id, parent_id)])
-            self.add_edge(self.cur_node_id, split_parent_id, self.edges[(node_id, split_parent_id)])
-            self.add_edge(node_id, self.cur_node_id, 0)
-            self.remove_edge(node_id, parent_id)
-            self.remove_edge(node_id, split_parent_id)
-            self.cur_node_id += 1
-            break
-    return cached_expr_ids 
-   
+      #print node_id, 'tiling:', node.tiling
+      if node.tiling >= 0:
+        _tiled_exprlist[node.expr.expr_id] = node.tiling
+        if isinstance(node.expr, (NdArrayExpr, ReduceExpr, DotExpr)) and len(node.expr.shape) > 0:
+          node.expr.tile_hint = list(node.expr.shape)
+          node.expr.tile_hint[node.tiling] = int(math.ceil(float(node.expr.tile_hint[node.tiling]) / FLAGS.num_workers))
+      
+    self.inited = False
+    return expr
+    
   def visit_default(self, expr):
-    if not self.inited:
-      self.cur_node_id = 1
-      self.edges = {}
-      self.nodes = {0: self.node_type(None, -1, [], [])}
-      self.expr_to_nodes = {}
-      self.split_nodes = {}
-      self.init_expr = id(expr)
-      self.inited = True
+    if not self.inited: self.init(expr)
     
-    #util.log_info('visit expr:%s', expr)
-    if expr in self.expr_to_nodes: return self.reuse_visited_expr(expr)
-    
-    expr_node_ids = []
+    if expr in self.expr_to_nodes: return self.expr_to_nodes[expr] 
+     
     if expr.expr_id in _tiled_exprlist or isinstance(expr, DistArray) or \
        isinstance(expr, (Val, AsArray)) and isinstance(expr.val, DistArray):
       # already partitioned array
@@ -542,257 +815,29 @@ class AutomaticTiling(OptimizePass):
         array = expr if isinstance(expr, DistArray) else expr.val
         tiling = array.tile_shape()[0] == array.shape[0]
       self.nodes[self.cur_node_id] = self.node_type(expr, tiling, [], [])
-      expr_node_ids.append(self.cur_node_id)
+      expr_node_ids = [self.cur_node_id]
       self.add_edge(0, self.cur_node_id, 0)
       self.cur_node_id += 1
-      
-    elif isinstance(expr, NdArrayExpr):
-      # new array need to be partitioned
-      if len(expr.shape) > 1 and expr.shape[1] > 1:
-        self.nodes[self.cur_node_id] = self.node_type(expr, -1, [], [])
-        self.add_edge(0, self.cur_node_id, 0)
-        self.add_split_nodes(self.cur_node_id + 1, self.cur_node_id + 2)
-        expr_node_ids.extend([self.cur_node_id + 1, self.cur_node_id + 2])
-        self.cur_node_id += 1
-        
-        self.nodes[self.cur_node_id] = self.node_type(expr, 0, [], [])
-        self.add_edge(self.cur_node_id - 1, self.cur_node_id, 0)
-        self.cur_node_id += 1    
-        self.nodes[self.cur_node_id] = self.node_type(expr, 1, [], [])
-        self.add_edge(self.cur_node_id - 2, self.cur_node_id, 0)
-        self.cur_node_id += 1
-      else:
-        self.nodes[self.cur_node_id] = self.node_type(expr, 0, [], [])
-        expr_node_ids.append(self.cur_node_id)
-        self.add_edge(0, self.cur_node_id, 0)
-        self.cur_node_id += 1
         
     elif isinstance(expr, CollectionExpr):
       # DictExpr, ListExpr, TupleExpr
       children = expr.values() if expr.typename() == 'DictExpr' else expr.vals
       child_ids = self.visit_children(children)
       self.nodes[self.cur_node_id] = self.node_type(expr, -1, [], [])
-      expr_node_ids.append(self.cur_node_id)
+      expr_node_ids = [self.cur_node_id]
       for child_id in child_ids:
         self.add_edge(child_id, self.cur_node_id, 0)
       self.cur_node_id += 1  
       
-    elif isinstance(expr, MapExpr):
-      largest = max(expr.children.vals, key=lambda v: reduce(operator.mul, v.shape, 1))
-      
-      child_ids = self.visit_children([largest])      
-      other_child_ids = self.visit_children(expr.children.vals, largest)
-      
-      # one input map, reuse child expr
-      if len(other_child_ids) == 0:
-        expr_node_ids.extend(child_ids)
-      else:
-        if child_ids[0] in self.split_nodes:
-          tiling_types = (0, 1)
-          self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
-        else:
-          tiling_types = (self.nodes[child_ids[0]].tiling,)
-         
-        for i in xrange(len(tiling_types)):
-          tiling_type = tiling_types[i]
-          self.nodes[self.cur_node_id] = self.node_type(expr, tiling_type, [], [])
-          expr_node_ids.append(self.cur_node_id)
-          self.add_edge(child_ids[i], self.cur_node_id, 0)
-          
-          for child_id in other_child_ids:
-            child = self.nodes[child_id]
-            e_cost = reduce(operator.mul, child.expr.shape, 1) if child.tiling != tiling_type else 0
-            self.add_edge(child_id, self.cur_node_id, e_cost)       
-          self.cur_node_id += 1
-          
-    elif isinstance(expr, ReduceExpr):
-      child_ids = self.visit_children(expr.children.vals)
-      cost = reduce(operator.mul, expr.shape, 1)  
-      self.nodes[self.cur_node_id] = self.node_type(expr, 0, [], [])
-      expr_node_ids.append(self.cur_node_id)
-      for child_id in child_ids:
-        child = self.nodes[child_id]
-        e_cost = 0 if expr.axis is None or (1-expr.axis) == child.tiling else cost
-        self.add_edge(child_id, self.cur_node_id, e_cost)
-      self.cur_node_id += 1  
-
-    elif isinstance(expr, ShuffleExpr):
-      if expr.cost_hint is None:
-        for child in expr.fn_kw.vals:
-          expr.cost_hint[child] = (0, reduce(operator.mul, child.shape, 1))
-        if expr.target is not None:
-          expr.cost_hint[expr.target] = (0, reduce(operator.mul, expr.target.shape, 1))
-        
-      child_ids = self.visit_children([expr.array])
-      other_child_ids = self.visit_children(expr.fn_kw.vals.values())
-      
-      # calc the copy cost
-      if len(other_child_ids) == 0:
-        expr_node_ids.extend(child_ids)
-      else:
-        if child_ids[0] in self.split_nodes:
-          tiling_types = (0, 1)
-          self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
-        else:
-          tiling_types = (self.nodes[child_ids[0]].tiling,)
-          
-        for i in xrange(len(tiling_types)):
-          tiling_type = tiling_types[i]
-          self.nodes[self.cur_node_id] = self.node_type(expr, tiling_type, [], [])
-          expr_node_ids.append(self.cur_node_id)
-          self.add_edge(child_ids[i], self.cur_node_id, 0)
-          for child_id in other_child_ids:
-            child = self.nodes[child_id]
-            self.add_edge(child_id, self.cur_node_id, expr.cost_hint[child.expr][int(child.tiling != tiling_type)])       
-          self.cur_node_id += 1
-
-      # calculate update cost
-      if expr.target is not None:
-        other_child_ids = expr_node_ids
-        expr_node_ids = []
-        child_ids = self.visit_children([expr.target])
-        
-        if child_ids[0] in self.split_nodes:
-          tiling_types = (0, 1)
-          self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
-        else:
-          tiling_types = (self.nodes[child_ids[0]].tiling,)
-  
-          for i in xrange(len(tiling_types)):
-            tiling_type = tiling_types[i]
-            self.nodes[self.cur_node_id] = self.node_type(expr, tiling_type, [], [])
-            expr_node_ids.append(self.cur_node_id)
-            self.add_edge(child_ids[i], self.cur_node_id, 0)
-            for child_id in other_child_ids:
-              e_cost = expr.cost_hint[expr.target][int(self.nodes[child_id].tiling != tiling_type)]
-              self.add_edge(child_id, self.cur_node_id, e_cost)       
-            self.cur_node_id += 1        
-      else:
-        # fix tiling of result
-        if len(expr.shape) == 1: expr.tile_hint = 0
-        if expr.tile_hint is not None:
-          if len(expr_node_ids) > 1 or expr.shape != expr.array.shape:
-            self.nodes[self.cur_node_id] = self.node_type(expr, expr.tile_hint, [], [])
-            for child_id in expr_node_ids: self.add_edge(child_id, self.cur_node_id, 0)
-            expr_node_ids = [self.cur_node_id]
-            self.cur_node_id += 1
-          else:
-            self.nodes[expr_node_ids[0]] = self.nodes[expr_node_ids[0]]._replace(tiling=expr.tile_hint)
-        elif expr.shape != expr.array.shape:
-          child_ids = expr_node_ids
-          expr_node_ids = []
-          for child_id in child_ids:
-            self.nodes[self.cur_node_id] = self.node_type(expr, self.nodes[child_id].tiling, [], [])
-            expr_node_ids.append(self.cur_node_id)
-            self.add_edge(child_id, self.cur_node_id, 0)
-            self.cur_node_id += 1
-          if len(expr_node_ids) > 1: self.add_split_nodes(*expr_node_ids)
-          
-    elif isinstance(expr, DotExpr):
-      child_ids = self.visit_children([expr.matrix_a])
-      other_child_ids = self.visit_children([expr.matrix_b])
-
-      # calc copy cost
-      if len(other_child_ids) != 0:
-        if child_ids[0] in self.split_nodes:
-          tiling_types = (0, 1)
-          self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
-        else:
-          tiling_types = (self.nodes[child_ids[0]].tiling,)
-          
-        for i in xrange(len(tiling_types)):
-          tiling_type = tiling_types[i]
-          self.nodes[self.cur_node_id] = self.node_type(expr, tiling_type, [], [])
-          expr_node_ids.append(self.cur_node_id)
-          self.add_edge(child_ids[i], self.cur_node_id, 0)
-          for child_id in other_child_ids:
-            child = self.nodes[child_id]
-            e_cost = reduce(operator.mul, child.expr.shape, 1) if tiling_type == 0 or child.tiling == tiling_type else 0
-            self.add_edge(child_id, self.cur_node_id, e_cost)       
-          self.cur_node_id += 1
-        
-        child_ids = expr_node_ids
-        expr_node_ids = []
-        
-      # calc update cost  
-      if len(expr.shape) == 1 or expr.shape[1] == 1:
-        tiling_types = (0,)
-      else:
-        tiling_types = (0, 1) 
-        self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
-      
-      for tiling_type in tiling_types:
-        self.nodes[self.cur_node_id] = self.node_type(expr, tiling_type, [], [])
-        expr_node_ids.append(self.cur_node_id)   
-        for child_id in child_ids:
-          e_cost = reduce(operator.mul, expr.shape, 1) if self.nodes[child_id].tiling != tiling_type else 0
-          self.add_edge(child_id, self.cur_node_id, e_cost)
-        self.cur_node_id += 1
-        
-    elif isinstance(expr, WriteArrayExpr):
-      child_ids = self.visit_children([expr.array])
-      if isinstance(expr.data, (Expr, DistArray)):
-        data_child_ids = self.visit_children([expr.data])
-        if child_ids[0] in self.split_nodes:
-          tiling_types = (0,1)
-          self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
-        else:
-          tiling_types = (self.nodes[child_ids[0]].tiling,)
-          
-        for i in xrange(len(tiling_types)):
-          self.nodes[self.cur_node_id] = self.node_type(expr, tiling_types[i], [], [])
-          expr_node_ids.append(self.cur_node_id)
-          self.add_edge(child_ids[i], self.cur_node_id, 0)
-          for child_id in data_child_ids:
-            child = self.nodes[child_id]
-            e_cost = reduce(operator.mul, child.expr.shape, 1) if child.tiling != tiling_types[i] else 0
-            self.add_edge(child_id, self.cur_node_id, e_cost)       
-          self.cur_node_id += 1
-      else:
-        expr_node_ids.extend(child_ids)
-        
-    elif isinstance(expr, (SliceExpr, FilterExpr, CheckpointExpr, TileOpExpr)):
-      src = expr.src if hasattr(expr, 'src') else expr.array
-      expr_node_ids.extend(self.visit_children([src]))
- 
-    elif isinstance(expr, (TransposeExpr, ReshapeExpr)):
-      child_ids = self.visit_children([expr.array])
-      if child_ids[0] in self.split_nodes:
-        tiling_types = (0, 1)
-        self.add_split_nodes(self.cur_node_id, self.cur_node_id + 1)
-      else:
-        tiling_types = (1-self.nodes[child_ids[0]].tiling,)
-      
-      for i in xrange(len(tiling_types)):
-        self.nodes[self.cur_node_id] = self.node_type(expr, tiling_types[i], [], [])
-        expr_node_ids.append(self.cur_node_id)
-        self.add_edge(child_ids[i-1], self.cur_node_id, 0)       
-        self.cur_node_id += 1
+    elif hasattr(self, 'visit_%s' % expr.typename()):
+      expr_node_ids = getattr(self, 'visit_%s' % expr.typename())(expr)
     
+    else:
+      util.log_debug("Skip expr:%s", expr.typename())
+      expr_node_ids = []
+      
     # add T node for graph and compute the min cost flow
-    if id(expr) == self.init_expr:
-      if self.cur_node_id - 1 in self.split_nodes:
-        self.nodes[self.cur_node_id] = self.node_type(expr, -1, [], [])
-        self.add_edge(self.cur_node_id - 2, self.cur_node_id, 0)
-        self.add_edge(self.cur_node_id - 1, self.cur_node_id, 0)
-        self.cur_node_id += 1
-      
-      # compute best tiling for all exprs
-      self.visited_nodes = set()
-      nodes = mincost_maxflow(self.cur_node_id - 1, self.generate_edges(), self.split_nodes.items())
-      
-      # give expr the best tiling hint
-      for node_id in nodes:
-        node = self.nodes[node_id]
-        #print node_id, 'tiling:', node.tiling
-        if node.tiling >= 0:
-          _tiled_exprlist[node.expr.expr_id] = node.tiling
-          if isinstance(node.expr, (NdArrayExpr, ReduceExpr, DotExpr)):
-            node.expr.tile_hint = list(node.expr.shape)
-            node.expr.tile_hint[node.tiling] = int(math.ceil(float(node.expr.tile_hint[node.tiling]) / FLAGS.num_workers))
-        
-      self.inited = False
-      return expr
+    if id(expr) == self.init_expr: return self.calc_tiling(expr)
     
     self.expr_to_nodes[expr] = expr_node_ids
     return expr_node_ids
