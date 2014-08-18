@@ -61,7 +61,7 @@ cdef class TileExtent(object):
   @property
   def size(self):
     return np.prod(self.shape)
-  
+
   @property
   def shape(self):
     result = []
@@ -69,7 +69,7 @@ cdef class TileExtent(object):
       result.append(self._lr[i] - self._ul[i])
       result[i] = 1 if result[i] == 0 else result[i]
     return tuple(result)
-  
+
   @property
   def ndim(self):
     return self._ul_len
@@ -78,10 +78,7 @@ cdef class TileExtent(object):
     return create, (self.ul, self.lr, self.array_shape)
 
   def to_slice(self):
-    result = []
-    for i in range(self._ul_len):
-      result.append(slice(self.ul[i], self.lr[i], None))
-    return tuple(result)
+    return tuple([slice(ul, lr) for ul, lr in zip(self.ul, self.lr)])
 
   def to_tuple(self):
     return (self.ul, self.lr, self.array_shape)
@@ -89,15 +86,12 @@ cdef class TileExtent(object):
   def __repr__(self):
     return 'extent(' + ','.join('%s:%s' % (a, b) for a, b in zip(self.ul, self.lr)) + ')'
 
-  
   def __getitem__(self, idx):
-    return create((self.ul[idx],),
-                  (self.lr[idx],),
-                  (self.array_shape[idx],))
+    return create((self.ul[idx],), (self.lr[idx],), (self.array_shape[idx],))
 
   def __hash__(self):
     return hash(self.ul)
-    
+
   def __richcmp__(self, other, operation):
     if operation == 0 or operation == 4: # smaller or bigger
       smaller = True
