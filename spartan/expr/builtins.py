@@ -532,28 +532,36 @@ def _scan_mapper(array, ex, scan_fn=None, axis=None, scan_base=None):
     #util.log_info('local_data type:%s data:%s', type(local_data), local_data)
         
     yield (ex, np.asarray(scan_fn(local_data, axis=axis)).reshape(ex.shape))   
-      
-def scan(array, reduce_fn=None, scan_fn=None, accum_fn=None, axis=None):
+
+
+def scan(array, reduce_fn=None, scan_fn=None, axis=None):
   '''
   Scan ``array`` over ``axis``.
-  
-  
-  :param array: The array to scan.
-  :param reduce_fn: local reduce function
-  :param scan_fn: scan function
-  :param accum_fn: accumulate function
-  :param axis: Either an integer or ``None``.
+
+
+  :param array: Expr, DistArray
+    The array to scan.
+  :param reduce_fn: function
+    The local reduce function.
+  :param scan_fn: function
+    The scan function.
+  :param axis: int, optional
+    The axis to apply reduce_fn and/or scan_fn; defaults to entire array.
+
+  :rtype: ShuffleExpr
+
   '''
-  reduce_result = shuffle(array, fn=_scan_reduce_mapper, kw={'axis': axis,
-                                                             'reduce_fn': reduce_fn})
+  reduce_result = shuffle(array, _scan_reduce_mapper, kw={'axis':axis,
+                                                          'reduce_fn': reduce_fn})
   fetch_result = reduce_result.glom()
   if scan_fn is not None:
     fetch_result = scan_fn(fetch_result, axis=axis)
-  
+
   scan_result = shuffle(array, fn=_scan_mapper, kw={'scan_fn':scan_fn,
                                                     'axis': axis,
                                                     'scan_base':fetch_result})
   return scan_result
+
 
 def mean(x, axis=None):
   '''
