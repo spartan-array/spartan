@@ -56,10 +56,9 @@ def _make_sparse_rand(input,
                  dtype=dtype)
 
 
-def _make_sparse_diagonal(value, ex):
+def _make_sparse_diagonal(tile, ex):
   ul, lr = ex[0], ex[1]
-  shape = tuple([lrp - ulp for ulp, lrp in zip(ul, lr)])
-  data = sp.lil_matrix(shape, dtype=value.dtype)
+  data = sp.lil_matrix(tile.shape, dtype=tile.dtype)
 
   if ul[0] >= ul[1] and ul[0] < lr[1]:  # below the diagonal
     for i in range(ul[0], __builtin__.min(lr[0], lr[1])):
@@ -238,7 +237,7 @@ def diagonal(a):
   return shuffle(a, _diagonal_mapper)
 
 
-def _normalize_mapper(value, ex, axis, norm_value):
+def _normalize_mapper(tile, ex, axis, norm_value):
   '''Normalize a region of an array.
 
   Returns a new, normalized region.
@@ -252,15 +251,15 @@ def _normalize_mapper(value, ex, axis, norm_value):
 
   '''
   if axis is None:
-    value /= norm_value
+    tile /= norm_value
   elif axis == 1:
-    for i in range(value.shape[0]):
-      value[i,:] /= norm_value[ex.ul[0] + i]
+    for i in range(tile.shape[0]):
+      tile[i,:] /= norm_value[ex.ul[0] + i]
   elif axis == 0:
-    for i in range(value.shape[1]):
-      value[:,i] /= norm_value[ex.ul[1] + i]
+    for i in range(tile.shape[1]):
+      tile[:,i] /= norm_value[ex.ul[1] + i]
 
-  return value
+  return tile
 
 
 def normalize(array, axis=None):
@@ -361,14 +360,13 @@ def ones(shape, dtype=np.float, tile_hint=None):
 
 
 @disable_parakeet
-def _arange_mapper(value, ex, start, stop, step, dtype=None):
-  shape = tuple([lr - ul for ul, lr in zip(ex[0], ex[1])])
+def _arange_mapper(tile, ex, start, stop, step, dtype=None):
   pos = extent.ravelled_pos(ex[0], ex[2])
   ex_start = pos*step + start
-  ex_stop = np.prod(shape)*step + ex_start
+  ex_stop = np.prod(tile.shape)*step + ex_start
 
   # np.reshape is not supported by parakeet.
-  return np.arange(ex_start, ex_stop, step, dtype=dtype).reshape(shape)
+  return np.arange(ex_start, ex_stop, step, dtype=dtype).reshape(tile.shape)
 
 
 def arange(shape=None, start=0, stop=None, step=1, dtype=np.float, tile_hint=None):
@@ -408,7 +406,7 @@ def arange(shape=None, start=0, stop=None, step=1, dtype=np.float, tile_hint=Non
     raise ValueError('Shape or stop expected, none supplied.')
 
   if shape is not None and stop is not None:
-    raise ValueError('Only shape OR stop can be supplied, not both')
+    raise ValueError('Only shape OR stop can be supplied, not both.')
 
   if shape is None:
     # Produces 1d array based on start, stop, step
@@ -544,9 +542,9 @@ def scan(array, reduce_fn=None, scan_fn=None, axis=None):
 
   :param array: Expr, DistArray
     The array to scan.
-  :param reduce_fn: function
+  :param reduce_fn: function, optional
     The local reduce function.
-  :param scan_fn: function
+  :param scan_fn: function, optional
     The scan function.
   :param axis: int, optional
     The axis to apply reduce_fn and/or scan_fn; defaults to entire array.
