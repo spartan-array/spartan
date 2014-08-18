@@ -40,6 +40,7 @@ class Broadcast(distarray.DistArray):
     else:
       self.base = base
     self.shape = shape
+    self.tiles = self.base.tiles
     self.dtype = base.dtype
     self.sparse = self.base.sparse
     self.bad_tiles = []
