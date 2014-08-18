@@ -5,18 +5,16 @@ Spartan computations consist of a master and one or more workers.
 The master tracks the location of array data, manages worker health,
 and runs user operations on workers.
 '''
-
 import atexit
-import socket
 import threading
 import weakref
-
 import time
-from spartan import util, rpc, core, blob_ctx
-from spartan.config import FLAGS
+import spartan
+from spartan import util, core, blob_ctx
+from spartan.config import parse, FLAGS
+from spartan.fastrpc import MasterService, WorkerProxy, Future, FutureGroup, Server, Client
 
 MASTER = None
-
 def _dump_profile():
   import yappi
   yappi.get_func_stats().save('master_prof.out', type='pstat')
@@ -24,20 +22,19 @@ def _dump_profile():
 def get():
   return MASTER
 
-class Master(object):
+class Master(MasterService):
   def __init__(self, port, num_workers):
     self._workers = {}
     self.num_workers = num_workers
-    self._port = port
-    self._server = rpc.listen('0.0.0.0', port)
-    self._server.register_object(self)
+    self._server = Server(4)
+    self._server.reg_svc(self)
+    self._server.start("0.0.0.0:%d" % port)
     self._initialized = False
-    self._server.serve_nonblock()
     self._ctx = None
     
     self._worker_statuses = {}
     self._worker_scores = {}
-    self._available_workers = []
+    self._available_workers = {}
     
     self._arrays = weakref.WeakSet()
     
@@ -60,17 +57,16 @@ class Master(object):
 
     self._ctx.active = False
 
-    futures = rpc.FutureGroup()
-    for id, w in self._workers.iteritems():
+    futures = FutureGroup()
+    req = core.EmptyMessage()
+    for id, w in self._available_workers.iteritems():
       util.log_info('Shutting down worker %d', id)
-      futures.append(w.shutdown())
+      futures.append(w.async_shutdown(req))
 
     # Wait a second to let our shutdown request go out.
     time.sleep(1)
 
-    self._server.shutdown()
-
-  def register(self, req, handle):
+  def reg(self, req):
     '''
     RPC method.
     
@@ -81,22 +77,23 @@ class Master(object):
       handle (PendingRequest):
     '''
     id = len(self._workers)
-    self._workers[id] = rpc.connect(req.host, req.port)
-    self._available_workers.append(id)
-    util.log_info('Registered %s:%s (%d/%d)', req.host, req.port, id, self.num_workers)
-
-    handle.done(core.EmptyMessage())
+    c = Client()
+    c.connect(req.host)
+    self._workers[id] = req.host
+    self._available_workers[id] = WorkerProxy(c)
+    util.log_info('Registered %s (%d/%d)', req.host, id, self.num_workers)
     
     self.init_worker_score(id, req.worker_status)
     
     if len(self._workers) == self.num_workers:
       threading.Thread(target=self._initialize).start()
-  
+    return
+
   def register_array(self, array):
     self._arrays.add(array)
     
   def get_available_workers(self):
-    return self._available_workers
+    return self._available_workers.keys()
 
   def get_workers_for_reload(self, array):
     tile_in_worker = [[i, 0] for i in range(self.num_workers)]
@@ -124,7 +121,7 @@ class Master(object):
                         
   def mark_failed_worker(self, worker_id):
     util.log_info('Marking worker %s as failed.', worker_id)
-    self._available_workers.remove(worker_id)
+    del self._available_workers[worker_id]
     for array in self._arrays:
       for ex, tile_id in array.tiles.iteritems():
         if tile_id.worker == worker_id:
@@ -136,8 +133,9 @@ class Master(object):
       if now - self._worker_statuses[worker_id].last_report_time > FLAGS.heartbeat_interval * FLAGS.worker_failed_heartbeat_threshold:
         self.mark_failed_worker(worker_id)
        
-  def maybe_steal_tile(self, req, handle):
+  def maybe_steal_tile(self, req):
     '''
+    RPC Method
     This is called when a worker has finished processing all of it's current tiles,
     and is looking for more work to do. 
     We check if there are any outstanding tiles on existing workers to steal from.
@@ -170,16 +168,13 @@ class Master(object):
         
       tile_id = slow_worker[1].kernel_remain_tiles[0]
       if self._ctx.cancel_tile(slow_worker[0], tile_id):
-        util.log_debug('move tile:%s from worker(%s) to worker(%s)', tile_id, slow_worker[0], req.worker_id)
+        util.log_warn('move tile:%s from worker(%s) to worker(%s)', tile_id, slow_worker[0], req.worker_id)
         slow_worker[1].kernel_remain_tiles.remove(tile_id)
-        resp = core.TileIdMessage(tile_id=tile_id)
-        handle.done(resp)
-        return
+        return core.TileIdMessage(tile_id)
  
-    resp = core.TileIdMessage(tile_id=None)
-    handle.done(resp)
+    return core.TileIdMessage(core.TileId(-1,-1))
     
-  def heartbeat(self, req, handle):
+  def heartbeat(self, req):
     '''RPC method.
     
     Called by worker processes periodically.
@@ -190,30 +185,28 @@ class Master(object):
       
     Returns: `EmptyMessage`
     '''
-    #util.log_info('Receive worker %d heartbeat.', req.worker_id)
+    #util.log_info('Receive worker %d heartbeat:%s', req.worker_id, req.worker_status)
     if req.worker_id >= 0 and self._initialized:     
       self.update_worker_score(req.worker_id, req.worker_status)
       self.mark_failed_workers()
       #util.log_info('available workers:%s', self._available_workers)
     
-    resp = core.EmptyMessage()
-    handle.done(resp)
+    return core.EmptyMessage()
       
   def _initialize(self):
     '''Sends an initialization request to all workers and waits 
     for their response.
     '''
     util.log_info('Initializing...')
-    req = core.InitializeReq(peers=dict([(id, w.addr())
-                                      for id, w in self._workers.iteritems()]))
+    req = core.InitializeReq(0, self._workers)
 
-    futures = rpc.FutureGroup()
-    for id, w in self._workers.iteritems():
-      req.id = id
-      futures.append(w.initialize(req))
+    futures = FutureGroup()
+    for id, w in self._available_workers.iteritems():
+      req = req._replace(id=id)
+      futures.append(w.async_initialize(req))
     futures.wait()
 
-    self._ctx = blob_ctx.BlobCtx(blob_ctx.MASTER_ID, self._workers, self)
+    self._ctx = blob_ctx.MasterBlobCtx(self._available_workers)
     self._initialized = True
     util.log_info('done...')
 
@@ -223,3 +216,4 @@ class Master(object):
       time.sleep(0.1)
 
     blob_ctx.set(self._ctx)
+

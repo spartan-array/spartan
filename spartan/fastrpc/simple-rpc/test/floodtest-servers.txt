@@ -1,0 +1,5 @@
+127.0.0.1:19000
+127.0.0.1:19001
+127.0.0.1:19002
+
+# list of servers in the format of `host:port`

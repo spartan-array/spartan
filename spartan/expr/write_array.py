@@ -15,7 +15,7 @@ import math
 import ast
 import struct
 
-from spartan import rpc
+from spartan import fastrpc
 from spartan import master
 from spartan.array import distarray, extent
 from spartan import sparse
@@ -29,7 +29,8 @@ from traits.api import PythonValue
 
 def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
   intersection = extent.intersection(ex, sregion)
-  futures = rpc.FutureGroup()
+
+  futures = fastrpc.FutureGroup()
   if intersection != None:
     dst_lr = np.asarray(intersection.lr) - np.asarray(sregion.ul)
     dst_ul = np.asarray(intersection.ul) - np.asarray(sregion.ul)

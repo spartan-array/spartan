@@ -16,12 +16,47 @@ import sys
 import threading
 import time
 import shutil
-from spartan import rpc
+from spartan import fastrpc
 from spartan import config, util
 import spartan
 from spartan.config import FLAGS, AssignMode
 import spartan.master
-import spartan.worker
+
+class HostListFlag(config.Flag):
+  def parse(self, str):
+    hosts = []
+    for host in str.split(','):
+      hostname, count = host.split(':')
+      hosts.append((hostname, int(count)))
+    self.val = hosts
+
+  def _str(self):
+    return ','.join(['%s:%d' % (host, count) for host, count in self.val])
+
+class AssignMode(object):
+  BY_CORE = 1
+  BY_NODE = 2
+
+class AssignModeFlag(config.Flag):
+  def parse(self, option_str):
+    self.val = getattr(AssignMode, option_str)
+
+  def _str(self):
+    if self.val == AssignMode.BY_CORE: return 'BY_CORE'
+    return 'BY_NODE'
+
+FLAGS.add(HostListFlag('hosts', default=[('localhost', 8)]))
+FLAGS.add(BoolFlag('xterm', default=False, help='Run workers in xterm'))
+FLAGS.add(BoolFlag('oprofile', default=False, help='Run workers inside of operf'))
+FLAGS.add(AssignModeFlag('assign_mode', default=AssignMode.BY_NODE))
+FLAGS.add(BoolFlag('use_single_core', default=True))
+
+FLAGS.add(BoolFlag(
+  'use_threads',
+  help='When running locally, use threads instead of forking. (slow, for debugging)',
+  default=True))
+FLAGS.add(IntFlag('heartbeat_interval', default=3, help='Heartbeat Interval in each worker'))
+FLAGS.add(IntFlag('worker_failed_heartbeat_threshold', default=10, help='the max number of heartbeat that a worker can delay'))
 
 def start_remote_worker(worker, st, ed):
   '''
@@ -33,16 +68,6 @@ def start_remote_worker(worker, st, ed):
   :param st: First process index to start.
   :param ed: Last process to start.
   '''
-  if FLAGS.use_threads and worker == 'localhost':
-    util.log_info('Using threads.')
-    for i in range(st, ed):
-      p = threading.Thread(target=spartan.worker._start_worker,
-                           args=((socket.gethostname(), FLAGS.port_base), i))
-      p.daemon = True
-      p.start()
-    time.sleep(0.1)
-    return
-
   util.log_info('Starting worker %d:%d on host %s', st, ed, worker)
   if FLAGS.oprofile:
     os.system('mkdir operf.%s' % worker)
@@ -59,7 +84,7 @@ def start_remote_worker(worker, st, ed):
 
   args += [
           #'gdb', '-ex', 'run', '--args',
-          'python', '-m spartan.worker',
+          'spartan/worker',
           '--master=%s:%d' % (socket.gethostname(), FLAGS.port_base),
           '--count=%d' % (ed - st),
           '--heartbeat_interval=%d' % FLAGS.heartbeat_interval
@@ -91,7 +116,7 @@ def start_cluster(num_workers, use_cluster_workers):
   :param num_workers:
   :param use_cluster_workers:
   '''
-  rpc.set_default_timeout(FLAGS.default_rpc_timeout)
+  fastrpc.set_default_timeout(FLAGS.default_rpc_timeout)
   #clean the checkpoint directory
   if os.path.exists(FLAGS.checkpoint_path):
     shutil.rmtree(FLAGS.checkpoint_path)

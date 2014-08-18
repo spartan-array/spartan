@@ -325,7 +325,7 @@ def _tile_mapper(tile_id, blob, tiles = None, user_fn=None, **kw):
     for ex, v in user_result:
       Assert.eq(ex.shape, v.shape, 'Bad shape from %s' % user_fn)
       result_tile = tile.from_data(v)
-      tile_id = ctx.create(result_tile).wait().tile_id
+      tile_id = ctx.create(result_tile).result.tile_id
       results.append((ex, tile_id))
   
   return LocalKernelResult(result=results)
@@ -351,7 +351,7 @@ def _partial_load(path, prefix, extents, iszip, ispickle):
                   hint=i)
 
   for ex in extents:
-    tiles[ex] = tiles[ex].wait().tile_id
+    tiles[ex] = tiles[ex].result.tile_id
   
   mapper = _load_mapper if not ispickle else _unpickle_mapper
   if ispickle:

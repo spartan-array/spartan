@@ -4,7 +4,7 @@ Dot expr.
 
 import numpy as np
 import scipy.sparse as sp
-from .. import sparse, rpc
+from .. import sparse
 from .base import Expr, lazify
 from .. import blob_ctx, util
 from ..util import is_iterable, Assert
@@ -46,9 +46,9 @@ def _dot_mapper(inputs, ex, av, bv):
   else:
     result = a.dot(b)
 
-  ul = np.asarray([ex_a.ul[0], 0])
-  lr = ul + result.shape
   target_shape = (av.shape[0], bv.shape[1])
+  ul = np.asarray([ex_a.ul[0], 0])
+  lr = ul + target_shape
   target_ex = extent.create(ul, lr, target_shape)
 
   # util.log_info('A: %s', a.dtype)
