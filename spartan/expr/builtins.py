@@ -55,18 +55,21 @@ def _make_sparse_rand(input,
                  format=format,
                  dtype=dtype)
 
-@disable_parakeet
-def _make_sparse_diagonal(tile, ex):
-  data = sp.lil_matrix(ex.shape, dtype=tile.dtype)
 
-  if ex.ul[0] >= ex.ul[1] and ex.ul[0] < ex.lr[1]:
-    for i in range(ex.ul[0], __builtin__.min(ex.lr[0], ex.lr[1])):
-      data[i - ex.ul[0], i - ex.ul[1]] = 1
-  elif ex.ul[1] >= ex.ul[0] and ex.ul[1] < ex.lr[0]:
-    for j in range(ex.ul[1], __builtin__.min(ex.lr[1], ex.lr[0])):
-      data[j - ex.ul[0], j - ex.ul[1]] = 1
+def _make_sparse_diagonal(value, ex):
+  ul, lr = ex[0], ex[1]
+  shape = tuple([lrp - ulp for ulp, lrp in zip(ul, lr)])
+  data = sp.lil_matrix(shape, dtype=value.dtype)
 
-  return [(ex, data)]
+  if ul[0] >= ul[1] and ul[0] < lr[1]:  # below the diagonal
+    for i in range(ul[0], __builtin__.min(lr[0], lr[1])):
+      data[i - ul[0], i - ul[1]] = 1
+  elif ul[1] >= ul[0] and ul[1] < lr[0]:  # above the diagonal
+    for j in range(ul[1], __builtin__.min(lr[1], lr[0])):
+      data[j - ul[0], j - ul[1]] = 1
+
+  return data
+
 
 @not_idempotent
 def rand(*shape, **kw):
@@ -156,10 +159,10 @@ def sparse_empty(shape,
   '''
   return ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True)
 
-def sparse_diagonal(shape,
-                    dtype=np.float32,
-                    tile_hint=None):
-  return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True), _make_sparse_diagonal)
+
+def sparse_diagonal(shape, dtype=np.float32, tile_hint=None):
+  return map_with_location(ndarray(shape, dtype, tile_hint, sparse=True),
+                           _make_sparse_diagonal)
 
 
 def _diag_mapper(array, ex):
