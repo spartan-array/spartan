@@ -14,16 +14,14 @@ import numpy as np
 import scipy.sparse as sp
 
 from .. import util
-from ..array import distarray, extent
+from ..array import extent
 from ..array.extent import index_for_reduction, shapes_match
 from ..util import Assert
-from .base import force
 from .map import map
 from .ndarray import ndarray
 from .optimize import disable_parakeet, not_idempotent
 from .reduce import reduce
 from .shuffle import shuffle
-from spartan import sparse
 import __builtin__
 
 def _make_ones(input): return np.ones(input.shape, input.dtype)
@@ -190,7 +188,7 @@ def diag(array):
   :param array: DistArray
     The data to fill the diagonal.
   '''
-  return shuffle(array, _diag_mapper)
+  return shuffle(array, _diag_mapper, shape_hint=(array.shape[0], array.shape[0]))
 
 
 def _diagonal_mapper(array, ex):
@@ -231,7 +229,7 @@ def diagonal(a):
   if len(a.shape) < 2:
     raise ValueError("diag requires an array of at least two dimensions")
 
-  return shuffle(a, _diagonal_mapper)
+  return shuffle(a, _diagonal_mapper, shape_hint=(__builtin__.min(a.shape), ))
 
 
 def _normalize_mapper(array, ex, axis, norm_value):
@@ -468,82 +466,6 @@ def min(x, axis=None, tile_hint=None):
       accumulate_fn=np.minimum,
       tile_hint = tile_hint)
 
-
-def _scan_reduce_mapper(array, ex, reduce_fn=None, axis=None):
-  if reduce_fn is None:
-    yield (ex, array.fetch(ex))
-  else:  
-    local_reduction = reduce_fn(array.fetch(ex), axis=axis)
-    if axis is None:
-      exts = sorted(array.tiles.keys(), key=lambda x: x.ul)
-      id = exts.index(ex)
-      dst_ex = extent.create((id,),(id+1,),(len(exts),))
-    else:
-      max_axis_shape = __builtin__.max([ext.shape[axis] for ext in array.tiles.keys()])
-      id = ex.ul[axis] / max_axis_shape
-      new_ul = list(ex.ul)
-      new_lr = list(ex.lr)
-      new_shape = list(ex.array_shape)
-      new_ul[axis] = id
-      new_lr[axis] = id + 1
-      new_shape[axis] = int(np.ceil(array.shape[axis] * 1.0 / max_axis_shape))
-    
-      dst_ex = extent.create(new_ul, new_lr, new_shape)
-      
-    local_reduction = np.asarray(local_reduction).reshape(dst_ex.shape)
-    #util.log_info('2 orig_ex:%s dst_ex:%s local_reduction:%s shape:%s', ex, dst_ex, local_reduction, local_reduction.shape)
-    yield (dst_ex, local_reduction)
-
-def _scan_mapper(array, ex, scan_fn=None, axis=None, scan_base=None):
-  if scan_fn is None:
-    yield (ex, array.fetch(ex))
-  else:
-    local_data = array.fetch(ex)
-    if sp.issparse(local_data):
-      local_data = local_data.todense()
-      
-    if axis is None:
-      exts = sorted(array.tiles.keys(), key=lambda x: x.ul)
-      id = exts.index(ex)
-      if id > 0:
-        local_data[tuple(np.zeros(len(ex.shape), dtype=int))] += scan_base[id-1]
-
-    else:
-      max_axis_shape = __builtin__.max([ext.shape[axis] for ext in array.tiles.keys()])  
-      id = ex.ul[axis] / max_axis_shape
-      if id > 0:
-        base_slice = list(ex.to_slice())
-        base_slice[axis] = slice(id-1, id, None)
-        new_slice = [slice(0, ex.shape[i], None) for i in range(len(ex.shape))]
-        new_slice[axis] = slice(0,1,None)
-        local_data[new_slice] += scan_base[base_slice]
-    
-    #util.log_info('local_data type:%s data:%s', type(local_data), local_data)
-        
-    yield (ex, np.asarray(scan_fn(local_data, axis=axis)).reshape(ex.shape))   
-      
-def scan(array, reduce_fn=None, scan_fn=None, accum_fn=None, axis=None):
-  '''
-  Scan ``array`` over ``axis``.
-  
-  
-  :param array: The array to scan.
-  :param reduce_fn: local reduce function
-  :param scan_fn: scan function
-  :param accum_fn: accumulate function
-  :param axis: Either an integer or ``None``.
-  '''
-  reduce_result = shuffle(array, fn=_scan_reduce_mapper, kw={'axis': axis,
-                                                             'reduce_fn': reduce_fn})
-  fetch_result = reduce_result.glom()
-  if scan_fn is not None:
-    fetch_result = scan_fn(fetch_result, axis=axis)
-  
-  scan_result = shuffle(array, fn=_scan_mapper, kw={'scan_fn':scan_fn,
-                                                    'axis': axis,
-                                                    'scan_base':fetch_result})
-  return scan_result
-
 def mean(x, axis=None):
   '''
   Compute the mean of ``x`` over ``axis``.
@@ -757,7 +679,7 @@ def ravel(v):
   See `numpy.ndarray.ravel`.
   :param v: `Expr` or `DistArray`
   '''
-  return shuffle(v, _ravel_mapper)
+  return shuffle(v, _ravel_mapper, shape_hint=(np.prod(v.shape),))
         
 def multiply(a, b):
   assert a.shape == b.shape
@@ -803,10 +725,12 @@ def bincount(v):
   maxval = max(v).glom()
   assert minval > 0
   target = ndarray((maxval + 1,), dtype=np.int64, reduce_fn=np.add)
+  cost = np.prod(target.shape)
   return shuffle(v, 
       _bincount_mapper, 
       target=target,
-      kw = { 'minlength' : maxval + 1})
+      kw = { 'minlength' : maxval + 1},
+      cost_hint={target:(cost, cost)})
 
 
 def _translate_extent(ex, a, roffset=0, coffset=0):
@@ -873,9 +797,9 @@ def concatenate(a, b, axis=0):
       raise ValueError('all the input array dimensions except for the' \
           'concatenation axis must match exactly')
 
-  return shuffle(distarray.create(new_shape),
+  return shuffle(ndarray(new_shape),
                  _concatenate_mapper,
-                 kw={'a': a, 'b': b, 'axis': axis})
+                 kw={'a': a, 'b': b, 'axis': axis}, shape_hint=new_shape)
 
 
 try:

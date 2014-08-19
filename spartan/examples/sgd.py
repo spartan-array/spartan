@@ -32,12 +32,9 @@ class SGDRegressor(object):
     raise NotImplementedError("Should be overrided by the child regression")
 
   def train(self):
-    self.x = expr.eager(self.x)
-    self.y = expr.eager(self.y)
-
     for i in range(self.iterations):
       diff = self.update()
-      grad = expr.sum(diff, axis=0, tile_hint=[self.N_DIM]).glom().reshape((self.N_DIM, 1))
+      grad = expr.sum(diff, axis=0).optimized().glom().reshape((self.N_DIM, 1))
       self.w = self.w - grad * self.alpha
     return self.w
 

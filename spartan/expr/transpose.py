@@ -64,7 +64,7 @@ class TransposeExpr(Expr):
   tile_hint = PythonValue(None, desc="Tuple or None") 
 
   def __str__(self):
-    return 'Transpose[%d] %s' % (self.expr_id, self.expr)
+    return 'Transpose[%d] %s' % (self.expr_id, self.array)
 
   def _evaluate(self, ctx, deps):
     v = deps['array']
