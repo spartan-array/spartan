@@ -1,5 +1,6 @@
 from spartan.examples import linear_regression
 from spartan import expr, util
+from spartan.config import FLAGS
 import test_common
 import time
 
@@ -9,11 +10,13 @@ ITERATION = 3
 
 class TestLinearRegression(test_common.ClusterTest):
   def test_lreg(self):
+    FLAGS.opt_parakeet_gen = 0
     linear_regression.run(N_EXAMPLES, N_DIM, ITERATION)
 
 
 def benchmark_lreg(ctx, timer):
   print "#worker:", ctx.num_workers
+  FLAGS.opt_parakeet_gen = 0
   #N_EXAMPLES = 40000000 * ctx.num_workers
   N_EXAMPLES = 5000000 * 64
   x = expr.eager(expr.rand(N_EXAMPLES, N_DIM, tile_hint=(N_EXAMPLES / ctx.num_workers, N_DIM)))
