@@ -23,7 +23,6 @@ from .ndarray import ndarray
 from .optimize import disable_parakeet, not_idempotent
 from .reduce import reduce
 from .shuffle import shuffle
-from spartan import sparse
 import __builtin__
 
 def _make_ones(input): return np.ones(input.shape, input.dtype)

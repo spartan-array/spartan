@@ -18,7 +18,7 @@ import struct
 from spartan import fastrpc
 from spartan import master
 from spartan.array import distarray, extent
-from spartan import sparse
+from spartan.array import sparse
 from .slice import Slice
 from ..core import LocalKernelResult
 from ..util import Assert, FileHelper

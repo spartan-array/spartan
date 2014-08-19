@@ -7,8 +7,8 @@ import traceback
 import scipy.sparse
 import numpy as np
 
-from . import tile, extent
-from .. import util, core, blob_ctx, fastrpc, sparse
+from . import tile, extent, sparse
+from .. import util, core, blob_ctx, fastrpc
 from ..core import LocalKernelResult
 from ..util import Assert
 from ..config import FLAGS

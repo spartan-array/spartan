@@ -4,7 +4,7 @@ Dot expr.
 
 import numpy as np
 import scipy.sparse as sp
-from .. import sparse
+from ..array import sparse
 from .base import Expr, lazify
 from .. import blob_ctx, util
 from ..util import is_iterable, Assert
