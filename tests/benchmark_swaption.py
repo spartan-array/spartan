@@ -5,6 +5,7 @@
 '''
 import spartan
 import test_common
+import time
 
 from spartan import util
 from spartan.examples import swaption
@@ -22,11 +23,14 @@ def benchmark_swaption(ctx, timer):
   # Parameter values for a series of swaptions.
   lamb_all = [0.2, 0.2, 0.15, 0.1]
 
+  start_time = time.time() 
   swaptions = swaption.simulate(ts_all, te_all, lamb_all, NUM_PATHS)
 
   for swap in swaptions:
     print "Mean: %d, Std: %d" % (swap[0].glom(), swap[1].glom())
-
+    
+  end_time  = time.time()
+  print "run time:", end_time - start_time
 
 if __name__ == '__main__':
   test_common.run(__file__)

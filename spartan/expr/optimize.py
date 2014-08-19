@@ -42,6 +42,7 @@ except:
 
 _parakeet_blacklist = set()
 _tiled_exprlist = {}
+_not_idempotent_list = set()
 
 def disable_parakeet(fn):
   "Disables parakeet optimization for this function."
@@ -54,7 +55,7 @@ def not_idempotent(fn):
     result = fn(*args, **kw)
     if isinstance(result, Expr):
       result.needs_cache = True
-      #result.force()
+      _not_idempotent_list.add(id(result))
     return result
   return wrapped
 
@@ -132,7 +133,8 @@ class MapMapFusion(OptimizePass):
         break
 
     if (not all_maps
-        or isinstance(expr.op, local.ParakeetExpr)):
+        or isinstance(expr.op, local.ParakeetExpr) 
+        or id(expr) in _not_idempotent_list):
       return expr.visit(self)
 
     #util.log_info('Original: %s', expr.op)
@@ -177,7 +179,7 @@ class ReduceMapFusion(OptimizePass):
     old_children = self.visit(expr.children)
 
     for v in old_children:
-      if not isinstance(v, (MapExpr, ParakeetExpr)):
+      if not isinstance(v, (MapExpr, ParakeetExpr)) or id(v) in _not_idempotent_list:
         return expr.visit(self)
       
     combined_op = LocalReduceExpr(fn=expr.op.fn,
@@ -339,10 +341,14 @@ class ParakeetGeneration(OptimizePass):
       for child in expr.children:
         new_children.append(self.visit(child))
 
-      return expr_like(expr,
-                       op=local.ParakeetExpr(source=source,  deps=expr.op.deps),
-                       children=ListExpr(vals = new_children),
-                       child_to_var=expr.child_to_var)
+      parakeet_expr = expr_like(expr,
+                                op=local.ParakeetExpr(source=source,  deps=expr.op.deps),
+                                children=ListExpr(vals = new_children),
+                                child_to_var=expr.child_to_var)
+      
+      if id(expr) in _not_idempotent_list: _not_idempotent_list.add(id(parakeet_expr))
+      
+      return parakeet_expr
     except local.CodegenException:
       util.log_info('Failed to convert to parakeet.')
       return expr.visit(self)
@@ -634,18 +640,16 @@ class AutomaticTiling(OptimizePass):
         self.cur_node_id += 1
       return expr_node_ids
     
+    if expr.shape == expr.array.shape or len(other_child_ids) > 0: return expr_node_ids
+    
     # fix result tiling
-    if len(expr.shape) == 1: expr.tile_hint = 0
-    
-    if expr.tile_hint is not None:
-      if len(expr_node_ids) > 1 or expr.shape != expr.array.shape:
-        self.nodes[self.cur_node_id] = self.node_type(expr, expr.tile_hint, [], [])
-        for child_id in expr_node_ids: self.add_edge(child_id, self.cur_node_id, 0)
-        self.cur_node_id += 1
-        return [self.cur_node_id - 1]
-    
-      self.nodes[expr_node_ids[0]] = self.nodes[expr_node_ids[0]]._replace(tiling=expr.tile_hint)    
-    elif expr.shape != expr.array.shape:
+    if len(expr.shape) <= 1 or 1 in expr.shape[:2]:
+      tiling_type = 0 if len(expr.shape) <= 1 else 1 - expr.shape.index(1)
+      self.nodes[self.cur_node_id] = self.node_type(expr, tiling_type, [], [])
+      for child_id in expr_node_ids: self.add_edge(child_id, self.cur_node_id, 0)
+      self.cur_node_id += 1
+      return [self.cur_node_id - 1]
+    else:
       child_ids = expr_node_ids
       expr_node_ids = []
       for child_id in child_ids:
@@ -653,8 +657,7 @@ class AutomaticTiling(OptimizePass):
         expr_node_ids.append(self.cur_node_id)
         self.add_edge(child_id, self.cur_node_id, 0)
         self.cur_node_id += 1
-      if len(expr_node_ids) > 1: self.add_split_nodes(*expr_node_ids)    
-    
+      if len(expr_node_ids) > 1: self.add_split_nodes(*expr_node_ids)
     return expr_node_ids
     
   def visit_DotExpr(self, expr):
