@@ -1,6 +1,6 @@
 from spartan.examples import ridge_regression
 import test_common
-from test_common import millis, with_ctx
+from test_common import millis
 from spartan import expr, util
 from spartan.config import FLAGS
 import time
