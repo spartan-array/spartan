@@ -456,7 +456,7 @@ def create(shape,
   elif FLAGS.tile_assignment_strategy == 'static':
     all_extents = list(extents.iterkeys())
     all_extents.sort()
-    if getattr(appdirs, 'user_config_dir'):  # user_config_dir new to v1.3.0
+    if hasattr(appdirs, 'user_config_dir'):  # user_config_dir new to v1.3.0
       map_file = appdirs.user_config_dir('spartan') + '/tiles_map'
     else:
       map_file = appdirs.user_data_dir('spartan') + '/tiles_map'

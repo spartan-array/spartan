@@ -165,7 +165,7 @@ def parse(argv):
 
   FLAGS._parsed = True
 
-  if getattr(appdirs, 'user_config_dir'):  # user_config_dir new to v1.3.0
+  if hasattr(appdirs, 'user_config_dir'):  # user_config_dir new to v1.3.0
     config_file = appdirs.user_config_dir('spartan') + '/spartan.ini'
   else:
     config_file = appdirs.user_data_dir('spartan') + '/spartan.ini'
