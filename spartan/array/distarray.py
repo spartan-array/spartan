@@ -4,6 +4,7 @@ import itertools
 import collections
 import traceback
 
+import appdirs
 import scipy.sparse
 import numpy as np
 
@@ -455,7 +456,10 @@ def create(shape,
   elif FLAGS.tile_assignment_strategy == 'static':
     all_extents = list(extents.iterkeys())
     all_extents.sort()
-    map_file = appdirs.user_data_dir('Spartan', 'rjpower.org') + '/tiles_map'
+    if getattr(appdirs, 'user_config_dir'):  # user_config_dir new to v1.3.0
+      map_file = appdirs.user_config_dir('spartan') + '/tiles_map'
+    else:
+      map_file = appdirs.user_data_dir('spartan') + '/tiles_map'
     with open(map_file) as fp:
       for ex in all_extents:
         worker = int(fp.readline().strip())
