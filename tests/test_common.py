@@ -14,7 +14,7 @@ import types
 import unittest
 
 FLAGS.add(StrFlag('worker_list', default='4,8,16,32,64,80'))
-FLAGS.add(BoolFlag('test_optimizations', default=True))
+FLAGS.add(BoolFlag('test_optimizations', default=False))
 
 def millis(t1, t2):
   dt = t2 - t1
