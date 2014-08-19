@@ -165,7 +165,10 @@ def parse(argv):
 
   FLAGS._parsed = True
 
-  config_file = appdirs.user_data_dir('Spartan', 'rjpower.org') + '/spartan.ini'
+  if getattr(appdirs, 'user_config_dir'):  # user_config_dir new to v1.3.0
+    config_file = appdirs.user_config_dir('spartan') + '/spartan.ini'
+  else:
+    config_file = appdirs.user_data_dir('spartan') + '/spartan.ini'
   config_dir = os.path.dirname(config_file)
   if not os.path.exists(config_dir):
     try:
