@@ -14,7 +14,7 @@ class NdArrayExpr(Expr):
   reduce_fn = PythonValue(None, desc="Function or None")
 
   def pretty_str(self):
-    return 'DistArray(%s, %s)' % (self.shape, np.dtype(self.dtype).name)
+    return 'DistArray(%s, %s, hint=%s)' % (self.shape, np.dtype(self.dtype).name, self.tile_hint)
 
   def visit(self, visitor):
     return expr_like(self,

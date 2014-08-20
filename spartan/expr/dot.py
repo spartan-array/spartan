@@ -72,7 +72,7 @@ class DotExpr(Expr):
   tile_hint = PythonValue(None, desc="Tuple or None")
 
   def __str__(self):
-    return 'Dot[%s, %s]' % (self.matrix_a, self.matrix_b)
+    return 'Dot[%s, %s, %s]' % (self.matrix_a, self.matrix_b, self.tile_hint)
 
   def compute_shape(self):
     # May raise NotShapeable

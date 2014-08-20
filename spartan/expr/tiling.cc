@@ -1,0 +1,123 @@
+#include <Python.h>
+#include <unordered_map>
+
+const int eMax = 1000000;
+const int nMax = 1000;
+const int INF = 1000000000;
+
+struct Edge {
+	int u, v, cost, next;
+} edge[eMax];
+
+std::unordered_map<int, int> split_nodes;
+int mincost, e, head[nMax], dis[nMax];
+bool vis[nMax];
+
+void add_edge(int u, int v, int cost) {
+	edge[e].u = u; edge[e].v = v; edge[e].cost = cost;
+    edge[e].next = head[u]; head[u] = e++;
+}
+
+int find_mincost_tiling(int s, int t, bool* vis) {
+	int mincost = 0, i, j, v, sp_v = -1;
+
+	for (i = head[s]; i != -1; i = edge[i].next) {
+		v = edge[i].v;
+		if (split_nodes.find(v) != split_nodes.end()) { // splited node
+			if (v == sp_v) continue; // already calculated
+
+			sp_v = split_nodes[v];
+
+			// find split edge j
+			for (j = edge[i].next; j != -1 && edge[j].v != sp_v; j=edge[j].next);
+
+			if (j < 0) {   // not a two-edges-choose-one case
+				if (vis[v] or vis[sp_v])
+					mincost += (vis[v])? edge[i].cost : INF;
+				else {
+					dis[v] = find_mincost_tiling(v, t, vis);
+					mincost += dis[v] + edge[i].cost;
+					vis[v] = true;
+				}
+			} else {      // two edges we can only choose one
+				if (vis[v] or vis[sp_v])
+					mincost += (vis[v])? edge[i].cost : edge[j].cost;
+				else {
+					bool vis1[nMax], vis2[nMax];
+					memcpy(vis1, vis, t * sizeof(bool));
+					memcpy(vis2, vis, t * sizeof(bool));
+					dis[v] = find_mincost_tiling(v, t, vis1);
+					dis[sp_v] = find_mincost_tiling(sp_v, t, vis2);
+					if (dis[v] + edge[i].cost < dis[sp_v] + edge[j].cost) {
+						mincost += dis[v] + edge[i].cost;
+						memcpy(vis, vis1, t * sizeof(bool));
+						vis[v] = true;
+					} else {
+						mincost += dis[sp_v] + edge[j].cost;
+						memcpy(vis, vis2, t * sizeof(bool));
+						vis[sp_v] = true;
+					}
+				}
+			}
+		} else { // all must be chosen case
+			if (vis[v]) mincost += edge[i].cost;
+			else {
+				dis[v] = find_mincost_tiling(v, t, vis);
+				mincost += dis[v] + edge[i].cost;
+				vis[v] = true;
+			}
+		}
+	}
+	return mincost;
+}
+
+static PyObject* mincost_tiling(PyObject *self, PyObject *args) {
+	PyObject *list, *ans;
+	Py_ssize_t pos;
+	int t, u, v, cost;
+
+	// init t node
+	t = (int)PyInt_AsLong(PyTuple_GetItem(args, 0));
+
+	// init edges
+	e = 0;
+	memset(head, -1, sizeof(head));
+	list = PyTuple_GetItem(args, 1);
+	for (pos = 0; pos < PyList_Size(list); pos++) {
+		PyArg_ParseTuple(PyList_GetItem(list, pos), "iii", &u, &v, &cost);
+		add_edge(u, v, cost);
+		//printf("add edge:(%d, %d, cost=%d)\n", u, v, cost);
+	}
+
+	// init splited nodes
+	split_nodes.clear();
+	list = PyTuple_GetItem(args, 2);
+	for (pos = 0; pos < PyList_Size(list); pos++) {
+		PyArg_ParseTuple(PyList_GetItem(list, pos), "ii", &u, &v);
+		split_nodes[u] = v;
+		split_nodes[v] = u;
+		//printf("add split nodes:(%d, %d)\n", u, v);
+	}
+
+	memset(vis, false, sizeof(vis));
+	mincost = find_mincost_tiling(0, t, vis);
+
+	ans = PySet_New(NULL);
+	for (u = 0; u < t; u++)
+		if (vis[u]) PySet_Add(ans, Py_BuildValue("i", u));
+
+	printf("mincost:%d\n", mincost);
+	return ans;
+}
+
+static PyMethodDef TilingMethods[] = {
+	{"mincost_tiling", mincost_tiling, METH_VARARGS, NULL},
+	{NULL, NULL, 0, NULL}
+};
+
+PyMODINIT_FUNC inittiling(void) {
+	PyObject *m;
+	m = Py_InitModule("tiling", TilingMethods);
+	if (m == NULL) return;
+}
+

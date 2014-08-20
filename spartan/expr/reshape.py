@@ -158,7 +158,7 @@ class ReshapeExpr(Expr):
   tile_hint = PythonValue(None, desc="None or Tuple")
 
   def __str__(self):
-    return 'Reshape[%d] %s to %s' % (self.expr_id, self.expr, self.new_shape)
+    return 'Reshape[%d] %s to %s' % (self.expr_id, self.array, self.new_shape)
 
   def _evaluate(self, ctx, deps):
     v = deps['array']
