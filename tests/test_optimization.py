@@ -1,4 +1,5 @@
 from spartan import array, expr
+from spartan.config import FLAGS
 from spartan.util import Assert
 import test_common
 import numpy as np
@@ -163,6 +164,7 @@ class TestOptimization(test_common.ClusterTest):
 
 
   def test_optimization_map_with_location(self):
+    FLAGS.opt_parakeet_gen = 1
     def mapper(tile, ex):
       return tile + 10
 
