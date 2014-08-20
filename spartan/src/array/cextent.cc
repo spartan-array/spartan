@@ -1,7 +1,8 @@
-#include <cassert>
-#include "cextent.h"
-
 #include <iostream>
+#include <cassert>
+#define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
+#define NO_IMPORT_ARRAY
+#include "cextent.h"
 CExtent::CExtent(int ndim, bool has_array_shape) 
 {
     this->ndim = ndim;
@@ -26,7 +27,7 @@ void CExtent::init_info(void)
 
 CSliceIdx* CExtent::to_slice(void) 
 {
-   CSliceIdx* slices; 
+   CSliceIdx* slices = new CSliceIdx(ndim);
 
    for (int i = 0; i < ndim; i++) {
         slices->get_slice(i).set_data(ul[i], lr[i], 1);

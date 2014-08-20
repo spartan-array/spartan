@@ -3,7 +3,7 @@ CC = c++
 CUR_DIR = $(shell pwd)
 CORE_DIR = $(CUR_DIR)/core 
 ARRAY_DIR = $(CUR_DIR)/array
-RPCDIR = $(CUR_DIR)/fastrpc
+RPCDIR = $(CUR_DIR)/rpc
 RPCBASE = $(RPCDIR)/base-utils
 RPC = $(RPCDIR)/simple-rpc
 
@@ -29,7 +29,7 @@ all: $(APPS)
 base-utils:
 	@if [ ! -d "$(RPCBASE)" ] ; then \
 	    git clone https://github.com/santazhang/base-utils $(RPCBASE); \
-	    cd $(RPCBASE) && patch -Np1 < ../base-utils-patch 2> /dev/null && cd - \
+	    cd $(RPCBASE) && patch -Np1 < ../base-utils-patch 2> /dev/null && cd - ;\
 	fi
 
 simple-rpc:

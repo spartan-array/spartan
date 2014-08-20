@@ -50,7 +50,7 @@ def replace(program, replace_begin, replace_end):
 
 def main():
   with open(sys.argv[1]) as rfp:
-    with open(sys.argv[1] + '.gen', 'w') as wfp:
+    with open(sys.argv[1][:-4], 'w') as wfp:
       # Read all lines at once. It can simply the process.
       program = rfp.read() 
       new_program = ''
@@ -72,10 +72,5 @@ def main():
       new_program += program[begin:]
       wfp.write(new_program)
       
-
-  import shutil
-  shutil.move(sys.argv[1], sys.argv[1] + '.src')
-  shutil.move(sys.argv[1] + '.gen', sys.argv[1])
-
 if __name__ == '__main__':
   main()

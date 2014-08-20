@@ -15,7 +15,7 @@ from .. import blob_ctx, node, util
 from ..util import Assert, copy_docstring
 from ..array import distarray
 from ..config import FLAGS, BoolFlag
-from ..fastrpc import TimeoutException
+from ..rpc import TimeoutException
 from traits.api import Any, Instance, Int, PythonValue
 
 class NotShapeable(Exception):

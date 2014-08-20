@@ -222,7 +222,7 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
         pLocal = PyModule_GetDict(pMain);
 
         PyRun_SimpleString("from spartan import blob_ctx, core");
-        PyRun_SimpleString("from spartan.fastrpc import read, serialize, FutureGroup");
+        PyRun_SimpleString("from spartan.rpc import read, serialize, FutureGroup");
 
         PyDict_SetItemString(pLocal, "worker_ctx", Py_BuildValue("k", _ctx));
         PyDict_SetItemString(pLocal, "fn", Py_BuildValue("s#", req.fn.c_str(), req.fn.size()));

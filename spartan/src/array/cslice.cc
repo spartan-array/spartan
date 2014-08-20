@@ -1,3 +1,5 @@
+#define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
+#define NO_IMPORT_ARRAY
 #include "cslice.h"
 static long long 
 get_longlong(PyObject *o) {
@@ -12,6 +14,7 @@ get_longlong(PyObject *o) {
     } else {
         assert(0);
     }
+    return 0;
 }
 
 

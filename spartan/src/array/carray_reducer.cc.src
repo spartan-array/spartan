@@ -32,7 +32,7 @@ _RP_NAME__scalar_replace(char **args)
 {
     char *ip1 = args[0], *ip2 = args[1];
 
-    _RP_TYPE_ in1 = *((_RP_TYPE_*)ip1);
+    //_RP_TYPE_ in1 = *((_RP_TYPE_*)ip1);
     _RP_TYPE_ in2 = *((_RP_TYPE_*)ip2);
     *((_RP_TYPE_*)ip1) = in2;
 }
@@ -116,9 +116,9 @@ scalar_reducer scalar_add_functions[] = {/*_RP_BEGIN_*/_RP_NAME__scalar_add, /*_
 scalar_reducer scalar_multiply_functions[] = {/*_RP_BEGIN_*/_RP_NAME__scalar_multiply, /*_RP_END_*/NULL};
 scalar_reducer scalar_maximum_functions[] = {/*_RP_BEGIN_*/_RP_NAME__scalar_maximum, /*_RP_END_*/NULL};
 scalar_reducer scalar_minimum_functions[] = {/*_RP_BEGIN_*/_RP_NAME__scalar_minimum, /*_RP_END_*/NULL};
-/*scalar_reducer scalar_and_functions[] = {[>_RP_BEGIN_*/_RP_NAME__scalar_and, /*_RP_END_<]NULL};*/
-/*scalar_reducer scalar_or_functions[] = {[>_RP_BEGIN_*/_RP_NAME__scalar_or, /*_RP_END_<]NULL};*/
-/*scalar_reducer scalar_xor_functions[] = {[>_RP_BEGIN_*/_RP_NAME__scalar_xor, /*_RP_END_<]NULL};*/
+//scalar_reducer scalar_and_functions[] = {/*_RP_BEGIN_*/_RP_NAME__scalar_and, /*_RP_END_*/NULL};
+//scalar_reducer scalar_or_functions[] = {/*_RP_BEGIN_*/_RP_NAME__scalar_or, /*_RP_END_*/NULL};
+//scalar_reducer scalar_xor_functions[] = {/*_RP_BEGIN_*/_RP_NAME__scalar_xor, /*_RP_END_*/NULL};
 
 char scalar_funcs_type[] = {/*_RP_BEGIN_*/_RP_TYPELTR_, /*_RP_END_*/' '};
 /* This must be sync with REDUCER enumeration */
@@ -137,12 +137,13 @@ scalar_reducer* scalar_functions[] = {
 scalar_reducer
 select_scalar_reducer(REDUCER reducer, char type)
 {
-    int i, j;
+    int i;
 
     for (i = 0; scalar_funcs_type[i] != ' '; i++) {
         if (scalar_funcs_type[i] == type)
             return scalar_functions[reducer - REDUCER_BEGIN][i];
     }
+    return NULL;
 }
 
 void
@@ -250,14 +251,14 @@ _RP_NAME__dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
 /*_RP_END_*/
 
 typedef void (*dense_reducer)(char**, npy_intp*, npy_intp*);
-dense_reducer dense_replace_functions[] = {/*_RP_BEGIN*/_RP_NAME__dense_replace, /*_RP_END_*/NULL};
-dense_reducer dense_add_functions[] = {/*_RP_BEGIN*/_RP_NAME__dense_add, /*_RP_END_*/NULL};
-dense_reducer dense_multiply_functions[] = {/*_RP_BEGIN*/_RP_NAME__dense_multiply, /*_RP_END_*/NULL};
-dense_reducer dense_maximum_functions[] = {/*_RP_BEGIN*/_RP_NAME__dense_maximum, /*_RP_END_*/NULL};
-dense_reducer dense_minimum_functions[] = {/*_RP_BEGIN*/_RP_NAME__dense_minimum, /*_RP_END_*/NULL};
-/*dense_reducer dense_and_functions[] = {[>_RP_BEGIN*/_RP_NAME__dense_and, /*_RP_END_<]NULL};*/
-/*dense_reducer dense_or_functions[] = {[>_RP_BEGIN*/_RP_NAME__dense_or, /*_RP_END_<]NULL};*/
-/*dense_reducer dense_xor_functions[] = {[>_RP_BEGIN*/_RP_NAME__dense_xor, /*_RP_END_<]NULL};*/
+dense_reducer dense_replace_functions[] = {/*_RP_BEGIN_*/_RP_NAME__dense_replace, /*_RP_END_*/NULL};
+dense_reducer dense_add_functions[] = {/*_RP_BEGIN_*/_RP_NAME__dense_add, /*_RP_END_*/NULL};
+dense_reducer dense_multiply_functions[] = {/*_RP_BEGIN_*/_RP_NAME__dense_multiply, /*_RP_END_*/NULL};
+dense_reducer dense_maximum_functions[] = {/*_RP_BEGIN_*/_RP_NAME__dense_maximum, /*_RP_END_*/NULL};
+dense_reducer dense_minimum_functions[] = {/*_RP_BEGIN_*/_RP_NAME__dense_minimum, /*_RP_END_*/NULL};
+//dense_reducer dense_and_functions[] = {/*_RP_BEGIN_*/_RP_NAME__dense_and, /*_RP_END_*/NULL};
+//dense_reducer dense_or_functions[] = {/*_RP_BEGIN_*/_RP_NAME__dense_or, /*_RP_END_*/NULL};
+//dense_reducer dense_xor_functions[] = {/*_RP_BEGIN_*/_RP_NAME__dense_xor, /*_RP_END_*/NULL};
 
 char dense_funcs_type[] = {/*_RP_BEGIN_*/_RP_TYPELTR_, /*_RP_END_*/' '};
 /* This must be sync with REDUCER enumeration */
@@ -276,12 +277,13 @@ dense_reducer* dense_functions[] = {
 dense_reducer
 select_dense_reducer(REDUCER reducer, char type)
 {
-    int i, j;
+    int i;
 
     for (i = 0; dense_funcs_type[i] != ' '; i++) {
         if (dense_funcs_type[i] == type)
             return dense_functions[reducer - REDUCER_BEGIN][i];
     }
+    return NULL;
 }
 
 /* reducer(ip1[ex], ip2) */
@@ -420,7 +422,7 @@ _RP_NAME__sparse_dense_or(char **args, npy_intp *dimensions, npy_intp *bases)
 
 typedef void (*sparse_dense_reducer)(char**, npy_intp*, npy_intp*);
 sparse_dense_reducer sparse_dense_add_functions[] = {/*_RP_BEGIN_*/_RP_NAME__sparse_dense_add, /*_RP_END_*/NULL};
-/*sparse_dense_reducer sparse_dense_or_functions[] = {[>_RP_BEGIN_*/_RP_NAME__sparse_dense_or, /*_RP_END_<]NULL};*/
+//sparse_dense_reducer sparse_dense_or_functions[] = {/*_RP_BEGIN_*/_RP_NAME__sparse_dense_or, /*_RP_END_*/NULL};
 
 char sparse_funcs_type[] = {/*_RP_BEGIN_*/_RP_TYPELTR_, /*_RP_END_*/' '};
 /* This must be sync with REDUCER enumeration */
@@ -440,12 +442,13 @@ sparse_dense_reducer* sparse_dense_functions[] = {
 sparse_dense_reducer
 select_sparse_dense_reducer(REDUCER reducer, char type)
 {
-    int i, j;
+    int i;
 
     for (i = 0; sparse_funcs_type[i] != ' '; i++) {
         if (sparse_funcs_type[i] == type)
             return sparse_dense_functions[reducer - REDUCER_BEGIN][i];
     }
+    return NULL;
 }
 
 void

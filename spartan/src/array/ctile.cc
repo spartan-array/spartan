@@ -293,7 +293,8 @@ CTile::to_tile_rpc(CSliceIdx &idx)
         } else {
             /* TODO: Sparse Slicing ..... */
             assert(0);
-            memcpy(base, &rpc, sizeof(CTile_RPC));
+            //memcpy(base, &rpc, sizeof(CTile_RPC));
+            return NULL;
         }
     }
 }
@@ -373,7 +374,7 @@ CTile::to_npy(void)
         assert(kword != NULL);
         kwds = PyDict_New();
         assert(kwds != NULL);
-        assert(PyDict_SetItem(kwds, kword, npy_mask));
+        PyDict_SetItem(kwds, kword, npy_mask);
         mod = PyImport_ImportModule("numpy.ma");
         assert(mod != NULL);
         object = PyObject_GetAttrString(mod, "array");
@@ -406,14 +407,14 @@ CTile::to_npy(void)
         assert(kwords != NULL);
         kargs = PyDict_New();
         assert(kargs != NULL);
-        assert(PyDict_SetItem(kargs, kwords, tuple[0]));
+        PyDict_SetItem(kargs, kwords, tuple[0]);
         sp = PyImport_ImportModule("scipy.sparse.coo");
         assert(sp != NULL);
-        if (sparse_type = CTILE_SPARSE_COO) {
+        if (sparse_type == CTILE_SPARSE_COO) {
             object = PyObject_GetAttrString(sp, "coo_matrix");
-        } else if (sparse_type = CTILE_SPARSE_CSR) {
+        } else if (sparse_type == CTILE_SPARSE_CSR) {
             object = PyObject_GetAttrString(sp, "csr_matrix");
-        } else if (sparse_type = CTILE_SPARSE_CSC) {
+        } else if (sparse_type == CTILE_SPARSE_CSC) {
             object = PyObject_GetAttrString(sp, "csc_matrix");
         } else {
             object = NULL;

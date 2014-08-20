@@ -1,4 +1,4 @@
-from spartan import fastrpc
+from spartan import rpc
 
 from .. import blob_ctx, util
 from ..array import distarray, tile
@@ -54,7 +54,7 @@ def target_mapper(ex, map_fn=None, source=None, target=None, fn_kw=None):
   '''
   result = list(map_fn(source, ex, **fn_kw))
   
-  futures = fastrpc.FutureGroup()
+  futures = rpc.FutureGroup()
   if result is not None:
     for ex, v in result:
       #update_time, _ = util.timeit(lambda: target.update(ex, v))

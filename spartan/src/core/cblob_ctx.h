@@ -4,7 +4,7 @@
 #include "base/logging.h"
 #include "ccore.h"
 #include "cworker.h"
-#include "fastrpc/service.h"
+#include "rpc/service.h"
 #include "rpc/client.h"
 
 class CBlobCtx {

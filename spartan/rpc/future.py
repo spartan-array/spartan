@@ -1,5 +1,6 @@
 from simplerpc import _pyrpc
 from simplerpc.marshal import Marshal
+import simplerpc.future
 import cPickle
 from cPickle import UnpicklingError
 
@@ -39,8 +40,8 @@ def deserialize(obj):
                 continue
     return obj
 
-class Future(object):
-    def __init__(self, id=-1, rep_types=None, rep=None):
+class Future(simplerpc.future.Future):
+    def __init__(self, id=-1, rep_types=None, rep=None, unpickle_func=deserialize):
         self.id = id
         self.rep = rep
         self.err_code = 0
@@ -53,35 +54,10 @@ class Future(object):
     @property
     def result(self):
         self.wait()
-        return deserialize(self.rep)
-
-    @property
-    def error_code(self):
-        self.wait()
-        return self.err_code
+        return self.unpickle_func(self.rep)
 
     def wait(self, timeout_sec=DEFAULT_TIMEOUT):
-        if self.wait_ok:
-            return self.err_code
-
-        if timeout_sec is None:
-            self.err_code, rep_marshal_id = _pyrpc.future_wait(self.id)
-        else:
-            timeout_msec = int(timeout_sec * 1000)
-            self.err_code, rep_marshal_id = _pyrpc.future_timedwait(self.id, timeout_msec)
-        results = []
-        if rep_marshal_id != 0 and self.err_code == 0:
-            rep_m = Marshal(id=rep_marshal_id)
-            for ty in self.rep_types:
-                results += rep_m.read_obj(ty),
-        self.wait_ok = True
-        if len(results) == 0:
-            self.rep = None
-        elif len(results) == 1:
-            self.rep = results[0]
-        else:
-            self.rep = results
-        return self.err_code
+        return super(Future, self).wait(timeout_sec)
 
 class FutureGroup(list):
     @property

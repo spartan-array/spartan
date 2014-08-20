@@ -12,7 +12,7 @@ import time
 import spartan
 from spartan import util, core, blob_ctx
 from spartan.config import parse, FLAGS
-from spartan.fastrpc import MasterService, WorkerProxy, Future, FutureGroup, Server, Client
+from spartan.rpc import MasterService, WorkerProxy, Future, FutureGroup, Server, Client
 
 MASTER = None
 def _dump_profile():

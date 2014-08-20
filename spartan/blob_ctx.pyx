@@ -10,7 +10,8 @@ from . import util, core
 import threading
 from .util import Assert
 import random
-from fastrpc import serialize, Client, RemoteException, TimeoutException, WorkerProxy, Future, FutureGroup
+from rpc import serialize, Client, RemoteException, TimeoutException, WorkerProxy
+from rpc import Future, FutureGroup
 
 from libcpp.string cimport string
 from libcpp.vector cimport vector
@@ -289,7 +290,7 @@ cdef class WorkerBlobCtx:
       timeout (float):
     '''
     cdef TileId tid
-    cdef SubSlice s
+    cdef CSliceIdx s
     cdef GetResp resp
 
     tid.worker = tile_id.worker

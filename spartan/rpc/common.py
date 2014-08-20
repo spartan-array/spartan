@@ -10,10 +10,8 @@ import pickle
 import sys
 import traceback
 
-from simplerpc import future
-from simplerpc.future import Future, FutureGroup
-from simplerpc import Server, Client
-from .. import cloudpickle, util
+from . import future, cloudpickle
+from .. import util
 
 def set_default_timeout(seconds):
   future.set_default_timeout(seconds)

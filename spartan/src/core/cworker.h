@@ -12,7 +12,7 @@
 #include "array/ctile.h"
 #include "base/threading.h"
 #include "base/logging.h"
-#include "fastrpc/service.h"
+#include "rpc/service.h"
 
 class CBlobCtx;
 

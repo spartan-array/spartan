@@ -1,4 +1,4 @@
-from simplerpc.marshal import Marshal
+from rpc.simplerpc.marshal import Marshal
 
 '''
 Python definitions for RPC messages.

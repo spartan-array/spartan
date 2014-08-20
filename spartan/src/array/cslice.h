@@ -33,7 +33,8 @@ public:
     ~CSliceIdx() {};
 
     CSlice& get_slice(int index) {return slices[index];};
-    int get_nd(void) {return nd;};
+    const CSlice& get_slice(int index) const {return slices[index];};
+    int get_nd(void) const {return nd;};
     void set_nd(int nd) {this->nd = nd;};
 private:
     CSlice slices[NPY_MAXDIMS];

@@ -8,7 +8,7 @@ import scipy.sparse
 import numpy as np
 
 from . import tile, extent, sparse
-from .. import util, core, blob_ctx, fastrpc
+from .. import util, core, blob_ctx, rpc
 from ..core import LocalKernelResult
 from ..util import Assert
 from ..config import FLAGS
@@ -305,7 +305,7 @@ class DistArrayImpl(DistArray):
     #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
     #util.log_info('Fetching %d tiles', len(splits))
 
-    futures = fastrpc.FutureGroup()
+    futures = rpc.FutureGroup()
     for ex, intersection in splits:
       tile_id = self.tiles[ex]
       futures.append(ctx.get(tile_id, extent.offset_slice(ex, intersection), wait=False))
@@ -370,7 +370,7 @@ class DistArrayImpl(DistArray):
       return ctx.update(tile_id, dst_slice, data, self.reducer_fn, wait=wait)
     
     
-    futures = fastrpc.FutureGroup()
+    futures = rpc.FutureGroup()
     slices = []
     
     if region.shape == self.shape:
