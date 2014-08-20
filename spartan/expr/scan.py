@@ -8,9 +8,12 @@ will not compile with Parakeet.
 '''
 import numpy as np
 import scipy.sparse as sp
+
 from ..array import extent
+from ..util import divup
 from .map_with_location import map_with_location
 from .shuffle import shuffle
+from .optimize import disable_parakeet
 
 
 def ex_to_slice(tup):
@@ -27,7 +30,7 @@ def _scan_reduce_mapper(array, ex, reduce_fn, axis):
   new_shape = list(ex.array_shape)
   new_ul[axis] = id
   new_lr[axis] = id + 1
-  new_shape[axis] = int(np.ceil(array.shape[axis] * 1.0 / axis_shape))
+  new_shape[axis] = divup(array.shape[axis], axis_shape)
 
   dst_ex = extent.create(new_ul, new_lr, new_shape)
 
@@ -35,25 +38,24 @@ def _scan_reduce_mapper(array, ex, reduce_fn, axis):
   yield (dst_ex, local_reduction)
 
 
+@disable_parakeet
 def _scan_mapper(tile, ex, scan_fn=None, axis=None, scan_base=None, tile_shape=None):
   '''Cannot compile with Parakeet because of ``np.reshape``.'''
   if sp.issparse(tile):
     tile = tile.todense()
 
+  base_slice = list(ex_to_slice(ex))
+  new_slice = [slice(0, length) for length in tile.shape]
   if axis is None:
     axis = 1
-    id = (ex[1][axis] - 1) / tile_shape[axis]
-    base_slice = list(ex_to_slice(ex))
-    base_slice[axis] = slice(id, id+1)
-    new_slice = [slice(0, length) for length in tile.shape]
+    tile_id = (ex[1][axis] - 1) / tile_shape[axis]
+    base_slice[axis] = slice(tile_id, tile_id+1)
     new_slice[axis] = slice(0, 1)
     tile[new_slice] += scan_base[base_slice]
   else:
-    id = (ex[1][axis] - 1) / tile_shape[axis]
-    if id > 0:
-      base_slice = list(ex_to_slice(ex))
-      base_slice[axis] = slice(id-1, id)
-      new_slice = [slice(0, length) for length in tile.shape]
+    tile_id = (ex[1][axis] - 1) / tile_shape[axis]
+    if tile_id > 0:
+      base_slice[axis] = slice(tile_id-1, tile_id)
       new_slice[axis] = slice(0, 1)
       tile[new_slice] += scan_base[base_slice]
 
