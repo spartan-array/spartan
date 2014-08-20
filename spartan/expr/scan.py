@@ -1,3 +1,11 @@
+#!/usr/bin/env python
+'''Implementation of the higher level operator Scan.
+
+Scan operations return ``MapExpr``s, which can be fused together. However,
+because Parakeet does not currently support ``np.reshape()``, scan operations
+will not compile with Parakeet.
+
+'''
 import numpy as np
 import scipy.sparse as sp
 from ..array import extent
@@ -28,6 +36,7 @@ def _scan_reduce_mapper(array, ex, reduce_fn, axis):
 
 
 def _scan_mapper(tile, ex, scan_fn=None, axis=None, scan_base=None, tile_shape=None):
+  '''Cannot compile with Parakeet because of ``np.reshape``.'''
   if sp.issparse(tile):
     tile = tile.todense()
 
