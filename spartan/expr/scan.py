@@ -20,7 +20,7 @@ def _scan_reduce_mapper(array, ex, reduce_fn, axis):
   yield (dst_ex, local_reduction)
 
 def _scan_mapper(array, ex, scan_fn, axis=None, scan_base=None):
-  local_data = array.fetch(ex)
+  local_data = array.fetch(ex).copy()
   if sp.issparse(local_data): local_data = local_data.todense()
   
   if axis is None:
