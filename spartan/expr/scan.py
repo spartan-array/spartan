@@ -43,6 +43,8 @@ def _scan_mapper(tile, ex, scan_fn=None, axis=None, scan_base=None, tile_shape=N
   '''Cannot compile with Parakeet because of ``np.reshape``.'''
   if sp.issparse(tile):
     tile = tile.todense()
+  else:
+    tile = tile.copy()
 
   base_slice = list(ex_to_slice(ex))
   new_slice = [slice(0, length) for length in tile.shape]
