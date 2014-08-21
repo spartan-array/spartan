@@ -415,20 +415,11 @@ if __name__ == '__main__':
 
   workers = []
   for i in range(FLAGS.count):
-    p = multiprocessing.Process(target=_start_worker, 
-                                args=(master, i))
+    p = multiprocessing.Process(target=_start_worker, args=(master, i))
     p.start()
     workers.append(p)
-    
-    
-  def kill_workers():
-    for p in workers:
-      p.terminate()
-      
-  watchdog = util.FileWatchdog(on_closed=kill_workers)
-  watchdog.start()
-  
+
   for w in workers:
     w.join()
-    
+
   print >>sys.stderr, 'Worker: all worker processes exited!'
