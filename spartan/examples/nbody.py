@@ -12,7 +12,7 @@ import numpy as np
 import spartan
 
 from spartan import expr
-from spartan.expr import diagonal, rand, sqrt, transpose, zeros
+from spartan.expr import rand, sqrt, zeros
 
 G = 6.67384e-11       # m/(kg*(s^2))
 dt = 60*60*24*365.25  # Years in seconds
@@ -25,7 +25,7 @@ def add_tuple(a, b):
   return tuple(list(a) + list(b))
 
 
-def _set_diagonal_mapper(array, ex, diag_scalar):
+def _set_diagonal_mapper(tile, ex, scalar):
   '''Replaces values along the diagonal with the values in data.
 
   Every mapper function has `array`, the DistArray, and `ex`, the extent
@@ -34,31 +34,22 @@ def _set_diagonal_mapper(array, ex, diag_scalar):
   can construct your own using `extent.create(ul, lr, array.shape)`
 
   '''
-  if ex.ul[0] >= ex.ul[1] and ex.ul[0] < ex.lr[1]:  # Below the diagonal.
-    above, below = False, True
-  elif ex.ul[1] >= ex.ul[0] and ex.ul[1] < ex.lr[0]:  # Above the diagonal.
-    above, below = True, False
-  else:  # Not on the diagonal.
-    yield (ex, array.fetch(ex))
-    return
-
-  data = array.fetch(ex)
-  for i in range(ex.ul[above], min(ex.lr[above], ex.lr[below])):
-    data[i - ex.ul[0], i - ex.ul[1]] = diag_scalar
-
-  yield (ex, data)
+  ul = ex[0]
+  if ul[0] == ul[1]:
+    return scalar
+  else:
+    return tile
 
 
-def set_diagonal(array, data):
+def set_diagonal(array, scalar):
   '''Creates a copy of array with elements from data on the diagonal.
 
   Spartan does not support views because data is not contiguous - so all
   expressions are read-only.
 
   '''
-  return spartan.shuffle(array, _set_diagonal_mapper,
-                        target=expr.ndarray(array.shape),
-                        kw={'diag_scalar': data})
+  return spartan.map_with_location(array, _set_diagonal_mapper,
+                                   fn_kw={'scalar': scalar})
 
 
 def random_galaxy(n):
@@ -135,4 +126,3 @@ def move(galaxy, dt):
 def simulate(galaxy, timesteps):
   for i in xrange(timesteps):
     move(galaxy, dt)
-
