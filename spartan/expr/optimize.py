@@ -137,14 +137,9 @@ class MapMapFusion(OptimizePass):
     #util.log_info('Original: %s', expr.op)
     children = []
     child_to_var = []
-    if isinstance(expr.op, LocalMapLocationExpr):
-      combined_op = LocalMapLocationExpr(fn=expr.op.fn,
-                                       kw=expr.op.kw,
-                                       pretty_fn=expr.op.pretty_fn)
-    else:
-      combined_op = LocalMapExpr(fn=expr.op.fn,
-                                 kw=expr.op.kw,
-                                 pretty_fn=expr.op.pretty_fn)
+    combined_op = expr.op.__class__(fn=expr.op.fn, kw=expr.op.kw,
+                                    pretty_fn=expr.op.pretty_fn)
+
     trace = ExprTrace()
 
     for child_expr in map_children:
@@ -162,7 +157,7 @@ class MapMapFusion(OptimizePass):
         combined_op.add_dep(LocalInput(idx=key))
         child_to_var.append(key)
 
-    if isinstance(expr.op, LocalMapLocationExpr):
+    if isinstance(combined_op, LocalMapLocationExpr):
       combined_op.add_dep(LocalInput(idx='extent'))
 
     return expr_like(expr,

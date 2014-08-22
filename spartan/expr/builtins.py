@@ -248,14 +248,13 @@ def _normalize_mapper(tile, ex, axis, norm_value):
     The axis to normalize; defaults to flattened array.
 
   '''
+  ul = ex[0]
   if axis is None:
     tile /= norm_value
-  elif axis == 1:
-    for i in range(tile.shape[0]):
-      tile[i,:] /= norm_value[ex.ul[0] + i]
   elif axis == 0:
-    for i in range(tile.shape[1]):
-      tile[:,i] /= norm_value[ex.ul[1] + i]
+    tile[:, 0] /= norm_value[ul[1]]
+  elif axis == 1:
+    tile[0, :] /= norm_value[ul[0]]
 
   return tile
 
