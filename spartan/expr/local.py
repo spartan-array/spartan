@@ -119,6 +119,9 @@ class FnCallExpr(LocalExpr):
 class LocalMapExpr(FnCallExpr):
   _op_type = 'map'
 
+class LocalMapLocationExpr(LocalMapExpr):
+  _op_type = 'map_location'
+
 class LocalReduceExpr(FnCallExpr):
   _op_type = 'reduce'
 
