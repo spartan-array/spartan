@@ -8,7 +8,6 @@ import logging
 from math import ceil
 import os
 from os.path import basename
-import select
 import socket
 import sys
 import threading
@@ -102,34 +101,6 @@ def _dump_timer():
 
 
 atexit.register(_dump_timer)
-
-class FileWatchdog(threading.Thread):
-  """Watchdog for a file (typically `sys.stdin` or `sys.stdout`).
-
-  When the file closes, terminate the process.
-  (This occurs when an ssh connection is terminated, for example.)
-  """
-
-  def __init__(self, file_handle=sys.stdin, on_closed=lambda: os._exit(1)):
-    '''
-    
-    :param file_handle:
-    :param on_closed:
-    '''
-    threading.Thread.__init__(self, name='WatchdogThread')
-    self.setDaemon(True)
-    self.file_handle = file_handle
-    self.on_closed = on_closed
-
-  def run(self):
-    f = [self.file_handle]
-    while 1:
-      r, w, x = select.select(f, f, f, 1.0)
-      #print >>sys.stderr, 'Watchdog running... %s %s %s' % (r, w, x)
-      if r or x:
-        self.on_closed()
-        return
-      time.sleep(0.1)
 
 
 def flatten(lst, depth=1, unique=False):
