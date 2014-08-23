@@ -22,6 +22,7 @@ from . import serialization
 from traits.api import PythonValue
 from . import serialization, serialization_buffer
 from spartan.util import TIMER
+from ..core import RunKernelReq
 
 NO_RESULT = object()
 DEFAULT_TIMEOUT = 60
@@ -49,6 +50,10 @@ class Group(tuple):
   pass
 
 def serialize_to(obj, writer):
+  if isinstance(obj, RunKernelReq): 
+    cloudpickle.dump(obj, writer, -1)
+    return
+
   pos = writer.tell()
   try:
     cPickle.dump(obj, writer, -1)
@@ -57,6 +62,9 @@ def serialize_to(obj, writer):
     cloudpickle.dump(obj, writer, -1)
     
 def serialize(obj):
+  if isinstance(obj, RunKernelReq): 
+    return cloudpickle.dump(obj, -1)
+
   try:
     return cPickle.dumps(obj, -1)
   except (pickle.PicklingError, PickleError, TypeError):
