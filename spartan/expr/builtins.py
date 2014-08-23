@@ -18,6 +18,7 @@ from ..array import extent
 from ..array.extent import index_for_reduction, shapes_match
 from ..util import Assert
 from .map import map
+from .map_with_location import map_with_location
 from .ndarray import ndarray
 from .optimize import disable_parakeet, not_idempotent
 from .reduce import reduce
@@ -52,18 +53,20 @@ def _make_sparse_rand(input,
                  format=format,
                  dtype=dtype)
 
-@disable_parakeet
+
 def _make_sparse_diagonal(tile, ex):
-  data = sp.lil_matrix(ex.shape, dtype=tile.dtype)
+  ul, lr = ex[0], ex[1]
+  data = sp.lil_matrix(tile.shape, dtype=tile.dtype)
 
-  if ex.ul[0] >= ex.ul[1] and ex.ul[0] < ex.lr[1]:
-    for i in range(ex.ul[0], __builtin__.min(ex.lr[0], ex.lr[1])):
-      data[i - ex.ul[0], i - ex.ul[1]] = 1
-  elif ex.ul[1] >= ex.ul[0] and ex.ul[1] < ex.lr[0]:
-    for j in range(ex.ul[1], __builtin__.min(ex.lr[1], ex.lr[0])):
-      data[j - ex.ul[0], j - ex.ul[1]] = 1
+  if ul[0] >= ul[1] and ul[0] < lr[1]:  # below the diagonal
+    for i in range(ul[0], __builtin__.min(lr[0], lr[1])):
+      data[i - ul[0], i - ul[1]] = 1
+  elif ul[1] >= ul[0] and ul[1] < lr[0]:  # above the diagonal
+    for j in range(ul[1], __builtin__.min(lr[1], lr[0])):
+      data[j - ul[0], j - ul[1]] = 1
 
-  return [(ex, data)]
+  return data
+
 
 @not_idempotent
 def rand(*shape, **kw):
@@ -153,10 +156,10 @@ def sparse_empty(shape,
   '''
   return ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True)
 
-def sparse_diagonal(shape,
-                    dtype=np.float32,
-                    tile_hint=None):
-  return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True), _make_sparse_diagonal)
+
+def sparse_diagonal(shape, dtype=np.float32, tile_hint=None):
+  return map_with_location(ndarray(shape, dtype, tile_hint, sparse=True),
+                           _make_sparse_diagonal)
 
 
 def _diag_mapper(array, ex):
@@ -232,42 +235,48 @@ def diagonal(a):
   return shuffle(a, _diagonal_mapper, shape_hint=(__builtin__.min(a.shape), ))
 
 
-def _normalize_mapper(array, ex, axis, norm_value):
-  '''
-  Normalize a region of an array.
-  Returns a new, normalized region.
-  
-  Args:
-    array (DistArray):
-    ex (Extent): Region being processed.
-    axis: Either an integer or ``None``.
-  '''
-  data = array.fetch(ex)
-  if axis is None:
-    data /= norm_value
-  elif axis == 1:
-    for i in range(data.shape[0]):
-      data[i,:] /= norm_value[ex.ul[0] + i]
-  elif axis == 0:
-    for i in range(data.shape[1]):
-      data[:,i] /= norm_value[ex.ul[1] + i]
+def _normalize_mapper(tile, ex, axis, norm_value):
+  '''Normalize a region of an array.
 
-  yield (ex, data)
+  Returns a new, normalized region.
+
+  :param value: np.ndarray
+    Data being processed.
+  :param ex: tuple
+    The value's location in the global array (ul, lr, array_shape).
+  :param axis: int, optional
+    The axis to normalize; defaults to flattened array.
+
+  '''
+  ul = ex[0]
+  if axis is None:
+    tile /= norm_value
+  elif axis == 0:
+    tile[:, 0] /= norm_value[ul[1]]
+  elif axis == 1:
+    tile[0, :] /= norm_value[ul[0]]
+
+  return tile
+
 
 def normalize(array, axis=None):
-  '''
-  Normalize the values of ``array`` over axis.
+  '''Normalize the values of ``array`` over axis.
+
   After normalization `sum(array, axis)` will be equal to 1.
-  
-  Args:
-    array (Expr): array need to be normalized
-    axis (int): Either an integer or ``None``.
-  
-  Returns:
-    `Expr`: Normalized array.
+
+  :param array: Expr
+    The array to be normalized.
+  :param axis: int, optional
+    The axis to normalize.``None`` will normalize the flattened array.
+
+  :rtype: MapExpr
+    Normalized array.
+
   '''
   axis_sum = sum(array, axis=axis).glom()
-  return shuffle(array, _normalize_mapper, kw=dict(axis=axis, norm_value=axis_sum))
+  return map_with_location(array, _normalize_mapper,
+                    fn_kw={'axis': axis, 'norm_value': axis_sum})
+
 
 def norm(array, ord=2):
   '''
@@ -347,12 +356,14 @@ def ones(shape, dtype=np.float, tile_hint=None):
              fn=_make_ones)
 
 
-def _arange_mapper(inputs, ex, start, stop, step, dtype=None):
-  pos = extent.ravelled_pos(ex.ul, ex.array_shape)
+@disable_parakeet
+def _arange_mapper(tile, ex, start, stop, step, dtype=None):
+  pos = extent.ravelled_pos(ex[0], ex[2])
   ex_start = pos*step + start
-  ex_stop = np.prod(ex.shape)*step + ex_start
+  ex_stop = np.prod(tile.shape)*step + ex_start
 
-  yield (ex, np.arange(ex_start, ex_stop, step, dtype=dtype).reshape(ex.shape))
+  # np.reshape is not supported by parakeet.
+  return np.arange(ex_start, ex_stop, step, dtype=dtype).reshape(tile.shape)
 
 
 def arange(shape=None, start=0, stop=None, step=1, dtype=np.float, tile_hint=None):
@@ -392,7 +403,7 @@ def arange(shape=None, start=0, stop=None, step=1, dtype=np.float, tile_hint=Non
     raise ValueError('Shape or stop expected, none supplied.')
 
   if shape is not None and stop is not None:
-    raise ValueError('Only shape OR stop can be supplied, not both')
+    raise ValueError('Only shape OR stop can be supplied, not both.')
 
   if shape is None:
     # Produces 1d array based on start, stop, step
@@ -402,9 +413,9 @@ def arange(shape=None, start=0, stop=None, step=1, dtype=np.float, tile_hint=Non
   if stop is None:
     stop = step*(np.prod(shape) + start)
 
-  return shuffle(ndarray(shape, dtype=dtype, tile_hint=tile_hint),
-                 fn=_arange_mapper, kw={'start': start, 'stop': stop,
-                                        'step': step, 'dtype': dtype})
+  return map_with_location(ndarray(shape, dtype, tile_hint), _arange_mapper,
+                    fn_kw={'start': start, 'stop': stop,
+                           'step': step, 'dtype': dtype})
 
 
 def _sum_local(ex, data, axis):
@@ -465,6 +476,7 @@ def min(x, axis=None, tile_hint=None):
       local_reduce_fn=lambda ex, data, axis: data.min(axis),
       accumulate_fn=np.minimum,
       tile_hint = tile_hint)
+
 
 def mean(x, axis=None):
   '''

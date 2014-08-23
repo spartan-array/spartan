@@ -1,8 +1,9 @@
-from spartan import expr, util
+from spartan import array, expr
+from spartan.config import FLAGS
 from spartan.util import Assert
 import test_common
 import numpy as np
-from scipy import sparse as sp
+
 
 class TestOptimization(test_common.ClusterTest):
   def _test_optimization_nonordered(self):
@@ -40,6 +41,7 @@ class TestOptimization(test_common.ClusterTest):
     nq = no[100:200, 100:200]
 
     Assert.all_eq(nq, q.optimized().glom(), tolerance = 1e-10)
+
 
   def test_optimization_shape(self):
     shape = (200, 800)
@@ -81,6 +83,7 @@ class TestOptimization(test_common.ClusterTest):
 
     Assert.all_eq(nq, q.optimized().glom(), tolerance = 1e-10)
 
+
   def _test_optimization_ordered(self):
     na = np.random.rand(1000, 1000)
     nb = np.random.rand(1000, 1000)
@@ -116,6 +119,7 @@ class TestOptimization(test_common.ClusterTest):
     nq = no[100:200, 100:200]
 
     Assert.all_eq(nq, q.optimized().glom(), tolerance = 1e-10)
+
 
   def test_optimization_reduced(self):
     na = np.random.rand(1000, 1000)
@@ -159,3 +163,21 @@ class TestOptimization(test_common.ClusterTest):
     Assert.all_eq(ns, s.optimized().glom(), tolerance = 1e-6)
 
 
+  def test_optimization_map_with_location(self):
+    FLAGS.opt_parakeet_gen = 1
+    def mapper(tile, ex):
+      return tile + 10
+
+    a = expr.map_with_location(expr.ones((5, 5)), mapper) + expr.ones((5, 5))
+    Assert.isinstance(a.optimized().op, expr.local.ParakeetExpr)
+
+
+  def test_optimization_region_map(self):
+    def mapper(tile, ex):
+      return tile + 10
+
+    ex = array.extent.create((0, 0), (1, 5), (5, 5))
+    a = expr.region_map(expr.ones((5, 5)), ex, mapper) + expr.ones((5, 5))*10
+
+    for child in a.optimized().op.deps:
+      Assert.true(not isinstance(child, expr.local.LocalInput))

@@ -1,39 +1,49 @@
-from .map import map
 from ..array import extent
-from .optimize import disable_parakeet
 from .base import Expr
+from .map_with_location import map_with_location
+from .optimize import disable_parakeet
+
 
 @disable_parakeet
-def _region_mapper(input, ex, array, region, user_fn, fn_kw=None):
-  '''
-  Run when mapping over a region.
-  Computes the intersection of the current tile and a global region.
-  If the intersection is None, return None to reuse the original tile. 
-  Otherwise, run the user mapper function.
+def _region_mapper(tile, ex, array, region, user_fn, fn_kw=None):
+  '''Run when mapping over a region.
 
-	:param input: original tile
-  :param ex:
-  :param array: the array to be mapped over.
-  :param user_fn: User Mapper function. Should take arguments (tile, array, extent, **kw)
-  :param region: list of `TileExtent` representing the region of the input array.
+  Computes the intersection of the current tile and a global region. If the
+  intersection is None, return None to reuse the original tile. Otherwise, run
+  the user mapper function.
+
+  :param input: np.ndarray
+    Original tile
+  :param ex: TileExtent
+  :param array: Expr, DistArray
+    The array to be mapped over.
+  :param user_fn: function
+    Mapper function. Should have signature (tile, extent, array, **kw) ->
+    NumPy array.
+  :param region: list
+    List of ``TileExtent`` representing the region of the input array.
   :param fn_kw: the parameters for the user define mapper function.
-  '''
-  if fn_kw is None: fn_kw = {}
 
-  for slice in region:
-    intersection = extent.intersection(slice, ex)
+  '''
+  ex = extent.from_tuple(ex)
+  if fn_kw is None:
+    fn_kw = {}
+
+  for area in region:
+    intersection = extent.intersection(area, ex)
     if intersection:
-      result = input.copy()
+      result = tile.copy()
       subslice = extent.offset_slice(ex, intersection)
-      result[subslice] = user_fn(result[subslice], array, ex, **fn_kw)
+      result[subslice] = user_fn(result[subslice], ex, array, **fn_kw)
       return result
-    
+
   return None
+
 
 def region_map(array, region, fn, fn_kw=None):
   '''
   Map ``fn`` over a subset of ``array``.
-  This returns a new array of the same shape as the input. 
+  This returns a new array of the same shape as the input.
 
   For areas within the region list are replaced with the result of `fn`; areas outside of the
   region list keep the values from the original array.
@@ -47,12 +57,13 @@ def region_map(array, region, fn, fn_kw=None):
   Returns:
     MapExpr: An expression node.
   '''
-  if isinstance(region, extent.TileExtent): region = list([region])
+  if isinstance(region, extent.TileExtent):
+    region = list([region])
+
   if fn_kw is not None:
     for k, v in fn_kw.iteritems():
       if isinstance(v, Expr):
         fn_kw[k] = v.evaluate()
-  
-  kw = {'fn_kw': fn_kw, 'user_fn': fn, 'region': region}
-  return map(array, fn=_region_mapper, fn_kw=kw)
- 
+
+  kw = {'fn_kw': fn_kw, 'user_fn': fn, 'array': array, 'region': region}
+  return map_with_location(array, fn=_region_mapper, fn_kw=kw)

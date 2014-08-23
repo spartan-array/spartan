@@ -18,13 +18,13 @@ from ..array.distarray import DistArray
 from . import local
 from .filter import FilterExpr
 from .slice import SliceExpr
-from .local import make_var, LocalInput, ParakeetExpr
+from .local import LocalInput, LocalMapExpr, LocalMapLocationExpr, make_var, ParakeetExpr
 from .reduce import ReduceExpr, LocalReduceExpr
 from ..util import Assert
 
 from .. import util
 from .base import Expr, Val, AsArray, ListExpr, lazify, expr_like, ExprTrace, NotShapeable, CollectionExpr
-from .map import MapExpr, LocalMapExpr
+from .map import MapExpr
 from .ndarray import NdArrayExpr
 from .shuffle import ShuffleExpr
 from .write_array import WriteArrayExpr
@@ -124,35 +124,29 @@ class MapMapFusion(OptimizePass):
     map_children = self.visit(expr.children)
     all_maps = True
     Assert.isinstance(map_children, ListExpr)
-    for i in range(len(map_children)):
-      k = expr.child_to_var[i]
-      v = map_children[i]
+    for k, v in zip(expr.child_to_var, map_children):
       if not fusable(v):
         util.log_debug('Skipping fusion: (%s -> %s)' % (k, type(v)))
         all_maps = False
         break
 
-    if (not all_maps
-        or isinstance(expr.op, local.ParakeetExpr) 
-        or id(expr) in _not_idempotent_list):
+    if (not all_maps or isinstance(expr.op, local.ParakeetExpr) or
+        id(expr) in _not_idempotent_list):
       return expr.visit(self)
 
     #util.log_info('Original: %s', expr.op)
     children = []
     child_to_var = []
-    combined_op = LocalMapExpr(fn=expr.op.fn,
-                               kw=expr.op.kw,
-                               pretty_fn=expr.op.pretty_fn)
+    combined_op = expr.op.__class__(fn=expr.op.fn, kw=expr.op.kw,
+                                    pretty_fn=expr.op.pretty_fn)
+
     trace = ExprTrace()
 
-    for i in range(len(map_children)):
-      child_expr = map_children[i]
+    for child_expr in map_children:
       trace.fuse(child_expr.stack_trace)
 
       if isinstance(child_expr, MapExpr):
-        for j in range(len(child_expr.children)):
-          k = child_expr.child_to_var[j]
-          v = child_expr.children[j]
+        for k, v in zip(child_expr.child_to_var, child_expr.children):
           merge_var(children, child_to_var, k, v)
 
         combined_op.add_dep(child_expr.op)
@@ -162,6 +156,9 @@ class MapMapFusion(OptimizePass):
         key = make_var()
         combined_op.add_dep(LocalInput(idx=key))
         child_to_var.append(key)
+
+    if isinstance(combined_op, LocalMapLocationExpr):
+      combined_op.add_dep(LocalInput(idx='extent'))
 
     return expr_like(expr,
                      children=ListExpr(vals=children),
