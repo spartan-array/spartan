@@ -203,6 +203,7 @@ class ReduceMapFusion(OptimizePass):
                      dtype_fn=expr.dtype_fn,
                      accumulate_fn=expr.accumulate_fn,
                      op=combined_op,
+                     tile_hint=expr.tile_hint,
                      trace=trace)
 
 
@@ -786,7 +787,7 @@ class AutomaticTiling(OptimizePass):
     # give expr the best tiling hint
     for node_id in nodes:
       node = self.nodes[node_id]
-      #print node_id, 'tiling:', node.tiling
+      #print node.expr.typename(), 'tiling:', node.tiling
       if node.tiling >= 0:
         _tiled_exprlist[node.expr.expr_id] = node.tiling
         if node.expr.typename() in ['NdArrayExpr', 'ReduceExpr', 'DotExpr'] and len(node.expr.shape) > 0:
