@@ -3,17 +3,18 @@ import numpy as np
 from scipy import linalg
 from spartan import expr, util
 from spartan.array import extent
+from spartan.expr.base import force
 
-def _cholesky_dpotrf_mapper(input, array, ex):
+def _cholesky_dpotrf_mapper(input, ex):
   L,info = linalg.lapack.dpotrf(input, lower=1)
   return L
 
-def _cholesky_dtrsm_mapper(input, array, ex, diag_ex):
+def _cholesky_dtrsm_mapper(input, ex, array, diag_ex):
   A_kk = array.fetch(diag_ex)
   L,info = linalg.lapack.dtrtrs(A_kk, input.T, lower=1)
   return L.T
 
-def _cholesky_dsyrk_dgemm_mapper(input, array, ex, k):
+def _cholesky_dsyrk_dgemm_mapper(input, ex, array, k):
   
   mk_ex = extent.create((ex.ul[1], k*input.shape[1]), (ex.lr[1], (k+1)*input.shape[1]), array.shape)
   A_mk = array.fetch(mk_ex)
@@ -50,16 +51,16 @@ def cholesky(A):
     
     # A[l,k] = DTRSM(A[k,k], A[l,k]) l -> [k+1,n)
     col_ex = extent.create(((k+1)*tile_size, k*tile_size),(n*tile_size, (k+1)*tile_size), A.shape)
-    A = expr.region_map(A, col_ex, _cholesky_dtrsm_mapper, fn_kw=dict(diag_ex=diag_ex))
+    A = expr.region_map(A, col_ex, _cholesky_dtrsm_mapper, fn_kw=dict(array=force(A), diag_ex=diag_ex))
     
     # A[m,m] = DSYRK(A[m,k], A[m,m]) m -> [k+1,n)
     # A[l,m] = DGEMM(A[l,k], A[m,k], A[l,m]) m -> [k+1,n) l -> [m+1,n)
     col_exs = list([extent.create((m*tile_size, m*tile_size), (n*tile_size, (m+1)*tile_size), A.shape) for m in range(k+1,n)])
-    A = expr.region_map(A, col_exs, _cholesky_dsyrk_dgemm_mapper, fn_kw=dict(k=k))
+    A = expr.region_map(A, col_exs, _cholesky_dsyrk_dgemm_mapper, fn_kw=dict(array=force(A), k=k))
   
   
   # update the right corner to 0
   col_exs = list([extent.create((0, m*tile_size),(m*tile_size, (m+1)*tile_size),A.shape) for m in range(1,n)])
-  A = expr.region_map(A, col_exs, lambda input, array, ex: np.zeros(input.shape, input.dtype))
+  A = expr.region_map(A, col_exs, lambda input, ex: np.zeros(input.shape, input.dtype))
   return A
         

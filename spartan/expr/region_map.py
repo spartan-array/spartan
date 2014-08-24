@@ -5,7 +5,7 @@ from .optimize import disable_parakeet
 
 
 @disable_parakeet
-def _region_mapper(tile, ex, array, region, user_fn, fn_kw=None):
+def _region_mapper(tile, ex, region, user_fn, fn_kw=None):
   '''Run when mapping over a region.
 
   Computes the intersection of the current tile and a global region. If the
@@ -34,7 +34,7 @@ def _region_mapper(tile, ex, array, region, user_fn, fn_kw=None):
     if intersection:
       result = tile.copy()
       subslice = extent.offset_slice(ex, intersection)
-      result[subslice] = user_fn(result[subslice], ex, array, **fn_kw)
+      result[subslice] = user_fn(result[subslice], ex, **fn_kw)
       return result
 
   return None
@@ -65,5 +65,5 @@ def region_map(array, region, fn, fn_kw=None):
       if isinstance(v, Expr):
         fn_kw[k] = v.evaluate()
 
-  kw = {'fn_kw': fn_kw, 'user_fn': fn, 'array': array, 'region': region}
+  kw = {'fn_kw': fn_kw, 'user_fn': fn, 'region': region}
   return map_with_location(array, fn=_region_mapper, fn_kw=kw)
