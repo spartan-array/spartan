@@ -476,7 +476,7 @@ class AutomaticTiling(OptimizePass):
     self.inited = True
       
   def add_edge(self, edge_from, edge_to, edge_cost=0):
-    #util.log_info('add_edge:%d %d cost:%d', edge_from, edge_to, edge_cost)
+    #util.log_debug('add_edge:%d %d cost:%d', edge_from, edge_to, edge_cost)
     self.edges[(edge_from, edge_to)] = edge_cost
     self.nodes[edge_from].parents.append(edge_to)
     self.nodes[edge_to].children.append(edge_from)
@@ -490,26 +490,6 @@ class AutomaticTiling(OptimizePass):
     self.split_nodes[node1] = node2
     self.split_nodes[node2] = node1  
   
-#   def reuse_visited_expr(self, expr):
-#     cached_expr_ids = self.expr_to_nodes[expr]
-#     #util.log_info('reuse expr:%s', cached_expr_ids)
-#     # check if we need to fix previous parents
-#     for node_id in cached_expr_ids:  
-#       node = self.nodes[node_id]
-#       for parent_id in node.parents:
-#         if parent_id in self.split_nodes:
-#           split_parent_id = self.split_nodes[parent_id]
-#           if split_parent_id in node.parents:
-#             self.nodes[self.cur_node_id] = self.node_type(self.nodes[parent_id].expr, -1, [], [])   
-#             self.add_edge(self.cur_node_id, parent_id, self.edges[(node_id, parent_id)])
-#             self.add_edge(self.cur_node_id, split_parent_id, self.edges[(node_id, split_parent_id)])
-#             self.add_edge(node_id, self.cur_node_id, 0)
-#             self.remove_edge(node_id, parent_id)
-#             self.remove_edge(node_id, split_parent_id)
-#             self.cur_node_id += 1
-#             break
-#     return cached_expr_ids 
-  
   def visit_children(self, children, except_child = None):
     child_ids = []
     for child in children:
@@ -520,16 +500,12 @@ class AutomaticTiling(OptimizePass):
   def visit_NdArrayExpr(self, expr):
     # new array need to be partitioned
     if len(expr.shape) > 1 and expr.shape[1] > 1:
-      self.nodes[self.cur_node_id] = self.node_type(expr, -1, [], [])
-      self.add_edge(0, self.cur_node_id, 0)
-      self.cur_node_id += 1
-      
       self.nodes[self.cur_node_id] = self.node_type(expr, 0, [], [])
-      self.add_edge(self.cur_node_id - 1, self.cur_node_id, 0)
+      self.add_edge(0, self.cur_node_id, 0)
       self.cur_node_id += 1    
       
       self.nodes[self.cur_node_id] = self.node_type(expr, 1, [], [])
-      self.add_edge(self.cur_node_id - 2, self.cur_node_id, 0)
+      self.add_edge(0, self.cur_node_id, 0)
       self.cur_node_id += 1
       
       self.add_split_nodes(self.cur_node_id - 2, self.cur_node_id - 1)

@@ -1,5 +1,6 @@
 #include <Python.h>
 #include <unordered_map>
+#include <list>
 
 const int eMax = 1000000;
 const int nMax = 1000;
@@ -18,14 +19,24 @@ void add_edge(int u, int v, int cost) {
     edge[e].next = head[u]; head[u] = e++;
 }
 
+void print_choices(int s, int t, bool* vis, int mincost) {
+	printf("%d choose (cost=%d):", s, mincost);
+	for (int u = 0; u <= t; u++)
+		if (vis[u]) printf("%d ", u);
+	printf("\n");
+}
+
 int find_mincost_tiling(int s, int t, bool* vis) {
-	int mincost = 0, i, j, v, sp_v = -1;
+	int mincost = 0, i, j, v, sp_v, size;
+	std::list<int> child_edges;
+	for (i = head[s]; i != -1; i = edge[i].next) child_edges.push_back(i);
+	size = child_edges.size();
 
-	for (i = head[s]; i != -1; i = edge[i].next) {
+	while (!child_edges.empty()) {
+		i = child_edges.front(); child_edges.pop_front(); size --;
 		v = edge[i].v;
-		if (split_nodes.find(v) != split_nodes.end()) { // splited node
-			if (v == sp_v) continue; // already calculated
 
+		if (split_nodes.find(v) != split_nodes.end()) { // splited node
 			sp_v = split_nodes[v];
 
 			// find split edge j
@@ -40,6 +51,7 @@ int find_mincost_tiling(int s, int t, bool* vis) {
 					vis[v] = true;
 				}
 			} else {      // two edges we can only choose one
+				child_edges.remove(j); size --;
 				if (vis[v] or vis[sp_v])
 					mincost += (vis[v])? edge[i].cost : edge[j].cost;
 				else {
@@ -48,7 +60,11 @@ int find_mincost_tiling(int s, int t, bool* vis) {
 					memcpy(vis2, vis, t * sizeof(bool));
 					dis[v] = find_mincost_tiling(v, t, vis1);
 					dis[sp_v] = find_mincost_tiling(sp_v, t, vis2);
-					if (dis[v] + edge[i].cost < dis[sp_v] + edge[j].cost) {
+					int cmp = dis[v] + edge[i].cost - dis[sp_v] - edge[j].cost;
+					if (cmp == 0 && size > 0) {
+						child_edges.push_back(i);
+						child_edges.push_back(j);
+					} else if (cmp <= 0) {
 						mincost += dis[v] + edge[i].cost;
 						memcpy(vis, vis1, t * sizeof(bool));
 						vis[v] = true;
@@ -68,6 +84,7 @@ int find_mincost_tiling(int s, int t, bool* vis) {
 			}
 		}
 	}
+	//print_choices(s, t, vis, mincost);
 	return mincost;
 }
 
