@@ -64,7 +64,7 @@ int find_mincost_tiling(int s, int t, bool* vis) {
 					if (cmp == 0 && size > 0) {
 						child_edges.push_back(i);
 						child_edges.push_back(j);
-					} else if (cmp <= 0) {
+					} else if (cmp < 0) {
 						mincost += dis[v] + edge[i].cost;
 						memcpy(vis, vis1, t * sizeof(bool));
 						vis[v] = true;
