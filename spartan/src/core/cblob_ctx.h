@@ -232,9 +232,8 @@ public:
                                               req, NULL, wait, timeout);
     }
 
-    unsigned long py_update(TileId* tile_id, CSliceIdx* region, std::string* data,
-                        int reducer) {
-        UpdateReq req(*tile_id, *region, *data, reducer);
+    unsigned long py_update(TileId* tile_id, CSliceIdx* region, CTile *data, int reducer) {
+        UpdateReq req(*tile_id, *region, data, reducer);
         return (unsigned long)_py_send<UpdateReq, EmptyMessage>(tile_id->worker, &CWorker::update,
                                                  &spartan::WorkerProxy::async_update,
                                                  req, NULL);

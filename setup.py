@@ -1,15 +1,15 @@
 #!/usr/bin/python
 
 from setuptools import setup, Extension
-from Cython.Build import cythonize
-import os
+#from Cython.Build import cythonize
+#import os
 import subprocess
 
 cmdclass = {}
 from Cython.Distutils import build_ext
 cmdclass['build_ext'] = build_ext
 
-# TODO: support sdist 
+# TODO: support sdist
 #try:
   #from Cython.Distutils import build_ext
   #cmdclass['build_ext'] = build_ext
@@ -31,7 +31,7 @@ cmdclass['build_ext'] = build_ext
   #def run(self):
     #build_cython()
     #sdist.run(self)
-  
+
 #cmdclass['sdist'] = cython_sdist
 
 # FIXME: Should integrate with setuptool
@@ -40,16 +40,15 @@ subprocess.call("cp spartan/src/worker spartan", shell=True)
 subprocess.call("cp spartan/src/libspartan_array.so spartan", shell=True)
 
 base = '.' #os.path.dirname(os.path.realpath(__file__))
-ext_include_dirs = ['/usr/local/include', 
-                    base + '/spartan/src/core',
-                    base + '/spartan/src/array',
+ext_include_dirs = ['/usr/local/include',
+                    base + '/spartan/src',
                     base + '/spartan/src/fastrpc/simple-rpc',
-                    base + '/spartan/src/fastrpc/base-utils', 
-                    base + '/spartan/src/fastrpc/simple-rpc/build',]
+                    base + '/spartan/src/fastrpc/base-utils',
+                    base + '/spartan/src/fastrpc/simple-rpc/build', ]
 ext_link_dirs = ['/usr/lib',
                  base + '/spartan/src/core',
                  base + '/spartan/src/fastrpc/base-utils/build',
-                 base + '/spartan/src/fastrpc/simple-rpc/build',]
+                 base + '/spartan/src/fastrpc/simple-rpc/build', ]
 
 setup(
   name='spartan',
@@ -78,59 +77,67 @@ setup(
     #'parakeet',
   ],
   package_dir={'': '.'},
-  packages=['spartan', 
+  packages=['spartan',
             'spartan.expr',
             'spartan.fastrpc',
             'spartan.array'],
 
   # Our extensions are written by Cython and Python C APIs
-  ext_modules = [
-    # Core extensions, Python APIs part.
+  ext_modules=[
+    # Spartan extensions, Python APIs part.
     Extension('spartan.array._cextent_py_if',
-             ['spartan/src/array/_cextent_py_if.cc'],
-             language='c++',
-             include_dirs = ext_include_dirs,
-             library_dirs = ext_link_dirs,
-             extra_compile_args=["-std=c++0x", "-lspartan_array"],
-             extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"]),
+              ['spartan/src/array/_cextent_py_if.cc'],
+              language='c++',
+              include_dirs=ext_include_dirs,
+              library_dirs=ext_link_dirs,
+              extra_compile_args=["-std=c++0x", "-lspartan_array"],
+              extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"]),
     Extension('spartan.array._ctile_py_if',
-             ['spartan/src/array/_ctile_py_if.cc'],
-             language='c++',
-             include_dirs = ext_include_dirs,
-             library_dirs = ext_link_dirs,
-             extra_compile_args=["-std=c++0x", "-lsparta_array"], 
-             extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"]),
+              ['spartan/src/array/_ctile_py_if.cc'],
+              language='c++',
+              include_dirs=ext_include_dirs,
+              library_dirs=ext_link_dirs,
+              extra_compile_args=["-std=c++0x", "-lsparta_array"],
+              extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"]),
+    Extension('spartan._cblob_ctx_py_if',
+              ['spartan/src/core/_cblob_ctx_py_if.cc'],
+              language='c++',
+              include_dirs=ext_include_dirs,
+              library_dirs=ext_link_dirs,
+              extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc"],
+              extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
+                               "-lbase", "-lpython2.7"]),
+    Extension('spartan.rpc._rpc_array',
+              ['spartan/src/rpc/_rpc_array.cc'],
+              language='c++',
+              include_dirs=ext_include_dirs,
+              library_dirs=ext_link_dirs,
+              extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc"],
+              extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
+                               "-lbase", "-lpython2.7"]),
 
-    # Core extensions, cython part.
-    Extension('spartan.fastrpc.serialization_buffer', 
-             ['spartan/fastrpc/serialization_buffer.pyx']),
-    Extension('spartan.fastrpc.cloudpickle', 
-             ['spartan/fastrpc/cloudpickle.pyx']),
-    Extension('spartan.blob_ctx', 
-             ['spartan/blob_ctx.pyx'], 
-             language='c++',
-             include_dirs = ext_include_dirs,
-             library_dirs = ext_link_dirs,
-             extra_compile_args=["-std=c++0x", "-lsimplerpc"], 
-             extra_link_args=["-std=c++11", "-lsimplerpc", "-lbase", "-lpython2.7"]),
-   Extension('spartan.array.sparse', 
-            ['spartan/array/sparse.pyx'], 
-            language='c++', 
-            extra_compile_args=["-std=c++0x"], 
-            extra_link_args=["-std=c++11"]),
-   Extension('spartan.config', 
-            ['spartan/config.pyx'], 
-            language='c++',
-            include_dirs = ext_include_dirs,
-            library_dirs = ext_link_dirs),
+    # Spartan extensions, cython part.
+    Extension('spartan.fastrpc.serialization_buffer',
+              ['spartan/fastrpc/serialization_buffer.pyx']),
+    Extension('spartan.fastrpc.cloudpickle',
+              ['spartan/fastrpc/cloudpickle.pyx']),
+    Extension('spartan.array.sparse',
+              ['spartan/array/sparse.pyx'],
+              language='c++',
+              extra_compile_args=["-std=c++0x"],
+              extra_link_args=["-std=c++11"]),
+    Extension('spartan.config',
+              ['spartan/config.pyx'],
+              language='c++',
+              include_dirs=ext_include_dirs,
+              library_dirs=ext_link_dirs),
 
-   # Example extensions
-   Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core.pyx']),
-   Extension('spartan.examples.cf.helper', ['spartan/examples/cf/helper.pyx']),
-   Extension('spartan.examples.sklearn.util.graph_shortest_path',
-            ['spartan/examples/sklearn/util/graph_shortest_path.pyx']),
+    # Example extensions
+    Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core.pyx']),
+    Extension('spartan.examples.cf.helper', ['spartan/examples/cf/helper.pyx']),
+    Extension('spartan.examples.sklearn.util.graph_shortest_path',
+              ['spartan/examples/sklearn/util/graph_shortest_path.pyx']),
   ],
 
   cmdclass=cmdclass,
 )
-

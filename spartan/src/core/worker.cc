@@ -121,7 +121,7 @@ void CWorker::initialize(const InitializeReq& req, EmptyMessage* resp) {
 
 void CWorker::get_tile_info(const TileIdMessage& req, TileInfoResp* resp) {
     lock(_blob_lock);
-    std::unordered_map<TileId, CTile>::iterator it = _blobs.find(req.tile_id);
+    std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.tile_id);
     unlock(_blob_lock);
     assert(it != _blobs.end());
     resp->dtype = (it->second).get_dtype();
@@ -140,45 +140,45 @@ void CWorker::destroy(const DestroyReq& req, EmptyMessage* resp) {
     lock(_blob_lock);
     for (auto& tid : req.ids) {
         //Log_debug("destroy tile:%s", tid.to_string().c_str());
-        if (tid.worker == id)
+        if (tid.worker == id) {
+            CTile* tile = _blobs[tid];
             _blobs.erase(tid);
+            delete tile;
+        }
     }
     unlock(_blob_lock);
 }
 
 void CWorker::update(const UpdateReq& req, EmptyMessage* resp) {
     lock(_blob_lock);
-    std::unordered_map<TileId, CTile>::iterator it = _blobs.find(req.id);
+    std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.id);
     unlock(_blob_lock);
     assert(it != _blobs.end());
-    // TODO: update tile data
-    //it->second.update(req.region, req.data, req.reducer);
+    it->second.update(req.region, req.data, req.reducer);
 }
 
 void CWorker::get(const GetReq& req, GetResp* resp) {
     Log_debug("receive get %s[%d:%d:%d]", req.id.to_string().c_str(),
-              req.subslice.get_slice(0).start, req.subslice.get_slice(0).stop, req.subslice.get_slice(0).step);
-    resp->data = "get success! in worker " + std::to_string(id);
+              req.subslice.get_slice(0).start, req.subslice.get_slice(0).stop,
+              req.subslice.get_slice(0).step);
 
     lock(_blob_lock);
-    std::unordered_map<TileId, CTile>::iterator it = _blobs.find(req.id);
+    std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.id);
     unlock(_blob_lock);
     assert(it != _blobs.end());
-    // TODO: get tile data
-    // resp->data = it->second.get(req.subslice);
+    resp->data = it->second->get(req.subslice);
 }
 
 void CWorker::get_flatten(const GetReq& req, GetResp* resp) {
     Log_debug("receive get_flatten %s[%d:%d:%d]", req.id.to_string().c_str(),
-              req.subslice.get_slice[0].start, req.subslice.get_slice[0].stop, req.subslice.get_slice(0).step);
+              req.subslice.get_slice(0).start, req.subslice.get_slice(0).stop,
+              req.subslice.get_slice(0).step);
 
     lock(_blob_lock);
-    std::unordered_map<TileId, CTile>::iterator it = _blobs.find(req.id);
+    std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.id);
     unlock(_blob_lock);
     assert(it != _blobs.end());
-    // TODO: get tile data
-    // resp->data = it->second.get(req.subslice);
-
+    resp->data = it->second->get(req.subslice);
 }
 
 void CWorker::cancel_tile(const TileIdMessage& req, rpc::i8* resp) {

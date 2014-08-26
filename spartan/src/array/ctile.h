@@ -2,6 +2,8 @@
 #define __CTILE_H__
 #include <Python.h>
 #include <numpy/arrayobject.h>
+#include <string>
+#include <vector>
 #include "cslice.h"
 #include "carray.h"
 #include "carray_reducer.h"
@@ -42,8 +44,49 @@ typedef struct CTile_RPC_t {
      * of the whole sparse array. Hence, users need to caculate the 
      * 'dimension' for the three matrices from item_size and size.
      */
-    CArray_RPC array[0];
+     CArray_RPC* array[3];
 } CTile_RPC;
+
+inline CTile_RPC* vector_to_ctile_rpc(std::vector<char*> buffers) {
+    bool is_npy_memmanager= *(bool*)buffers[0];
+
+    if (is_npy_memmanager) {
+        NpyMemManager* mgr; 
+        mgr = (NpyMemManager*)buffers[1];
+        CArray_RPC *rpc = mgr->data;
+        mgr->clear();
+        delete mgr;
+        rpc->array[0] = rpc->array[1] = rpc->array[2] = NULL;
+        for (int i = 2; i < buffers.size(); i += 2) {
+            assert((i + 1) < buffers.size());
+            mgr = (NpyMemManager*)buffers[i];
+            rpc.array[i] = (CArray_RPC*) mgr->data;
+            mgr->clear();
+            delete mgr;
+            rpc.array[i].is_npy_memmanager = true;
+            rpc.array[i].data = buffers[i + 1];
+        }
+    } else {
+        CArray_RPC *rpc = buffers[1];
+        rpc->array[0] = rpc->array[1] = rpc->array[2] = NULL;
+        for (int i = 2; i < buffers.size(); i += 2) {
+            assert((i + 1) < buffers.size());
+            rpc.array[i] = (CArray_RPC*) buffers[i];
+            rpc.array[i].is_npy_memmanager = false;
+            rpc.array[i].data = buffers[i + 1];
+        }
+    }
+    delete (bool*)buffers[0];
+}
+
+inline void release_ctile_rpc(CTile_RPC* rpc)
+{
+    for (int i = 0; i < 3; ++i) {
+        if (rpc->array[i] != NULL)
+            free(rpc->array[i]);
+    } 
+    free(rpc);
+}
 
 /**
  * CTile only initializes data(mask) when necessary. This can reduce 
@@ -54,15 +97,15 @@ class CTile {
 public:
 
     CTile() : nd(0) {};
-    CTile(npy_intp dimensions[], int nd, char dtype, CTILE_TYPE tile_type, CTILE_SPARSE_TYPE sparse_type);
+    CTile(npy_intp dimensions[], int nd, char dtype, 
+          CTILE_TYPE tile_type, CTILE_SPARSE_TYPE sparse_type);
     // This constructor will also set data pointers to rpc.
     // No need to call set_data again.
     CTile(CTile_RPC *rpc);
+    CTile(std::string *s);
     ~CTile();
 
     void initialize(void);
-    CExtent* slice_to_ex(CSliceIdx &idx);
-    bool is_idx_complete(CSliceIdx &idx);
 
     bool set_data(CArray *dense, CArray *mask);
     bool set_data(CArray **sparse);
@@ -73,16 +116,22 @@ public:
     char* get(CSliceIdx &idx); 
     // This won't call Python APIs
     char* to_tile_rpc(CSliceIdx &idx);
+
     // This will call Python APIs
     PyObject* to_npy(void);
 
     // Setter and getter
-    CTILE_TYPE get_type(void) { return type; };
-    CTILE_SPARSE_TYPE get_sparse_type(void) { return sparse_type; };
-    int get_nd(void) { return nd; };
-    npy_intp* get_dimensions(void) { return dimensions; };
-    char get_dtype(void) { return dtype; };
+    CTILE_TYPE get_type(void) { return type; }
+    CTILE_SPARSE_TYPE get_sparse_type(void) { return sparse_type; }
+    int get_nd(void) { return nd; }
+    npy_intp* get_dimensions(void) { return dimensions; }
+    char get_dtype(void) { return dtype; }
+
+    // For RPC marshal
+    friend rpc::Marshal& operator<<(rpc::Marshal&, const CTile&);
 private:
+    CExtent* slice_to_ex(CSliceIdx &idx);
+    bool is_idx_complete(CSliceIdx &idx);
     void reduce(CSliceIdx &idx, CTile &update, REDUCER reducer);
 
     CTILE_TYPE type;
@@ -97,15 +146,55 @@ private:
     CArray *sparse[3]; // COO, CSR, CSC all use three arrays to represent data.
 };
 
-/* We should never have chance to call to here */
-inline rpc::Marshal& operator <<(rpc::Marshal& m, const CTile& o) {
-    assert(false);
+inline rpc::Marshal& operator <<(rpc::Marshal& m, const CTile& o) 
+{
+    m << (int)o.type;
+    m << (int)o.sparse_type;
+    m << o.nd;
+    m.write(o.dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
+    m << o.dtype;
+    m << o.initialized;
+    if (o.initialized) {
+        if (o.type == CTILE_DENSE) {
+            m << *(o.dense);
+        } else if (o.type == CTILE_MASKED) {
+            m << *(o.dense);
+            m << *(o.mask);
+        } else if (o.type == CTILE_SPARSE) {
+            for (int i = 0; i < 3; ++i) {
+                m << *(o.sparse[i]);
+            }
+        }
+    }
     return m;
 }
 
-/* We should never have chance to call to here */
-inline rpc::Marshal& operator >>(rpc::Marshal&m, CTile& o) {
-    assert(false);
+inline rpc::Marshal& operator >>(rpc::Marshal&m, CTile& o) 
+{
+    m >> (int)o.type;
+    m >> (int)o.sparse_type;
+    m >> o.nd;
+    m.read(o.dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
+    m >> o.dtype;
+    m >> o.initialized;
+    if (o.initialized) {
+        if (o.type == CTILE_DENSE) {
+            o.dense = new CArray();
+            m >> *(o.dense);
+        } else if (o.type == CTILE_MASKED) {
+            o.dense = new CArray();
+            m >> *(o.dense);
+            o.mask = new CArray();
+            m >> *(o.mask);
+        } else if (o.type == CTILE_SPARSE) {
+            for (int i = 0; i < 3; ++i) {
+                o.sparse[i] = new CArray();
+                m >> *(o.sparse[i]);
+            }
+        }
+    }
+
     return m;
 }
-#endif
+
+zsh:1: command not found: k1G

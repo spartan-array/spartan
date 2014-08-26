@@ -4,6 +4,8 @@
 #define NO_IMPORT_ARRAY
 #include <numpy/arrayobject.h>
 #include <iostream>
+#include <string>
+#include <vector>
 #include "ctile.h"
 #include "carray_reducer.h"
 
@@ -45,27 +47,20 @@ CTile::CTile(CTile_RPC *rpc)
         return;
     }
 
-    CArray_RPC *data;
     if (type != CTILE_SPARSE) {
         for (int i = 0; i < 3; i++) {
             sparse[i] = NULL;
         }
-        data = rpc->array;
-        NpyMemManager *dense_source = new NpyMemManager((char*)rpc);
-        dense = new CArray(data, dense_source);
+        dense = new CArray(rpc->array[0]);
         if (type == CTILE_MASKED) {
-            NEXT_CARRAY_RPC(data, data->size, data);
-            NpyMemManager *mask_source = new NpyMemManager((char*)rpc);
-            mask = new CArray(data, mask_source);
+            mask = new CArray(rpc->array[1]);
         } else {
             mask = NULL;
         }
     } else {
         dense = mask = NULL;
-        data = rpc->array;
         for (int i = 0; i < 3; i++) {
-            NpyMemManager *sparse_source = new NpyMemManager((char*)rpc);
-            sparse[i] = new CArray(data, sparse_source);
+            sparse[i] = new CArray(rpc->array[i]);
         }
     }
 }
@@ -79,7 +74,6 @@ CTile::~CTile()
     }
 }
 
-bool
 CTile::set_data(CArray *dense, CArray *mask)
 {
     if (initialized || type == CTILE_MASKED) {
@@ -209,87 +203,53 @@ CTile::update(CSliceIdx &idx, CTile &update_data, npy_intp reducer)
     }
 }
 
-char*
+std::vector <char*>
 CTile::get(CSliceIdx &idx)
 {
     return to_tile_rpc(idx);
 }
 
-char*
+std::vector <char*>
 CTile::to_tile_rpc(CSliceIdx &idx)
 {
     std::cout << __func__ << std::endl;
+    std::vector<char*> dest;
 
     CExtent *ex = slice_to_ex(idx);
-    CTile_RPC rpc;
+    dest.push((char*)(new bool(true)));
+    CTile_RPC *rpc = (CTile_RPC*) malloc(sizeof(CTile_RPC));
 
-    rpc.type = type;
-    rpc.sparse_type = sparse_type;
-    rpc.initialized = initialized;
-    rpc.nd = nd;
-    rpc.item_type = dtype;
+    rpc->type = type;
+    rpc->sparse_type = sparse_type;
+    rpc->initialized = initialized;
+    rpc->nd = nd;
+    rpc->item_type = dtype;
     memcpy(rpc.dimensions, dimensions, sizeof(npy_int64) * NPY_MAXDIMS);
+    dest.push((char*)(new NpyMemManager(rpc, rpc, false, sizeof(CTILE_RPC));
 
     std::cout << __func__ << " A " << std::endl;
-    CTile_RPC *base; 
     npy_intp size = sizeof(CTile_RPC);
-    if (!initialized) {
-        std::cout << __func__ << " B " << std::endl;
-        rpc.initialized = 0;
-        base = (CTile_RPC*) malloc(sizeof(CTile_RPC) + sizeof(CArray_RPC));
-        assert(base != NULL);
-        memcpy(base, &rpc, sizeof(CTile_RPC));
-        return (char*)base;
-    } else if (type != CTILE_SPARSE) {
+    if (initialized && type != CTILE_SPARSE) {
         std::cout << __func__ << " C " << std::endl;
-        CArray_RPC *data;
         npy_intp dense_size = ex->size * dense->get_type_size();
 
-        std::cout << __func__ << " D " << std::endl;
-        if (type == CTILE_DENSE) {
-            size += dense_size + sizeof(CArray_RPC);
-        } else {
-            npy_intp mask_size = ex->size * mask->get_type_size();
-            size += dense_size + mask_size + sizeof(CArray_RPC) * 2;
-        }
-        std::cout << __func__ << " E = " <<  size << " " << dense_size << std::endl;
-        base = (CTile_RPC*) malloc(size);
-        std::cout << "base = " << base << " array = " << base->array << " data = " << (void*)base->array[0].data << std::endl;
-        assert(base != NULL);
-        memcpy(base, &rpc, sizeof(CTile_RPC));
-        std::cout << __func__ << " F " << std::endl;
-
-        if (type == CTILE_DENSE) {
-            data = base->array;
-            dense->to_carray_rpc(data, ex);
-            base->count = 1;
-        } else {
-            data = base->array;
-            dense->to_carray_rpc(data, ex);
-            NEXT_CARRAY_RPC(data, dense_size, data);
-            mask->to_carray_rpc(data, ex);
-            base->count = 2;
+        std::vector v = dense->to_carray_rpc(ex);
+        dest.insert(dest.end(), v.begin(), v.end());
+        rpc->count = 1;
+        if (type == CTILE_MASKED) {
+            std::vector v = dense->to_carray_rpc(ex);
+            dest.insert(dest.end(), v.begin(), v.end());
+            rpc->count = 2;
         }
         std::cout << __func__ << " G " << std::endl;
 
-        return (char*)base;
-    } else {
+    } else if (initialized && type == CTILE_SPARSE) {
         if (is_idx_complete(idx)) {
-            CArray_RPC *data;
-
-            size += sparse[0]->get_size() * 2 + sparse[2]->get_size() +
-                    sizeof(CArray_RPC) * 3;
-            base = (CTile_RPC*) malloc(size);
-            assert(base != NULL);
-            memcpy(base, &rpc, sizeof(CTile_RPC));
-
-            base->count = 3;
-            data = base->array;
+            rpc->count = 3;
             for (int i = 0; i < 3; i++) {
-                sparse[i]->to_carray_rpc(data, ex);
-                NEXT_CARRAY_RPC(data, sparse[i]->get_size(), data);
+                std::vector v = sparse[i]->to_carray_rpc(ex);
+                dest.insert(dest.end(), v.begin(), v.end());
             }
-            return (char*)base;
         } else {
             /* TODO: Sparse Slicing ..... */
             assert(0);
@@ -297,34 +257,8 @@ CTile::to_tile_rpc(CSliceIdx &idx)
             return NULL;
         }
     }
+    return dest;
 }
-
-//PyObject* _tile_rpc_to_pyobject(CTile_RPC *rpc, CArray_RPC *data, npy_intp *dims, int nd)
-//{
-    //int type_num, type_size;
-    //npy_intp strides[NPY_MAXDIMS];
-    //PyObject *array;
-
-    //type_num = npy_type_token_to_number((char)rpc->type);
-    //type_size = npy_type_token_to_size((char)rpc->type);
-    //for (i = nd - 1; i >= 0; i--) {
-        //if (i == nd - 1) {
-            //strides[i] = type_size;
-        //} else {
-            //stride[i] = stride[i + 1] * dims[i + 1];
-        //}
-    //}
-    //array = PyArray_New(NULL, rpc->nd, dims, type_num, strides, 
-                        //data->data, 0, NPY_ARRAY_ALIGNED, NULL);
-
-    //NpyMemManager *manager = new NpyMemManager((char*)rpc);
-    //assert(manager == NULL);
-    //PyObject *capsule = PyCapsule_New(manager, _CAPSULE_NAME, _capsule_destructor);
-    //assert(capsule);
-    //assert(PyArray_SetBaseObject(azrray, capsule) == 0);
-
-    //return array;
-//}
 
 PyObject*
 CTile::to_npy(void)
@@ -427,3 +361,73 @@ CTile::to_npy(void)
     }
 }
 
+static long long 
+get_longlong(PyObject *o) {
+    if (PyNumber_Check(o)) {
+        PyObject *_long;
+        long long ret;
+
+        _long = PyNumber_Long(o);
+        ret = PyLong_AsLongLong(_long);
+        Py_DECREF(_long);
+        return ret;
+    } else {
+        assert(0);
+    }
+    return 0;
+}
+
+static CTile*
+ctile_creator(PyObject *args)
+{
+    PyObject *shape, *data;
+    const char* dtype;
+    unsigned long &tile_type, &sparse_type;
+
+    if (!PyArg_ParseTuple(args, "OskkO", &shape, &dtype, &tile_type, &sparse_type, &data))
+        return NULL;
+
+    int nd = PyTuple_Size(shape);
+    npy_intp dimensions[NPY_MAXDIMS];
+    for (int i = 0; i < nd; i++) {
+        dimensions[i] = (npy_intp)get_longlong(PyTuple_GetItem(shape, i));
+    }
+
+    CTile *tile = new CTile(dimensions, nd, dtype[0], tile_type, sparse_type);
+    if (tile == NULL)
+        return NULL;
+
+    if (data != Py_None) {
+        assert(PyTuple_Check(data) != 0);
+        if (tile_type != CTILE_SPARSE) {
+            PyArrayObject *dense = (PyArrayObject*)PyTuple_GetItem(data, 0);
+            std::cout << __func__ << "2.1" << std::endl;
+            CArray *dense_array = new CArray(dense->dimensions, dense->nd,
+                                             dense->descr->type, dense->data,
+                                             dense);
+            std::cout << __func__ << "2.2" << std::endl;
+            CArray *mask_array = NULL;
+            if (tile_type == CTILE_MASKED) {
+                PyArrayObject *mask = (PyArrayObject*)PyTuple_GetItem(data, 1);
+                mask_array = new CArray(mask->dimensions, mask->nd,
+                                        mask->descr->type, mask->data,
+                                        mask);
+                std::cout << __func__ << "2.3" << std::endl;
+            }
+            std::cout << __func__ << "2.4" << std::endl;
+            tile->set_data(dense_array, mask_array);
+            std::cout << __func__ << "2.5" << std::endl;
+        } else {
+            CArray *sparse_array[3];
+            for (int i = 0; i < 3; i++) {
+                PyArrayObject *sparse = (PyArrayObject*)PyTuple_GetItem(data, i);
+                sparse_array[i] = new CArray(sparse->dimensions, sparse->nd,
+                                             sparse->descr->type, sparse->data,
+                                             sparse);
+            }
+            tile->set_data(sparse_array);
+        }
+    }
+
+    return tile;
+}

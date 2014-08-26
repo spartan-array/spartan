@@ -4,6 +4,7 @@
 #include <numpy/arrayobject.h>
 #include <iostream>
 #include "cextent.h"
+#include "rpc/marshal.h"
 
 extern int npy_type_size[]; 
 extern int npy_type_number[];
@@ -38,50 +39,78 @@ npy_type_token_to_number(char token)
 }
 
 #include <map>
+/**
+ * TODO: Is this class has to be locked ?
+ */
 class NpyMemManager {
 public:
-    NpyMemManager(void) : ptr(NULL), own_by_npy(false) {};
-    NpyMemManager(char* ptr, bool own_by_npy = false) {
+    NpyMemManager(void) : ptr(NULL), data(NULL), own_by_npy(false) , size(0){};
+    NpyMemManager(char* source, char *data, bool own_by_npy, unsigned long size) {
         std::map<char*, int>::iterator it;
 
-        this->ptr = ptr;
+        this->source = source;
+        this->data = data;
         this->own_by_npy = own_by_npy;
-        if ((it = NpyMemManager::refcount.find(ptr)) == NpyMemManager::refcount.end()) {
-            refcount[ptr] = 1; 
+        this->size = size;
+        if ((it = NpyMemManager::refcount.find(source)) == NpyMemManager::refcount.end()) {
+            refcount[source] = 1; 
             if (own_by_npy) {
-                Py_INCREF(ptr);
+                Py_INCREF(source);
             }
         } else {
             it->second += 1;
         }
     };
+
+    NpyMemManager(const NpyMemManager& mgr) {
+        source = mgr.source;
+        data = mgr.data;
+        own_by_npy = mgr.own_by_npy;
+        size = mgr.size;
+        refcount[source] += 1;
+    }
+
     ~NpyMemManager(void) {
-        int count = refcount[ptr]; 
-        if (count == 1) {
-            std::cout << "Now we are deleteing a data region " << own_by_npy << std::endl;
-            refcount.erase(ptr);
-            if (own_by_npy) {
-                Py_DECREF(ptr);
+        if ((it = NpyMemManager::refcount.find(source)) != NpyMemManager::refcount.end()) {
+            if (it->second == 1) {
+                refcount.erase(source);
+                if (own_by_npy) {
+                    Py_DECREF(source);
+                } else {
+                    delete source;
+                }
             } else {
-                delete ptr;
+                it->second -= 1;
             }
-            std::cout << "Now we are done" << std::endl;
-        } else {
-            refcount[ptr] -= 1;
         }
     };
-    NpyMemManager operator=(const NpyMemManager& obj) {
-        if (this != &obj) {
-            this->ptr = obj.ptr;
-            this->own_by_npy = obj.own_by_npy;
-            refcount[this->ptr] += 1;
+
+    // A danger function which should only be used when you actually know what this is for.
+    void clear(char *source) {
+        if ((it = NpyMemManager::refcount.find(source)) != NpyMemManager::refcount.end()) {
+            refcount.erase(source);
         }
-       return *this;
-    };
-private:
-    static std::map<char*, int> refcount;
-    char* ptr;
+    }
+    //NpyMemManager& operator=(const NpyMemManager& obj) {
+        //if (this != &obj) {
+            //source = obj.source;
+            //data = obj.data;
+            //own_by_npy = obj.own_by_npy;
+            //size = size;
+            //refcount[source] += 1;
+        //}
+       //return *this;
+    //};
+
+    char* get_source() { return source; };
+    char* get_data() { return data; };
+    unsigned long size;
     bool own_by_npy;
+private:
+    NpyMemManager& operator=(const NpyMemManager& obj) = delete;
+    static std::map<char*, int> refcount;
+    char* source;
+    char* data;
 };
 
 typedef struct CArray_RPC_t {
@@ -90,7 +119,8 @@ typedef struct CArray_RPC_t {
     npy_int64 size; 
     npy_int32 nd;
     npy_intp dimensions[NPY_MAXDIMS];
-    char data[0];
+    bool is_npy_memmanager;
+    char *data;
 } CArray_RPC;
 
 class CArray {
@@ -98,22 +128,24 @@ public:
     CArray(void) : nd(0), type(NPY_INTLTR), type_size(sizeof(npy_int)) {};
     // For this constructor, CArray owns the data and will delete it in the destructor.
     CArray(npy_intp dimensions[], int nd, char type);
-    // For this constructor, CArray doesn't owns the data won't delete it, only Py_INCREF 
-    // or Py_DECREF the source.
+    // For this constructor, CArray owns the data and will delete it in the destructor.
+    CArray(npy_intp dimensions[], int nd, char type, char *buffer);
+    // For this constructor, CArray doesn't owns the data and won't delete it, only 
+    // Py_INCREF or Py_DECREF the source.
     CArray(npy_intp dimensions[], int nd, char type, char *data, PyArrayObject *source);
     // For this constructor, CArray uses the data and owns the source and will delete
     // it in the destructor. Note that source is a NpyMemManager. This means that it's
     // possible that many objects own the same source. NpyMemManager delete only delete
     // the real data when the reference count is 0.
     CArray(npy_intp dimensions[], int nd, char type, char *data, NpyMemManager *source);
-    // The same as previous one except the source is from RPC 
-    CArray(CArray_RPC *rpc, NpyMemManager *source);
+    // The source is from RPC and the ownership is passed to this CArray
+    CArray(CArray_RPC *rpc);
     ~CArray();
 
     void copy(char *dest, CExtent *ex); /* dest = this[ex] */
 
     // This won't call Python APIs
-    void to_carray_rpc(CArray_RPC *rpc, CExtent *ex);
+    std::vector <char*> CArray::to_carray_rpc(CExtent *ex);
     // This will call Python APIs
     PyObject* to_npy(void);
 
@@ -125,6 +157,10 @@ public:
     npy_intp get_size(void) { return size; };
     char get_type(void) { return type; };
     int get_type_size(void) { return type_size; };
+
+    // For RPC marshal
+    friend rpc::Marshal& operator <<(rpc::Marshal&, const CArray&);
+    friend rpc::Marshal& operator >>(rpc::Marshal&, CArray& o) ;
 
 private:
     void init(npy_intp dimensions[], int nd, char type);
@@ -140,5 +176,35 @@ private:
 };
 
 
+inline rpc::Marshal& operator <<(rpc::Marshal& m, const CArray& o) 
+{
+    npy_intp dimensions[NPY_MAXDIMS];
+    int nd;
+    char type;
+
+    m << o.nd;
+    m << o.type;
+    m.write(dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
+    m.write(o.data, o.size);
+    return m;
+}
+
+inline rpc::Marshal& operator >>(rpc::Marshal&m, CArray& o) 
+{
+    npy_intp dimensions[NPY_MAXDIMS];
+    int nd;
+    char type;
+
+    m >> nd;
+    m >> type;
+    m.read(dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
+    o.init(dimensions, nd, type);
+    o.data = (char*) malloc(o.size);
+    assert(o.data != NULL);
+    o.data_source = new NpyMemManager(o.data);
+    assert(m.content_size() == o.size);
+    m.read(o.data, o.size);
+    return m;
+}
 
 #endif

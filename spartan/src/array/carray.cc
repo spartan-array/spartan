@@ -43,37 +43,44 @@ std::map<char*, int> NpyMemManager::refcount;
 
 CArray::CArray(npy_intp dimensions[], int nd, char type)
 {
-    std::cout << __func__ << 'A' << ' ' << (unsigned)type << ' ' << (char)type << std::endl;
     init(dimensions, nd, type);
     data = (char*) malloc(size);
-    std::cout << __func__ << 'A' << ' ' << (void*)data << std::endl;
     assert(this->data != NULL);
     memset(data, 0, size);
-    data_source = new NpyMemManager(data);
+    data_source = new NpyMemManager(data, data, false, size);
+}
+
+CArray::CArray(npy_intp dimensions[], int nd, char type, char *buffer)
+{
+    init(dimensions, nd, type);
+    data = buffer;
+    data_source = new NpyMemManager(data, data, false, size);
 }
 
 CArray::CArray(npy_intp dimensions[], int nd, char type, char *data, PyArrayObject *source)
 {
-    std::cout << __func__ << 'B' << ' ' << (unsigned)type << ' ' << (char)type << std::endl;
     init(dimensions, nd, type);
     this->data = data;
-    data_source = new NpyMemManager((char*)source, true);
+    data_source = new NpyMemManager((char*)source, data, true, size);
 }
 
 CArray::CArray(npy_intp dimensions[], int nd, char type, char *data, NpyMemManager *source)
 {
-    std::cout << __func__ << 'C' << ' ' << (unsigned)type << ' ' << (char)type << std::endl;
     init(dimensions, nd, type);
     this->data = data;
     data_source = source;
 }
 
-CArray::CArray(CArray_RPC *rpc, NpyMemManager *source)
+CArray::CArray(CArray_RPC *rpc)
 {
-    std::cout << __func__ << 'D' << ' ' << (unsigned)type << ' ' << std::endl;
     init(rpc->dimensions, (int)rpc->nd, (char)rpc->item_type);
-    data = rpc->data;
-    data_source = source;
+    if (rpc->is_npy_memmanager) { 
+        data_source = (NpyMemManager*)(rpc->data);
+        data = data_source->data; 
+    } else {
+        data = rpc->data;
+        data_source = new NpyMemManager(data, data, false, size);
+    }
 }
 
 CArray::~CArray()
@@ -106,9 +113,8 @@ CArray::init(npy_intp dimensions[], int nd, char type)
 }
 
 
-/* dest = this[ex] */
-void
-CArray::copy(char *dest, CExtent *ex)
+int
+CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
 {
     bool full = true;
     int i;
@@ -123,8 +129,8 @@ CArray::copy(char *dest, CExtent *ex)
     std::cout << __func__ << " " << full << " " << (void*)dest << " " << (void*)data << std::endl;
 
     if (full) { /* Special case, no slice */
-        std::cout << "copy " << size << std::endl;
-        memcpy(dest, data, size);
+        *dest = new NpyMemManager(data_source);
+        return size;
     } else {
         npy_intp continous_size, all_size;
         int i, last_sliced_dim;
@@ -155,10 +161,13 @@ CArray::copy(char *dest, CExtent *ex)
         }
         all_size = ex->size * type_size; 
 
-        char *source_data = this->data;
+        char *source_data = data;
+        char *buf = malloc(all_size);
+        assert(buf != NULL);
+        *dest = new NpyMemManager(buf, buf, false, all_size); 
         do {
             curr_pos = ravelled_pos(curr_idx, ex->array_shape, nd);
-            memcpy(dest, source_data + curr_pos, continous_size);
+            memcpy(buf, source_data + curr_pos, continous_size);
 
             for (i = last_sliced_dim; i >= 0; i--) {
                 curr_idx[i] += 1;
@@ -167,7 +176,7 @@ CArray::copy(char *dest, CExtent *ex)
                 }
                 curr_idx[i] = ex->ul[i];
             }
-            dest += continous_size;
+            buf += continous_size;
             all_size -= continous_size;
         } while(all_size > 0);
     }
@@ -209,18 +218,28 @@ CArray::to_npy(void)
     return (PyObject*)array;
 }
 
-void
-CArray::to_carray_rpc(CArray_RPC *rpc, CExtent *ex)
+std::vector <char*>
+CArray::to_carray_rpc(CExtent *ex)
 {
+    std::vector <char*> dest;
     std::cout << __func__ << type_size << " " << type << " " << nd <<std::endl;
+    CArray_RPC *rpc = malloc(sizeof(CArray_RPC));
+    dest.push((char*)(new NpyMemManager(rpc, rpc, false, sizeof(CArray_RPC))));
+
     rpc->item_size = type_size;
     rpc->item_type = type;
     rpc->size = size;
     rpc->nd = nd;
+    rpc->is_npy_memmanager = true;
     for (int i = 0; i < nd; ++i) {
         rpc->dimensions[i] = dimensions[i];    
     }
-    copy(rpc->data, ex);
+    if (copy_slice(ex, (NpyMemManager**)(&(rpc->data))) != size) {
+        assert(false);
+    }
+    dest.push(rpc->data);
+
+    return dest;
 }
 
 // This is the entry when loading the shared library

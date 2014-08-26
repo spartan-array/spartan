@@ -5,6 +5,7 @@
 #include <numpy/arrayobject.h>
 #include <iostream>
 #include "ctile.h"
+#include "_ctile_py_if.h"
 
 #define RETURN_IF_ERROR(expr) \
 do {\
@@ -30,11 +31,6 @@ do {\
         return val; \
     } \
 } while (0) 
-
-typedef struct {
-    PyObject_HEAD
-    CTile *c_tile;
-} TileBase;
 
 static bool 
 is_integer(PyObject *o) {
@@ -145,10 +141,25 @@ TileBase__update(PyObject* o, PyObject* args)
 {
     TileBase *self = (TileBase*)o;
     PyObject *slice, *data, *tile_type, *sparse_type, *reducer;
+    PyObject *kargs;
+    //char *klist=["private_id"];
 
     std::cout << __func__ << std::endl;
+    //if (!PyArg_ParseTupleAndKeywords(args, &kargs, "OOOOO", klist, &slice, &tile_type, &sparse_type, &data, &reducer))
     if (!PyArg_ParseTuple(args, "OOOOO", &slice, &tile_type, &sparse_type, &data, &reducer))
         return NULL;
+
+    //if (kargs != Py_None) {
+        //PyObject *pid = PyDict_GetItemString(kargs, "private_id");
+        //if (PyInt_Check(pid))
+            //self->c_tile = (CTile*) PyInt_AsLong(pid);
+        //else if(PyLong_Check(pid))
+            //self->c_tile = (CTile*) PyLong_AsLongLong(pid);
+        //else
+            //assert(0);
+        //Py_INCREF(o);
+        //return o;
+    //}
 
     CSliceIdx cslice_idx(slice, self->c_tile->get_nd(), self->c_tile->get_dimensions());
     CTILE_TYPE ttype = (CTILE_TYPE)get_longlong(tile_type);
@@ -196,62 +207,12 @@ TileBase__update(PyObject* o, PyObject* args)
 }
 
 static int 
-TileBase_init(PyObject *o, PyObject *args, PyObject *kwds)
+TileBase_init(PyObject *o, PyObject *args)
 {
     TileBase *self = (TileBase*)o;
-    PyObject *shape, *dtype_obj, *tile_type, *sparse_type, *data;
-
-    std::cout << __func__ << " " << (void*) o << std::endl;
-    if (!PyArg_ParseTuple(args, "OOOOO", &shape, &dtype_obj, &tile_type, &sparse_type, &data))
+    self->tile = ctile_creator(args);
+    if (self->tile == NULL)
         return -1;
-    
-    int nd = PyTuple_Size(shape);
-    npy_intp dimensions[NPY_MAXDIMS];
-    char *dtype;
-    for (int i = 0; i < nd; i++) {
-        dimensions[i] = (npy_intp)get_longlong(PyTuple_GetItem(shape, i));
-    }
-    std::cout << __func__ << "0" << std::endl;
-    dtype = PyString_AsString(dtype_obj);
-    CTILE_TYPE ttype = (CTILE_TYPE)get_longlong(tile_type);
-    CTILE_SPARSE_TYPE stype = (CTILE_SPARSE_TYPE)get_longlong(sparse_type);
-
-    std::cout << __func__ << "1" << std::endl;
-    CTile *tile = new CTile(dimensions, nd, dtype[0], ttype, stype);
-    std::cout << __func__ << "2" << std::endl;
-    if (data != Py_None) {
-        assert(PyTuple_Check(data) != 0);
-        if (ttype != CTILE_SPARSE) {
-            PyArrayObject *dense = (PyArrayObject*)PyTuple_GetItem(data, 0);
-            std::cout << __func__ << "2.1" << std::endl;
-            CArray *dense_array = new CArray(dense->dimensions, dense->nd,
-                                             dense->descr->type, dense->data,
-                                             dense);
-            std::cout << __func__ << "2.2" << std::endl;
-            CArray *mask_array = NULL;
-            if (ttype == CTILE_MASKED) {
-                PyArrayObject *mask = (PyArrayObject*)PyTuple_GetItem(data, 1);
-                mask_array = new CArray(mask->dimensions, mask->nd,
-                                        mask->descr->type, mask->data,
-                                        mask);
-                std::cout << __func__ << "2.3" << std::endl;
-            }
-            std::cout << __func__ << "2.4" << std::endl;
-            tile->set_data(dense_array, mask_array);
-            std::cout << __func__ << "2.5" << std::endl;
-        } else {
-            CArray *sparse_array[3];
-            for (int i = 0; i < 3; i++) {
-                PyArrayObject *sparse = (PyArrayObject*)PyTuple_GetItem(data, i);
-                sparse_array[i] = new CArray(sparse->dimensions, sparse->nd,
-                                             sparse->descr->type, sparse->data,
-                                             sparse);
-            }
-            tile->set_data(sparse_array);
-        }
-    }
-    std::cout << __func__ << "3" << std::endl;
-    self->c_tile = tile;
     return 0;
 }
 

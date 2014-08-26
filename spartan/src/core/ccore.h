@@ -226,23 +226,51 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, GetReq& o) {
  */
 struct GetResp {
     TileId id;
-    std::string& data;
-    std::string new_data;
+    std::vector<char*> data;
+    bool own_data;
 
-    GetResp(const TileId& i, std::string& d): id(i), data(d) {}
+    GetResp(const TileId& i, std::vector& d): id(i), data(d) {}
     GetResp(std::string& d): data(d) {}
-    GetResp(): data(new_data) {}
+    GetResp(): own_data(false) {}
+    ~GetResp(): {
+        if (own_data) {
+            delete (bool*)data[0];
+            int size = data.size();
+            for (int i = 1; i < size; ++i) {
+               delete (NpyMemManager*)data[i];
+            }
+        }
+    }
 };
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const GetResp& o) {
+    o.own_data = true;
     m << o.id;
-    m << o.data;
+    int size = o.data.size();
+    m << size - 1;
+    for (int i = 0; i < size; ++i) {
+        NpyMemManager *mgr;
+        mgr = (NpyMemManager*)(o.data[i]);
+        m << mgr->size;
+        m.write(mgr->data, mgr->size);
+    }
     return m;
 }
 
 inline rpc::Marshal& operator >>(rpc::Marshal& m, GetResp& o) {
+    o.own_data = false;
     m >> o.id;
-    m >> o.data;
+    o.data.push((char*)(new bool(false)));
+    int size;
+    m >> size;
+    for (int i = 0; i < size; ++i) {
+        unsigned long data_size;
+        m >> data_size;
+        char *buf = malloc(data_size);
+        assert(buf != NULL);
+        m.read(buf, data_size);
+        o.data.push(buf);
+    }
     return m;
 }
 
@@ -275,12 +303,13 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, DestroyReq& o) {
 struct UpdateReq {
     TileId id;
     CSliceIdx region;
-    std::string& data;
-    std::string new_data;
-    int32_t reducer;
+    CTile *data;
+    unsigned long reducer;
 
-    UpdateReq(const TileId& i, const CSliceIdx& r, std::string& d, int32_t red): id(i), region(r), data(d), reducer(red) {}
-    UpdateReq(): data(new_data) {}
+    UpdateReq(const TileId& i, const CSliceIdx& r, CTile *d, unsigned long red)
+              : id(i), region(r), data(d), reducer(red) {}
+    UpdateReq() : data(new_data) {}
+    ~UpdateReq() {delete data;}
 };
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const UpdateReq& o) {
@@ -293,9 +322,9 @@ inline rpc::Marshal& operator <<(rpc::Marshal& m, const UpdateReq& o) {
 
 inline rpc::Marshal& operator >>(rpc::Marshal& m, UpdateReq& o) {
     m >> o.id;
-    m << o.region;
-    m << o.data;
-    m << o.reducer;
+    m >> o.region;
+    m >> o.data;
+    m >> o.reducer;
     return m;
 }
 
@@ -353,20 +382,21 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, RunKernelResp& o) {
  */
 struct CreateTileReq {
     TileId tile_id;
-    CTile data;
+    CTile *data;
     CreateTileReq(const TileId& tid, const CTile& d): tile_id(tid), data(d) {}
     CreateTileReq() {}
 };
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const CreateTileReq& o) {
     m << o.tile_id;
-    m << o.data;
+    m << *(o.data);
     return m;
 }
 
 inline rpc::Marshal& operator >>(rpc::Marshal& m, CreateTileReq& o) {
     m >> o.tile_id;
-    m >> o.data;
+    o.data = new CTile();
+    m >> *(o.data);
     return m;
 }
 
