@@ -281,7 +281,10 @@ def compute_slice(TileExtent base, idx):
       ul[i] = base.ul[i]
       lr[i] = base.lr[i]
     else:
-      start, stop, step = idx[i].indices(base.shape[i])
+      axis_idx = idx[i]
+      if np.isscalar(axis_idx):
+        axis_idx = slice(axis_idx, axis_idx + 1)
+      start, stop, step = axis_idx.indices(base.shape[i])
       ul[i] = base.ul[i] + start
       lr[i] = base.ul[i] + stop
   

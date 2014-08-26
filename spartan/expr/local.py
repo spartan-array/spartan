@@ -122,6 +122,17 @@ class LocalMapExpr(FnCallExpr):
 class LocalMapLocationExpr(LocalMapExpr):
   _op_type = 'map_location'
 
+  def evaluate(self, ctx):
+    deps = []
+    for d in self.deps:
+      if isinstance(d, LocalInput) and d.idx == 'extent':
+        deps.append(d.evaluate(ctx).to_tuple())
+      else:
+        deps.append(d.evaluate(ctx))
+
+    #util.log_info('Evaluating %s.%d [%s]', self.fn_name(), self.id, deps)
+    return self.fn(*deps, **self.kw)
+
 class LocalReduceExpr(FnCallExpr):
   _op_type = 'reduce'
 

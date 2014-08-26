@@ -8,20 +8,26 @@ from ..array import extent
 from .region_map import region_map
 
 
-def _assign_mapper(tile, ex, start, value):
+def _assign_mapper(tile, ex, assign_region, value):
   '''Helper function for assign.'''
-  if np.isscalar(value) or isinstance(value, np.ndarray):
+  if np.isscalar(value):
     return value
 
-  value_ul = [0] * min(len(ex.shape), len(value.shape))
-  value_lr = [0] * len(value_ul)
-  offset = max(len(ex.shape) - len(value.shape), 0)
-  for i in range(len(value_ul)):
-    value_ul[i] = max(ex.ul[i + offset] - start[i + offset], 0)
-    value_lr[i] = min(ex.lr[i + offset], value.shape[i])
-
-  return value.fetch(extent.create(value_ul, value_lr, value.shape))
-
+  intersection = extent.intersection(assign_region, ex)
+  value_slice = extent.offset_slice(assign_region, intersection)
+  region_shape = assign_region.shape
+  if len(region_shape) != len(value.shape):
+    j = -1
+    s = []
+    for axis_shape in value.shape:
+      j = region_shape.index(axis_shape, j + 1)
+      s.append(value_slice[j])
+    value_slice = tuple(s)
+ 
+  if isinstance(value, np.ndarray):
+    return value[value_slice]
+  
+  return value.fetch(extent.from_slice(value_slice, value.shape))
 
 def assign(a, idx, value):
   '''Assigns ``value`` to a[index].
@@ -38,6 +44,6 @@ def assign(a, idx, value):
       idx = slice(idx, idx + 1)
     region = extent.from_slice(idx, a.shape)
 
-  return region_map(a, region, _assign_mapper, {'start': region.ul,
+  return region_map(a, region, _assign_mapper, {'assign_region': region,
                                                 'value': value})
 

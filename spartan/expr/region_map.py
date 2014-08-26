@@ -37,7 +37,7 @@ def _region_mapper(tile, ex, region, user_fn, fn_kw=None):
       result[subslice] = user_fn(result[subslice], ex, **fn_kw)
       return result
 
-  return None
+  return tile
 
 
 def region_map(array, region, fn, fn_kw=None):

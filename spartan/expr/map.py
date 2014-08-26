@@ -52,7 +52,7 @@ def get_local_values(ex, children, child_to_var):
   return local_values
 
 
-def tile_mapper(ex, children, child_to_var, op, source_array=None):
+def tile_mapper(ex, children, child_to_var, op):
   '''
   Run for each tile of a `Map` operation.
   
@@ -64,8 +64,7 @@ def tile_mapper(ex, children, child_to_var, op, source_array=None):
   :param op: `LocalExpr` to evaluate.
   '''
   local_values = get_local_values(ex, children, child_to_var)
-  if isinstance(op, LocalMapLocationExpr):
-    local_values['extent'] = ex.to_tuple()
+  local_values['extent'] = ex
 
   #util.log_info('MapTiles: %s', op)
   #util.log_info('Fetching %d inputs', len(children))
@@ -81,8 +80,8 @@ def tile_mapper(ex, children, child_to_var, op, source_array=None):
   #util.log_info('Inputs: %s', local_values)
   result = op.evaluate(op_ctx)
 
-  if result is None:
-    return LocalKernelResult(result=[(ex, source_array.tiles[ex])])
+  if id(result) == id(local_values[child_to_var[0]]):
+    return LocalKernelResult(result=[(ex, children[0].tiles[ex])])
 
   #util.log_info('Result: %s', result)
   Assert.eq(ex.shape, result.shape,
@@ -137,7 +136,6 @@ class MapExpr(Expr):
         output_shape[i] = max(output_shape[i], v)
     return tuple([output_shape[i] for i in range(len(output_shape))])
 
-
   def _evaluate(self, ctx, deps):
     children = deps['children']
     child_to_var = deps['child_to_var']
@@ -146,6 +144,10 @@ class MapExpr(Expr):
 
     children = broadcast(children)
     largest = distarray.largest_value(children)
+    
+    i = children.index(largest)
+    children[0], children[i] = children[i], children[0]
+    child_to_var[0], child_to_var[i] = child_to_var[i], child_to_var[0]
 
     for child in children:
       util.log_debug('Map children: %s', child)
@@ -154,7 +156,7 @@ class MapExpr(Expr):
 
     return largest.map_to_array(
               tile_mapper, 
-              kw = {'source_array':largest, 'children':children, 'child_to_var':child_to_var, 'op':op})
+              kw = {'children':children, 'child_to_var':child_to_var, 'op':op})
 
 
 def map(inputs, fn, numpy_expr=None, fn_kw=None):
