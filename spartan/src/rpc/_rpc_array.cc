@@ -20,11 +20,21 @@ numpy_to_ctile(PyObject* o, PyObject *args)
     return Py_BuildValue("k", (unsigned long)tile);
 }
 
+static void
+release_ctile(PyObject* o, PyObject *args)
+{
+    unsigned long u;
+    if (!PyArg_ParseTuple(args, "k", &u))
+        return NULL;
+
+    delete (CTile*)u;
+}
+
 static PyObject *
 deserialize_get_resp(PyObject* o, PyObject *args)
 {
-    unsigned long u; 
-    if (!PyArg_ParseTuple(args, "k", &u)) 
+    unsigned long u;
+    if (!PyArg_ParseTuple(args, "k", &u))
         return NULL;
     
     Marshal* m = (Marshal *) u;
@@ -63,7 +73,8 @@ get_resp_to_tile(PyObject* o, PyObject *args)
 }
 
 static PyMethodDef _rpc_ctile_methods[] = {
-    {"numpy_to_ctile", numpy_to_ctile, METH_VARARGS, ""};
+    {"numpy_to_ctile", numpy_to_ctile, METH_VARARGS, ""},
+    {"release_ctile", release_ctile, METH_VARAGS, ""},
     {"deserialize_get_resp", deserialize_get_Resp, METH_VARARGS, ""},
     {"get_resp_to_tile", get_resp_to_tile, METH_VARARGS, ""},
     {NULL}  /* Sentinel */

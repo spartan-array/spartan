@@ -3,7 +3,7 @@ from simplerpc.marshal import Marshal
 import simplerpc.future
 import cPickle
 from cPickle import UnpicklingError
-import _rpc_array
+import rpc_array
 
 DEFAULT_TIMEOUT = None
 
@@ -85,7 +85,7 @@ class Future_Get(simplerpc.future.Future):
       return self.rep
 
     self.wait()
-    self.rep = _rpc_array.get_resp_to_tile(self.rep)
+    self.rep = rpc_array.get_resp_to_tile(self.rep)
     if self.is_flatten:
       self.rep = self.rep.flatten()
 
@@ -104,7 +104,7 @@ class Future_Get(simplerpc.future.Future):
     if rep_marshal_id != 0 and self.err_code == 0:
       rep_m = Marshal(id=rep_marshal_id)
       rep_m.read_obj(['Tile_id'])
-      self.rep = _rpc_array.deserialize_get_resp(rep_marshal_id)
+      self.rep = rpc_array.deserialize_get_resp(rep_marshal_id)
     self.wait_ok = True
     return self.err_code
 

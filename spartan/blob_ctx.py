@@ -9,8 +9,10 @@ running user-defined *kernel functions* on tile data.
 from . import util, core, _cblob_ctx_py_if
 import threading
 import random
+import numpy as np
 from rpc import serialize, RemoteException, WorkerProxy
-from rpc import Future, FutureGroup
+from rpc import FutureGroup
+import rpc_array
 
 
 ID_COUNTER = iter(xrange(10000000))
@@ -18,7 +20,7 @@ MASTER_ID = 65536
 
 
 class BlobCtx(object):
-  def __init__(self, workers, worker_id):
+  def __init__(self, workers, worker_id, cblob_ctx=0):
     '''
     Create a new context.
 
@@ -30,6 +32,15 @@ class BlobCtx(object):
     self.workers = workers
     self.worker_id = worker_id
     self.active = True
+
+    cworkers = None
+    if (self.is_master()):
+      assert cblob_ctx == 0
+      cworkers = {}
+      for k, v in workers.iteritems():
+        cworkers[k] = v.id
+
+    self._cblob_ctx = _cblob_ctx_py_if.CBlobCtx_Py(worker_id, workers, cblob_ctx)
 
   def is_master(self):
     '''
@@ -84,6 +95,7 @@ class BlobCtx(object):
         If not specified, workers are chosen in round-robin order.
       timeout (float):
     '''
+    assert not isinstance(data, np.ndarray)
     # master dispatches to a worker in round-robin order.
     if self.is_master():
       if hint is None:
@@ -95,13 +107,9 @@ class BlobCtx(object):
         worker_id = random.choice(self.workers.keys())
     else:
       worker_id = self.worker_id
+    tile_id = core.TileId(worker=worker_id, id=-1)
 
-    tile_id = core.TileId(worker=worker_id, id=ID_COUNTER.next())
-
-    # util.log_info('%s %s %s %s', new_id, worker_id, data.shape, ''.join(traceback.format_stack()))
-
-    req = core.CreateTileReq(tile_id=tile_id, data=data)
-    return self._send(tile_id.worker, WorkerProxy.async_create, req, wait=False)
+    return self._cblob_ctx.create(tile_id, data)
 
   def get(self, tile_id, subslice, wait=True, timeout=None):
     '''
@@ -113,10 +121,10 @@ class BlobCtx(object):
       wait (boolean): Wait for this operation to finish before returning.
       timeout (float):
     '''
-    future = _cblob_ctx_py_if.get(tile_id, subslice)
+    future = self._cblob_ctx.get(tile_id, subslice)
 
     if wait:
-      future.result
+      return future.result
     else:
       return future
 
@@ -130,10 +138,10 @@ class BlobCtx(object):
       wait (boolean): Wait for this operation to finish before returning.
       timeout (float):
     '''
-    future = _cblob_ctx_py_if.get(tile_id, subslice)
+    future = self._cblob_ctx.get(tile_id, subslice)
 
     if wait:
-      future.result
+      return future.result
     else:
       return future
 
@@ -151,8 +159,14 @@ class BlobCtx(object):
       wait (boolean): If true, wait for completion before returning.
       timeout (float):
     '''
-    req = core.UpdateReq(id=tile_id, region=region, data=serialize(data), reducer=reducer)
-    return self._send(tile_id.worker, WorkerProxy.async_update, req, wait=wait, timeout=timeout)
+    ctile = rpc_array.numpy_to_ctile(data)
+    future = self._cblob_ctx.update(tile_id, region, ctile, reducer)
+    rpc_array.release_ctile(ctile)
+
+    if wait:
+      return future.result
+    else:
+      return future
 
   def destroy_all(self, tile_ids):
     '''
@@ -220,135 +234,6 @@ class BlobCtx(object):
     '''
     req = core.TileIdMessage(tile_id=tile_id)
     return self._send(tile_id.worker, WorkerProxy.async_get_tile_info, req)
-
-#cdef class WorkerBlobCtx:
-  #cdef CBlobCtx* ctx
-
-  #def __cinit__(self, unsigned long ctx):
-    #'''
-    #Create a new context.
-
-    #Args:
-      #ctx: C++ BlobCtx used for RPC connections from worker to other workers in the computation.
-        #This is used to avoid sending RPC messages for operations that can be serviced locally.
-    #'''
-    #self.ctx = <CBlobCtx*>ctx
-
-  #def is_master(self):
-    #'''
-    #True if this context is running in the master process.
-    #'''
-    #return False
-
-  #def get(self, tile_id, subslice, wait=True, timeout=None):
-    #'''
-    #Fetch a region of a tile.
-
-    #Args:
-      #tile_id (int): Tile to fetch from.
-      #subslice (slice or None): Portion of tile to fetch.
-      #wait (boolean): Wait for this operation to finish before returning.
-      #timeout (float):
-    #'''
-    #cdef TileId tid
-    #cdef CSliceIdx s
-    #cdef GetResp resp
-
-    #tid.worker = tile_id.worker
-    #tid.id = tile_id.id
-    #for dim in subslice:
-      #s.slices.push_back(Slice(dim.start, dim.stop, dim.step))
-
-    #cdef unsigned long fu = self.ctx.py_get(&tid, &s, &resp)
-
-    #if fu == 0:
-      #future = Future(id=-1, rep_types=None, rep=core.GetResp(tile_id, resp.data))
-    #else:
-      #future = Future(id=fu, rep_types=['GetResp'])
-
-    #if wait:
-      #return future.result.data
-    #return future
-
-  #def get_flatten(self, tile_id, subslice, wait=True, timeout=None):
-    #'''
-    #Fetch a flatten region of the flatten format of a tile.
-
-    #Args:
-      #tile_id (int): Tile to fetch from.
-      #subslice (slice or None): Portion of tile to fetch.
-      #wait (boolean): Wait for this operation to finish before returning.
-      #timeout (float):
-    #'''
-    #cdef TileId tid
-    #cdef SubSlice s
-    #cdef GetResp resp
-
-    #tid.worker = tile_id.worker
-    #tid.id = tile_id.id
-    #for dim in subslice:
-      #s.slices.push_back(Slice(dim.start, dim.stop, dim.step))
-
-    #cdef unsigned long fu = self.ctx.py_get_flatten(&tid, &s, &resp)
-
-    #if fu == 0:
-      #future = Future(id=-1, rep_types=None, rep=core.GetResp(tile_id, resp.data))
-    #else:
-      #future = Future(id=fu, rep_types=['GetResp'])
-
-    #if wait:
-      #return future.result.data
-    #return future
-
-  #def update(self, tile_id, region, data, reducer, wait=True, timeout=None):
-    #'''
-    #Update ``region`` of ``tile_id`` with ``data``.
-
-    #``data`` is combined with existing tile data using ``reducer``.
-
-    #Args:
-      #tile_id (int):
-      #region (slice):
-      #data (Numpy array):
-      #reducer (function): function from (array, array) -> array
-      #wait (boolean): If true, wait for completion before returning.
-      #timeout (float):
-    #'''
-    #cdef TileId tid
-    #cdef SubSlice s
-    #cdef string d = serialize(data)
-
-    #tid.worker = tile_id.worker
-    #tid.id = tile_id.id
-    #for dim in region:
-      #s.slices.push_back(Slice(dim.start, dim.stop, dim.step))
-
-    #cdef unsigned long fu = self.ctx.py_update(&tid, &s, &d, reducer)
-
-    #if fu == 0:
-      #future = Future(id=-1, rep_types=None, rep=core.EmptyMessage())
-    #else:
-      #future = Future(id=fu, rep_types=['EmptyMessage'])
-
-    #if wait: future.wait()
-    #return future
-
-  #def create(self, data, hint=None, timeout=None):
-    #'''
-    #Create a new tile to hold ``data``.
-
-    #Args:
-      #data (Tile): Tile to be created
-      #hint (int): Optional.  Worker to store data on.
-        #If not specified, workers are chosen in round-robin order.
-      #timeout (float):
-    #'''
-    #cdef CTile tile
-    #cdef TileIdMessage resp
-
-    ##TODO: transform the python Tile to CTile
-    #self.ctx.py_create(&tile, &resp)
-    #return Future(id=-1, rep_types=None, rep=core.TileIdMessage(core.TileId(resp.tile_id.worker, resp.tile_id.id)))
 
 _ctx = threading.local()
 _ctx.val = None

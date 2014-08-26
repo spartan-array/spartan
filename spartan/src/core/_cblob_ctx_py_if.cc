@@ -38,6 +38,9 @@ public:
 typedef struct {
     PyObject_HEAD
     class CBlobCtx *ctx;
+    bool is_master;
+    std::unordered_map<int32_t, spartan::WorkerProxy*> workers;
+
 } CBlobCtx_Py;
 
 static bool 
@@ -197,20 +200,51 @@ CBlobCtx_Py_create(PyObject* o, PyObject *args)
 }
 
 static void
-CBlobCtx_Py_dealloc(PyObject *o)
+CBlobCtx_Py_delete_workers(PyObject *o, PyObject *args)
 {
-    CBlobCtx_Py *self = (CBlobCtx_Py*) o;
-
-    delete self->ctx;
+    /* TODO: */
+    assert(false);
 }
 
 static int 
 CBlobCtx_Py_init(PyObject *o, PyObject *args, PyObject *kwds)
 {
+    PyObject *workers;
+    unsigned long worker_id, ctx_u;
     CBlobCtx_Py *self = (CBlobCtx_Py*)o;
 
-    self->ctx = NULL;
+    if (!PyArg_ParseTuple(args, "kOk", &worker_id, &workers, &ctx_u))
+        return -1;
+
+    assert (PyDict_Check(workers));
+
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+    self->workers.clear();
+    while (PyDict_Next(workers, &pos, &key, &value)) {
+        self->workers[get_longlong(key)] = new spartan::WorkerProxy(get_longlong(value));
+    }
+
+    if (ctx_u == 0) { // This is the master!
+        self->ctx = CBlobCtx(worker_id, &self->workers, NULL);
+        self->is_master = true;
+    } else {
+        self->ctx = (CBlobCtx*) ctx_u;
+        self->is_master = false;
+    }
     return 0;
+}
+
+static void
+CBlobCtx_Py_dealloc(PyObject *o)
+{
+    CBlobCtx_Py *self = (CBlobCtx_Py*) o;
+
+    if (self->is_master) {
+        for (auto it = self->workers.begin(); it != self->workers.end(); ++it) {
+            delete it->second;
+        }
+    }
 }
 
 static PyMemberDef CBlobCtx_Py_members[] = {
@@ -222,6 +256,8 @@ static PyGetSetDef CBlobCtx_Py_getseters[] = {
 };
 
 static PyMethodDef CBlobCtx_Py_methods[] = {
+    {"delete_workers", (PyCFunction)CBlobCtx_Py_delete_worker, METH_VARAGS,
+     "Deleter workers from CBlobCtx (should not be called from workers)"},
     {"get", (PyCFunction)CBlobCtx_Py_get, METH_VARAGS,
      "get RPC."},
     {"get_flatten", (PyCFunction)CBlobCtx_Py_get_flatten, METH_VARAGS,

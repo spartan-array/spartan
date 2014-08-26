@@ -7,27 +7,31 @@ TYPE_DENSE = Tile.TILE_DENSE
 TYPE_MASKED = Tile.TILE_MASKED
 TYPE_SPARSE = Tile.TILE_SPARSE
 
-def _npdata_to_tuple (data):
-  ret = []
-  if sp.issparse(data):
-    ret.append(Tile.TILE_SPARSE)
-    if isinstance(data, sp.coo_matrix):
-      ret.append((data.row, data.col, data.data))
-      ret.append(Tile.TILE_SPARSE_COO)
-    elif isinstance(data, sp.csc_matrix):
-      ret.append((data.indices, data.inptr, data.data))
-      ret.append(Tile.TILE_SPARSE_CSC)
-    elif isinstance(data, sp.csr_matrix):
-      ret.append((data.indices, data.inptr, data.data))
-      ret.append(Tile.TILE_SPARSE_CSR)
-  elif isinstance(data, ma.MaskedArray):
-    ret.append(Tile.TILE_MASKED)
-    ret.append((data.data, data.mask))
-  else:
-    ret.append(Tile.TILE_DENSE)
-    ret.append((data,))
 
-  return ret
+def npdata_to_internal(data):
+  ttype = None
+  stype = Tile.TILE_SPARSE_NONE
+  data = None
+  if sp.issparse(data):
+    ttype = Tile.TILE_SPARSE
+    if isinstance(data, sp.coo_matrix):
+      stype = Tile.TILE_SPARSE_COO
+      data = (data.row, data.col, data.data)
+    elif isinstance(data, sp.csc_matrix):
+      stype = Tile.TILE_SPARSE_CSC
+      data = (data.indices, data.inptr, data.data)
+    elif isinstance(data, sp.csr_matrix):
+      stype = Tile.TILE_SPARSE_CSR
+      data = (data.indices, data.inptr, data.data)
+  elif isinstance(data, ma.MaskedArray):
+    ttype = Tile.TILE_MASKED
+    data = (data.data, data.mask)
+  else:
+    ttype = Tile.TILE_DENSE
+    data = (data,)
+
+  return data.shape, data.dtype.char, ttype, stype, data
+
 
 class Tile(TileBase):
   ''' Wrapper class of Tile.
@@ -51,21 +55,12 @@ class Tile(TileBase):
       return super(Tile, self).get(subslice)
 
   def update(self, subslice, data, reducer):
-    print 'Tile.update'
-    internal_data = _npdata_to_tuple(data)
-    tile_type = internal_data[0]
-    if len(internal_data) == 2:
-      sparse_type = Tile.TILE_SPARSE_NONE
-      tile_data = internal_data[1]
-    else:
-      sparse_type = internal_data[1]
-      tile_data = internal_data[2]
+    _, _, sparse_type, tile_type, tile_data = npdata_to_internal(data)
 
     if self.builtin_reducers.get(reducer, None) is None:
       _reducer = reducer
     else:
       _reducer = self.builtin_reducers[reducer]
-    print "DATATATATATATATATATATA", data, self
     self._update(subslice, tile_type, sparse_type,
                  tile_data, _reducer)
     return self
@@ -74,19 +69,9 @@ class Tile(TileBase):
   def dtype(self):
     return np.dtype(super(Tile, self).dtype)
 
+
 def from_data(data):
-  internal_data = _npdata_to_tuple(data)
-  tile_type = internal_data[0]
-  tile_data = internal_data[1]
-
-  if len(internal_data) < 3:
-    sparse_type = Tile.TILE_SPARSE_NONE
-  else:
-    sparse_type = internal_data[2]
-
-  shape = data.shape
-  print 'from_data', data.dtype
-  dtype = data.dtype.char
+  shape, dtype, sparse_type, tile_type, tile_data = npdata_to_internal(data)
 
   assert isinstance(tile_data, tuple), (type(tile_data))
   return Tile(shape,
@@ -103,6 +88,7 @@ def from_shape(shape, dtype, tile_type, sparse_type=Tile.TILE_SPARSE_COO):
               tile_type,
               sparse_type,
               None)
+
 
 # DONT use this API. This API is only for internal usage.
 def _internal_update(data, subslice, update, reducer):
