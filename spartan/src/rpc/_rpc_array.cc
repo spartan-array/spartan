@@ -5,7 +5,7 @@
 #include <numpy/arrayobject.h>
 #include <iostream>
 
-#include "rpc/server.h"
+#include "service.h"
 #include "rpc/client.h"
 #include "array/ctile.h"
 #include "core/ccore.h"
@@ -20,7 +20,7 @@ numpy_to_ctile(PyObject* o, PyObject *args)
     return Py_BuildValue("k", (unsigned long)tile);
 }
 
-static void
+static PyObject*
 release_ctile(PyObject* o, PyObject *args)
 {
     unsigned long u;
@@ -28,6 +28,7 @@ release_ctile(PyObject* o, PyObject *args)
         return NULL;
 
     delete (CTile*)u;
+    return Py_True;
 }
 
 static PyObject *
@@ -37,7 +38,7 @@ deserialize_get_resp(PyObject* o, PyObject *args)
     if (!PyArg_ParseTuple(args, "k", &u))
         return NULL;
     
-    Marshal* m = (Marshal *) u;
+    rpc::Marshal* m = (rpc::Marshal *) u;
     GetResp* resp = new GetResp();
     *m >> *resp;
 
@@ -74,8 +75,8 @@ get_resp_to_tile(PyObject* o, PyObject *args)
 
 static PyMethodDef _rpc_ctile_methods[] = {
     {"numpy_to_ctile", numpy_to_ctile, METH_VARARGS, ""},
-    {"release_ctile", release_ctile, METH_VARAGS, ""},
-    {"deserialize_get_resp", deserialize_get_Resp, METH_VARARGS, ""},
+    {"release_ctile", release_ctile, METH_VARARGS, ""},
+    {"deserialize_get_resp", deserialize_get_resp, METH_VARARGS, ""},
     {"get_resp_to_tile", get_resp_to_tile, METH_VARARGS, ""},
     {NULL}  /* Sentinel */
 };
@@ -86,8 +87,5 @@ static PyMethodDef _rpc_ctile_methods[] = {
 PyMODINIT_FUNC
 init_rpc_ctile_py_if(void) 
 {
-    PyObject* m;
-
-    m = Py_InitModule3("_rpc_ctile", _rpc_ctile_methods,
-                       "Python interface for rpc_ctile module");
+    (void)Py_InitModule("_rpc_array", _rpc_ctile_methods);
 }

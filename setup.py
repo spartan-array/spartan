@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from setuptools import setup, Extension
+from setuptools import setup, Extension, Command
 #from Cython.Build import cythonize
 #import os
 import subprocess
@@ -34,6 +34,16 @@ cmdclass['build_ext'] = build_ext
 
 #cmdclass['sdist'] = cython_sdist
 
+
+class clean(Command):
+  def run(self):
+    subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp", shell=True)
+    subprocess.call("rm -rf spartan/array/*.so spartan/array/*.c spartan/array/*.cpp", shell=True)
+    subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp", shell=True)
+    subprocess.call("make -C spartan/src clean", shell=True)
+    subprocess.call("rm -rf build")
+
+
 # FIXME: Should integrate with setuptool
 subprocess.call("make -C spartan/src", shell=True)
 subprocess.call("cp spartan/src/worker spartan", shell=True)
@@ -46,7 +56,7 @@ ext_include_dirs = ['/usr/local/include',
                     base + '/spartan/src/rpc/base-utils',
                     base + '/spartan/src/rpc/simple-rpc/build', ]
 ext_link_dirs = ['/usr/lib',
-                 base + '/spartan/src/core',
+                 base + '/spartan/src/',
                  base + '/spartan/src/rpc/base-utils/build',
                  base + '/spartan/src/rpc/simple-rpc/build', ]
 
@@ -139,5 +149,8 @@ setup(
               ['spartan/examples/sklearn/util/graph_shortest_path.pyx']),
   ],
 
-  cmdclass=cmdclass,
+  cmdclass={
+    'build_ext': build_ext,
+    'clean': clean
+  },
 )

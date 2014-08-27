@@ -21,7 +21,7 @@ do {\
     if (val == NULL) { \
         return NULL; \
     } \
-} while (0) 
+} while (0)
 
 #define RETURN_CHECK(val) \
 do {\
@@ -30,17 +30,17 @@ do {\
     } else { \
         return val; \
     } \
-} while (0) 
+} while (0)
 
-static bool 
-is_integer(PyObject *o) {
-    if (PyLong_Check(o) || PyInt_Check(o)) {
-        return true;
-    }
-    return false;
-}
+//static bool
+//is_integer(PyObject *o) {
+    //if (PyLong_Check(o) || PyInt_Check(o)) {
+        //return true;
+    //}
+    //return false;
+//}
 
-static long long 
+static long long
 get_longlong(PyObject *o) {
     if (PyNumber_Check(o)) {
         PyObject *_long;
@@ -59,7 +59,7 @@ get_longlong(PyObject *o) {
 static void
 TileBase_dealloc(PyObject *o)
 {
-    TileBase *self = (TileBase*) o; 
+    TileBase *self = (TileBase*) o;
     std::cout << __func__ << " " << o << " " << self->c_tile << std::endl;
     delete self->c_tile;
     self->ob_type->tp_free((PyObject*)self);
@@ -125,7 +125,8 @@ TileBase_get(PyObject* o, PyObject* args)
 
     CSliceIdx cslice_idx(slice, self->c_tile->get_nd(), self->c_tile->get_dimensions());
 
-    CTile_RPC *rpc = (CTile_RPC*) self->c_tile->get(cslice_idx);
+    std::vector<char*> rpc_vector = self->c_tile->get(cslice_idx);
+    CTile_RPC *rpc = (CTile_RPC*) vector_to_ctile_rpc(rpc_vector);
     CTile *ctile = new CTile(rpc);
     PyObject *ret = ctile->to_npy();
 
@@ -141,7 +142,7 @@ TileBase__update(PyObject* o, PyObject* args)
 {
     TileBase *self = (TileBase*)o;
     PyObject *slice, *data, *tile_type, *sparse_type, *reducer;
-    PyObject *kargs;
+    //PyObject *kargs;
     //char *klist=["private_id"];
 
     std::cout << __func__ << std::endl;
@@ -206,17 +207,17 @@ TileBase__update(PyObject* o, PyObject* args)
     return o;
 }
 
-static int 
-TileBase_init(PyObject *o, PyObject *args)
+static int
+TileBase_init(PyObject *o, PyObject *args, PyObject *kwds)
 {
     TileBase *self = (TileBase*)o;
-    self->tile = ctile_creator(args);
-    if (self->tile == NULL)
+    self->c_tile = ctile_creator(args);
+    if (self->c_tile == NULL)
         return -1;
     return 0;
 }
 
-static PyObject* 
+static PyObject*
 TileBase_repr(PyObject *o)
 {
     TileBase *self = (TileBase*)o;
@@ -316,7 +317,7 @@ static PyMethodDef extent_methods[] = {
 #define PyMODINIT_FUNC void
 #endif
 PyMODINIT_FUNC
-init_ctile_py_if(void) 
+init_ctile_py_if(void)
 {
     PyObject* m;
 
@@ -324,48 +325,48 @@ init_ctile_py_if(void)
     /* Initialize class-wise members here */
     PyObject *tp_dict = PyDict_New();
     if (tp_dict == NULL) {
-        return;    
+        return;
     }
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_DENSE"),
                                    PyInt_FromLong((long)CTILE_DENSE)));
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_MASKED"),
                                    PyInt_FromLong((long)CTILE_MASKED)));
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_SPARSE"),
                                    PyInt_FromLong((long)CTILE_SPARSE)));
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_SPARSE_NONE"),
                                    PyInt_FromLong((long)CTILE_SPARSE_NONE)));
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_SPARSE_COO"),
                                    PyInt_FromLong((long)CTILE_SPARSE_COO)));
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_SPARSE_CSC"),
                                    PyInt_FromLong((long)CTILE_SPARSE_CSC)));
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_SPARSE_CSR"),
                                    PyInt_FromLong((long)CTILE_SPARSE_CSR)));
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_REDUCER_ADD"),
                                    PyInt_FromLong((long)REDUCER_ADD)));
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_REDUCER_MUL"),
                                    PyInt_FromLong((long)REDUCER_MUL)));
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_REDUCER_MAXIMUM"),
                                    PyInt_FromLong((long)REDUCER_MAXIMUM)));
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_REDUCER_MINIMUM"),
                                    PyInt_FromLong((long)REDUCER_MINIMUM)));
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_REDUCER_AND"),
                                    PyInt_FromLong((long)REDUCER_AND)));
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_REDUCER_XOR"),
                                    PyInt_FromLong((long)REDUCER_XOR)));
-    RETURN_IF_ERROR(PyDict_SetItem(tp_dict, 
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_REDUCER_OR"),
                                    PyInt_FromLong((long)REDUCER_OR)));
     TileBaseType.tp_dict = tp_dict;

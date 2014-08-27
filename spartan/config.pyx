@@ -26,7 +26,7 @@ import appdirs
 
 class Flag(object):
   '''Base object for a representing a command line flag.
-  
+
   Subclasses must implement the ``set`` operation to parse
   a flag value from a command line string.
   '''
@@ -51,9 +51,9 @@ class StrFlag(Flag):
     self.val = str
 
 class BoolFlag(Flag):
-  '''Boolean flag.  
-  
-  Accepts '0' or 'false' for false values, '1' or 'true' for true values. 
+  '''Boolean flag.
+
+  Accepts '0' or 'false' for false values, '1' or 'true' for true values.
   '''
   def parse(self, str):
     str = str.lower()
@@ -61,8 +61,8 @@ class BoolFlag(Flag):
 
     if str == 'false' or str == '0': val = False
     elif str == 'true' or str == '1': val = True
-    else: 
-      assert False, 'Invalid value for boolean flag: "%s"' % str 
+    else:
+      assert False, 'Invalid value for boolean flag: "%s"' % str
 
     self.val = val
 
@@ -110,7 +110,7 @@ class AssignModeFlag(Flag):
 from libcpp.vector cimport vector
 from libc.string cimport const_char
 from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
-cdef extern from "cconfig.h":
+cdef extern from "src/core/cconfig.h":
   cdef vector[const_char *] get_flags_info()
   cdef void config_parse(int argc, const_char **argv)
 
@@ -139,14 +139,14 @@ class Flags(object):
 
     assert self.__dict__['_parsed'], 'Access to flags before config.parse() called.'
     return self.__dict__['_vals'][key].val
-  
+
   def __setattr__(self, key, value):
-    if key.startswith('_'): 
+    if key.startswith('_'):
       self.__dict__[key] = value
       return
 
     # print >>sys.stderr, ('Setting flag: %s %s', key, value)
-    
+
     assert self.__dict__['_parsed'], 'Access to flags before config.parse() called.'
     self.__dict__['_vals'][key].val = value
 
