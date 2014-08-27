@@ -38,7 +38,7 @@ CSliceIdx::CSliceIdx(PyObject *idx, int nd, npy_intp *dimensions)
             Py_ssize_t start, stop, step, slicelength;
             PyObject *slc = PyTuple_GET_ITEM(idx, i);
             assert(PySlice_Check(slc) != 0);
-            PySlice_GetIndicesEx((PySliceObject*)slc, NPY_MAX_ULONGLONG,
+            PySlice_GetIndicesEx((PySliceObject*)slc, NPY_MAX_ULONG,
                                  &start, &stop, &step, &slicelength);
             slices[i].start = (npy_intp) start;
             slices[i].stop = (npy_intp) stop;

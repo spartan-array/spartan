@@ -1,7 +1,7 @@
 CC = c++
 
 CUR_DIR = $(shell pwd)
-CORE_DIR = $(CUR_DIR)/core 
+CORE_DIR = $(CUR_DIR)/core
 ARRAY_DIR = $(CUR_DIR)/array
 RPCDIR = $(CUR_DIR)/rpc
 RPCBASE = $(RPCDIR)/base-utils
@@ -15,8 +15,7 @@ endif
 
 CFLAGS = -I$(CUR_DIR) -I$(CORE_DIR) -I$(ARRAY_DIR) -I$(RPC) -I$(RPCBASE) $(PY_CFLAGS) $(NUMPY) -pthread -std=c++0x -O2 # -g
 LDFLAGS = -L$(RPCBASE)/build -L$(RPC)/build -L$(CURDIR) $(PY_LDFLAGS) -lbase -lpython2.7 -std=c++11 # -g
-
-OBJS_WORKER = $(CUR_DIR)/core/worker.o $(CUR_DIR)/core/cconfig.o
+OBJS_WORKER = $(CUR_DIR)/core/worker.o $(CUR_DIR)/core/cblob_ctx.o $(CUR_DIR)/core/cconfig.o
 OBJS_ARRAY = $(ARRAY_DIR)/cslice.o $(ARRAY_DIR)/cextent.o $(ARRAY_DIR)/ctile.o $(ARRAY_DIR)/carray.o $(ARRAY_DIR)/carray_reducer.o
 APPS = rpc libspartan_array.so worker
 
@@ -53,6 +52,7 @@ clean:
 	cd $(RPC);python waf clean
 	rm -f $(RPCDIR)/*.o 
 	rm -f $(ARRAY_DIR)/*.o
+	rm -f $(CORE_DIR)/*.o
 	rm -f $(CUR_DIR)/*.o
 	rm -f $(CUR_DIR)/libspartan_array.so $(CUR_DIR)/worker
 

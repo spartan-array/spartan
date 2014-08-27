@@ -42,13 +42,13 @@ subprocess.call("cp spartan/src/libspartan_array.so spartan", shell=True)
 base = '.' #os.path.dirname(os.path.realpath(__file__))
 ext_include_dirs = ['/usr/local/include',
                     base + '/spartan/src',
-                    base + '/spartan/src/fastrpc/simple-rpc',
-                    base + '/spartan/src/fastrpc/base-utils',
-                    base + '/spartan/src/fastrpc/simple-rpc/build', ]
+                    base + '/spartan/src/rpc/simple-rpc',
+                    base + '/spartan/src/rpc/base-utils',
+                    base + '/spartan/src/rpc/simple-rpc/build', ]
 ext_link_dirs = ['/usr/lib',
                  base + '/spartan/src/core',
-                 base + '/spartan/src/fastrpc/base-utils/build',
-                 base + '/spartan/src/fastrpc/simple-rpc/build', ]
+                 base + '/spartan/src/rpc/base-utils/build',
+                 base + '/spartan/src/rpc/simple-rpc/build', ]
 
 setup(
   name='spartan',
@@ -79,7 +79,7 @@ setup(
   package_dir={'': '.'},
   packages=['spartan',
             'spartan.expr',
-            'spartan.fastrpc',
+            'spartan.rpc',
             'spartan.array'],
 
   # Our extensions are written by Cython and Python C APIs
@@ -117,10 +117,10 @@ setup(
                                "-lbase", "-lpython2.7"]),
 
     # Spartan extensions, cython part.
-    Extension('spartan.fastrpc.serialization_buffer',
-              ['spartan/fastrpc/serialization_buffer.pyx']),
-    Extension('spartan.fastrpc.cloudpickle',
-              ['spartan/fastrpc/cloudpickle.pyx']),
+    Extension('spartan.rpc.serialization_buffer',
+              ['spartan/rpc/serialization_buffer.pyx']),
+    Extension('spartan.rpc.cloudpickle',
+              ['spartan/rpc/cloudpickle.pyx']),
     Extension('spartan.array.sparse',
               ['spartan/array/sparse.pyx'],
               language='c++',

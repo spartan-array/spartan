@@ -161,7 +161,7 @@ class BlobCtx(object):
     '''
     ctile = rpc_array.numpy_to_ctile(data)
     future = self._cblob_ctx.update(tile_id, region, ctile, reducer)
-    rpc_array.release_ctile(ctile)
+    #rpc_array.release_ctile(ctile)
 
     if wait:
       return future.result

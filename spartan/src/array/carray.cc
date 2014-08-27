@@ -76,7 +76,7 @@ CArray::CArray(CArray_RPC *rpc)
     init(rpc->dimensions, (int)rpc->nd, (char)rpc->item_type);
     if (rpc->is_npy_memmanager) { 
         data_source = (NpyMemManager*)(rpc->data);
-        data = data_source->data; 
+        data = data_source->get_data();
     } else {
         data = rpc->data;
         data_source = new NpyMemManager(data, data, false, size);
@@ -113,7 +113,7 @@ CArray::init(npy_intp dimensions[], int nd, char type)
 }
 
 
-int
+npy_intp
 CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
 {
     bool full = true;
@@ -129,7 +129,7 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
     std::cout << __func__ << " " << full << " " << (void*)dest << " " << (void*)data << std::endl;
 
     if (full) { /* Special case, no slice */
-        *dest = new NpyMemManager(data_source);
+        *dest = new NpyMemManager(*data_source);
         return size;
     } else {
         npy_intp continous_size, all_size;
@@ -160,9 +160,10 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
             curr_idx[i] = ex->ul[i];
         }
         all_size = ex->size * type_size; 
+        npy_intp ret = all_size;
 
         char *source_data = data;
-        char *buf = malloc(all_size);
+        char *buf = (char*)malloc(all_size);
         assert(buf != NULL);
         *dest = new NpyMemManager(buf, buf, false, all_size); 
         do {
@@ -179,6 +180,7 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
             buf += continous_size;
             all_size -= continous_size;
         } while(all_size > 0);
+        return ret;
     }
 }
 
@@ -223,8 +225,8 @@ CArray::to_carray_rpc(CExtent *ex)
 {
     std::vector <char*> dest;
     std::cout << __func__ << type_size << " " << type << " " << nd <<std::endl;
-    CArray_RPC *rpc = malloc(sizeof(CArray_RPC));
-    dest.push((char*)(new NpyMemManager(rpc, rpc, false, sizeof(CArray_RPC))));
+    CArray_RPC *rpc = (CArray_RPC*)malloc(sizeof(CArray_RPC));
+    dest.push_back((char*)(new NpyMemManager((char*)rpc, (char*)rpc, false, sizeof(CArray_RPC))));
 
     rpc->item_size = type_size;
     rpc->item_type = type;
@@ -237,7 +239,7 @@ CArray::to_carray_rpc(CExtent *ex)
     if (copy_slice(ex, (NpyMemManager**)(&(rpc->data))) != size) {
         assert(false);
     }
-    dest.push(rpc->data);
+    dest.push_back(rpc->data);
 
     return dest;
 }

@@ -68,7 +68,7 @@ CExtent* offset_from(CExtent* base, CExtent* other);
 
 void offset_slice(CExtent* base, CExtent* other, CSlice slice[]);
 
-CExtent* from_slice(CSliceIdx &idx, npy_intp shape[], int ndim);
+CExtent* from_slice(const CSliceIdx &idx, npy_intp shape[], int ndim);
 
 void shape_for_reduction(npy_intp input_shape[],
                          int ndim, 
@@ -84,5 +84,5 @@ CExtent* drop_axis(CExtent* ex, int axis);
 void find_shape(CExtent **extents, int num_ex,
                 npy_intp shape[]); // output
 
-bool is_complete(npy_intp shape[], int ndim, CSliceIdx &idx);
+bool is_complete(npy_intp shape[], int ndim, const CSliceIdx &idx);
 #endif

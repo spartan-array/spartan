@@ -16,6 +16,21 @@ private:
     static int32_t RPC_TIMEOUT;
     int32_t id_counter = 0;
 
+    template<typename Q, typename R>
+    rpc::Future* _send(int32_t worker_id, void (CWorker::*pLocalFunc)(const Q&, R*),
+                       rpc::Future* (spartan::WorkerProxy::*pFunc)(const Q&, const rpc::FutureAttr&),
+                       Q& req, R* resp, bool wait=true, int32_t timeout=CBlobCtx::RPC_TIMEOUT) const; 
+
+    template<typename Q, typename R>
+    void _send_all(rpc::Future* (spartan::WorkerProxy::*pFunc)(const Q&, const rpc::FutureAttr&),
+                   Q& req, std::vector<R*>* resp, std::vector<int32_t>* target_workers=NULL,
+                   bool wait=true, int32_t timeout=CBlobCtx::RPC_TIMEOUT) const ;
+
+    template<typename Q, typename R>
+    rpc::Future* _py_send(int32_t worker_id, void (CWorker::*pLocalFunc)(const Q&, R*),
+                          rpc::Future* (spartan::WorkerProxy::*pFunc)(const Q&, const rpc::FutureAttr&),
+                          Q& req, R* resp) const;
+
 public:
     CBlobCtx(int32_t wid, std::unordered_map<int32_t, spartan::WorkerProxy*>* peers,
              CWorker* l_worker = NULL, bool o_workers = false)
@@ -43,12 +58,16 @@ public:
     rpc::Future* get(const TileId& tile_id, const CSliceIdx& subslice, GetResp* resp,
                      bool wait=true, int32_t timeout=CBlobCtx::RPC_TIMEOUT) {
         GetReq req(tile_id, subslice);
+        /* Transfer data ownership to ctile */
+        resp->own_data = false;
         return _send<GetReq, GetResp>(tile_id.worker, &CWorker::get,
                                       &spartan::WorkerProxy::async_get, req, resp, wait, timeout);
     }
 
     unsigned long py_get(TileId* tile_id, CSliceIdx* subslice, GetResp* resp) {
         GetReq req(*tile_id, *subslice);
+        /* Transfer data ownership to ctile */
+        resp->own_data = false;
         return (unsigned long)_py_send<GetReq, GetResp>(tile_id->worker, &CWorker::get,
                                                         &spartan::WorkerProxy::async_get,
                                                         req, resp);
@@ -68,7 +87,7 @@ public:
                                          &spartan::WorkerProxy::async_get_flatten, req, resp);
     }
 
-    rpc::Future* create(const CTile& data, int32_t hint, TileIdMessage* resp, int32_t timeout=CBlobCtx::RPC_TIMEOUT) {
+    rpc::Future* create(CTile* data, int32_t hint, TileIdMessage* resp, int32_t timeout=CBlobCtx::RPC_TIMEOUT) {
         int32_t w_id;
         if (is_master()) {
             w_id = (hint < 0) ? (id_counter++) % num_workers : hint % num_workers;
@@ -89,12 +108,12 @@ public:
 
     unsigned long py_create(CTile* data, TileIdMessage* resp) {
         TileId tile_id(worker_id, -1);
-        CreateTileReq req(tile_id, *data);
+        CreateTileReq req(tile_id, data);
         local_worker->create(req, resp);
         return 0;
     }
 
-    rpc::Future* update(const TileId& tile_id, const CSliceIdx& region, std::string& data,
+    rpc::Future* update(const TileId& tile_id, const CSliceIdx& region, CTile *data,
                         int reducer, bool wait=true, int32_t timeout=CBlobCtx::RPC_TIMEOUT) {
         UpdateReq req(tile_id, region, data, reducer);
         return _send<UpdateReq, EmptyMessage>(tile_id.worker, &CWorker::update,
@@ -135,6 +154,5 @@ public:
 
 };
 
-int32_t CBlobCtx::RPC_TIMEOUT = 1000;
 
 #endif

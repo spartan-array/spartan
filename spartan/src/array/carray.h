@@ -44,7 +44,7 @@ npy_type_token_to_number(char token)
  */
 class NpyMemManager {
 public:
-    NpyMemManager(void) : ptr(NULL), data(NULL), own_by_npy(false) , size(0){};
+    NpyMemManager(void) : size(0), source(NULL), data(NULL), own_by_npy(false){};
     NpyMemManager(char* source, char *data, bool own_by_npy, unsigned long size) {
         std::map<char*, int>::iterator it;
 
@@ -60,7 +60,7 @@ public:
         } else {
             it->second += 1;
         }
-    };
+    }
 
     NpyMemManager(const NpyMemManager& mgr) {
         source = mgr.source;
@@ -71,7 +71,8 @@ public:
     }
 
     ~NpyMemManager(void) {
-        if ((it = NpyMemManager::refcount.find(source)) != NpyMemManager::refcount.end()) {
+        auto it = NpyMemManager::refcount.find(source);
+        if (it != NpyMemManager::refcount.end()) {
             if (it->second == 1) {
                 refcount.erase(source);
                 if (own_by_npy) {
@@ -83,11 +84,12 @@ public:
                 it->second -= 1;
             }
         }
-    };
+    }
 
-    // A danger function which should only be used when you actually know what this is for.
-    void clear(char *source) {
-        if ((it = NpyMemManager::refcount.find(source)) != NpyMemManager::refcount.end()) {
+    // A dangerous function which should only be used when you actually know what this is for.
+    void clear() {
+        auto it = NpyMemManager::refcount.find(source);
+        if (it != NpyMemManager::refcount.end()) {
             refcount.erase(source);
         }
     }
@@ -102,15 +104,16 @@ public:
        //return *this;
     //};
 
-    char* get_source() { return source; };
-    char* get_data() { return data; };
+    char* get_source() { return source; }
+    char* get_data() { return data; }
+
     unsigned long size;
-    bool own_by_npy;
 private:
     NpyMemManager& operator=(const NpyMemManager& obj) = delete;
     static std::map<char*, int> refcount;
     char* source;
     char* data;
+    bool own_by_npy;
 };
 
 typedef struct CArray_RPC_t {
@@ -142,10 +145,10 @@ public:
     CArray(CArray_RPC *rpc);
     ~CArray();
 
-    void copy(char *dest, CExtent *ex); /* dest = this[ex] */
+    npy_intp copy_slice(CExtent *ex, NpyMemManager **dest);
 
     // This won't call Python APIs
-    std::vector <char*> CArray::to_carray_rpc(CExtent *ex);
+    std::vector <char*> to_carray_rpc(CExtent *ex);
     // This will call Python APIs
     PyObject* to_npy(void);
 
@@ -179,11 +182,9 @@ private:
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const CArray& o) 
 {
     npy_intp dimensions[NPY_MAXDIMS];
-    int nd;
-    char type;
 
     m << o.nd;
-    m << o.type;
+    m.write(&(o.type), sizeof(o.type));
     m.write(dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
     m.write(o.data, o.size);
     return m;
@@ -196,15 +197,14 @@ inline rpc::Marshal& operator >>(rpc::Marshal&m, CArray& o)
     char type;
 
     m >> nd;
-    m >> type;
+    m.read(&type, sizeof(char));
     m.read(dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
     o.init(dimensions, nd, type);
     o.data = (char*) malloc(o.size);
     assert(o.data != NULL);
-    o.data_source = new NpyMemManager(o.data);
+    o.data_source = new NpyMemManager(o.data, o.data, false, o.size);
     assert(m.content_size() == o.size);
     m.read(o.data, o.size);
     return m;
 }
-
 #endif

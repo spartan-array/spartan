@@ -50,33 +50,36 @@ typedef struct CTile_RPC_t {
 inline CTile_RPC* vector_to_ctile_rpc(std::vector<char*> buffers) {
     bool is_npy_memmanager= *(bool*)buffers[0];
 
+    CTile_RPC *rpc;
     if (is_npy_memmanager) {
         NpyMemManager* mgr; 
         mgr = (NpyMemManager*)buffers[1];
-        CArray_RPC *rpc = mgr->data;
+        rpc = (CTile_RPC*)mgr->get_data();
         mgr->clear();
         delete mgr;
         rpc->array[0] = rpc->array[1] = rpc->array[2] = NULL;
-        for (int i = 2; i < buffers.size(); i += 2) {
+        for (unsigned i = 2; i < buffers.size(); i += 2) {
             assert((i + 1) < buffers.size());
             mgr = (NpyMemManager*)buffers[i];
-            rpc.array[i] = (CArray_RPC*) mgr->data;
+            rpc->array[i] = (CArray_RPC*) mgr->get_data();
             mgr->clear();
             delete mgr;
-            rpc.array[i].is_npy_memmanager = true;
-            rpc.array[i].data = buffers[i + 1];
+            rpc->array[i]->is_npy_memmanager = true;
+            rpc->array[i]->data = buffers[i + 1];
         }
     } else {
-        CArray_RPC *rpc = buffers[1];
+        rpc = (CTile_RPC*)buffers[1];
         rpc->array[0] = rpc->array[1] = rpc->array[2] = NULL;
-        for (int i = 2; i < buffers.size(); i += 2) {
+        for (unsigned i = 2; i < buffers.size(); i += 2) {
             assert((i + 1) < buffers.size());
-            rpc.array[i] = (CArray_RPC*) buffers[i];
-            rpc.array[i].is_npy_memmanager = false;
-            rpc.array[i].data = buffers[i + 1];
+            rpc->array[i] = (CArray_RPC*) buffers[i];
+            rpc->array[i]->is_npy_memmanager = false;
+            rpc->array[i]->data = buffers[i + 1];
         }
     }
     delete (bool*)buffers[0];
+
+    return rpc;
 }
 
 inline void release_ctile_rpc(CTile_RPC* rpc)
@@ -110,12 +113,12 @@ public:
     bool set_data(CArray *dense, CArray *mask);
     bool set_data(CArray **sparse);
     void clear_data() {dense = mask = sparse[0] = sparse[1] = sparse[2] = NULL;};
-    void update(CSliceIdx &idx, CTile &update_data, npy_intp reducer);
+    void update(const CSliceIdx &idx, CTile &update_data, npy_intp reducer);
 
     // Backward compatible, just call to_tile_rpc.
-    char* get(CSliceIdx &idx); 
+    std::vector <char*> get(const CSliceIdx &idx);
     // This won't call Python APIs
-    char* to_tile_rpc(CSliceIdx &idx);
+    std::vector <char*> to_tile_rpc(const CSliceIdx &idx);
 
     // This will call Python APIs
     PyObject* to_npy(void);
@@ -129,10 +132,11 @@ public:
 
     // For RPC marshal
     friend rpc::Marshal& operator<<(rpc::Marshal&, const CTile&);
+    friend rpc::Marshal& operator>>(rpc::Marshal&m, CTile& o);
 private:
-    CExtent* slice_to_ex(CSliceIdx &idx);
-    bool is_idx_complete(CSliceIdx &idx);
-    void reduce(CSliceIdx &idx, CTile &update, REDUCER reducer);
+    CExtent* slice_to_ex(const CSliceIdx &idx);
+    bool is_idx_complete(const CSliceIdx &idx);
+    void reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer);
 
     CTILE_TYPE type;
     CTILE_SPARSE_TYPE sparse_type;
@@ -146,14 +150,14 @@ private:
     CArray *sparse[3]; // COO, CSR, CSC all use three arrays to represent data.
 };
 
-inline rpc::Marshal& operator <<(rpc::Marshal& m, const CTile& o) 
+inline rpc::Marshal& operator<<(rpc::Marshal& m, const CTile& o) 
 {
-    m << (int)o.type;
-    m << (int)o.sparse_type;
+    m.write(&o.type, sizeof(o.type));
+    m.write(&o.sparse_type, sizeof(o.sparse_type));
     m << o.nd;
     m.write(o.dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
-    m << o.dtype;
-    m << o.initialized;
+    m.write(&o.dtype, sizeof(o.dtype));
+    m.write(&o.initialized, sizeof(o.initialized));
     if (o.initialized) {
         if (o.type == CTILE_DENSE) {
             m << *(o.dense);
@@ -169,14 +173,14 @@ inline rpc::Marshal& operator <<(rpc::Marshal& m, const CTile& o)
     return m;
 }
 
-inline rpc::Marshal& operator >>(rpc::Marshal&m, CTile& o) 
+inline rpc::Marshal& operator>>(rpc::Marshal&m, CTile& o) 
 {
-    m >> (int)o.type;
-    m >> (int)o.sparse_type;
+    m.read(&o.type, sizeof(o.type));
+    m.read(&o.type, sizeof(o.sparse_type));
     m >> o.nd;
     m.read(o.dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
-    m >> o.dtype;
-    m >> o.initialized;
+    m.read(&o.dtype, sizeof(o.dtype));
+    m.read(&o.initialized, sizeof(o.initialized));
     if (o.initialized) {
         if (o.type == CTILE_DENSE) {
             o.dense = new CArray();
@@ -197,4 +201,5 @@ inline rpc::Marshal& operator >>(rpc::Marshal&m, CTile& o)
     return m;
 }
 
-zsh:1: command not found: k1G
+CTile* ctile_creator(PyObject *args);
+#endif

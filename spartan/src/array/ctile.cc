@@ -74,6 +74,7 @@ CTile::~CTile()
     }
 }
 
+bool 
 CTile::set_data(CArray *dense, CArray *mask)
 {
     if (initialized || type == CTILE_MASKED) {
@@ -119,19 +120,19 @@ CTile::initialize(void)
 }
 
 CExtent*
-CTile::slice_to_ex(CSliceIdx &idx) 
+CTile::slice_to_ex(const CSliceIdx &idx) 
 {
     return from_slice(idx, dimensions, nd);
 }
 
 bool
-CTile::is_idx_complete(CSliceIdx &idx)
+CTile::is_idx_complete(const CSliceIdx &idx)
 {
     return is_complete(dimensions, nd, idx);
 }
 
 void 
-CTile::reduce(CSliceIdx &idx, CTile &update, REDUCER reducer)
+CTile::reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer)
 {
     CExtent *ex = slice_to_ex(idx);
     bool trivial = is_idx_complete(idx);
@@ -169,7 +170,7 @@ CTile::reduce(CSliceIdx &idx, CTile &update, REDUCER reducer)
 }
 
 void 
-CTile::update(CSliceIdx &idx, CTile &update_data, npy_intp reducer)
+CTile::update(const CSliceIdx &idx, CTile &update_data, npy_intp reducer)
 {
     std::cout << __func__ << " reducer = " << (unsigned)reducer << std::endl;
     if (!initialized) {
@@ -204,19 +205,19 @@ CTile::update(CSliceIdx &idx, CTile &update_data, npy_intp reducer)
 }
 
 std::vector <char*>
-CTile::get(CSliceIdx &idx)
+CTile::get(const CSliceIdx &idx)
 {
     return to_tile_rpc(idx);
 }
 
 std::vector <char*>
-CTile::to_tile_rpc(CSliceIdx &idx)
+CTile::to_tile_rpc(const CSliceIdx &idx)
 {
     std::cout << __func__ << std::endl;
     std::vector<char*> dest;
 
     CExtent *ex = slice_to_ex(idx);
-    dest.push((char*)(new bool(true)));
+    dest.push_back((char*)(new bool(true)));
     CTile_RPC *rpc = (CTile_RPC*) malloc(sizeof(CTile_RPC));
 
     rpc->type = type;
@@ -224,20 +225,18 @@ CTile::to_tile_rpc(CSliceIdx &idx)
     rpc->initialized = initialized;
     rpc->nd = nd;
     rpc->item_type = dtype;
-    memcpy(rpc.dimensions, dimensions, sizeof(npy_int64) * NPY_MAXDIMS);
-    dest.push((char*)(new NpyMemManager(rpc, rpc, false, sizeof(CTILE_RPC));
+    memcpy(rpc->dimensions, dimensions, sizeof(npy_int64) * NPY_MAXDIMS);
+    dest.push_back((char*)(new NpyMemManager((char*)rpc, (char*)rpc, false, sizeof(CTile_RPC))));
 
     std::cout << __func__ << " A " << std::endl;
-    npy_intp size = sizeof(CTile_RPC);
     if (initialized && type != CTILE_SPARSE) {
         std::cout << __func__ << " C " << std::endl;
-        npy_intp dense_size = ex->size * dense->get_type_size();
 
-        std::vector v = dense->to_carray_rpc(ex);
+        std::vector<char*> v = dense->to_carray_rpc(ex);
         dest.insert(dest.end(), v.begin(), v.end());
         rpc->count = 1;
         if (type == CTILE_MASKED) {
-            std::vector v = dense->to_carray_rpc(ex);
+            std::vector<char*> v = dense->to_carray_rpc(ex);
             dest.insert(dest.end(), v.begin(), v.end());
             rpc->count = 2;
         }
@@ -247,14 +246,14 @@ CTile::to_tile_rpc(CSliceIdx &idx)
         if (is_idx_complete(idx)) {
             rpc->count = 3;
             for (int i = 0; i < 3; i++) {
-                std::vector v = sparse[i]->to_carray_rpc(ex);
+                std::vector<char*> v = sparse[i]->to_carray_rpc(ex);
                 dest.insert(dest.end(), v.begin(), v.end());
             }
         } else {
             /* TODO: Sparse Slicing ..... */
             assert(0);
             //memcpy(base, &rpc, sizeof(CTile_RPC));
-            return NULL;
+            return dest;
         }
     }
     return dest;
@@ -377,12 +376,12 @@ get_longlong(PyObject *o) {
     return 0;
 }
 
-static CTile*
+CTile*
 ctile_creator(PyObject *args)
 {
     PyObject *shape, *data;
     const char* dtype;
-    unsigned long &tile_type, &sparse_type;
+    unsigned long tile_type, sparse_type;
 
     if (!PyArg_ParseTuple(args, "OskkO", &shape, &dtype, &tile_type, &sparse_type, &data))
         return NULL;
@@ -393,7 +392,8 @@ ctile_creator(PyObject *args)
         dimensions[i] = (npy_intp)get_longlong(PyTuple_GetItem(shape, i));
     }
 
-    CTile *tile = new CTile(dimensions, nd, dtype[0], tile_type, sparse_type);
+    CTile *tile = new CTile(dimensions, nd, dtype[0], (CTILE_TYPE)tile_type, 
+                            (CTILE_SPARSE_TYPE)sparse_type);
     if (tile == NULL)
         return NULL;
 

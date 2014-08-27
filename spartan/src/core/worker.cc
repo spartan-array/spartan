@@ -124,8 +124,8 @@ void CWorker::get_tile_info(const TileIdMessage& req, TileInfoResp* resp) {
     std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.tile_id);
     unlock(_blob_lock);
     assert(it != _blobs.end());
-    resp->dtype = (it->second).get_dtype();
-    resp->sparse = ((it->second).get_type() == CTILE_SPARSE);
+    resp->dtype = (it->second)->get_dtype();
+    resp->sparse = ((it->second)->get_type() == CTILE_SPARSE);
 }
 
 void CWorker::create(const CreateTileReq& req, TileIdMessage* resp) {
@@ -154,7 +154,7 @@ void CWorker::update(const UpdateReq& req, EmptyMessage* resp) {
     std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.id);
     unlock(_blob_lock);
     assert(it != _blobs.end());
-    it->second.update(req.region, req.data, req.reducer);
+    it->second->update(req.region, *(req.data), req.reducer);
 }
 
 void CWorker::get(const GetReq& req, GetResp* resp) {

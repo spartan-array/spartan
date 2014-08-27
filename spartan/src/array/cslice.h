@@ -36,6 +36,8 @@ public:
     const CSlice& get_slice(int index) const {return slices[index];};
     int get_nd(void) const {return nd;};
     void set_nd(int nd) {this->nd = nd;};
+    friend rpc::Marshal& operator<<(rpc::Marshal& m, const CSliceIdx& o); 
+    friend rpc::Marshal& operator>>(rpc::Marshal& m, CSliceIdx& o);
 private:
     CSlice slices[NPY_MAXDIMS];
     int nd;
@@ -44,9 +46,9 @@ private:
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const CSliceIdx& o) {
     m << o.get_nd();
     for (int i = 0; i < o.get_nd() ; i++) {
-       m << o.get_slice(i).start;
-       m << o.get_slice(i).stop;
-       m << o.get_slice(i).step;
+       m << o.slices[i].start;
+       m << o.slices[i].stop;
+       m << o.slices[i].step;
     }
     return m;
 }
@@ -61,7 +63,7 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, CSliceIdx& o) {
        m >> start;
        m >> stop;
        m >> step;
-       o.get_slice(i).set_data(start, stop, step);
+       o.slices[i].set_data(start, stop, step);
     }
     return m;
 }

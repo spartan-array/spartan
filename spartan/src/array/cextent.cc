@@ -263,18 +263,24 @@ void offset_slice(CExtent* base, CExtent* other, CSlice slice[])
     }
 }
 
-CExtent* from_slice(CSliceIdx &idx, npy_intp shape[], int ndim)
+CExtent* from_slice(const CSliceIdx &idx, npy_intp shape[], int ndim)
 {
     npy_intp ul[NPY_MAXDIMS], lr[NPY_MAXDIMS];
 
     for (int i = 0; i < ndim; i++) {
         npy_intp dim = shape[i];
+        npy_intp start, stop;
+
+        start = idx.get_slice(i).start;
+        stop = idx.get_slice(i).stop;
         if (idx.get_slice(i).start >= dim) assert(0);
         if (idx.get_slice(i).stop > dim) assert(0);
-        if (idx.get_slice(i).start < 0) idx.get_slice(i).start += dim;
-        if (idx.get_slice(i).stop < 0) idx.get_slice(i).stop += dim;
-        ul[i] = idx.get_slice(i).start;
-        lr[i] = idx.get_slice(i).stop;
+        if (idx.get_slice(i).start < 0) 
+            start += dim;
+        if (idx.get_slice(i).stop < 0) 
+            stop += dim;
+        ul[i] = start;
+        lr[i] = stop;
     }
 
     return extent_create(ul, lr, shape, ndim);
@@ -373,7 +379,7 @@ void find_shape(CExtent **extents, int num_ex,
     }
 }
 
-bool is_complete(npy_intp shape[], int ndim, CSliceIdx &idx)
+bool is_complete(npy_intp shape[], int ndim, const CSliceIdx &idx)
 {
     for (int i = 0; i < ndim; i++) {
         if (idx.get_slice(i).start != 0) return false;
