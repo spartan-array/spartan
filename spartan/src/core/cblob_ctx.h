@@ -156,5 +156,6 @@ public:
 
 };
 
+#include "cblob_ctx.tpp"
 
 #endif

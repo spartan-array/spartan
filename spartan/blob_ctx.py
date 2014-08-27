@@ -12,7 +12,7 @@ import random
 import numpy as np
 from rpc import serialize, RemoteException, WorkerProxy
 from rpc import FutureGroup
-import rpc_array
+import rpc.rpc_array
 
 
 ID_COUNTER = iter(xrange(10000000))

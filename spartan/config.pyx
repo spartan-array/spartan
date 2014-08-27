@@ -179,6 +179,17 @@ FLAGS.add(BoolFlag('capture_expr_stack', default=False))
 FLAGS.add(BoolFlag('dump_timers', default=False))
 FLAGS.add(BoolFlag('load_balance', default=False))
 
+FLAGS.add(HostListFlag('hosts', default=[('localhost', 8)]))
+FLAGS.add(BoolFlag('xterm', default=False, help='Run workers in xterm'))
+FLAGS.add(BoolFlag('oprofile', default=False, help='Run workers inside of operf'))
+FLAGS.add(AssignModeFlag('assign_mode', default=AssignMode.BY_NODE))
+FLAGS.add(BoolFlag('use_single_core', default=True))
+
+FLAGS.add(BoolFlag('use_threads', default=True, help='When running locally, use threads instead of forking. (slow, for debugging)'))
+FLAGS.add(IntFlag('heartbeat_interval', default=3, help='Heartbeat Interval in each worker'))
+FLAGS.add(IntFlag('worker_failed_heartbeat_threshold', default=10, help='the max number of heartbeat that a worker can delay'))
+
+
 # print flags in sorted order
 # from http://stackoverflow.com/questions/12268602/sort-argparse-help-alphabetically
 from argparse import HelpFormatter

@@ -35,14 +35,22 @@ cmdclass['build_ext'] = build_ext
 #cmdclass['sdist'] = cython_sdist
 
 
-
 class clean(Command):
+  description = 'Remove build and trash files'
+  user_options = [("all", "a", "the same")]
+
+  def initialize_options(self):
+    self.all = None
+
+  def finalize_options(self):
+    pass
+
   def run(self):
     subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp", shell=True)
     subprocess.call("rm -rf spartan/array/*.so spartan/array/*.c spartan/array/*.cpp", shell=True)
     subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp", shell=True)
     subprocess.call("make -C spartan/src clean", shell=True)
-    subprocess.call("rm -rf build")
+    subprocess.call("rm -rf build", shell=True)
 
 # FIXME: Should integrate with develop or intall command
 import site
@@ -52,11 +60,12 @@ site.addsitedir(os.path.join(os.path.realpath('.'), 'spartan/rpc/'))
 subprocess.call("make -C spartan/src", shell=True)
 subprocess.call("cp spartan/src/worker spartan", shell=True)
 subprocess.call("cp spartan/src/libspartan_array.so spartan", shell=True)
-subprocess.call("cp spartan/src/libcconfig.so spartan", shell=True)
-subprocess.call("cp spartan/src/rpc/service.py spartan/rpc", shell=True)
+subprocess.call("cp spartan/src/libcore.so spartan", shell=True)
 subprocess.call("mkdir -p spartan/rpc/simplerpc", shell=True)
-subprocess.call("cp spartan/src/rpc/simple-rpc/_pyrpc.so spartan/rpc/simplerpc", shell=True)
+subprocess.call("cp spartan/src/rpc/simple-rpc/build/_pyrpc.so spartan/rpc/simplerpc", shell=True)
 subprocess.call("cp spartan/src/rpc/simple-rpc/pylib/simplerpc/*.py spartan/rpc/simplerpc", shell=True)
+
+subprocess.call("cp spartan/src/rpc/service.py spartan/rpc", shell=True)
 
 path = os.path.realpath('spartan/src/rpc/simple-rpc/pylib/simplerpc/')
 new_path = os.path.realpath('spartan/rpc/simplerpc/')
@@ -68,6 +77,17 @@ for f in os.listdir(path):
           line = line.replace('simplerpc.', '.')
           line = line.replace('simplerpc ', '. ')
           wfp.write(line)
+
+path = os.path.relpath('spartan/src/rpc/service.py')
+new_path = os.path.relpath('spartan/rpc/simplerpc/service.py')
+with open(path) as rfp:
+  with open(new_path, 'w') as wfp:
+    for line in rfp:
+      line = line.replace('simplerpc.', '.')
+      line = line.replace('simplerpc ', '. ')
+      wfp.write(line)
+
+
 
 
 base = '.' #os.path.dirname(os.path.realpath(__file__))
@@ -135,9 +155,9 @@ setup(
               language='c++',
               include_dirs=ext_include_dirs,
               library_dirs=ext_link_dirs,
-              extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc"],
+              extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc", "-lcore"],
               extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
-                               "-lbase", "-lpython2.7"]),
+                               "-lbase", "-lcore", "-lpython2.7"]),
     Extension('spartan.rpc._rpc_array',
               ['spartan/src/rpc/_rpc_array.cc'],
               language='c++',
@@ -162,8 +182,8 @@ setup(
               language='c++',
               include_dirs=ext_include_dirs,
               library_dirs=ext_link_dirs,
-              extra_compile_args=["-std=c++0x", "-lcconfig"],
-              extra_link_args=["-std=c++11", "-lcconfig"]),
+              extra_compile_args=["-std=c++0x", "-lcore"],
+              extra_link_args=["-std=c++11", "-lcore"]),
 
     # Example extensions
     Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core.pyx']),

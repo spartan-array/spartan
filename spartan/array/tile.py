@@ -3,31 +3,31 @@ import numpy.ma as ma
 import scipy.sparse as sp
 from _ctile_py_if import *
 
-TYPE_DENSE = Tile.TILE_DENSE
-TYPE_MASKED = Tile.TILE_MASKED
-TYPE_SPARSE = Tile.TILE_SPARSE
+TYPE_DENSE = TileBase.TILE_DENSE
+TYPE_MASKED = TileBase.TILE_MASKED
+TYPE_SPARSE = TileBase.TILE_SPARSE
 
 
 def npdata_to_internal(data):
   ttype = None
-  stype = Tile.TILE_SPARSE_NONE
+  stype = TileBase.TILE_SPARSE_NONE
   data = None
   if sp.issparse(data):
-    ttype = Tile.TILE_SPARSE
+    ttype = TileBase.TILE_SPARSE
     if isinstance(data, sp.coo_matrix):
-      stype = Tile.TILE_SPARSE_COO
+      stype = TileBase.TILE_SPARSE_COO
       data = (data.row, data.col, data.data)
     elif isinstance(data, sp.csc_matrix):
-      stype = Tile.TILE_SPARSE_CSC
+      stype = TileBase.TILE_SPARSE_CSC
       data = (data.indices, data.inptr, data.data)
     elif isinstance(data, sp.csr_matrix):
-      stype = Tile.TILE_SPARSE_CSR
+      stype = TileBase.TILE_SPARSE_CSR
       data = (data.indices, data.inptr, data.data)
   elif isinstance(data, ma.MaskedArray):
-    ttype = Tile.TILE_MASKED
+    ttype = TileBase.TILE_MASKED
     data = (data.data, data.mask)
   else:
-    ttype = Tile.TILE_DENSE
+    ttype = TileBase.TILE_DENSE
     data = (data,)
 
   return data.shape, data.dtype.char, ttype, stype, data
@@ -43,10 +43,10 @@ class Tile(TileBase):
     print '__init__', dtype
     super(Tile, self).__init__(shape, np.dtype(dtype).char, tile_type, sparse_type, data)
     self.builtin_reducers = {}
-    self.builtin_reducers[np.add] = Tile.TILE_REDUCER_ADD
-    self.builtin_reducers[np.multiply] = Tile.TILE_REDUCER_MUL
-    self.builtin_reducers[np.maximum] = Tile.TILE_REDUCER_MAXIMUM
-    self.builtin_reducers[np.minimum] = Tile.TILE_REDUCER_MINIMUM
+    self.builtin_reducers[np.add] = TileBase.TILE_REDUCER_ADD
+    self.builtin_reducers[np.multiply] = TileBase.TILE_REDUCER_MUL
+    self.builtin_reducers[np.maximum] = TileBase.TILE_REDUCER_MAXIMUM
+    self.builtin_reducers[np.minimum] = TileBase.TILE_REDUCER_MINIMUM
 
   def get(self, subslice, local=False):
     if local:
@@ -81,7 +81,7 @@ def from_data(data):
               tile_data)
 
 
-def from_shape(shape, dtype, tile_type, sparse_type=Tile.TILE_SPARSE_COO):
+def from_shape(shape, dtype, tile_type, sparse_type=TileBase.TILE_SPARSE_COO):
   print 'well', shape, dtype, tile_type, sparse_type
   return Tile(shape,
               np.dtype(dtype).char,

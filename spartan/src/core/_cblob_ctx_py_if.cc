@@ -286,10 +286,10 @@ static PyMethodDef CBlobCtx_Py_methods[] = {
 static PyTypeObject CBlobCtx_PyType = {
     PyObject_HEAD_INIT(NULL)
     0,                           /* ob_size */
-    "blob_ctx.CBlobCtx_Py",     /* tp_name */
-    sizeof(CBlobCtx_Py),        /* tp_basicsize */
+    "blob_ctx.CBlobCtx_Py",      /* tp_name */
+    sizeof(CBlobCtx_Py),         /* tp_basicsize */
     0,                           /* tp_itemsize */
-    CBlobCtx_Py_dealloc,        /* tp_dealloc */
+    CBlobCtx_Py_dealloc,         /* tp_dealloc */
     0,                           /* tp_print */
     0,                           /* tp_getattr */
     0,                           /* tp_setattr */
@@ -341,7 +341,7 @@ init_cblob_ctx_py_if(void)
     if (PyType_Ready(&CBlobCtx_PyType) < 0)
         return;
 
-    m = Py_InitModule3("_cblob_ctx_if", _cblob_ctx_py_if_methods,
+    m = Py_InitModule3("_cblob_ctx_py_if", _cblob_ctx_py_if_methods,
                        "Python interface for cblob_ctx module");
 
     Py_INCREF(&CBlobCtx_PyType);

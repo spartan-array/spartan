@@ -119,7 +119,6 @@ TileBase_get(PyObject* o, PyObject* args)
     TileBase *self = (TileBase*)o;
     PyObject *slice;
 
-    std::cout << __func__ << (void*)&PyArray_Type << std::endl;
     if (!PyArg_ParseTuple(args, "O",  &slice))
         return NULL;
 
@@ -380,5 +379,4 @@ init_ctile_py_if(void)
     PyModule_AddObject(m, "TileBase", (PyObject *)&TileBaseType);
 
     //import_array();   /* required NumPy initialization */
-    std::cout << (void*)&PyArray_Type  << std::endl;
 }

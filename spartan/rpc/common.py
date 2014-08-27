@@ -9,7 +9,6 @@ import cPickle
 import pickle
 import sys
 import traceback
-
 from . import future, cloudpickle
 from .. import util
 
@@ -33,7 +32,7 @@ class TimeoutException(Exception):
 
   def __str__(self):
     return repr(self)
-  
+
 class RemoteException(Exception):
   '''Wrap a uncaught remote exception.'''
   def __init__(self, tb):
@@ -52,13 +51,13 @@ def serialize_to(obj, writer):
   except (ImportError, pickle.PicklingError, PickleError, TypeError):
     writer.seek(pos)
     cloudpickle.dump(obj, writer, -1)
-    
+
 def serialize(obj):
   try:
     return cPickle.dumps(obj, -1)
   except (pickle.PicklingError, PickleError, TypeError):
     return cloudpickle.dumps(obj, -1)
-    
+
 def read(f):
   return cPickle.loads(f)
 
