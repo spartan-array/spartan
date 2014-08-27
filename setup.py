@@ -2,7 +2,7 @@
 
 from setuptools import setup, Extension, Command
 #from Cython.Build import cythonize
-#import os
+import os
 import subprocess
 
 cmdclass = {}
@@ -35,6 +35,7 @@ cmdclass['build_ext'] = build_ext
 #cmdclass['sdist'] = cython_sdist
 
 
+
 class clean(Command):
   def run(self):
     subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp", shell=True)
@@ -43,11 +44,31 @@ class clean(Command):
     subprocess.call("make -C spartan/src clean", shell=True)
     subprocess.call("rm -rf build")
 
+# FIXME: Should integrate with develop or intall command
+import site
+site.addsitedir(os.path.join(os.path.realpath('.'), 'spartan/rpc/'))
 
 # FIXME: Should integrate with setuptool
 subprocess.call("make -C spartan/src", shell=True)
 subprocess.call("cp spartan/src/worker spartan", shell=True)
 subprocess.call("cp spartan/src/libspartan_array.so spartan", shell=True)
+subprocess.call("cp spartan/src/libcconfig.so spartan", shell=True)
+subprocess.call("cp spartan/src/rpc/service.py spartan/rpc", shell=True)
+subprocess.call("mkdir -p spartan/rpc/simplerpc", shell=True)
+subprocess.call("cp spartan/src/rpc/simple-rpc/_pyrpc.so spartan/rpc/simplerpc", shell=True)
+subprocess.call("cp spartan/src/rpc/simple-rpc/pylib/simplerpc/*.py spartan/rpc/simplerpc", shell=True)
+
+path = os.path.realpath('spartan/src/rpc/simple-rpc/pylib/simplerpc/')
+new_path = os.path.realpath('spartan/rpc/simplerpc/')
+for f in os.listdir(path):
+  if f.endswith(".py"):
+    with open(os.path.join(path, f)) as rfp:
+      with open(os.path.join(new_path, f), 'w') as wfp:
+        for line in rfp:
+          line = line.replace('simplerpc.', '.')
+          line = line.replace('simplerpc ', '. ')
+          wfp.write(line)
+
 
 base = '.' #os.path.dirname(os.path.realpath(__file__))
 ext_include_dirs = ['/usr/local/include',
@@ -140,7 +161,9 @@ setup(
               ['spartan/config.pyx'],
               language='c++',
               include_dirs=ext_include_dirs,
-              library_dirs=ext_link_dirs),
+              library_dirs=ext_link_dirs,
+              extra_compile_args=["-std=c++0x", "-lcconfig"],
+              extra_link_args=["-std=c++11", "-lcconfig"]),
 
     # Example extensions
     Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core.pyx']),

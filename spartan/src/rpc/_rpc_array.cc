@@ -85,7 +85,7 @@ static PyMethodDef _rpc_ctile_methods[] = {
 #define PyMODINIT_FUNC void
 #endif
 PyMODINIT_FUNC
-init_rpc_ctile_py_if(void) 
+init_rpc_array(void) 
 {
     (void)Py_InitModule("_rpc_array", _rpc_ctile_methods);
 }
