@@ -179,12 +179,9 @@ void CWorker::get(const GetReq& req, GetResp* resp) {
     std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.id);
     unlock(_blob_lock);
     assert(it != _blobs.end());
-    Log_debug("feginfegin a\n");
-    //resp->data = it->second->get(req.subslice);
-    std::vector<char*> data = it->second->get(req.subslice);
-    Log_debug("feginfegin b\n");
-    resp->data = data;
+    resp->data = it->second->get(req.subslice);
     Log_debug("feginfegin c\n");
+
 }
 
 void CWorker::get_flatten(const GetReq& req, GetResp* resp) {
@@ -241,7 +238,8 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
                         "util.log_info('----------------------------------------------')\n"
                         "results[tile_id]=map_result.result\n"
                         "if map_result.futures is not None:\n"
-                        "\tfutures.append(map_result.futures)\n";
+                        "  assert isinstance(map_result.futures, list)\n"
+                        "  futures.extend(map_result.futures)\n";
 
     PyObject *pMain, *pLocal;
     {

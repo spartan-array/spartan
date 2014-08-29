@@ -176,8 +176,10 @@ class DistArray(object):
       return result[0]
 
     ex = extent.from_slice(idx, self.shape)
-    #util.log_info('Select: %s + %s -> %s', idx, self.shape, ex)
-    return self.fetch(ex)
+    util.log_info('Select: %s + %s -> %s', idx, self.shape, ex)
+    ret = self.fetch(ex)
+    util.log_info('Select: done')
+    return ret
 
   def __getitem__(self, idx):
     return self.select(idx)
@@ -315,6 +317,7 @@ class DistArrayImpl(DistArray):
     # if we have any masked tiles, then we need to create a masked array.
     # otherwise, create a dense array.
     results = [r.data for r in futures.result]
+    util.log_info('FETCH: %s', len(results))
 
     DENSE = 0
     MASKED = 1
@@ -349,6 +352,9 @@ class DistArrayImpl(DistArray):
           tgt = sparse.compute_sparse_update(tgt, result, dst_slice)
         else:
           tgt[dst_slice] = result
+
+    util.log_info('FETCH: end')
+    util.log_info('FETCH: end with %s', tgt)
 
 
     return tgt
@@ -522,7 +528,10 @@ def from_table(extents):
     util.log_debug('%s :: %s', key, tile_id)
 
     resp = blob_ctx.get().get_tile_info(tile_id)
-    dtype = getattr(np, resp.dtype)
+    if len(resp.dtype) == 1:
+      dtype = np.dtype(resp.dtype).type
+    else:
+      dtype = getattr(np, resp.dtype)
     sparse = resp.sparse
   else:
     # empty table; default dtype.

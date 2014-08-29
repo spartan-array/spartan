@@ -9,29 +9,29 @@ TYPE_MASKED = TileBase.TILE_MASKED
 TYPE_SPARSE = TileBase.TILE_SPARSE
 
 
-def npdata_to_internal(data):
+def npdata_to_internal(array):
   ttype = None
   stype = TileBase.TILE_SPARSE_NONE
   data = None
-  if sp.issparse(data):
+  if sp.issparse(array):
     ttype = TileBase.TILE_SPARSE
-    if isinstance(data, sp.coo_matrix):
+    if isinstance(array, sp.coo_matrix):
       stype = TileBase.TILE_SPARSE_COO
-      data = (data.row, data.col, data.data)
-    elif isinstance(data, sp.csc_matrix):
+      data = (array.row, array.col, array.data)
+    elif isinstance(array, sp.csc_matrix):
       stype = TileBase.TILE_SPARSE_CSC
-      data = (data.indices, data.inptr, data.data)
-    elif isinstance(data, sp.csr_matrix):
+      data = (array.indices, array.inptr, array.data)
+    elif isinstance(array, sp.csr_matrix):
       stype = TileBase.TILE_SPARSE_CSR
-      data = (data.indices, data.inptr, data.data)
-  elif isinstance(data, ma.MaskedArray):
+      data = (array.indices, array.inptr, array.data)
+  elif isinstance(array, ma.MaskedArray):
     ttype = TileBase.TILE_MASKED
-    data = (data.data, data.mask)
+    data = (array.data, array.mask)
   else:
     ttype = TileBase.TILE_DENSE
-    data = (data,)
+    data = (array,)
 
-  return data.shape, data.dtype.char, ttype, stype, data
+  return array.shape, array.dtype.char, ttype, stype, data
 
 
 class Tile(TileBase):
@@ -40,9 +40,10 @@ class Tile(TileBase):
       it is pointless to implemented in pure c++. This class provides
       simpler implementation for such operations.
   '''
-  def __init__(self, shape, dtype, tile_type, sparse_type, data):
-    print '__init__', dtype
-    super(Tile, self).__init__(shape, np.dtype(dtype).char, tile_type, sparse_type, data)
+  def __init__(self, shape, dtype, tile_type, sparse_type, data, ctile_id=None):
+    util.log_info('Tile.__init__')
+    super(Tile, self).__init__(shape, np.dtype(dtype).char, tile_type,
+                               sparse_type, data, ctile_id=ctile_id)
     self.builtin_reducers = {}
     self.builtin_reducers[np.add] = TileBase.TILE_REDUCER_ADD
     self.builtin_reducers[np.multiply] = TileBase.TILE_REDUCER_MUL
@@ -73,7 +74,7 @@ class Tile(TileBase):
 
 def from_data(data):
   util.log_info("from_data")
-  shape, dtype, sparse_type, tile_type, tile_data = npdata_to_internal(data)
+  shape, dtype, tile_type, sparse_type, tile_data = npdata_to_internal(data)
 
   assert isinstance(tile_data, tuple), (type(tile_data))
   return Tile(shape,

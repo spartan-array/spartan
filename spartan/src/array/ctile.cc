@@ -29,7 +29,7 @@ CTile::CTile(npy_intp dimensions[], int nd, char dtype,
     for (i = 0; i < 3; i++) {
         sparse[i] = NULL;
     }
-    std::cout << __func__ << '1' << std::endl;
+    std::cout << __func__ << " A Done" << std::endl;
 }
 
 CTile::CTile(CTile_RPC *rpc)
@@ -37,7 +37,7 @@ CTile::CTile(CTile_RPC *rpc)
 {
     std::cout << __func__ << " B" << std::endl;
     type = (CTILE_TYPE)rpc->type;
-    sparse_type = (CTILE_SPARSE_TYPE)rpc->type;
+    sparse_type = (CTILE_SPARSE_TYPE)rpc->sparse_type;
     initialized = rpc->initialized;
     nd = rpc->nd;
     for (int i = 0; i < rpc->nd; i++) {
@@ -45,10 +45,22 @@ CTile::CTile(CTile_RPC *rpc)
     }
     dtype = rpc->item_type;
 
+    std::cout << __func__ << " B 1 " << std::endl;
+    std::cout << __func__ << " is initialized " << initialized << std::endl;
+    std::cout << __func__ << " type is " << type << std::endl;
+    std::cout << __func__ << " sparse_type is " << sparse_type << std::endl;
+    std::cout << __func__ << " dtype is " << dtype << std::endl;
+    std::cout << __func__ << " nd is " << nd << std::endl;
     if (!initialized) {
+        dense = NULL;
+        mask = NULL;
+        for (int i = 0; i < 3; i++) {
+            sparse[i] = NULL;
+        }
         return;
     }
 
+    std::cout << __func__ << " B 2" << std::endl;
     if (type != CTILE_SPARSE) {
         for (int i = 0; i < 3; i++) {
             sparse[i] = NULL;
@@ -65,6 +77,8 @@ CTile::CTile(CTile_RPC *rpc)
             sparse[i] = new CArray(rpc->array[i]);
         }
     }
+
+    std::cout << __func__ << " B Done" << std::endl;
 }
 
 CTile::~CTile()
@@ -216,12 +230,16 @@ std::vector <char*>
 CTile::to_tile_rpc(const CSliceIdx &idx)
 {
     std::cout << __func__ << std::endl;
+    std::cout << __func__ << " address = " << (unsigned long) this << std::endl;
     std::vector<char*> dest;
     CExtent *ex = slice_to_ex(idx);
     dest.push_back((char*)(new bool(true)));
     CTile_RPC *rpc = (CTile_RPC*) malloc(sizeof(CTile_RPC));
 
     rpc->type = type;
+    std::cout << __func__ << " is initialized is " << initialized << std::endl;
+    std::cout << __func__ << " type is " << type << std::endl;
+    std::cout << __func__ << " sparse_type is " << type << std::endl;
     rpc->sparse_type = sparse_type;
     rpc->initialized = initialized;
     rpc->nd = nd;
@@ -267,7 +285,7 @@ CTile::to_tile_rpc(const CSliceIdx &idx)
 PyObject*
 CTile::to_npy(void)
 {
-    std::cout << "CTile::" << __func__ << std::endl;
+    std::cout << "CTile::" << __func__ <<  " " << type << std::endl;
     if (!initialized) {
         std::cout << "get a uninitialized tile" << std::endl;
         PyObject *mod, *object, *npy_dimensions;
@@ -299,6 +317,7 @@ CTile::to_npy(void)
         std::cout << "After creating a matric" << std::endl;
         return ret;
     } else if (type == CTILE_DENSE) {
+        std::cout << "dense array" << std::endl;
         return dense->to_npy();
     } else if (type == CTILE_MASKED) {
         PyObject *npy_dense = dense->to_npy();
@@ -402,7 +421,7 @@ ctile_creator(PyObject *args)
     if (tile == NULL)
         return NULL;
 
-    std::cout << __func__ << std::endl;
+    std::cout << __func__ << " tile_type = " << tile_type << std::endl;
     if (data != Py_None) {
         assert(PyTuple_Check(data) != 0);
         if (tile_type != CTILE_SPARSE) {
@@ -435,5 +454,6 @@ ctile_creator(PyObject *args)
         }
     }
 
+    std::cout << __func__ << " address = " << (unsigned long) tile << std::endl;
     return tile;
 }

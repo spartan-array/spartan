@@ -76,7 +76,6 @@ class Master(MasterService):
       req (RegisterReq):
       handle (PendingRequest):
     '''
-    util.log_info ('************************')
     id = len(self._workers)
     c = Client()
     c.connect(req.host)

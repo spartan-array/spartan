@@ -29,6 +29,7 @@ class CSliceIdx {
 public:
     CSliceIdx() : nd(0) {};
     CSliceIdx(int nd) : nd(nd) {};
+    //CSliceIdx(int nd, npy_intp *dimensions);
     CSliceIdx(PyObject *slice, int nd, npy_intp *dimensions);
     ~CSliceIdx() {};
 

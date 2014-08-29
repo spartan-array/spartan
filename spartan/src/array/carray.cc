@@ -73,10 +73,19 @@ CArray::CArray(npy_intp dimensions[], int nd, char type, char *data, NpyMemManag
 
 CArray::CArray(CArray_RPC *rpc)
 {
+    std::cout << __func__ << " " << rpc << std::endl;
+    std::cout << __func__ << " is_npy_memmanager = " << rpc->is_npy_memmanager << std::endl;
+    std::cout << __func__ << " nd = " << (int)rpc->nd << std::endl;
+    std::cout << __func__ << " size = " << rpc->size << std::endl;
+
+    for (int i = 0; i < (int)rpc->nd; ++i) {
+        std::cout << __func__ << " " << rpc->dimensions[i] << std::endl;  
+    }
     init(rpc->dimensions, (int)rpc->nd, (char)rpc->item_type);
     if (rpc->is_npy_memmanager) { 
         data_source = (NpyMemManager*)(rpc->data);
         data = data_source->get_data();
+        data_source = new NpyMemManager(data, data, false, size);
     } else {
         data = rpc->data;
         data_source = new NpyMemManager(data, data, false, size);
@@ -85,8 +94,11 @@ CArray::CArray(CArray_RPC *rpc)
 
 CArray::~CArray()
 {
-    if (data_source != NULL)
+    std::cout << __func__ << std::endl;
+    if (data_source != NULL) {
+        std::cout << __func__ << " " << (unsigned long) data_source->get_source() << std::endl;
         delete data_source;
+    }
 }
 
 void

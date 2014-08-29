@@ -110,8 +110,8 @@ class Future_Get(simplerpc.future.Future):
       self.err_code, rep_marshal_id = _pyrpc.future_timedwait(self.id, timeout_msec)
 
     if rep_marshal_id != 0 and self.err_code == 0:
-      rep_m = Marshal(id=rep_marshal_id)
-      rep_m.read_obj(['Tile_id'])
+      #rep_m = Marshal(id=rep_marshal_id)
+      #rep_m.read_obj('TileId')
       self.rep = rpc_array.deserialize_get_resp(rep_marshal_id)
     else:
       assert False, (self.id, rep_marshal_id, self.err_code)

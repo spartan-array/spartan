@@ -76,15 +76,19 @@ _CBlobCtx_Py_get(PyObject* o, PyObject *args, bool is_flatten)
     PyObject *tile_id, *subslice, *id_worker, *id_id;
     assert(self->ctx != NULL);
 
+    std::cout << __func__ << " 1" << std::endl;
     if (!PyArg_ParseTuple(args, "OO", &tile_id, &subslice))
         return NULL;
 
     id_worker = PyObject_GetAttrString(tile_id, "worker");
     id_id = PyObject_GetAttrString(tile_id, "id");
+    std::cout << __func__ << " 2 " << id_worker << " " << id_id << std::endl;
     assert(id_worker != NULL);
     assert(id_id != NULL);
     TileId id(get_longlong(id_worker), get_longlong(id_id));
+    std::cout << __func__ << " 3" << std::endl;
     CSliceIdx idx(subslice, 0, NULL);
+    std::cout << __func__ << " 4" << std::endl;
 
     GetResp *resp = new GetResp();
     rpc::Future *fu = NULL;

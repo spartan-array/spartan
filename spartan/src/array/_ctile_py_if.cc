@@ -1,7 +1,7 @@
 #include <Python.h>
 #include <structmember.h>
-//#define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
-//#define NO_IMPORT_ARRAY
+#define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
+#define NO_IMPORT_ARRAY
 #include <numpy/arrayobject.h>
 #include <iostream>
 #include "ctile.h"
@@ -69,6 +69,8 @@ TileBase_dealloc(PyObject *o)
         std::cout << __func__ << " Can't release the ctile" << std::endl;
     }
     self->c_tile = NULL;
+    Py_DECREF(self->shape);
+    Py_DECREF(self->dtype);
     self->ob_type->tp_free((PyObject*)self);
 }
 
@@ -148,25 +150,10 @@ TileBase__update(PyObject* o, PyObject* args)
 {
     TileBase *self = (TileBase*)o;
     PyObject *slice, *data, *tile_type, *sparse_type, *reducer;
-    //PyObject *kargs;
-    //char *klist=["private_id"];
 
     std::cout << __func__ << std::endl;
-    //if (!PyArg_ParseTupleAndKeywords(args, &kargs, "OOOOO", klist, &slice, &tile_type, &sparse_type, &data, &reducer))
     if (!PyArg_ParseTuple(args, "OOOOO", &slice, &tile_type, &sparse_type, &data, &reducer))
         return NULL;
-
-    //if (kargs != Py_None) {
-        //PyObject *pid = PyDict_GetItemString(kargs, "private_id");
-        //if (PyInt_Check(pid))
-            //self->c_tile = (CTile*) PyInt_AsLong(pid);
-        //else if(PyLong_Check(pid))
-            //self->c_tile = (CTile*) PyLong_AsLongLong(pid);
-        //else
-            //assert(0);
-        //Py_INCREF(o);
-        //return o;
-    //}
 
     CSliceIdx cslice_idx(slice, self->c_tile->get_nd(), self->c_tile->get_dimensions());
     CTILE_TYPE ttype = (CTILE_TYPE)get_longlong(tile_type);
@@ -216,13 +203,47 @@ TileBase__update(PyObject* o, PyObject* args)
 static int
 TileBase_init(PyObject *o, PyObject *args, PyObject *kwds)
 {
-    std::cout << __func__ << std::endl;
+    PyObject *cid = NULL;
+    std::cout << __func__ << " " << kwds << std::endl;
+    if (kwds != Py_None) {
+        assert(PyDict_Check(kwds) != 0);
+        cid = PyDict_GetItemString(kwds, (char*)"ctile_id");
+        assert(cid != NULL);
+    }
+    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
+
     TileBase *self = (TileBase*)o;
-    self->c_tile = ctile_creator(args);
-    if (self->c_tile == NULL)
-        return -1;
+    if (cid != NULL && cid != Py_None) {
+        if (PyInt_Check(cid))
+            self->c_tile = (CTile*) PyInt_AsLong(cid);
+        else if(PyLong_Check(cid))
+            self->c_tile = (CTile*) PyLong_AsLongLong(cid);
+        else
+            assert(0);
+    } else {
+        self->c_tile = ctile_creator(args);
+        if (self->c_tile == NULL)
+            return -1;
+    }
+
+    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
+    npy_intp *dimensions = self->c_tile->get_dimensions();
+    PyObject *shape = PyTuple_New(self->c_tile->get_nd());
+    for (int i = 0; i < self->c_tile->get_nd(); ++i) {
+        PyTuple_SetItem(shape, i, Py_BuildValue("k", dimensions[i]));
+    }
+    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
+    self->shape = shape;
+    std::cout << __func__ << self->c_tile->get_dtype() << std::endl;
+    int dtype_num = npy_type_token_to_number(self->c_tile->get_dtype());
+    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
+    self->dtype = (PyObject*)PyArray_DescrNewFromType(dtype_num);
+    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
+    self->type = self->c_tile->get_type();
+    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
     // Tell c++ part that someone else is using this CTile.
     self->c_tile->increase_py_c_refcount();
+    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
     return 0;
 }
 
@@ -235,33 +256,19 @@ TileBase_repr(PyObject *o)
 }
 
 static PyObject*
-TileBase_gettype(TileBase *self, void *closure)
-{
-    return PyInt_FromLong(self->c_tile->get_type());
-}
-
-static PyObject*
-TileBase_getdtype(TileBase *self, void *closure)
-{
-    char str[2] = {'\0', '\0'};
-
-    str[0] = self->c_tile->get_dtype();
-    return PyString_FromString(str);
-}
-
-static PyObject*
 TileBase_getdata(TileBase *self, void *closure)
 {
     return self->c_tile->to_npy();
 }
 
 static PyMemberDef TileBase_members[] = {
+    {(char*)"type", T_INT, offsetof(TileBase, type), 0, (char*)"type"},
+    {(char*)"shape", T_OBJECT_EX, offsetof(TileBase, shape), 0, (char*)"shape"},
+    {(char*)"dtype", T_OBJECT_EX, offsetof(TileBase, dtype), 0, (char*)"dtype"},
     {NULL} /* Sentinel */
 };
 
 static PyGetSetDef TileBase_getseters[] = {
-    {(char*)"type", (getter)TileBase_gettype, NULL, (char*)"dtype", NULL},
-    {(char*)"dtype", (getter)TileBase_getdtype, NULL, (char*)"dtype", NULL},
     {(char*)"data", (getter)TileBase_getdata, NULL, (char*)"data", NULL},
     {NULL} /* Sentinel */
 };

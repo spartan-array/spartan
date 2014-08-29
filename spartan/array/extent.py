@@ -44,13 +44,13 @@ def shape_for_reduction(input_shape, axis):
 
 def find_overlapping(extents, region):
   '''
-  Return the extents that overlap with ``region``.   
-  
+  Return the extents that overlap with ``region``.
+
   :param extents: List of extents to search over.
   :param region: `Extent` to match.
   '''
   for ex in extents:
-    overlap = extent.intersection(ex, region)
+    overlap = intersection(ex, region)
     if overlap is not None:
       yield (ex, overlap)
 

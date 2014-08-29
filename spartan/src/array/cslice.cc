@@ -38,7 +38,7 @@ CSliceIdx::CSliceIdx(PyObject *idx, int nd, npy_intp *dimensions)
             Py_ssize_t start, stop, step, slicelength;
             PyObject *slc = PyTuple_GET_ITEM(idx, i);
             assert(PySlice_Check(slc) != 0);
-            PySlice_GetIndicesEx((PySliceObject*)slc, NPY_MAX_ULONG,
+            PySlice_GetIndicesEx((PySliceObject*)slc, NPY_MAX_INTP,
                                  &start, &stop, &step, &slicelength);
             slices[i].start = (npy_intp) start;
             slices[i].stop = (npy_intp) stop;
@@ -50,7 +50,9 @@ CSliceIdx::CSliceIdx(PyObject *idx, int nd, npy_intp *dimensions)
     if (!PyTuple_Check(idx)) {
         if (PySlice_Check(idx)) {
             Py_ssize_t start, stop, step, slicelength;
-            PySlice_GetIndicesEx((PySliceObject*)idx, dimensions[0], 
+            npy_intp bound = (dimensions == NULL) ? NPY_MAX_INTP : dimensions[0];
+            std::cout << "bound = " << bound << std::endl;
+            PySlice_GetIndicesEx((PySliceObject*)idx, bound,
                                  &start, &stop, &step, &slicelength);
             slices[0].start = (npy_intp) start;
             slices[0].stop = (npy_intp) stop;
@@ -70,7 +72,8 @@ CSliceIdx::CSliceIdx(PyObject *idx, int nd, npy_intp *dimensions)
             if (PySlice_Check(slc)) {
                 //std::cout << "2" << std::endl;
                 Py_ssize_t start, stop, step, slicelength;
-                PySlice_GetIndicesEx((PySliceObject*)slc, dimensions[i], 
+                npy_intp bound = (dimensions == NULL) ? NPY_MAX_INTP : dimensions[i];
+                PySlice_GetIndicesEx((PySliceObject*)slc, bound,
                                      &start, &stop, &step, &slicelength);
                 slices[i].start = (npy_intp) start;
                 slices[i].stop = (npy_intp) stop;

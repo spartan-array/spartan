@@ -47,8 +47,9 @@ typedef struct CTile_RPC_t {
      CArray_RPC* array[3];
 } CTile_RPC;
 
-inline CTile_RPC* vector_to_ctile_rpc(std::vector<char*> buffers) {
+inline CTile_RPC* vector_to_ctile_rpc(std::vector<char*> &buffers) {
     bool is_npy_memmanager= *(bool*)buffers[0];
+    delete (bool*)buffers[0];
 
     CTile_RPC *rpc;
     if (is_npy_memmanager) {
@@ -58,26 +59,27 @@ inline CTile_RPC* vector_to_ctile_rpc(std::vector<char*> buffers) {
         mgr->clear();
         delete mgr;
         rpc->array[0] = rpc->array[1] = rpc->array[2] = NULL;
-        for (unsigned i = 2; i < buffers.size(); i += 2) {
+        for (unsigned i = 2, array_idx = 0; i < buffers.size(); i += 2, array_idx++) {
             assert((i + 1) < buffers.size());
             mgr = (NpyMemManager*)buffers[i];
-            rpc->array[i] = (CArray_RPC*) mgr->get_data();
+            rpc->array[array_idx] = (CArray_RPC*) mgr->get_data();
             mgr->clear();
             delete mgr;
-            rpc->array[i]->is_npy_memmanager = true;
-            rpc->array[i]->data = buffers[i + 1];
+            rpc->array[array_idx]->is_npy_memmanager = true;
+            rpc->array[array_idx]->data = buffers[i + 1];
         }
     } else {
         rpc = (CTile_RPC*)buffers[1];
         rpc->array[0] = rpc->array[1] = rpc->array[2] = NULL;
-        for (unsigned i = 2; i < buffers.size(); i += 2) {
+        std::cout << __func__ << std::endl;
+        for (unsigned i = 2, array_idx = 0; i < buffers.size(); i += 2) {
             assert((i + 1) < buffers.size());
-            rpc->array[i] = (CArray_RPC*) buffers[i];
-            rpc->array[i]->is_npy_memmanager = false;
-            rpc->array[i]->data = buffers[i + 1];
+            rpc->array[array_idx] = (CArray_RPC*) buffers[i];
+            rpc->array[array_idx]->is_npy_memmanager = false;
+            rpc->array[array_idx]->data = buffers[i + 1];
+            std::cout <<  __func__ << " " << (unsigned long )buffers[i + 1] << std::endl;
         }
     }
-    delete (bool*)buffers[0];
 
     return rpc;
 }
@@ -85,8 +87,18 @@ inline CTile_RPC* vector_to_ctile_rpc(std::vector<char*> buffers) {
 inline void release_ctile_rpc(CTile_RPC* rpc)
 {
     for (int i = 0; i < 3; ++i) {
-        if (rpc->array[i] != NULL)
-            free(rpc->array[i]);
+        if (rpc->array[i] != NULL) {
+            if (rpc->array[i]->is_npy_memmanager) {
+                delete rpc->array[i];
+            } else {
+                /**
+                * If this contains raw data, the data will be
+                * directly used by CTile. It should not be 
+                * deleted here.
+                */
+                ;
+            }
+        }
     } 
     free(rpc);
 }

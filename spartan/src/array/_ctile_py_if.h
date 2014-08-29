@@ -3,5 +3,8 @@
 typedef struct {
     PyObject_HEAD
     CTile *c_tile;
+    int type;
+    PyObject* shape;
+    PyObject* dtype;
 } TileBase;
 #endif

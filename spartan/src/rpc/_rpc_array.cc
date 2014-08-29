@@ -49,29 +49,34 @@ static PyObject *
 get_resp_to_tile(PyObject* o, PyObject *args)
 {
     unsigned long u; 
+    std::cout << __func__ << std::endl;
     if (!PyArg_ParseTuple(args, "k", &u)) 
         return NULL;
     
     GetResp* resp = (GetResp*) u;
     assert(!resp->own_data);
 
-    //PyObject *mod = PyImport_ImportModule("spartan.array.tile");
-    //PyObject *obj = PyObject_GetAttrString(mod, "Tile");
-    //PyObject *args = Py_BuildValue("(OOOOO)", Py_None, Py_None, Py_None, 
-                                              //Py_None, Py_None);
-    //PyObject *kargs = PyDict_New();
-    //PyDict_SetItem(kargs, PyString_FromString("private_id"),
-                   //Py_BuildValue("k", (unsigned long)ctile));
-    //PyObject *tile = PyObject_Call(obj, args, kargs);
-    
+    std::cout << __func__ << " vector size " << resp->data.size() << std::endl;
     CTile_RPC *rpc = vector_to_ctile_rpc(resp->data);
     CTile *ctile = new CTile(rpc);
     release_ctile_rpc(rpc);
-    PyObject *obj = ctile->to_npy();
-    delete ctile;
-    delete resp;
 
-    return obj;
+    PyObject *mod = PyImport_ImportModule("spartan.array.tile");
+    PyObject *obj = PyObject_GetAttrString(mod, "Tile");
+    PyObject *_args = Py_BuildValue("(OOOOO)", Py_None, Py_None, Py_None, 
+                                               Py_None, Py_None);
+    PyObject *kargs = PyDict_New();
+    PyDict_SetItem(kargs, PyString_FromString("ctile_id"),
+                   Py_BuildValue("k", (unsigned long)ctile));
+    std::cout << __func__ << "Before " << std::endl;
+    PyObject *tile = PyObject_Call(obj, _args, kargs);
+    std::cout << __func__ << "After " << std::endl;
+
+    std::cout << __func__ << std::endl;
+    delete resp;
+    std::cout << __func__ << std::endl;
+
+    return tile;
 }
 
 static PyMethodDef _rpc_ctile_methods[] = {

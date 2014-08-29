@@ -229,24 +229,34 @@ struct GetResp {
     std::vector<char*> data;
     bool own_data;
 
-    GetResp(const TileId& i, std::vector<char*>& d, bool own= true): id(i), data(d), own_data(own) {}
+    GetResp(const TileId& i, std::vector<char*>& d, bool own = true): id(i), data(d), own_data(own) {}
     GetResp(): own_data(true) {}
     ~GetResp() {
+        std::cout << "GetResp dealloc1" << std::endl;
         if (own_data) {
+            std::cout << "GetResp dealloc2" << std::endl;
             delete (bool*)data[0];
             int size = data.size();
             for (int i = 1; i < size; ++i) {
+                std::cout << "GetResp dealloc3 " << size << std::endl;
                delete (NpyMemManager*)data[i];
             }
         }
+        std::cout << "GetResp dealloc4" << std::endl;
     }
 };
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const GetResp& o) {
-    m << o.id;
     int size = o.data.size();
-    m << size - 1;
-    for (int i = 0; i < size; ++i) {
+
+    m << o.id;
+    m << size;
+    Log_info ("GetResp marshal << %d %d", size, o.id);
+    // The first one is for the destructor of GetResp use only,
+    // but we still send it to RPC for consistency.
+    m.write(o.data[0], sizeof(bool));
+    // A tricky and bugy implementation but can't think a better way.
+    for (int i = 1; i < size; ++i) {
         NpyMemManager *mgr;
         mgr = (NpyMemManager*)(o.data[i]);
         m.write(&mgr->size, sizeof(mgr->size));
@@ -256,14 +266,19 @@ inline rpc::Marshal& operator <<(rpc::Marshal& m, const GetResp& o) {
 }
 
 inline rpc::Marshal& operator >>(rpc::Marshal& m, GetResp& o) {
+    int size;
+    bool dummy;
+
     o.own_data = false;
     m >> o.id;
-    o.data.push_back((char*)(new bool(false)));
-    int size;
     m >> size;
-    for (int i = 0; i < size; ++i) {
+    Log_info ("GetResp marshal >> %d %d", size, o.id);
+    m.read(&dummy, sizeof(bool));
+    o.data.push_back((char*)(new bool(false)));
+    for (int i = 1; i < size; ++i) {
         unsigned long data_size;
-        m.write(&data_size, sizeof(data_size));
+        m.read(&data_size, sizeof(data_size));
+        Log_info ("GetResp marshal >> size = %u", data_size);
         char *buf = (char*)malloc(data_size);
         assert(buf != NULL);
         m.read(buf, data_size);
