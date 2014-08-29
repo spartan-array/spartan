@@ -4,6 +4,8 @@
 //#define NO_IMPORT_ARRAY
 #include <numpy/arrayobject.h>
 #include <iostream>
+#include <unordered_map>
+#include <utility>
 #include "cblob_ctx.h"
 #include "array/_ctile_py_if.h"
 
@@ -39,7 +41,7 @@ typedef struct {
     PyObject_HEAD
     class CBlobCtx *ctx;
     bool is_master;
-    std::unordered_map<int32_t, spartan::WorkerProxy*> workers;
+    std::unordered_map<int32_t, spartan::WorkerProxy*> *workers;
 
 } CBlobCtx_Py;
 
@@ -93,31 +95,33 @@ _CBlobCtx_Py_get(PyObject* o, PyObject *args, bool is_flatten)
     PyObject *obj = PyObject_GetAttrString(mod, "Future_Get");
     if (fu == NULL) {
         if (is_flatten)
-            return PyObject_CallFunction(obj, (char*)"(OkO)", Py_None,
+            return PyObject_CallFunction(obj, (char*)"(kkO)", 0,
                                          (unsigned long)resp, Py_True, NULL);
         else
-            return PyObject_CallFunction(obj, (char*)"(OkO)", Py_None,
+            return PyObject_CallFunction(obj, (char*)"(kkO)", 0,
                                          (unsigned long)resp, Py_False, NULL);
     } else {
         delete resp;
         if (is_flatten)
             return PyObject_CallFunction(obj, (char*)"(kOO)", (unsigned long)fu,
-                                         Py_None, Py_True);
+                                         Py_None, Py_True, NULL);
         else
             return PyObject_CallFunction(obj, (char*)"(kOO)", (unsigned long)fu,
-                                         Py_None, Py_False);
+                                         Py_None, Py_False, NULL);
     }
 }
 
 static PyObject *
 CBlobCtx_Py_get(PyObject* o, PyObject *args)
 {
+    std::cout << __func__ << std::endl;
     return _CBlobCtx_Py_get(o, args, false);
 }
 
 static PyObject *
 CBlobCtx_Py_get_flatten(PyObject* o, PyObject *args)
 {
+    std::cout << __func__ << std::endl;
     return _CBlobCtx_Py_get(o, args, true);
 }
 
@@ -128,6 +132,7 @@ CBlobCtx_Py_update(PyObject* o, PyObject *args)
     CBlobCtx_Py *self = (CBlobCtx_Py*) o;
     unsigned long reducer, ctile_u;
 
+    std::cout << __func__ << std::endl;
     assert(self->ctx != NULL);
 
     if (!PyArg_ParseTuple(args, "OOkk", &tile_id, &subslice, &ctile_u, &reducer))
@@ -157,10 +162,10 @@ CBlobCtx_Py_update(PyObject* o, PyObject *args)
         PyDict_SetItemString(kargs, "resp", resp);
         return PyObject_Call(obj, PyTuple_New(0), kargs);
     } else {
-        PyObject *rep_type = Py_BuildValue("(s)", "EmptyMessage");
+        PyObject *rep_types = Py_BuildValue("(s)", "EmptyMessage");
         PyObject *kargs = PyDict_New();
         PyDict_SetItemString(kargs, "id", Py_BuildValue("k", (unsigned long)fu));
-        PyDict_SetItemString(kargs, "rep_type", rep_type);
+        PyDict_SetItemString(kargs, "rep_types", rep_types);
         return PyObject_Call(obj, PyTuple_New(0), kargs);
     }
 }
@@ -168,11 +173,12 @@ CBlobCtx_Py_update(PyObject* o, PyObject *args)
 static PyObject *
 CBlobCtx_Py_create(PyObject* o, PyObject *args)
 {
+    std::cout << __func__ << std::endl;
     CBlobCtx_Py *self = (CBlobCtx_Py*) o;
     PyObject *tile, *tile_id, *id_worker, *id_id;
     assert(self->ctx != NULL);
 
-    if (!PyArg_ParseTuple(args, "OOO", &tile_id, &tile))
+    if (!PyArg_ParseTuple(args, "OO", &tile_id, &tile))
         return NULL;
 
     id_worker = PyObject_GetAttrString(tile_id, "worker");
@@ -195,7 +201,7 @@ CBlobCtx_Py_create(PyObject* o, PyObject *args)
         PyObject *tileid = PyObject_CallFunction(core_obj, (char*)"kk",
                                                  resp.tile_id.worker,
                                                  resp.tile_id.id);
-        core_obj = PyObject_GetAttrString(mod, "TileIdMessage");
+        core_obj = PyObject_GetAttrString(core_mod, "TileIdMessage");
         PyObject *message = PyObject_CallFunctionObjArgs(core_obj, tileid, NULL);
         mod = PyImport_ImportModule("spartan.rpc.future");
         obj = PyObject_GetAttrString(mod, "Future");
@@ -204,10 +210,10 @@ CBlobCtx_Py_create(PyObject* o, PyObject *args)
         PyDict_SetItemString(kargs, "rep", message);
         return PyObject_Call(obj, PyTuple_New(0), kargs);
     } else {
-        PyObject *rep_type = Py_BuildValue("(s)", "TileIdMessage");
+        PyObject *rep_types = Py_BuildValue("(s)", "TileIdMessage");
         PyObject *kargs = PyDict_New();
         PyDict_SetItemString(kargs, "id", Py_BuildValue("k", (unsigned long)fu));
-        PyDict_SetItemString(kargs, "rep_type", rep_type);
+        PyDict_SetItemString(kargs, "rep_types", rep_types);
         return PyObject_Call(obj, PyTuple_New(0), kargs);
     }
 }
@@ -222,26 +228,30 @@ CBlobCtx_Py_delete_workers(PyObject *o, PyObject *args)
 static int
 CBlobCtx_Py_init(PyObject *o, PyObject *args, PyObject *kwds)
 {
-    PyObject *workers;
-    unsigned long worker_id, ctx_u;
     CBlobCtx_Py *self = (CBlobCtx_Py*)o;
+    unsigned long worker_id, ctx_u;
+    PyObject *workers;
 
+    std::cout << __func__ << std::endl;
     if (!PyArg_ParseTuple(args, "kOk", &worker_id, &workers, &ctx_u))
         return -1;
 
     assert (PyDict_Check(workers));
 
-    PyObject *key, *value;
-    Py_ssize_t pos = 0;
-    self->workers.clear();
-    while (PyDict_Next(workers, &pos, &key, &value)) {
-        rpc::Client *client = (rpc::Client*) get_longlong(value);
-        self->workers[get_longlong(key)] = new spartan::WorkerProxy(client);
-    }
-
-    if (ctx_u == 0) { // This is the master!
-        self->ctx = new CBlobCtx(worker_id, &self->workers, NULL);
+    if (ctx_u == 0) { // This is master!
+        PyObject *key, *value;
+        Py_ssize_t pos = 0;
         self->is_master = true;
+
+        self->workers = new std::unordered_map<int32_t, spartan::WorkerProxy*>;
+        while (PyDict_Next(workers, &pos, &key, &value)) {
+            rpc::Client *client = (rpc::Client*) get_longlong(value);
+            int32_t k = (int32_t)get_longlong(key);
+            spartan::WorkerProxy  *v = new spartan::WorkerProxy(client);
+            (*(self->workers))[k] = v;
+        }
+        self->ctx = new CBlobCtx(worker_id, self->workers, NULL);
+
     } else {
         self->ctx = (CBlobCtx*) ctx_u;
         self->is_master = false;
@@ -255,9 +265,10 @@ CBlobCtx_Py_dealloc(PyObject *o)
     CBlobCtx_Py *self = (CBlobCtx_Py*) o;
 
     if (self->is_master) {
-        for (auto it = self->workers.begin(); it != self->workers.end(); ++it) {
+        for (auto it = self->workers->begin(); it != self->workers->end(); ++it) {
             delete it->second;
         }
+        delete self->workers;
     }
 }
 
@@ -278,7 +289,7 @@ static PyMethodDef CBlobCtx_Py_methods[] = {
      "get_flatten RPC."},
     {"update", (PyCFunction)CBlobCtx_Py_update, METH_VARARGS,
      "update RPC."},
-    {"create", (PyCFunction)CBlobCtx_Py_create, METH_NOARGS,
+    {"create", (PyCFunction)CBlobCtx_Py_create, METH_VARARGS,
      "create RPC."},
     {NULL} /* Sentinel */
 };

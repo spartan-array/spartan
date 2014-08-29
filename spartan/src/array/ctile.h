@@ -99,13 +99,12 @@ inline void release_ctile_rpc(CTile_RPC* rpc)
 class CTile {
 public:
 
-    CTile() : nd(0) {};
+    CTile() : py_c_refcount(0), nd(0) {};
     CTile(npy_intp dimensions[], int nd, char dtype, 
-          CTILE_TYPE tile_type, CTILE_SPARSE_TYPE sparse_type);
+          CTILE_TYPE tile_type, CTILE_SPARSE_TYPE sparse_type); 
     // This constructor will also set data pointers to rpc.
     // No need to call set_data again.
-    CTile(CTile_RPC *rpc);
-    CTile(std::string *s);
+    CTile(CTile_RPC *rpc); 
     ~CTile();
 
     void initialize(void);
@@ -130,6 +129,10 @@ public:
     npy_intp* get_dimensions(void) { return dimensions; }
     char get_dtype(void) { return dtype; }
 
+    void increase_py_c_refcount (void) { py_c_refcount++; }
+    void decrease_py_c_refcount (void) { py_c_refcount--; }
+    bool can_release (void) { return py_c_refcount == 0; }
+
     // For RPC marshal
     friend rpc::Marshal& operator<<(rpc::Marshal&, const CTile&);
     friend rpc::Marshal& operator>>(rpc::Marshal&m, CTile& o);
@@ -137,6 +140,12 @@ private:
     CExtent* slice_to_ex(const CSliceIdx &idx);
     bool is_idx_complete(const CSliceIdx &idx);
     void reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer);
+
+    /** 
+     * This reference count is used to determine whether this CTile is used 
+     * by Python only or by both C++ and Python.
+     */
+    int py_c_refcount;
 
     CTILE_TYPE type;
     CTILE_SPARSE_TYPE sparse_type;
@@ -148,6 +157,7 @@ private:
     CArray *dense;
     CArray *mask;
     CArray *sparse[3]; // COO, CSR, CSC all use three arrays to represent data.
+
 };
 
 inline rpc::Marshal& operator<<(rpc::Marshal& m, const CTile& o) 

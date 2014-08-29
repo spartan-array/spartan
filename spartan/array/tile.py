@@ -1,7 +1,8 @@
 import numpy as np
 import numpy.ma as ma
 import scipy.sparse as sp
-from _ctile_py_if import *
+from _ctile_py_if import TileBase
+from spartan import util
 
 TYPE_DENSE = TileBase.TILE_DENSE
 TYPE_MASKED = TileBase.TILE_MASKED
@@ -71,6 +72,7 @@ class Tile(TileBase):
 
 
 def from_data(data):
+  util.log_info("from_data")
   shape, dtype, sparse_type, tile_type, tile_data = npdata_to_internal(data)
 
   assert isinstance(tile_data, tuple), (type(tile_data))
@@ -82,7 +84,7 @@ def from_data(data):
 
 
 def from_shape(shape, dtype, tile_type, sparse_type=TileBase.TILE_SPARSE_COO):
-  print 'well', shape, dtype, tile_type, sparse_type
+  util.log_info("from_shape")
   return Tile(shape,
               np.dtype(dtype).char,
               tile_type,

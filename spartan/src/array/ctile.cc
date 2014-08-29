@@ -10,7 +10,8 @@
 #include "carray_reducer.h"
 
 CTile::CTile(npy_intp dimensions[], int nd, char dtype, 
-             CTILE_TYPE tile_type, CTILE_SPARSE_TYPE sparse_type)
+             CTILE_TYPE tile_type, CTILE_SPARSE_TYPE sparse_type) 
+    : py_c_refcount(0)
 {
     int i;
 
@@ -32,6 +33,7 @@ CTile::CTile(npy_intp dimensions[], int nd, char dtype,
 }
 
 CTile::CTile(CTile_RPC *rpc)
+    : py_c_refcount(0)
 {
     std::cout << __func__ << " B" << std::endl;
     type = (CTILE_TYPE)rpc->type;
@@ -215,7 +217,6 @@ CTile::to_tile_rpc(const CSliceIdx &idx)
 {
     std::cout << __func__ << std::endl;
     std::vector<char*> dest;
-
     CExtent *ex = slice_to_ex(idx);
     dest.push_back((char*)(new bool(true)));
     CTile_RPC *rpc = (CTile_RPC*) malloc(sizeof(CTile_RPC));
@@ -225,7 +226,9 @@ CTile::to_tile_rpc(const CSliceIdx &idx)
     rpc->initialized = initialized;
     rpc->nd = nd;
     rpc->item_type = dtype;
-    memcpy(rpc->dimensions, dimensions, sizeof(npy_int64) * NPY_MAXDIMS);
+    for (int i = 0; i < nd; i++) {
+        rpc->dimensions[i] = dimensions[i];
+    }
     dest.push_back((char*)(new NpyMemManager((char*)rpc, (char*)rpc, false, sizeof(CTile_RPC))));
 
     std::cout << __func__ << " A " << std::endl;
@@ -256,6 +259,8 @@ CTile::to_tile_rpc(const CSliceIdx &idx)
             return dest;
         }
     }
+    delete ex;
+    std::cout << __func__ << " E " << std::endl;
     return dest;
 }
 
@@ -397,6 +402,7 @@ ctile_creator(PyObject *args)
     if (tile == NULL)
         return NULL;
 
+    std::cout << __func__ << std::endl;
     if (data != Py_None) {
         assert(PyTuple_Check(data) != 0);
         if (tile_type != CTILE_SPARSE) {

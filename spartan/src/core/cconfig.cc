@@ -17,7 +17,7 @@ void init_flags(void)
         return;
 
     FLAGS.add(new StrFlag("master", "0.0.0.0:10000"));
-    FLAGS.add(new IntFlag("count", "3"));
+    FLAGS.add(new IntFlag("count", "1"));
     FLAGS.add(new BoolFlag("print_options", "false"));
     FLAGS.add(new BoolFlag("profile_worker", "false"));
     FLAGS.add(new BoolFlag("profile_master", "false"));
@@ -45,7 +45,7 @@ void init_flags(void)
 
     FLAGS.add(new BoolFlag("use_threads", "true",
                            "When running locally, use threads instead of forking."
-                          "(slow, for debugging)"));
+                           "(slow, for debugging)"));
     FLAGS.add(new IntFlag("heartbeat_interval", "3", "Heartbeat Interval in each worker"));
     FLAGS.add(new IntFlag("worker_failed_heartbeat_threshold", "10",
                           "the max number of heartbeat that a worker can delay"));

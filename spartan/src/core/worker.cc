@@ -6,6 +6,7 @@
 #include "cconfig.h"
 #include "cblob_ctx.h"
 #include "cworker.h"
+#include "array/ctile.h"
 
 class GILHelper {
     PyGILState_STATE gil_state;
@@ -120,6 +121,7 @@ void CWorker::initialize(const InitializeReq& req, EmptyMessage* resp) {
 }
 
 void CWorker::get_tile_info(const TileIdMessage& req, TileInfoResp* resp) {
+    Log_debug("RPC %s", __func__);
     lock(_blob_lock);
     std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.tile_id);
     unlock(_blob_lock);
@@ -131,18 +133,27 @@ void CWorker::get_tile_info(const TileIdMessage& req, TileInfoResp* resp) {
 void CWorker::create(const CreateTileReq& req, TileIdMessage* resp) {
     resp->tile_id.worker = id;
     resp->tile_id.id = _id_counter++;
+    Log_debug("RPC %s %s", __func__, resp->tile_id.to_string().c_str());
     lock(_blob_lock);
     _blobs[resp->tile_id] = req.data;
+    // Tell Python's Tile that there is someone else using this CTile.
+    req.data->increase_py_c_refcount();
     unlock(_blob_lock);
 }
 
 void CWorker::destroy(const DestroyReq& req, EmptyMessage* resp) {
+    Log_debug("RPC %s", __func__);
     lock(_blob_lock);
     for (auto& tid : req.ids) {
         //Log_debug("destroy tile:%s", tid.to_string().c_str());
         if (tid.worker == id) {
             CTile* tile = _blobs[tid];
             _blobs.erase(tid);
+            tile->decrease_py_c_refcount();
+            if (!tile->can_release()) {
+                Log_error("Why is Python still using this CTile?");
+                assert(false);
+            }
             delete tile;
         }
     }
@@ -150,6 +161,7 @@ void CWorker::destroy(const DestroyReq& req, EmptyMessage* resp) {
 }
 
 void CWorker::update(const UpdateReq& req, EmptyMessage* resp) {
+    Log_debug("RPC %s", __func__);
     lock(_blob_lock);
     std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.id);
     unlock(_blob_lock);
@@ -158,18 +170,25 @@ void CWorker::update(const UpdateReq& req, EmptyMessage* resp) {
 }
 
 void CWorker::get(const GetReq& req, GetResp* resp) {
+    Log_debug("RPC %s", __func__);
     Log_debug("receive get %s[%d:%d:%d]", req.id.to_string().c_str(),
               req.subslice.get_slice(0).start, req.subslice.get_slice(0).stop,
               req.subslice.get_slice(0).step);
-
+    
     lock(_blob_lock);
     std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.id);
     unlock(_blob_lock);
     assert(it != _blobs.end());
-    resp->data = it->second->get(req.subslice);
+    Log_debug("feginfegin a\n");
+    //resp->data = it->second->get(req.subslice);
+    std::vector<char*> data = it->second->get(req.subslice);
+    Log_debug("feginfegin b\n");
+    resp->data = data;
+    Log_debug("feginfegin c\n");
 }
 
 void CWorker::get_flatten(const GetReq& req, GetResp* resp) {
+    Log_debug("RPC %s\n", __func__);
     Log_debug("receive get_flatten %s[%d:%d:%d]", req.id.to_string().c_str(),
               req.subslice.get_slice(0).start, req.subslice.get_slice(0).stop,
               req.subslice.get_slice(0).step);
@@ -182,6 +201,7 @@ void CWorker::get_flatten(const GetReq& req, GetResp* resp) {
 }
 
 void CWorker::cancel_tile(const TileIdMessage& req, rpc::i8* resp) {
+    Log_debug("RPC %s\n", __func__);
     Log_info("receive cancel_tile %s", req.tile_id.to_string().c_str());
     *resp = 0;
     lock(_kernel_lock);
@@ -193,6 +213,7 @@ void CWorker::cancel_tile(const TileIdMessage& req, rpc::i8* resp) {
 }
 
 void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
+    Log_debug("RPC %s\n", __func__);
     lock(_blob_lock);
     for (auto& tid : req.blobs) {
         if (tid.worker == id)
@@ -203,16 +224,24 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
     // TODO:sort _kernel_remain_tiles according to tile size
     // self._kernel_remain_tiles.sort()
 
-    char init_cmd[] = "blob_ctx.set(blob_ctx.WorkerBlobCtx(worker_ctx))\n"
+    char init_cmd[] = "blob_ctx.set(blob_ctx.BlobCtx(worker_id, None, None, worker_ctx))\n"
                       "mapper_fn, kw = read(fn)\n"
+                      "print mapper_fn, kw\n"
                       "results={}\n"
                       "futures=FutureGroup()\n";
 
-    //char mapper_cmd[] = "tile_id = core.TileId(*tid)\n"
-                        //"map_result = mapper_fn(tile_id, blob, **kw)\n"
-                        //"results[tile_id]=map_result.result\n"
-                        //"if map_result.futures is not None:\n"
-                        //"\tfutures.append(map_result.futures)\n";
+    char mapper_cmd[] = 
+                        "util.log_info('mapper_cmd start 1')\n"
+                        "tile_id = core.TileId(*tid)\n"
+                        "util.log_info('mapper_cmd start 2')\n"
+                        "util.log_info('mapper_cmd start 2 %s', str(mapper_fn))\n"
+                        "map_result = mapper_fn(tile_id, blob, **kw)\n"
+                        "util.log_info('mapper_cmd start 3')\n"
+                        "util.log_info(str(map_result))\n"
+                        "util.log_info('----------------------------------------------')\n"
+                        "results[tile_id]=map_result.result\n"
+                        "if map_result.futures is not None:\n"
+                        "\tfutures.append(map_result.futures)\n";
 
     PyObject *pMain, *pLocal;
     {
@@ -221,43 +250,54 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
         pMain = PyImport_AddModule("__main__");
         pLocal = PyModule_GetDict(pMain);
 
-        PyRun_SimpleString("from spartan import blob_ctx, core");
+        PyRun_SimpleString("from spartan import blob_ctx, core, util");
         PyRun_SimpleString("from spartan.rpc import read, serialize, FutureGroup");
 
         PyDict_SetItemString(pLocal, "worker_ctx", Py_BuildValue("k", _ctx));
+        PyDict_SetItemString(pLocal, "worker_id", Py_BuildValue("k", id));
         PyDict_SetItemString(pLocal, "fn", Py_BuildValue("s#", req.fn.c_str(), req.fn.size()));
 
         PyRun_String(init_cmd, Py_file_input, pLocal, pLocal);
 
-        PyRun_SimpleString("print mapper_fn(*kw)\n");
-        PyRun_SimpleString("ctx = blob_ctx.get()\n");
-    }
+        //PyRun_SimpleString("print mapper_fn(*kw)\n");
+        //PyRun_SimpleString("ctx = blob_ctx.get()\n");
+    //}
 
-    TileId tid;
-    while (true) {
-        lock(_kernel_lock);
-        if (_kernel_remain_tiles.size() > 0) {
-            tid = _kernel_remain_tiles.back();
-            _kernel_remain_tiles.pop_back();
-            unlock(_kernel_lock);
-        } else {
-            unlock(_kernel_lock);
-            break;
-        }
+        TileId tid;
+        while (true) {
+            lock(_kernel_lock);
+            if (_kernel_remain_tiles.size() > 0) {
+                tid = _kernel_remain_tiles.back();
+                _kernel_remain_tiles.pop_back();
+                unlock(_kernel_lock);
+            } else {
+                unlock(_kernel_lock);
+                break;
+            }
 
-        //CTile blob = _blobs[tid];
 
-        Log_debug("process tile:%s", tid.to_string().c_str());
-        {
-            GILHelper gil_helper;
+        //Log_debug("process tile:%s", tid.to_string().c_str());
+        //{
+            //GILHelper gil_helper;
 
-            /*
-            PyDict_SetItemString(pLocal, "blob", Py_BuildValue("s", blob));
+
+            PyObject *py_blob;
+            auto it = _py_blobs.find(tid);
+            if (it == _py_blobs.end()) {
+                py_blob = _blobs[tid]->to_npy();
+                /* TODO:Increase the reference count?*/
+                _py_blobs[tid] = py_blob;
+            } else {
+                py_blob = it->second;
+            }
+            PyDict_SetItemString(pLocal, "blob", py_blob);
             PyDict_SetItemString(pLocal, "tid", Py_BuildValue("(ii)", tid.worker, tid.id));
-            PyRun_String(mapper_cmd, Py_file_input, pLocal, pLocal);
-            */
-            PyDict_SetItemString(pLocal, "tid", Py_BuildValue("(ii)", tid.worker, tid.id));
-            PyRun_SimpleString("results[core.TileId(*tid)] = ctx.get(core.TileId(0,4), [slice(0,1,2)])\n");
+            if (PyRun_String(mapper_cmd, Py_file_input, pLocal, pLocal) == NULL) {
+                PyErr_PrintEx(0);
+            } else {
+                Log_info("PyRun_String success ?");
+            }
+        //}
         }
     }
 

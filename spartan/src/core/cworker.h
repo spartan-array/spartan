@@ -26,6 +26,7 @@ private:
     std::unordered_map<int32_t, spartan::WorkerProxy*> _peers; // rpc client to other workers
     CBlobCtx* _ctx; // simple rpc interface
     std::unordered_map<TileId, CTile*> _blobs; // all the tiles in this worker
+    std::unordered_map<TileId, PyObject*> _py_blobs; // all the tiles in this worker
     int32_t _id_counter; // TileId counter in local worker
     std::vector<TileId> _kernel_remain_tiles; // current remain tiles waiting for kernel processing
     WorkerStatus* _worker_status; // worker status of this worker which will be send to master in each heartbeat

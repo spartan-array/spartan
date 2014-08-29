@@ -40,7 +40,7 @@ simple-rpc:
 rpc: base-utils simple-rpc
 	cd $(RPCBASE);python waf configure;python waf;
 	cd $(RPC);python waf configure;python waf;
-	cd $(RPCDIR);python simple-rpc/bin/rpcgen service.rpc --python --cpp;
+	#cd $(RPCDIR);python simple-rpc/bin/rpcgen service.rpc --python --cpp;
 
 libcore.so: $(OBJS_CORE)
 	${CC} -o $(CUR_DIR)/$@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach

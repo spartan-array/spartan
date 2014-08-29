@@ -9,10 +9,9 @@ import atexit
 import threading
 import weakref
 import time
-import spartan
 from spartan import util, core, blob_ctx
-from spartan.config import parse, FLAGS
-from spartan.rpc import MasterService, WorkerProxy, Future, FutureGroup, Server, Client
+from spartan.config import FLAGS
+from spartan.rpc import MasterService, WorkerProxy, FutureGroup, Server, Client
 
 MASTER = None
 def _dump_profile():
@@ -35,6 +34,7 @@ class Master(MasterService):
     self._worker_statuses = {}
     self._worker_scores = {}
     self._available_workers = {}
+    self._available_clients = {}
 
     self._arrays = weakref.WeakSet()
 
@@ -76,11 +76,13 @@ class Master(MasterService):
       req (RegisterReq):
       handle (PendingRequest):
     '''
+    util.log_info ('************************')
     id = len(self._workers)
     c = Client()
     c.connect(req.host)
     self._workers[id] = req.host
     self._available_workers[id] = WorkerProxy(c)
+    self._available_clients[id] = c
     util.log_info('Registered %s (%d/%d)', req.host, id, self.num_workers)
 
     self.init_worker_score(id, req.worker_status)
@@ -206,7 +208,8 @@ class Master(MasterService):
       futures.append(w.async_initialize(req))
     futures.wait()
 
-    self._ctx = blob_ctx.MasterBlobCtx(self._available_workers)
+    self._ctx = blob_ctx.BlobCtx(blob_ctx.MASTER_ID, self._available_workers,
+                                 self._available_clients)
     self._initialized = True
     util.log_info('done...')
 

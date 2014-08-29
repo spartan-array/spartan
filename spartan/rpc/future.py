@@ -4,6 +4,7 @@ import simplerpc.future
 import cPickle
 from cPickle import UnpicklingError
 import rpc_array
+from spartan import util
 
 DEFAULT_TIMEOUT = None
 
@@ -46,11 +47,17 @@ def deserialize(obj):
 
 
 class Future(simplerpc.future.Future):
-  def __init__(self, id=0, rep_types=None, rep=None):
-    self.id = id
+  def __init__(self, id=0, rep_types=None, rep=None, fu=None):
+    if fu is not None:
+      # Transform simplerpc.future to our future.
+      self.id = fu.id
+      self.rep_types = fu.rep_types
+    else:
+      self.id = id
+      self.rep_types = rep_types
+
     self.rep = rep
     self.err_code = 0
-    self.rep_types = rep_types
     if rep is None:
       self.wait_ok = False
     else:
@@ -85,6 +92,7 @@ class Future_Get(simplerpc.future.Future):
       return self.rep
 
     self.wait()
+    util.log_info(self.rep)
     self.rep = rpc_array.get_resp_to_tile(self.rep)
     if self.is_flatten:
       self.rep = self.rep.flatten()
@@ -105,6 +113,8 @@ class Future_Get(simplerpc.future.Future):
       rep_m = Marshal(id=rep_marshal_id)
       rep_m.read_obj(['Tile_id'])
       self.rep = rpc_array.deserialize_get_resp(rep_marshal_id)
+    else:
+      assert False, (self.id, rep_marshal_id, self.err_code)
     self.wait_ok = True
     return self.err_code
 

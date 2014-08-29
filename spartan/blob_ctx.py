@@ -11,7 +11,7 @@ import threading
 import random
 import numpy as np
 from rpc import serialize, RemoteException, WorkerProxy
-from rpc import FutureGroup
+from rpc import FutureGroup, Future
 import rpc.rpc_array
 
 
@@ -20,7 +20,7 @@ MASTER_ID = 65536
 
 
 class BlobCtx(object):
-  def __init__(self, workers, worker_id, cblob_ctx=0):
+  def __init__(self, worker_id, workers, clients, cblob_ctx=0):
     '''
     Create a new context.
 
@@ -33,14 +33,14 @@ class BlobCtx(object):
     self.worker_id = worker_id
     self.active = True
 
-    cworkers = None
+    cclients = {}
     if (self.is_master()):
       assert cblob_ctx == 0
-      cworkers = {}
-      for k, v in workers.iteritems():
-        cworkers[k] = v.id
+      self.num_workers = len(workers)
+      for k, v in clients.iteritems():
+        cclients[k] = v.id
 
-    self._cblob_ctx = _cblob_ctx_py_if.CBlobCtx_Py(worker_id, workers, cblob_ctx)
+    self._cblob_ctx = _cblob_ctx_py_if.CBlobCtx_Py(worker_id, cclients, cblob_ctx)
 
   def is_master(self):
     '''
@@ -54,6 +54,9 @@ class BlobCtx(object):
       return None
 
     fu = method(self.workers[worker_id], req)
+    # Transform simplerpc.future to our future.
+    fu = Future(fu=fu)
+    assert isinstance(fu, Future), type(fu)
 
     if wait:
       err_code = fu.wait(timeout)
@@ -71,7 +74,10 @@ class BlobCtx(object):
 
     fu_group = FutureGroup()
     for w in self.workers.values():
-      fu_group.append(method(w, req))
+      fu = method(w, req)
+      # Transform simplerpc.future to our future.
+      fu = Future(fu=fu)
+      fu_group.append(fu)
 
     if wait:
       result = []
@@ -159,7 +165,7 @@ class BlobCtx(object):
       wait (boolean): If true, wait for completion before returning.
       timeout (float):
     '''
-    ctile = rpc_array.numpy_to_ctile(data)
+    ctile = rpc.rpc_array.numpy_to_ctile(data)
     future = self._cblob_ctx.update(tile_id, region, ctile, reducer)
     #rpc_array.release_ctile(ctile)
 
@@ -219,11 +225,10 @@ class BlobCtx(object):
     assert self.worker_id == MASTER_ID
     req = core.RunKernelReq(blobs=tile_ids, fn=serialize((mapper_fn, kw)))
     futures = self._send_all(WorkerProxy.async_run_kernel, req)
-    result = futures
-    #result = {}
-    #for f in futures:
-        #for source_tile, map_result in f.iteritems():
-      #  result[source_tile] = map_result
+    result = {}
+    for f in futures:
+      for source_tile, map_result in f.result.iteritems():
+        result[source_tile] = map_result
     return result
 
   def get_tile_info(self, tile_id):

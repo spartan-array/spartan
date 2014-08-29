@@ -61,7 +61,14 @@ TileBase_dealloc(PyObject *o)
 {
     TileBase *self = (TileBase*) o;
     std::cout << __func__ << " " << o << " " << self->c_tile << std::endl;
-    delete self->c_tile;
+    self->c_tile->decrease_py_c_refcount();
+    if (self->c_tile->can_release()) {
+        std::cout << __func__ << " Can release the ctile" << std::endl;
+        delete self->c_tile;
+    } else {
+        std::cout << __func__ << " Can't release the ctile" << std::endl;
+    }
+    self->c_tile = NULL;
     self->ob_type->tp_free((PyObject*)self);
 }
 
@@ -209,10 +216,13 @@ TileBase__update(PyObject* o, PyObject* args)
 static int
 TileBase_init(PyObject *o, PyObject *args, PyObject *kwds)
 {
+    std::cout << __func__ << std::endl;
     TileBase *self = (TileBase*)o;
     self->c_tile = ctile_creator(args);
     if (self->c_tile == NULL)
         return -1;
+    // Tell c++ part that someone else is using this CTile.
+    self->c_tile->increase_py_c_refcount();
     return 0;
 }
 

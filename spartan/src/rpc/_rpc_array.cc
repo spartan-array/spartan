@@ -69,6 +69,7 @@ get_resp_to_tile(PyObject* o, PyObject *args)
     release_ctile_rpc(rpc);
     PyObject *obj = ctile->to_npy();
     delete ctile;
+    delete resp;
 
     return obj;
 }
