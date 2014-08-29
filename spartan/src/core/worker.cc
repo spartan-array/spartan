@@ -228,14 +228,8 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
                       "futures=FutureGroup()\n";
 
     char mapper_cmd[] = 
-                        "util.log_info('mapper_cmd start 1')\n"
                         "tile_id = core.TileId(*tid)\n"
-                        "util.log_info('mapper_cmd start 2')\n"
-                        "util.log_info('mapper_cmd start 2 %s', str(mapper_fn))\n"
                         "map_result = mapper_fn(tile_id, blob, **kw)\n"
-                        "util.log_info('mapper_cmd start 3')\n"
-                        "util.log_info(str(map_result))\n"
-                        "util.log_info('----------------------------------------------')\n"
                         "results[tile_id]=map_result.result\n"
                         "if map_result.futures is not None:\n"
                         "  assert isinstance(map_result.futures, list)\n"
@@ -250,7 +244,6 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
 
         PyRun_SimpleString("from spartan import blob_ctx, core, util");
         PyRun_SimpleString("from spartan.rpc import read, serialize, FutureGroup");
-
         PyDict_SetItemString(pLocal, "worker_ctx", Py_BuildValue("k", _ctx));
         PyDict_SetItemString(pLocal, "worker_id", Py_BuildValue("k", id));
         PyDict_SetItemString(pLocal, "fn", Py_BuildValue("s#", req.fn.c_str(), req.fn.size()));

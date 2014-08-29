@@ -93,16 +93,15 @@ public:
             refcount.erase(source);
         }
     }
-    //NpyMemManager& operator=(const NpyMemManager& obj) {
-        //if (this != &obj) {
-            //source = obj.source;
-            //data = obj.data;
-            //own_by_npy = obj.own_by_npy;
-            //size = size;
-            //refcount[source] += 1;
-        //}
-       //return *this;
-    //};
+
+    int get_refcount(void) {
+        auto it = NpyMemManager::refcount.find(source);
+        if (it != NpyMemManager::refcount.end()) {
+            return it->second;
+        } else {
+            return -1;
+        }
+    }
 
     char* get_source() { return source; }
     char* get_data() { return data; }

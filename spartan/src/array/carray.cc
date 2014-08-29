@@ -73,14 +73,7 @@ CArray::CArray(npy_intp dimensions[], int nd, char type, char *data, NpyMemManag
 
 CArray::CArray(CArray_RPC *rpc)
 {
-    std::cout << __func__ << " " << rpc << std::endl;
-    std::cout << __func__ << " is_npy_memmanager = " << rpc->is_npy_memmanager << std::endl;
-    std::cout << __func__ << " nd = " << (int)rpc->nd << std::endl;
-    std::cout << __func__ << " size = " << rpc->size << std::endl;
-
-    for (int i = 0; i < (int)rpc->nd; ++i) {
-        std::cout << __func__ << " " << rpc->dimensions[i] << std::endl;  
-    }
+    std::cout << "CArray::" << __func__ << std::endl;
     init(rpc->dimensions, (int)rpc->nd, (char)rpc->item_type);
     if (rpc->is_npy_memmanager) { 
         data_source = (NpyMemManager*)(rpc->data);
@@ -96,7 +89,8 @@ CArray::~CArray()
 {
     std::cout << __func__ << std::endl;
     if (data_source != NULL) {
-        std::cout << __func__ << " " << (unsigned long) data_source->get_source() << std::endl;
+        std::cout << __func__ << " " << (unsigned long)data_source->get_source() \
+                  << " " << data_source->get_refcount() << std::endl;
         delete data_source;
     }
 }
@@ -106,9 +100,8 @@ CArray::init(npy_intp dimensions[], int nd, char type)
 {
     int i;
 
-    std::cout << __func__ << (unsigned)type << std::endl;
+    std::cout << "CArray::" << __func__ << (unsigned)type << std::endl;
     type_size = npy_type_token_to_size(type);
-    std::cout << "type_size " << type_size << std::endl;
     this->nd = nd;
     this->type = type;
     size = type_size;
@@ -121,7 +114,7 @@ CArray::init(npy_intp dimensions[], int nd, char type)
         }
         size *= this->dimensions[i];
     }
-    std::cout << __func__ << "end" << std::endl;
+    std::cout << "CArray::" <<  __func__ << "end" << std::endl;
 }
 
 
@@ -138,7 +131,6 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
             }
         }
     }
-    std::cout << __func__ << " " << full << " " << (void*)dest << " " << (void*)data << std::endl;
 
     if (full) { /* Special case, no slice */
         *dest = new NpyMemManager(*data_source);
@@ -212,15 +204,15 @@ CArray::to_npy(void)
     PyArrayObject *array;
     int type_num;
 
-    std::cout << "CArray::" << __func__ << " " << nd << " " << type_size << std::endl;
+    std::cout << "CArray::" << __func__ << std::endl;
     type_num = npy_type_token_to_number(type);
-    std::cout << "Before PyArray_New " << type_num << " " << size << " " << (void*)&PyArray_Type << std::endl;
+    std::cout << "Before PyArray_New " << type_num << " " << size << std::endl;
     array = (PyArrayObject*)PyArray_New(&PyArray_Type, nd, dimensions, type_num, strides, 
                                         data, size, NPY_CARRAY, NULL);
     std::cout << "PyArray_New" << std::endl;
     assert(array != NULL);
     if (data_source != NULL) {
-        manager = data_source;
+        manager = new NpyMemManager(*data_source);
     }
     std::cout << "Before PyCapsule_New" << std::endl;
     PyObject *capsule = PyCapsule_New(manager, _CAPSULE_NAME, _capsule_destructor);
@@ -236,9 +228,10 @@ std::vector <char*>
 CArray::to_carray_rpc(CExtent *ex)
 {
     std::vector <char*> dest;
-    std::cout << __func__ << type_size << " " << type << " " << nd <<std::endl;
+    std::cout << "CArray::" << __func__ << std::endl;
     CArray_RPC *rpc = (CArray_RPC*)malloc(sizeof(CArray_RPC));
-    dest.push_back((char*)(new NpyMemManager((char*)rpc, (char*)rpc, false, sizeof(CArray_RPC))));
+    dest.push_back((char*)(new NpyMemManager((char*)rpc, (char*)rpc, 
+                                             false, sizeof(CArray_RPC))));
 
     rpc->item_size = type_size;
     rpc->item_type = type;

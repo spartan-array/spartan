@@ -353,12 +353,8 @@ class DistArrayImpl(DistArray):
         else:
           tgt[dst_slice] = result
 
-    util.log_info('FETCH: end')
-    util.log_info('FETCH: end with %s', tgt)
-
 
     return tgt
-    #return tile.data[]
 
   def update_slice(self, slc, data):
     return self.update(extent.from_slice(slc, self.shape), data)

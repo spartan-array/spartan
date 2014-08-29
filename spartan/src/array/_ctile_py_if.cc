@@ -72,6 +72,7 @@ TileBase_dealloc(PyObject *o)
     Py_DECREF(self->shape);
     Py_DECREF(self->dtype);
     self->ob_type->tp_free((PyObject*)self);
+    std::cout << __func__ << " done" << std::endl;
 }
 
 //static PyObject *
@@ -103,12 +104,10 @@ TileBase_reduce(PyObject* o)
     tile_type = PyInt_FromLong((long)self->c_tile->get_type());
     sparse_type = PyInt_FromLong((long)self->c_tile->get_sparse_type());
     shape = PyTuple_New(self->c_tile->get_nd());
-    std::cout << shape << " " << self->c_tile->get_nd() << std::endl;
     for (int i = 0; i < self->c_tile->get_nd(); i++) {
         PyTuple_SetItem(shape, i, PyLong_FromLongLong(self->c_tile->get_dimensions()[i]));
     }
 
-    std::cout << "__reduce__" << std::endl;
     mod = PyImport_ImportModule("spartan.array.tile");
     obj = PyObject_GetAttrString(mod, "from_shape");
     Py_DECREF(mod);
@@ -118,7 +117,6 @@ TileBase_reduce(PyObject* o)
     PyTuple_SetItem(tuple, 3,  sparse_type);
     PyTuple_SetItem(result, 0,  obj);
     PyTuple_SetItem(result, 1,  tuple);
-    std::cout << "__reduce__" << std::endl;
     return result;
 }
 
@@ -210,7 +208,6 @@ TileBase_init(PyObject *o, PyObject *args, PyObject *kwds)
         cid = PyDict_GetItemString(kwds, (char*)"ctile_id");
         assert(cid != NULL);
     }
-    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
 
     TileBase *self = (TileBase*)o;
     if (cid != NULL && cid != Py_None) {
@@ -226,24 +223,18 @@ TileBase_init(PyObject *o, PyObject *args, PyObject *kwds)
             return -1;
     }
 
-    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
     npy_intp *dimensions = self->c_tile->get_dimensions();
     PyObject *shape = PyTuple_New(self->c_tile->get_nd());
     for (int i = 0; i < self->c_tile->get_nd(); ++i) {
         PyTuple_SetItem(shape, i, Py_BuildValue("k", dimensions[i]));
     }
-    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
     self->shape = shape;
-    std::cout << __func__ << self->c_tile->get_dtype() << std::endl;
     int dtype_num = npy_type_token_to_number(self->c_tile->get_dtype());
-    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
     self->dtype = (PyObject*)PyArray_DescrNewFromType(dtype_num);
-    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
     self->type = self->c_tile->get_type();
-    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
     // Tell c++ part that someone else is using this CTile.
     self->c_tile->increase_py_c_refcount();
-    std::cout << __func__ << " " << (cid == Py_None)<< std::endl;
+    std::cout << __func__ << " done" << std::endl;
     return 0;
 }
 
