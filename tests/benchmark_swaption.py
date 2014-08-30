@@ -27,7 +27,7 @@ def benchmark_swaption(ctx, timer):
   swaptions = swaption.simulate(ts_all, te_all, lamb_all, NUM_PATHS)
 
   for swap in swaptions:
-    print "Mean: %d, Std: %d" % (swap[0].glom(), swap[1].glom())
+    print "Mean: %f, Std: %f" % (swap[0].glom(), swap[1].glom())
     
   end_time  = time.time()
   print "run time:", end_time - start_time

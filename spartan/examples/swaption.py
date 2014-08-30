@@ -96,7 +96,7 @@ def simulate(ts_all, te_all, lamb_all, num_paths):
       me = mean((swaption[0:num_paths] + swaption[num_paths:])/2) * 10000
       st = std((swaption[0:num_paths] + swaption[num_paths:])/2)/sqrt(num_paths)*10000
 
-      swaptions.append([me, st])
+      swaptions.append([me.optimized().force(), st.optimized().force()])
       #print time() - start
       i += 1
   return swaptions

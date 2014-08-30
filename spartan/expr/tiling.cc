@@ -3,7 +3,7 @@
 #include <list>
 
 const int eMax = 1000000;
-const int nMax = 1000;
+const int nMax = 5000;
 const int INF = 1000000000;
 
 struct Edge {
@@ -123,7 +123,7 @@ static PyObject* mincost_tiling(PyObject *self, PyObject *args) {
 	for (u = 0; u < t; u++)
 		if (vis[u]) PySet_Add(ans, Py_BuildValue("i", u));
 
-	printf("mincost:%d\n", mincost);
+	//printf("mincost:%d\n", mincost);
 	return ans;
 }
 
