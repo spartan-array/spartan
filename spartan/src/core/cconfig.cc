@@ -7,14 +7,21 @@
 #include <sstream>
 #include <map>
 #include <vector>
+#include <iostream>
 #include "cconfig.h"
 
 CFlags FLAGS;
 void init_flags(void)
 {
     static bool done = false;
-    if (done)
+    if (done) {
+        std::cout << __func__ << " done" << std::endl;
         return;
+    } else {
+        std::cout << __func__ << " not done" << std::endl;
+    }
+   
+    done = true;
 
     FLAGS.add(new StrFlag("master", "0.0.0.0:10000"));
     FLAGS.add(new IntFlag("count", "1"));
@@ -83,6 +90,7 @@ std::map<std::string, std::string> parse_argv(int argc, char **argv)
     return argv_map;
 }
 
+#include <iostream>
 /**
  * There are some assumptions for this function:
  *   1. This is only called from workers (the master should call python version).
@@ -97,7 +105,10 @@ std::map<std::string, std::string> parse_argv(int argc, char **argv)
 void config_parse(int argc, char **argv)
 {
     if (FLAGS.is_parsed()) {
+        std::cout << __func__ << " is_parsed" << std::endl;
         return;
+    } else {
+        std::cout << __func__ << " is not parsed" << std::endl;
     }
 
     init_flags();
@@ -115,7 +126,6 @@ void config_parse(int argc, char **argv)
     }
 }
 
-//void get_flags_info(std::vector<char*>* list)
 std::vector<const char*> get_flags_info(void)
 {
     std::vector<const char*> list;

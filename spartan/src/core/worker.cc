@@ -37,6 +37,7 @@ CWorker::CWorker(const std::string& master_addr, const std::string& worker_addr,
     HEARTBEAT_INTERVAL = heartbeat_interval;
 }
 
+#include <time.h>
 CWorker::~CWorker() {
     for (auto& it : _peers) {
         delete it.second;
@@ -113,6 +114,7 @@ void CWorker::wait_for_shutdown() {
 void CWorker::initialize(const InitializeReq& req, EmptyMessage* resp) {
     id = req.id;
     for (auto& it : req.peers) {
+        std::cout << "CWorker::initialize " << it.first << " " << it.second << std::endl;
         _peers[it.first] = new spartan::WorkerProxy(_clt_pool->get_client(it.second));
     }
     _ctx = new CBlobCtx(id, &_peers, this);
@@ -324,6 +326,7 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
     }
 }
 
+#include <time.h>
 void start_worker(int32_t port, int argc, char** argv) {
     std::string w_addr = "0.0.0.0:" + std::to_string(port);
     Log_info("start worker pid %d at %s", getpid(), w_addr.c_str());
@@ -359,10 +362,12 @@ void start_worker(int32_t port, int argc, char** argv) {
         Py_Finalize();
     }
 
+    Log_info("Before clear");
     delete server;
     pool->release();
     poll->release();
     delete w;
+    Log_info("Everything is cleared");
 }
 
 int main(int argc, char* argv[]) {

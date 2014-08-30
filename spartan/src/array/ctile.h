@@ -77,7 +77,7 @@ inline CTile_RPC* vector_to_ctile_rpc(std::vector<char*> &buffers) {
             rpc->array[array_idx] = (CArray_RPC*) buffers[i];
             rpc->array[array_idx]->is_npy_memmanager = false;
             rpc->array[array_idx]->data = buffers[i + 1];
-            std::cout <<  __func__ << " " << (unsigned long )buffers[i + 1] << std::endl;
+            std::cout <<  __func__ << " " << std::hex << (unsigned long )buffers[i + 1] << std::endl;
         }
     }
 

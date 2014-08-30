@@ -63,6 +63,7 @@ subprocess.call("cp spartan/src/libspartan_array.so spartan", shell=True)
 subprocess.call("cp spartan/src/libcore.so spartan", shell=True)
 subprocess.call("mkdir -p spartan/rpc/simplerpc", shell=True)
 subprocess.call("cp spartan/src/rpc/simple-rpc/build/_pyrpc.so spartan/rpc/simplerpc", shell=True)
+subprocess.call("cp spartan/src/rpc/simple-rpc/build/libsimplerpc.so spartan/rpc/simplerpc", shell=True)
 subprocess.call("cp spartan/src/rpc/simple-rpc/pylib/simplerpc/*.py spartan/rpc/simplerpc", shell=True)
 
 subprocess.call("cp spartan/src/rpc/service.py spartan/rpc", shell=True)

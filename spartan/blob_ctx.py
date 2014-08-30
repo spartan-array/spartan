@@ -13,6 +13,7 @@ import numpy as np
 from rpc import serialize, RemoteException, WorkerProxy
 from rpc import FutureGroup, Future
 import rpc.rpc_array
+from .array.tile import builtin_reducers
 
 
 ID_COUNTER = iter(xrange(10000000))
@@ -166,7 +167,11 @@ class BlobCtx(object):
       timeout (float):
     '''
     ctile = rpc.rpc_array.numpy_to_ctile(data)
-    future = self._cblob_ctx.update(tile_id, region, ctile, reducer)
+    if builtin_reducers.get(reducer, None) is None:
+      _reducer = reducer
+    else:
+      _reducer = builtin_reducers[reducer]
+    future = self._cblob_ctx.update(tile_id, region, ctile, _reducer)
     #rpc_array.release_ctile(ctile)
 
     if wait:

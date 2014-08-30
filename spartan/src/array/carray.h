@@ -78,6 +78,7 @@ public:
                 if (own_by_npy) {
                     Py_DECREF(source);
                 } else {
+                    std::cout << "NpyMemManager delete " << std::hex << (unsigned long)source << std::endl;
                     delete source;
                 }
             } else {

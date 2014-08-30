@@ -430,6 +430,6 @@ ctile_creator(PyObject *args)
         }
     }
 
-    std::cout << __func__ << " address = " << (unsigned long) tile << std::endl;
+    std::cout << __func__ << " address = " << std::hex << (unsigned long) tile << std::endl;
     return tile;
 }

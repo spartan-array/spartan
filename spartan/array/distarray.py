@@ -316,7 +316,8 @@ class DistArrayImpl(DistArray):
     # stitch results back together
     # if we have any masked tiles, then we need to create a masked array.
     # otherwise, create a dense array.
-    results = [r.data for r in futures.result]
+    #results = [r.data for r in futures.result]
+    results = [r for r in futures.result]
     util.log_info('FETCH: %s', len(results))
 
     DENSE = 0

@@ -61,6 +61,11 @@ get_resp_to_tile(PyObject* o, PyObject *args)
     CTile *ctile = new CTile(rpc);
     release_ctile_rpc(rpc);
 
+    PyObject *obj = ctile->to_npy();
+    delete ctile;
+    return obj;
+
+    /*
     PyObject *mod = PyImport_ImportModule("spartan.array.tile");
     PyObject *obj = PyObject_GetAttrString(mod, "Tile");
     PyObject *_args = Py_BuildValue("(OOOOO)", Py_None, Py_None, Py_None, 
@@ -77,6 +82,8 @@ get_resp_to_tile(PyObject* o, PyObject *args)
     std::cout << __func__ << std::endl;
 
     return tile;
+    */
+
 }
 
 static PyMethodDef _rpc_ctile_methods[] = {

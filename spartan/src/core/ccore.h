@@ -232,13 +232,13 @@ struct GetResp {
     GetResp(const TileId& i, std::vector<char*>& d, bool own = true): id(i), data(d), own_data(own) {}
     GetResp(): own_data(true) {}
     ~GetResp() {
-        std::cout << "GetResp dealloc1" << std::endl;
+        std::cout << "GetResp dealloc1 " << std::endl;
         if (own_data) {
-            std::cout << "GetResp dealloc2" << std::endl;
+            std::cout << "GetResp dealloc2 " << std::hex << (unsigned long)data[0] << std::endl;
             delete (bool*)data[0];
             int size = data.size();
             for (int i = 1; i < size; ++i) {
-                std::cout << "GetResp dealloc3 " << size << std::endl;
+               std::cout << "GetResp dealloc3 " << std::hex << (unsigned long)data[i] << std::endl;
                delete (NpyMemManager*)data[i];
             }
         }

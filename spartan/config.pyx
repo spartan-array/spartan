@@ -112,7 +112,6 @@ from libc.string cimport const_char
 from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 cdef extern from "src/core/cconfig.h":
   cdef vector[const_char *] get_flags_info()
-  cdef void config_parse(int argc, const_char **argv)
 
 class Flags(object):
   def __init__(self):

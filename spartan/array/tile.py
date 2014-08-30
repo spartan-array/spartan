@@ -8,6 +8,12 @@ TYPE_DENSE = TileBase.TILE_DENSE
 TYPE_MASKED = TileBase.TILE_MASKED
 TYPE_SPARSE = TileBase.TILE_SPARSE
 
+builtin_reducers = {}
+builtin_reducers[np.add] = TileBase.TILE_REDUCER_ADD
+builtin_reducers[np.multiply] = TileBase.TILE_REDUCER_MUL
+builtin_reducers[np.maximum] = TileBase.TILE_REDUCER_MAXIMUM
+builtin_reducers[np.minimum] = TileBase.TILE_REDUCER_MINIMUM
+
 
 def npdata_to_internal(array):
   ttype = None
@@ -44,11 +50,6 @@ class Tile(TileBase):
     util.log_info('Tile.__init__')
     super(Tile, self).__init__(shape, np.dtype(dtype).char, tile_type,
                                sparse_type, data, ctile_id=ctile_id)
-    self.builtin_reducers = {}
-    self.builtin_reducers[np.add] = TileBase.TILE_REDUCER_ADD
-    self.builtin_reducers[np.multiply] = TileBase.TILE_REDUCER_MUL
-    self.builtin_reducers[np.maximum] = TileBase.TILE_REDUCER_MAXIMUM
-    self.builtin_reducers[np.minimum] = TileBase.TILE_REDUCER_MINIMUM
 
   def get(self, subslice, local=False):
     if local:

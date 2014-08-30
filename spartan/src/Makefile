@@ -13,8 +13,8 @@ ifndef $(NUMPY_FLAGS)
     NUMPY = $(shell python -c "import numpy; print '-I' + numpy.__path__[0] + '/core/include/numpy'")
 endif
 
-CFLAGS = -I$(CUR_DIR) -I$(CORE_DIR) -I$(ARRAY_DIR) -I$(RPC) -I$(RPCBASE) $(PY_CFLAGS) $(NUMPY) -pthread -std=c++0x -O2 #-g
-LDFLAGS = -L$(RPCBASE)/build -L$(RPC)/build -L$(CURDIR) $(PY_LDFLAGS) -lbase -lpython2.7 -std=c++11 #-g
+CFLAGS = -I$(CUR_DIR) -I$(CORE_DIR) -I$(ARRAY_DIR) -I$(RPC) -I$(RPCBASE) $(PY_CFLAGS) $(NUMPY) -pthread -std=c++0x -O2 -ggdb
+LDFLAGS = -L$(RPCBASE)/build -L$(RPC)/build -L$(CURDIR) $(PY_LDFLAGS) -lbase -lpython2.7 -std=c++11 -ggdb
 OBJS_WORKER = $(CUR_DIR)/core/worker.o
 OBJS_ARRAY = $(ARRAY_DIR)/cslice.o $(ARRAY_DIR)/cextent.o $(ARRAY_DIR)/ctile.o $(ARRAY_DIR)/carray.o $(ARRAY_DIR)/carray_reducer.o
 OBJS_CORE = $(CUR_DIR)/core/cconfig.o
@@ -35,6 +35,7 @@ base-utils:
 simple-rpc:
 	@if [ ! -d "$(RPC)" ] ; then \
 	    git clone https://github.com/santazhang/simple-rpc $(RPC); \
+	    cp $(RPCDIR)/simple-rpc-wscript $(RPC)/wscript
 	fi
 
 rpc: base-utils simple-rpc

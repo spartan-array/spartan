@@ -163,7 +163,7 @@ CBlobCtx_Py_update(PyObject* o, PyObject *args)
         PyObject *resp = PyObject_CallFunction(core_obj, NULL);
         PyObject *kargs = PyDict_New();
         PyDict_SetItemString(kargs, "id", PyInt_FromLong(-1));
-        PyDict_SetItemString(kargs, "resp", resp);
+        PyDict_SetItemString(kargs, "rep", resp);
         return PyObject_Call(obj, PyTuple_New(0), kargs);
     } else {
         PyObject *rep_types = Py_BuildValue("(s)", "EmptyMessage");
