@@ -1,17 +1,21 @@
 import sys
 
 types = ['npy_bool',
-         'npy_int', 
-         'npy_uint', 
-         'npy_longlong', 
+         'npy_int',
+         'npy_uint',
+         'npy_long',
+         'npy_ulong',
+         'npy_longlong',
          'npy_ulonglong',
          'npy_float',
          'npy_double']
 
 type_ltrs = ['NPY_BOOLLTR',
-             'NPY_INTLTR', 
-             'NPY_UINTLTR', 
-             'NPY_LONGLONGLTR', 
+             'NPY_INTLTR',
+             'NPY_UINTLTR',
+             'NPY_LONGLTR',
+             'NPY_ULONGLTR',
+             'NPY_LONGLONGLTR',
              'NPY_ULONGLONGLTR',
              'NPY_FLOATLTR',
              'NPY_DOUBLELTR']
@@ -19,10 +23,13 @@ type_ltrs = ['NPY_BOOLLTR',
 type_names = ['BOOL',
               'INT',
               'UINT',
+              'LONG',
+              'ULONG',
               'LONGLONG',
               'ULONGLONG',
               'FLOAT',
               'DOUBLE']
+
 
 def replace(program, replace_begin, replace_end):
   output = ''
@@ -30,7 +37,7 @@ def replace(program, replace_begin, replace_end):
     begin = replace_begin
     end = replace_end
     while True:
-      index = program.find('_RP_', begin, end);
+      index = program.find('_RP_', begin, end)
       if index == -1:
         break
       output += program[begin:index]
@@ -48,11 +55,12 @@ def replace(program, replace_begin, replace_end):
     output += program[begin:end]
   return output
 
+
 def main():
   with open(sys.argv[1]) as rfp:
     with open(sys.argv[1][:-4], 'w') as wfp:
       # Read all lines at once. It can simply the process.
-      program = rfp.read() 
+      program = rfp.read()
       new_program = ''
       begin = end = 0
       replace_begin = replace_end = 0
@@ -71,6 +79,6 @@ def main():
 
       new_program += program[begin:]
       wfp.write(new_program)
-      
+
 if __name__ == '__main__':
   main()

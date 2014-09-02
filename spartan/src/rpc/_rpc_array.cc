@@ -56,7 +56,6 @@ get_resp_to_tile(PyObject* o, PyObject *args)
     GetResp* resp = (GetResp*) u;
     assert(!resp->own_data);
 
-    std::cout << __func__ << " vector size " << resp->data.size() << std::endl;
     CTile_RPC *rpc = vector_to_ctile_rpc(resp->data);
     CTile *ctile = new CTile(rpc);
     release_ctile_rpc(rpc);
@@ -73,13 +72,9 @@ get_resp_to_tile(PyObject* o, PyObject *args)
     PyObject *kargs = PyDict_New();
     PyDict_SetItem(kargs, PyString_FromString("ctile_id"),
                    Py_BuildValue("k", (unsigned long)ctile));
-    std::cout << __func__ << "Before " << std::endl;
     PyObject *tile = PyObject_Call(obj, _args, kargs);
-    std::cout << __func__ << "After " << std::endl;
 
-    std::cout << __func__ << std::endl;
     delete resp;
-    std::cout << __func__ << std::endl;
 
     return tile;
     */

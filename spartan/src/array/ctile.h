@@ -8,6 +8,7 @@
 #include "carray.h"
 #include "carray_reducer.h"
 #include "rpc/marshal.h"
+#include "base/logging.h"
 
 enum CTILE_TYPE {
     CTILE_EMPTY = 0,
@@ -28,7 +29,7 @@ enum CTILE_SPARSE_TYPE {
 
 typedef struct CTile_RPC_t {
     npy_int32 type;
-    npy_int32 sparse_type; 
+    npy_int32 sparse_type;
     npy_int32 initialized;
     npy_int32 nd;
     npy_int64 dimensions[NPY_MAXDIMS];
@@ -39,9 +40,9 @@ typedef struct CTile_RPC_t {
      * The fields may repeat.
      * For a dense array, there is only one array.
      * For a masked array, there are two arrays.
-     * For a sparse array, there are three arrays. 
-     * For a sparse array, the 'dimension' field means the dimension 
-     * of the whole sparse array. Hence, users need to caculate the 
+     * For a sparse array, there are three arrays.
+     * For a sparse array, the 'dimension' field means the dimension
+     * of the whole sparse array. Hence, users need to caculate the
      * 'dimension' for the three matrices from item_size and size.
      */
      CArray_RPC* array[3];
@@ -53,7 +54,7 @@ inline CTile_RPC* vector_to_ctile_rpc(std::vector<char*> &buffers) {
 
     CTile_RPC *rpc;
     if (is_npy_memmanager) {
-        NpyMemManager* mgr; 
+        NpyMemManager* mgr;
         mgr = (NpyMemManager*)buffers[1];
         rpc = (CTile_RPC*)mgr->get_data();
         mgr->clear();
@@ -93,30 +94,31 @@ inline void release_ctile_rpc(CTile_RPC* rpc)
             } else {
                 /**
                 * If this contains raw data, the data will be
-                * directly used by CTile. It should not be 
+                * directly used by CTile. It should not be
                 * deleted here.
                 */
                 ;
             }
         }
-    } 
+    }
     free(rpc);
 }
 
 /**
- * CTile only initializes data(mask) when necessary. This can reduce 
- * transmission time when data is not required (such as creat() in 
+ * CTile only initializes data(mask) when necessary. This can reduce
+ * transmission time when data is not required (such as creat() in
  * distarray).
  */
 class CTile {
 public:
 
-    CTile() : py_c_refcount(0), nd(0) {};
-    CTile(npy_intp dimensions[], int nd, char dtype, 
-          CTILE_TYPE tile_type, CTILE_SPARSE_TYPE sparse_type); 
+    CTile()
+        : py_c_refcount(0), nd(0), dense(NULL), mask(NULL), sparse {NULL, NULL, NULL} {};
+    CTile(npy_intp dimensions[], int nd, char dtype,
+          CTILE_TYPE tile_type, CTILE_SPARSE_TYPE sparse_type);
     // This constructor will also set data pointers to rpc.
     // No need to call set_data again.
-    CTile(CTile_RPC *rpc); 
+    CTile(CTile_RPC *rpc);
     ~CTile();
 
     void initialize(void);
@@ -153,8 +155,8 @@ private:
     bool is_idx_complete(const CSliceIdx &idx);
     void reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer);
 
-    /** 
-     * This reference count is used to determine whether this CTile is used 
+    /**
+     * This reference count is used to determine whether this CTile is used
      * by Python only or by both C++ and Python.
      */
     int py_c_refcount;
@@ -172,7 +174,7 @@ private:
 
 };
 
-inline rpc::Marshal& operator<<(rpc::Marshal& m, const CTile& o) 
+inline rpc::Marshal& operator<<(rpc::Marshal& m, const CTile& o)
 {
     m.write(&o.type, sizeof(o.type));
     m.write(&o.sparse_type, sizeof(o.sparse_type));
@@ -180,6 +182,8 @@ inline rpc::Marshal& operator<<(rpc::Marshal& m, const CTile& o)
     m.write(o.dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
     m.write(&o.dtype, sizeof(o.dtype));
     m.write(&o.initialized, sizeof(o.initialized));
+    Log_debug("Marshal::%s , type = %d, nd = %d, initialized = %u, dtype = %c",
+              __func__, o.type, o.nd, o.initialized, o.dtype);
     if (o.initialized) {
         if (o.type == CTILE_DENSE) {
             m << *(o.dense);
@@ -195,14 +199,16 @@ inline rpc::Marshal& operator<<(rpc::Marshal& m, const CTile& o)
     return m;
 }
 
-inline rpc::Marshal& operator>>(rpc::Marshal&m, CTile& o) 
+inline rpc::Marshal& operator>>(rpc::Marshal&m, CTile& o)
 {
     m.read(&o.type, sizeof(o.type));
-    m.read(&o.type, sizeof(o.sparse_type));
+    m.read(&o.sparse_type, sizeof(o.sparse_type));
     m >> o.nd;
     m.read(o.dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
     m.read(&o.dtype, sizeof(o.dtype));
     m.read(&o.initialized, sizeof(o.initialized));
+    Log_debug("Marshal::%s , type = %d, nd = %d, initialized = %u, dtype = %c",
+              __func__, o.type, o.nd, o.initialized, o.dtype);
     if (o.initialized) {
         if (o.type == CTILE_DENSE) {
             o.dense = new CArray();

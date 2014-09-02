@@ -87,9 +87,9 @@ CArray::CArray(CArray_RPC *rpc)
 
 CArray::~CArray()
 {
-    std::cout << __func__ << std::endl;
     if (data_source != NULL) {
-        std::cout << __func__ << " " << (unsigned long)data_source->get_source() \
+        std::cout << __func__ << " " << std::hex \
+                  << (unsigned long)data_source->get_source() \
                   << " " << data_source->get_refcount() << std::endl;
         delete data_source;
     }

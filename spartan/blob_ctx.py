@@ -168,6 +168,7 @@ class BlobCtx(object):
     '''
     ctile = rpc.rpc_array.numpy_to_ctile(data)
     if builtin_reducers.get(reducer, None) is None:
+      assert False, reducer
       _reducer = reducer
     else:
       _reducer = builtin_reducers[reducer]

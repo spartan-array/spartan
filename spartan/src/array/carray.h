@@ -3,8 +3,10 @@
 #include <Python.h>
 #include <numpy/arrayobject.h>
 #include <iostream>
+#include <assert.h>
 #include "cextent.h"
 #include "rpc/marshal.h"
+#include "base/logging.h"
 
 extern int npy_type_size[]; 
 extern int npy_type_number[];
@@ -78,7 +80,6 @@ public:
                 if (own_by_npy) {
                     Py_DECREF(source);
                 } else {
-                    std::cout << "NpyMemManager delete " << std::hex << (unsigned long)source << std::endl;
                     delete source;
                 }
             } else {
@@ -181,11 +182,9 @@ private:
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const CArray& o) 
 {
-    npy_intp dimensions[NPY_MAXDIMS];
-
     m << o.nd;
     m.write(&(o.type), sizeof(o.type));
-    m.write(dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
+    m.write((void*)o.dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
     m.write(o.data, o.size);
     return m;
 }
@@ -198,10 +197,9 @@ inline rpc::Marshal& operator >>(rpc::Marshal&m, CArray& o)
 
     m >> nd;
     m.read(&type, sizeof(char));
-    m.read(dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
+    m.read((void*)dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
     o.init(dimensions, nd, type);
     o.data = (char*) malloc(o.size);
-    assert(o.data != NULL);
     o.data_source = new NpyMemManager(o.data, o.data, false, o.size);
     assert(m.content_size() == o.size);
     m.read(o.data, o.size);

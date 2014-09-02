@@ -8,6 +8,7 @@
 #include <utility>
 #include "cblob_ctx.h"
 #include "array/_ctile_py_if.h"
+#include "base/logging.h"
 
 #define RETURN_IF_NULL(val) \
 do {\
@@ -76,19 +77,16 @@ _CBlobCtx_Py_get(PyObject* o, PyObject *args, bool is_flatten)
     PyObject *tile_id, *subslice, *id_worker, *id_id;
     assert(self->ctx != NULL);
 
-    std::cout << __func__ << " 1" << std::endl;
+    Log_debug(__func__);
     if (!PyArg_ParseTuple(args, "OO", &tile_id, &subslice))
         return NULL;
 
     id_worker = PyObject_GetAttrString(tile_id, "worker");
     id_id = PyObject_GetAttrString(tile_id, "id");
-    std::cout << __func__ << " 2 " << id_worker << " " << id_id << std::endl;
     assert(id_worker != NULL);
     assert(id_id != NULL);
     TileId id(get_longlong(id_worker), get_longlong(id_id));
-    std::cout << __func__ << " 3" << std::endl;
     CSliceIdx idx(subslice, 0, NULL);
-    std::cout << __func__ << " 4" << std::endl;
 
     GetResp *resp = new GetResp();
     rpc::Future *fu = NULL;
@@ -118,14 +116,14 @@ _CBlobCtx_Py_get(PyObject* o, PyObject *args, bool is_flatten)
 static PyObject *
 CBlobCtx_Py_get(PyObject* o, PyObject *args)
 {
-    std::cout << __func__ << std::endl;
+    Log_debug(__func__);
     return _CBlobCtx_Py_get(o, args, false);
 }
 
 static PyObject *
 CBlobCtx_Py_get_flatten(PyObject* o, PyObject *args)
 {
-    std::cout << __func__ << std::endl;
+    Log_debug(__func__);
     return _CBlobCtx_Py_get(o, args, true);
 }
 
@@ -136,7 +134,7 @@ CBlobCtx_Py_update(PyObject* o, PyObject *args)
     CBlobCtx_Py *self = (CBlobCtx_Py*) o;
     unsigned long reducer, ctile_u;
 
-    std::cout << __func__ << std::endl;
+    Log_debug(__func__);
     assert(self->ctx != NULL);
 
     if (!PyArg_ParseTuple(args, "OOkk", &tile_id, &subslice, &ctile_u, &reducer))
@@ -177,7 +175,7 @@ CBlobCtx_Py_update(PyObject* o, PyObject *args)
 static PyObject *
 CBlobCtx_Py_create(PyObject* o, PyObject *args)
 {
-    std::cout << __func__ << std::endl;
+    Log_debug(__func__);
     CBlobCtx_Py *self = (CBlobCtx_Py*) o;
     PyObject *tile, *tile_id, *id_worker, *id_id;
     assert(self->ctx != NULL);

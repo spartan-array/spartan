@@ -424,6 +424,7 @@ def create(shape,
   dtype = np.dtype(dtype)
   shape = tuple(shape)
 
+  util.log_debug('Creating a new distarray with shape %s', str(shape))
   extents = compute_extents(shape, tile_hint, ctx.num_workers * 4)
   tiles = {}
   tile_type = tile.TYPE_SPARSE if sparse else tile.TYPE_DENSE
@@ -470,6 +471,7 @@ def create(shape,
 
   array = DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
   master.get().register_array(array)
+  util.log_debug('Succcessfully created a new distarray')
   return array
 
 def from_replica(X):

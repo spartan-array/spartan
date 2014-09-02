@@ -356,6 +356,9 @@ init_ctile_py_if(void)
                                    PyString_FromString("TILE_SPARSE_CSR"),
                                    PyInt_FromLong((long)CTILE_SPARSE_CSR)));
     RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
+                                   PyString_FromString("TILE_REDUCER_REPLACE"),
+                                   PyInt_FromLong((long)REDUCER_REPLACE)));
+    RETURN_IF_ERROR(PyDict_SetItem(tp_dict,
                                    PyString_FromString("TILE_REDUCER_ADD"),
                                    PyInt_FromLong((long)REDUCER_ADD)));
     RETURN_IF_ERROR(PyDict_SetItem(tp_dict,

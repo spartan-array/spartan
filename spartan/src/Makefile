@@ -35,7 +35,7 @@ base-utils:
 simple-rpc:
 	@if [ ! -d "$(RPC)" ] ; then \
 	    git clone https://github.com/santazhang/simple-rpc $(RPC); \
-	    cp $(RPCDIR)/simple-rpc-wscript $(RPC)/wscript
+	    cp $(RPCDIR)/simple-rpc-wscript $(RPC)/wscript; \
 	fi
 
 rpc: base-utils simple-rpc
@@ -53,8 +53,8 @@ worker: $(OBJS_WORKER)
 	${CC} -o $(CUR_DIR)/$@ $^ $(LDFLAGS) -lsimplerpc -lspartan_array -lcore
 
 clean:
-	cd $(RPCBASE);python waf clean
-	cd $(RPC);python waf clean
+	#cd $(RPCBASE);python waf clean
+	#cd $(RPC);python waf clean
 	rm -f $(RPCDIR)/*.o
 	rm -f $(ARRAY_DIR)/*.o
 	rm -f $(CORE_DIR)/*.o

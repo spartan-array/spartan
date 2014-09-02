@@ -9,6 +9,7 @@ TYPE_MASKED = TileBase.TILE_MASKED
 TYPE_SPARSE = TileBase.TILE_SPARSE
 
 builtin_reducers = {}
+builtin_reducers[None] = TileBase.TILE_REDUCER_REPLACE
 builtin_reducers[np.add] = TileBase.TILE_REDUCER_ADD
 builtin_reducers[np.multiply] = TileBase.TILE_REDUCER_MUL
 builtin_reducers[np.maximum] = TileBase.TILE_REDUCER_MAXIMUM
@@ -60,10 +61,10 @@ class Tile(TileBase):
   def update(self, subslice, data, reducer):
     _, _, sparse_type, tile_type, tile_data = npdata_to_internal(data)
 
-    if self.builtin_reducers.get(reducer, None) is None:
+    if builtin_reducers.get(reducer, None) is None:
       _reducer = reducer
     else:
-      _reducer = self.builtin_reducers[reducer]
+      _reducer = builtin_reducers[reducer]
     self._update(subslice, tile_type, sparse_type,
                  tile_data, _reducer)
     return self

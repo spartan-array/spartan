@@ -16,8 +16,6 @@
  */
 
 #include <iostream>
-#define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
-#define NO_IMPORT_ARRAY
 #include "carray.h"
 #include "carray_reducer.h"
 #include "cextent.h"
@@ -272,6 +270,171 @@ UINT_scalar_xor(char **args)
     npy_uint in1 = *((npy_uint*)ip1);
     npy_uint in2 = *((npy_uint*)ip2);
     *((npy_uint*)ip1) = in1 xor in2;
+}
+*/
+
+void
+LONG_scalar_replace(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    //npy_long in1 = *((npy_long*)ip1);
+    npy_long in2 = *((npy_long*)ip2);
+    *((npy_long*)ip1) = in2;
+}
+
+void
+LONG_scalar_add(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_long in1 = *((npy_long*)ip1);
+    npy_long in2 = *((npy_long*)ip2);
+    *((npy_long*)ip1) = in1 + in2;
+}
+
+void
+LONG_scalar_multiply(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_long in1 = *((npy_long*)ip1);
+    npy_long in2 = *((npy_long*)ip2);
+    *((npy_long*)ip1) = in1 * in2;
+}
+
+void
+LONG_scalar_maximum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_long in1 = *((npy_long*)ip1);
+    npy_long in2 = *((npy_long*)ip2);
+    *((npy_long*)ip1) = (in1 >= in2) ? in1 : in2;
+}
+
+void
+LONG_scalar_minimum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_long in1 = *((npy_long*)ip1);
+    npy_long in2 = *((npy_long*)ip2);
+    std::cout << __func__ << "in1 = " << in1 << ", in2 = " << in2 << std::endl;
+    *((npy_long*)ip1) = (in1 < in2) ? in1 : in2;
+}
+
+/*
+void
+LONG_scalar_and(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_long in1 = *((npy_long*)ip1);
+    npy_long in2 = *((npy_long*)ip2);
+    *((npy_long*)ip1) = in1 & in2;
+}
+
+void
+LONG_scalar_or(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_long in1 = *((npy_long*)ip1);
+    npy_long in2 = *((npy_long*)ip2);
+    *((npy_long*)ip1) = in1 | in2;
+}
+
+void
+LONG_scalar_xor(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_long in1 = *((npy_long*)ip1);
+    npy_long in2 = *((npy_long*)ip2);
+    *((npy_long*)ip1) = in1 xor in2;
+}
+*/
+
+void
+ULONG_scalar_replace(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    //npy_ulong in1 = *((npy_ulong*)ip1);
+    npy_ulong in2 = *((npy_ulong*)ip2);
+    *((npy_ulong*)ip1) = in2;
+}
+
+void
+ULONG_scalar_add(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulong in1 = *((npy_ulong*)ip1);
+    npy_ulong in2 = *((npy_ulong*)ip2);
+    *((npy_ulong*)ip1) = in1 + in2;
+}
+
+void
+ULONG_scalar_multiply(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulong in1 = *((npy_ulong*)ip1);
+    npy_ulong in2 = *((npy_ulong*)ip2);
+    *((npy_ulong*)ip1) = in1 * in2;
+}
+
+void
+ULONG_scalar_maximum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulong in1 = *((npy_ulong*)ip1);
+    npy_ulong in2 = *((npy_ulong*)ip2);
+    *((npy_ulong*)ip1) = (in1 >= in2) ? in1 : in2;
+}
+
+void
+ULONG_scalar_minimum(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulong in1 = *((npy_ulong*)ip1);
+    npy_ulong in2 = *((npy_ulong*)ip2);
+    *((npy_ulong*)ip1) = (in1 < in2) ? in1 : in2;
+}
+
+/*
+void
+ULONG_scalar_and(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulong in1 = *((npy_ulong*)ip1);
+    npy_ulong in2 = *((npy_ulong*)ip2);
+    *((npy_ulong*)ip1) = in1 & in2;
+}
+
+void
+ULONG_scalar_or(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulong in1 = *((npy_ulong*)ip1);
+    npy_ulong in2 = *((npy_ulong*)ip2);
+    *((npy_ulong*)ip1) = in1 | in2;
+}
+
+void
+ULONG_scalar_xor(char **args)
+{
+    char *ip1 = args[0], *ip2 = args[1];
+
+    npy_ulong in1 = *((npy_ulong*)ip1);
+    npy_ulong in2 = *((npy_ulong*)ip2);
+    *((npy_ulong*)ip1) = in1 xor in2;
 }
 */
 
@@ -605,16 +768,16 @@ DOUBLE_scalar_xor(char **args)
 
 
 typedef void (*scalar_reducer)(char**);
-scalar_reducer scalar_replace_functions[] = {BOOL_scalar_replace, INT_scalar_replace, UINT_scalar_replace, LONGLONG_scalar_replace, ULONGLONG_scalar_replace, FLOAT_scalar_replace, DOUBLE_scalar_replace, NULL};
-scalar_reducer scalar_add_functions[] = {BOOL_scalar_add, INT_scalar_add, UINT_scalar_add, LONGLONG_scalar_add, ULONGLONG_scalar_add, FLOAT_scalar_add, DOUBLE_scalar_add, NULL};
-scalar_reducer scalar_multiply_functions[] = {BOOL_scalar_multiply, INT_scalar_multiply, UINT_scalar_multiply, LONGLONG_scalar_multiply, ULONGLONG_scalar_multiply, FLOAT_scalar_multiply, DOUBLE_scalar_multiply, NULL};
-scalar_reducer scalar_maximum_functions[] = {BOOL_scalar_maximum, INT_scalar_maximum, UINT_scalar_maximum, LONGLONG_scalar_maximum, ULONGLONG_scalar_maximum, FLOAT_scalar_maximum, DOUBLE_scalar_maximum, NULL};
-scalar_reducer scalar_minimum_functions[] = {BOOL_scalar_minimum, INT_scalar_minimum, UINT_scalar_minimum, LONGLONG_scalar_minimum, ULONGLONG_scalar_minimum, FLOAT_scalar_minimum, DOUBLE_scalar_minimum, NULL};
-//scalar_reducer scalar_and_functions[] = {BOOL_scalar_and, INT_scalar_and, UINT_scalar_and, LONGLONG_scalar_and, ULONGLONG_scalar_and, FLOAT_scalar_and, DOUBLE_scalar_and, NULL};
-//scalar_reducer scalar_or_functions[] = {BOOL_scalar_or, INT_scalar_or, UINT_scalar_or, LONGLONG_scalar_or, ULONGLONG_scalar_or, FLOAT_scalar_or, DOUBLE_scalar_or, NULL};
-//scalar_reducer scalar_xor_functions[] = {BOOL_scalar_xor, INT_scalar_xor, UINT_scalar_xor, LONGLONG_scalar_xor, ULONGLONG_scalar_xor, FLOAT_scalar_xor, DOUBLE_scalar_xor, NULL};
+scalar_reducer scalar_replace_functions[] = {BOOL_scalar_replace, INT_scalar_replace, UINT_scalar_replace, LONG_scalar_replace, ULONG_scalar_replace, LONGLONG_scalar_replace, ULONGLONG_scalar_replace, FLOAT_scalar_replace, DOUBLE_scalar_replace, NULL};
+scalar_reducer scalar_add_functions[] = {BOOL_scalar_add, INT_scalar_add, UINT_scalar_add, LONG_scalar_add, ULONG_scalar_add, LONGLONG_scalar_add, ULONGLONG_scalar_add, FLOAT_scalar_add, DOUBLE_scalar_add, NULL};
+scalar_reducer scalar_multiply_functions[] = {BOOL_scalar_multiply, INT_scalar_multiply, UINT_scalar_multiply, LONG_scalar_multiply, ULONG_scalar_multiply, LONGLONG_scalar_multiply, ULONGLONG_scalar_multiply, FLOAT_scalar_multiply, DOUBLE_scalar_multiply, NULL};
+scalar_reducer scalar_maximum_functions[] = {BOOL_scalar_maximum, INT_scalar_maximum, UINT_scalar_maximum, LONG_scalar_maximum, ULONG_scalar_maximum, LONGLONG_scalar_maximum, ULONGLONG_scalar_maximum, FLOAT_scalar_maximum, DOUBLE_scalar_maximum, NULL};
+scalar_reducer scalar_minimum_functions[] = {BOOL_scalar_minimum, INT_scalar_minimum, UINT_scalar_minimum, LONG_scalar_minimum, ULONG_scalar_minimum, LONGLONG_scalar_minimum, ULONGLONG_scalar_minimum, FLOAT_scalar_minimum, DOUBLE_scalar_minimum, NULL};
+//scalar_reducer scalar_and_functions[] = {BOOL_scalar_and, INT_scalar_and, UINT_scalar_and, LONG_scalar_and, ULONG_scalar_and, LONGLONG_scalar_and, ULONGLONG_scalar_and, FLOAT_scalar_and, DOUBLE_scalar_and, NULL};
+//scalar_reducer scalar_or_functions[] = {BOOL_scalar_or, INT_scalar_or, UINT_scalar_or, LONG_scalar_or, ULONG_scalar_or, LONGLONG_scalar_or, ULONGLONG_scalar_or, FLOAT_scalar_or, DOUBLE_scalar_or, NULL};
+//scalar_reducer scalar_xor_functions[] = {BOOL_scalar_xor, INT_scalar_xor, UINT_scalar_xor, LONG_scalar_xor, ULONG_scalar_xor, LONGLONG_scalar_xor, ULONGLONG_scalar_xor, FLOAT_scalar_xor, DOUBLE_scalar_xor, NULL};
 
-char scalar_funcs_type[] = {NPY_BOOLLTR, NPY_INTLTR, NPY_UINTLTR, NPY_LONGLONGLTR, NPY_ULONGLONGLTR, NPY_FLOATLTR, NPY_DOUBLELTR, ' '};
+char scalar_funcs_type[] = {NPY_BOOLLTR, NPY_INTLTR, NPY_UINTLTR, NPY_LONGLTR, NPY_ULONGLTR, NPY_LONGLONGLTR, NPY_ULONGLONGLTR, NPY_FLOATLTR, NPY_DOUBLELTR, ' '};
 /* This must be sync with REDUCER enumeration */
 scalar_reducer* scalar_functions[] = {
                                      scalar_replace_functions,  /* REDUCER_REPLACE */
@@ -633,6 +796,7 @@ select_scalar_reducer(REDUCER reducer, char type)
 {
     int i;
 
+    std::cout << __func__ << " reducer = " << reducer << std::endl;
     for (i = 0; scalar_funcs_type[i] != ' '; i++) {
         if (scalar_funcs_type[i] == type)
             return scalar_functions[reducer - REDUCER_BEGIN][i];
@@ -901,6 +1065,168 @@ UINT_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
         npy_uint in1 = *((npy_uint*)ip1);
         npy_uint in2 = *((npy_uint*)ip2);
         *((npy_uint*)ip1) = in1 xor in2;
+    }
+}
+*/
+
+void
+LONG_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_long in2 = *((npy_long*)ip2);
+        *((npy_long*)ip1) = in2;
+    }
+}
+
+void
+LONG_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_long in1 = *((npy_long*)ip1);
+        npy_long in2 = *((npy_long*)ip2);
+        *((npy_long*)ip1) = in1 + in2;
+    }
+}
+
+void
+LONG_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_long in1 = *((npy_long*)ip1);
+        npy_long in2 = *((npy_long*)ip2);
+        *((npy_long*)ip1) = in1 * in2;
+    }
+}
+
+void
+LONG_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_long in1 = *((npy_long*)ip1);
+        npy_long in2 = *((npy_long*)ip2);
+        *((npy_long*)ip1) = (in1 >= in2) ? in1 : in2;
+    }
+}
+
+void
+LONG_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_long in1 = *((npy_long*)ip1);
+        npy_long in2 = *((npy_long*)ip2);
+        *((npy_long*)ip1) = (in1 <= in2) ? in1 : in2;
+    }
+}
+
+/*
+void
+LONG_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_long in1 = *((npy_long*)ip1);
+        npy_long in2 = *((npy_long*)ip2);
+        *((npy_long*)ip1) = in1 and in2;
+    }
+}
+
+void
+LONG_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_long in1 = *((npy_long*)ip1);
+        npy_long in2 = *((npy_long*)ip2);
+        *((npy_long*)ip1) = in1 or in2;
+    }
+}
+
+void
+LONG_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_long in1 = *((npy_long*)ip1);
+        npy_long in2 = *((npy_long*)ip2);
+        *((npy_long*)ip1) = in1 xor in2;
+    }
+}
+*/
+
+void
+ULONG_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulong in2 = *((npy_ulong*)ip2);
+        *((npy_ulong*)ip1) = in2;
+    }
+}
+
+void
+ULONG_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulong in1 = *((npy_ulong*)ip1);
+        npy_ulong in2 = *((npy_ulong*)ip2);
+        *((npy_ulong*)ip1) = in1 + in2;
+    }
+}
+
+void
+ULONG_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulong in1 = *((npy_ulong*)ip1);
+        npy_ulong in2 = *((npy_ulong*)ip2);
+        *((npy_ulong*)ip1) = in1 * in2;
+    }
+}
+
+void
+ULONG_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulong in1 = *((npy_ulong*)ip1);
+        npy_ulong in2 = *((npy_ulong*)ip2);
+        *((npy_ulong*)ip1) = (in1 >= in2) ? in1 : in2;
+    }
+}
+
+void
+ULONG_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulong in1 = *((npy_ulong*)ip1);
+        npy_ulong in2 = *((npy_ulong*)ip2);
+        *((npy_ulong*)ip1) = (in1 <= in2) ? in1 : in2;
+    }
+}
+
+/*
+void
+ULONG_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulong in1 = *((npy_ulong*)ip1);
+        npy_ulong in2 = *((npy_ulong*)ip2);
+        *((npy_ulong*)ip1) = in1 and in2;
+    }
+}
+
+void
+ULONG_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulong in1 = *((npy_ulong*)ip1);
+        npy_ulong in2 = *((npy_ulong*)ip2);
+        *((npy_ulong*)ip1) = in1 or in2;
+    }
+}
+
+void
+ULONG_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
+{
+    BINARY_DENSE_LOOP {
+        npy_ulong in1 = *((npy_ulong*)ip1);
+        npy_ulong in2 = *((npy_ulong*)ip2);
+        *((npy_ulong*)ip1) = in1 xor in2;
     }
 }
 */
@@ -1231,16 +1557,16 @@ DOUBLE_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
 
 
 typedef void (*dense_reducer)(char**, npy_intp*, npy_intp*);
-dense_reducer dense_replace_functions[] = {BOOL_dense_replace, INT_dense_replace, UINT_dense_replace, LONGLONG_dense_replace, ULONGLONG_dense_replace, FLOAT_dense_replace, DOUBLE_dense_replace, NULL};
-dense_reducer dense_add_functions[] = {BOOL_dense_add, INT_dense_add, UINT_dense_add, LONGLONG_dense_add, ULONGLONG_dense_add, FLOAT_dense_add, DOUBLE_dense_add, NULL};
-dense_reducer dense_multiply_functions[] = {BOOL_dense_multiply, INT_dense_multiply, UINT_dense_multiply, LONGLONG_dense_multiply, ULONGLONG_dense_multiply, FLOAT_dense_multiply, DOUBLE_dense_multiply, NULL};
-dense_reducer dense_maximum_functions[] = {BOOL_dense_maximum, INT_dense_maximum, UINT_dense_maximum, LONGLONG_dense_maximum, ULONGLONG_dense_maximum, FLOAT_dense_maximum, DOUBLE_dense_maximum, NULL};
-dense_reducer dense_minimum_functions[] = {BOOL_dense_minimum, INT_dense_minimum, UINT_dense_minimum, LONGLONG_dense_minimum, ULONGLONG_dense_minimum, FLOAT_dense_minimum, DOUBLE_dense_minimum, NULL};
-//dense_reducer dense_and_functions[] = {BOOL_dense_and, INT_dense_and, UINT_dense_and, LONGLONG_dense_and, ULONGLONG_dense_and, FLOAT_dense_and, DOUBLE_dense_and, NULL};
-//dense_reducer dense_or_functions[] = {BOOL_dense_or, INT_dense_or, UINT_dense_or, LONGLONG_dense_or, ULONGLONG_dense_or, FLOAT_dense_or, DOUBLE_dense_or, NULL};
-//dense_reducer dense_xor_functions[] = {BOOL_dense_xor, INT_dense_xor, UINT_dense_xor, LONGLONG_dense_xor, ULONGLONG_dense_xor, FLOAT_dense_xor, DOUBLE_dense_xor, NULL};
+dense_reducer dense_replace_functions[] = {BOOL_dense_replace, INT_dense_replace, UINT_dense_replace, LONG_dense_replace, ULONG_dense_replace, LONGLONG_dense_replace, ULONGLONG_dense_replace, FLOAT_dense_replace, DOUBLE_dense_replace, NULL};
+dense_reducer dense_add_functions[] = {BOOL_dense_add, INT_dense_add, UINT_dense_add, LONG_dense_add, ULONG_dense_add, LONGLONG_dense_add, ULONGLONG_dense_add, FLOAT_dense_add, DOUBLE_dense_add, NULL};
+dense_reducer dense_multiply_functions[] = {BOOL_dense_multiply, INT_dense_multiply, UINT_dense_multiply, LONG_dense_multiply, ULONG_dense_multiply, LONGLONG_dense_multiply, ULONGLONG_dense_multiply, FLOAT_dense_multiply, DOUBLE_dense_multiply, NULL};
+dense_reducer dense_maximum_functions[] = {BOOL_dense_maximum, INT_dense_maximum, UINT_dense_maximum, LONG_dense_maximum, ULONG_dense_maximum, LONGLONG_dense_maximum, ULONGLONG_dense_maximum, FLOAT_dense_maximum, DOUBLE_dense_maximum, NULL};
+dense_reducer dense_minimum_functions[] = {BOOL_dense_minimum, INT_dense_minimum, UINT_dense_minimum, LONG_dense_minimum, ULONG_dense_minimum, LONGLONG_dense_minimum, ULONGLONG_dense_minimum, FLOAT_dense_minimum, DOUBLE_dense_minimum, NULL};
+//dense_reducer dense_and_functions[] = {BOOL_dense_and, INT_dense_and, UINT_dense_and, LONG_dense_and, ULONG_dense_and, LONGLONG_dense_and, ULONGLONG_dense_and, FLOAT_dense_and, DOUBLE_dense_and, NULL};
+//dense_reducer dense_or_functions[] = {BOOL_dense_or, INT_dense_or, UINT_dense_or, LONG_dense_or, ULONG_dense_or, LONGLONG_dense_or, ULONGLONG_dense_or, FLOAT_dense_or, DOUBLE_dense_or, NULL};
+//dense_reducer dense_xor_functions[] = {BOOL_dense_xor, INT_dense_xor, UINT_dense_xor, LONG_dense_xor, ULONG_dense_xor, LONGLONG_dense_xor, ULONGLONG_dense_xor, FLOAT_dense_xor, DOUBLE_dense_xor, NULL};
 
-char dense_funcs_type[] = {NPY_BOOLLTR, NPY_INTLTR, NPY_UINTLTR, NPY_LONGLONGLTR, NPY_ULONGLONGLTR, NPY_FLOATLTR, NPY_DOUBLELTR, ' '};
+char dense_funcs_type[] = {NPY_BOOLLTR, NPY_INTLTR, NPY_UINTLTR, NPY_LONGLTR, NPY_ULONGLTR, NPY_LONGLONGLTR, NPY_ULONGLONGLTR, NPY_FLOATLTR, NPY_DOUBLELTR, ' '};
 /* This must be sync with REDUCER enumeration */
 dense_reducer* dense_functions[] = {
                                      dense_replace_functions,  /* REDUCER_REPLACE */
@@ -1322,17 +1648,14 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip2, CExtent *ex, REDUCER reducer)
 void
 trivial_dense_outer_loop(CArray *ip1, CArray *ip2, REDUCER reducer)
 {
-    std::cout << __func__ << std::endl;
     char *arrays[2] = {ip1->get_data(), ip2->get_data()};
     npy_intp inner_steps[1] = {ip1->get_strides()[ip1->get_nd() - 1]};
     npy_intp size = 1;
-    std::cout << __func__ << std::endl;
     for (int i = 0; i < ip1->get_nd(); i++) {
         size *= ip1->get_dimensions()[i];
     }
 
     dense_reducer func = select_dense_reducer(reducer, ip1->get_type());
-    std::cout << __func__ << " " << (void*) func << std::endl;
     func(arrays, &size, inner_steps);
 }
 
@@ -1457,6 +1780,68 @@ UINT_sparse_dense_or(char **args, npy_intp *dimensions, npy_intp *bases)
     npy_uint dense_val = *((npy_uint*)(dp + pos));
     npy_uint sparse_val = *((npy_uint*)(vp));
     *((npy_uint*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+*/
+
+void
+LONG_sparse_dense_add(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_long dense_val = *((npy_long*)(dp + pos));
+    npy_long sparse_val = *((npy_long*)(vp));
+    *((npy_long*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_long dense_val = *((npy_long*)(dp + pos));
+    npy_long sparse_val = *((npy_long*)(vp));
+    *((npy_long*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+
+/*
+void
+LONG_sparse_dense_or(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_long dense_val = *((npy_long*)(dp + pos));
+    npy_long sparse_val = *((npy_long*)(vp));
+    *((npy_long*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_long dense_val = *((npy_long*)(dp + pos));
+    npy_long sparse_val = *((npy_long*)(vp));
+    *((npy_long*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+*/
+
+void
+ULONG_sparse_dense_add(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_ulong dense_val = *((npy_ulong*)(dp + pos));
+    npy_ulong sparse_val = *((npy_ulong*)(vp));
+    *((npy_ulong*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_ulong dense_val = *((npy_ulong*)(dp + pos));
+    npy_ulong sparse_val = *((npy_ulong*)(vp));
+    *((npy_ulong*)(dp + pos)) = dense_val + sparse_val;
+    BINARY_SPARSE_LOOP_END
+}
+
+/*
+void
+ULONG_sparse_dense_or(char **args, npy_intp *dimensions, npy_intp *bases)
+{
+    BINARY_BEGIN_SPARSE_LOOP
+    npy_ulong dense_val = *((npy_ulong*)(dp + pos));
+    npy_ulong sparse_val = *((npy_ulong*)(vp));
+    *((npy_ulong*)(dp + pos)) = dense_val or sparse_val;
+    BINARY_BEGIN_SPARSE_ELSE
+    npy_ulong dense_val = *((npy_ulong*)(dp + pos));
+    npy_ulong sparse_val = *((npy_ulong*)(vp));
+    *((npy_ulong*)(dp + pos)) = dense_val or sparse_val;
     BINARY_SPARSE_LOOP_END
 }
 */
@@ -1587,10 +1972,10 @@ DOUBLE_sparse_dense_or(char **args, npy_intp *dimensions, npy_intp *bases)
 
 
 typedef void (*sparse_dense_reducer)(char**, npy_intp*, npy_intp*);
-sparse_dense_reducer sparse_dense_add_functions[] = {BOOL_sparse_dense_add, INT_sparse_dense_add, UINT_sparse_dense_add, LONGLONG_sparse_dense_add, ULONGLONG_sparse_dense_add, FLOAT_sparse_dense_add, DOUBLE_sparse_dense_add, NULL};
-//sparse_dense_reducer sparse_dense_or_functions[] = {BOOL_sparse_dense_or, INT_sparse_dense_or, UINT_sparse_dense_or, LONGLONG_sparse_dense_or, ULONGLONG_sparse_dense_or, FLOAT_sparse_dense_or, DOUBLE_sparse_dense_or, NULL};
+sparse_dense_reducer sparse_dense_add_functions[] = {BOOL_sparse_dense_add, INT_sparse_dense_add, UINT_sparse_dense_add, LONG_sparse_dense_add, ULONG_sparse_dense_add, LONGLONG_sparse_dense_add, ULONGLONG_sparse_dense_add, FLOAT_sparse_dense_add, DOUBLE_sparse_dense_add, NULL};
+//sparse_dense_reducer sparse_dense_or_functions[] = {BOOL_sparse_dense_or, INT_sparse_dense_or, UINT_sparse_dense_or, LONG_sparse_dense_or, ULONG_sparse_dense_or, LONGLONG_sparse_dense_or, ULONGLONG_sparse_dense_or, FLOAT_sparse_dense_or, DOUBLE_sparse_dense_or, NULL};
 
-char sparse_funcs_type[] = {NPY_BOOLLTR, NPY_INTLTR, NPY_UINTLTR, NPY_LONGLONGLTR, NPY_ULONGLONGLTR, NPY_FLOATLTR, NPY_DOUBLELTR, ' '};
+char sparse_funcs_type[] = {NPY_BOOLLTR, NPY_INTLTR, NPY_UINTLTR, NPY_LONGLTR, NPY_ULONGLTR, NPY_LONGLONGLTR, NPY_ULONGLONGLTR, NPY_FLOATLTR, NPY_DOUBLELTR, ' '};
 /* This must be sync with REDUCER enumeration */
 /* Only support add and or now. These two are trivial to implement */
 sparse_dense_reducer* sparse_dense_functions[] = {

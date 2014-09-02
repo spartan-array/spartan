@@ -163,7 +163,7 @@ void CWorker::destroy(const DestroyReq& req, EmptyMessage* resp) {
 }
 
 void CWorker::update(const UpdateReq& req, EmptyMessage* resp) {
-    Log_debug("RPC %s", __func__);
+    Log_debug("RPC %s %u %p", __func__, req.reducer, req.data);
     lock(_blob_lock);
     std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.id);
     unlock(_blob_lock);

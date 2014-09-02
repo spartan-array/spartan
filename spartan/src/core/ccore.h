@@ -4,9 +4,10 @@
 #include <string>
 #include <vector>
 #include <map>
-
+#include <iostream>
 #include "array/ctile.h"
 #include "array/cslice.h"
+#include "base/logging.h"
 
 /**
  * A `TileId` uniquely identifies a tile in a Spartan execution.
@@ -232,17 +233,13 @@ struct GetResp {
     GetResp(const TileId& i, std::vector<char*>& d, bool own = true): id(i), data(d), own_data(own) {}
     GetResp(): own_data(true) {}
     ~GetResp() {
-        std::cout << "GetResp dealloc1 " << std::endl;
         if (own_data) {
-            std::cout << "GetResp dealloc2 " << std::hex << (unsigned long)data[0] << std::endl;
             delete (bool*)data[0];
             int size = data.size();
             for (int i = 1; i < size; ++i) {
-               std::cout << "GetResp dealloc3 " << std::hex << (unsigned long)data[i] << std::endl;
                delete (NpyMemManager*)data[i];
             }
         }
-        std::cout << "GetResp dealloc4" << std::endl;
     }
 };
 
@@ -272,7 +269,7 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, GetResp& o) {
     o.own_data = false;
     m >> o.id;
     m >> size;
-    Log_info ("GetResp marshal >> %d %d", size, o.id);
+    Log_info ("GetResp marshal >> size = %d, id = %d", size, o.id);
     m.read(&dummy, sizeof(bool));
     o.data.push_back((char*)(new bool(false)));
     for (int i = 1; i < size; ++i) {
@@ -316,30 +313,35 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, DestroyReq& o) {
 struct UpdateReq {
     TileId id;
     CSliceIdx region;
-    CTile *data;
     unsigned long reducer;
+    CTile *data;
     /* TODO: May need to sync with GetResp
      * bool own_data*/
 
     UpdateReq(const TileId& i, const CSliceIdx& r, CTile *d, unsigned long red)
-              : id(i), region(r), data(d), reducer(red) {}
+              : id(i), region(r), reducer(red), data(d) {}
     UpdateReq() : data(NULL){}
     ~UpdateReq() {delete data;}
 };
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const UpdateReq& o) {
     m << o.id;
+    //std::cout <<  __func__ << o.id.to_string().c_str() << std::endl;
+    Log_debug("Marshal::%s id = %s, reducer = %u", 
+              __func__, o.id.to_string().c_str(), o.reducer);
     m << o.region;
+    m << o.reducer;
     m << *(o.data);
-    m.write(&(o.reducer), sizeof(o.reducer));
     return m;
 }
 
 inline rpc::Marshal& operator >>(rpc::Marshal& m, UpdateReq& o) {
     m >> o.id;
+    Log_debug("Marshal::%s %s", __func__, o.id.to_string().c_str());
     m >> o.region;
+    m >> o.reducer;
+    o.data = new CTile();
     m >> *(o.data);
-    m.read(&(o.reducer), sizeof(o.reducer));
     return m;
 }
 

@@ -15,7 +15,7 @@ CTile::CTile(npy_intp dimensions[], int nd, char dtype,
 {
     int i;
 
-    std::cout << __func__ << " A" << (void*)&PyArray_Type << std::endl;
+    std::cout << __func__ << " A"<< std::endl;
     initialized = false;
     type = (CTILE_TYPE)tile_type;
     this->sparse_type = (CTILE_SPARSE_TYPE)sparse_type;
@@ -111,7 +111,7 @@ CTile::set_data(CArray **sparse)
 void
 CTile::initialize(void)
 {
-    std::cout << __func__ << std::endl;
+    std::cout << "CTile::" << __func__ << std::endl;
     if (type == CTILE_SPARSE) {
          sparse[0] = new CArray(dimensions, 1, NPY_INTPLTR);
          sparse[1] = new CArray(dimensions, 1, NPY_INTPLTR);
@@ -182,12 +182,19 @@ CTile::update(const CSliceIdx &idx, CTile &update_data, npy_intp reducer)
     if (!initialized) {
         initialize(); 
     }
+    /**
+     * TODO:
+     * The reducer should deal with uninitialized matrix. For those 
+     * data initialized by initialized(), it should be replaced by
+     * the reducer.
+     */
     if (reducer >= REDUCER_BEGIN && reducer <= REDUCER_END) {
         reduce(idx, update_data, (REDUCER)reducer);
     } else {
         PyObject *old, *update, *subslice, *reducer_npy;
 
         PyObject *mod, *object;
+        /* TODO: Get GIL here */
         mod = PyImport_ImportModule("spartan.array.tile");
         assert(mod != NULL);
         object = PyObject_GetAttrString(mod, "_internal_update");
@@ -201,7 +208,7 @@ CTile::update(const CSliceIdx &idx, CTile &update_data, npy_intp reducer)
             PyTuple_SET_ITEM(subslice, i, 
                              PySlice_New(PyLong_FromLongLong(idx.get_slice(i).start),
                                          PyLong_FromLongLong(idx.get_slice(i).stop),
-                                                      NULL));
+                                         NULL));
         }
         reducer_npy = (PyObject*) reducer;
         /* TODO: Do we have to update our dense ? */
