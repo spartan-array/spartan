@@ -48,7 +48,7 @@ def _dot_mapper(inputs, ex, av, bv):
 
   target_shape = (av.shape[0], bv.shape[1])
   ul = np.asarray([ex_a.ul[0], 0])
-  lr = ul + target_shape
+  lr = ul + (a.shape[0], b.shape[1])
   target_ex = extent.create(ul, lr, target_shape)
 
   # util.log_info('A: %s', a.dtype)
@@ -87,18 +87,18 @@ class DotExpr(Expr):
     if isinstance(bv, np.ndarray):
       if len(bv.shape) < 2:
         bv = bv.reshape((bv.shape[0], 1))
-        
+
       if self.tile_hint is None:
         tile_hint = (av.tile_shape()[0], bv.shape[1])
       else:
         tile_hint = self.tile_hint
-        
+
       target = distarray.create((av.shape[0], bv.shape[1]), dtype=av.dtype,
                         tile_hint=tile_hint, reducer=np.add)
 
       fn_kw = dict(numpy_data = bv)
       av.foreach_tile(mapper_fn = target_mapper,
-                             kw = dict(source=av, 
+                             kw = dict(source=av,
                                        map_fn=_dot_numpy,
                                        target=target,
                                        fn_kw=fn_kw))
