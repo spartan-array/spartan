@@ -81,7 +81,6 @@ def from_data(data):
   shape, dtype, tile_type, sparse_type, tile_data = npdata_to_internal(data)
 
   assert isinstance(tile_data, tuple), (type(tile_data))
-  util.log_info(tile_data)
   return Tile(shape,
               dtype,
               tile_type,

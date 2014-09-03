@@ -249,7 +249,8 @@ CArray::to_carray_rpc(CExtent *ex)
     rpc->nd = nd;
     rpc->is_npy_memmanager = true;
     for (int i = 0; i < nd; ++i) {
-        rpc->dimensions[i] = dimensions[i];    
+        rpc->dimensions[i] = ex->lr[i] - ex->ul[i]; //dimensions[i];
+        rpc->dimensions[i] = (rpc->dimensions[i] == 0) ? 1 : rpc->dimensions[i];
     }
     if (copy_slice(ex, (NpyMemManager**)(&(rpc->data))) != size) {
         assert(false);
