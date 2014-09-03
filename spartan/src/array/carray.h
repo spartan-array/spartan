@@ -78,11 +78,16 @@ public:
             if (it->second == 1) {
                 refcount.erase(source);
                 if (own_by_npy) {
+                    Log_debug("~NpyMemManager decreases the refcnt of a npy %p", source);
+                    PyGILState_STATE gil_state = PyGILState_Ensure();
                     Py_DECREF(source);
+                    PyGILState_Release(gil_state);
                 } else {
+                    Log_debug("~NpyMemManager prepares to free %p", source);
                     delete source;
                 }
             } else {
+                Log_debug("~NpyMemManager got another free %p", source);
                 it->second -= 1;
             }
         }

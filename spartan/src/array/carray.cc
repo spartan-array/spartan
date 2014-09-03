@@ -45,6 +45,7 @@ CArray::CArray(npy_intp dimensions[], int nd, char type)
 {
     init(dimensions, nd, type);
     data = (char*) malloc(size);
+    Log_debug("CArray create a memory buffer %p", data);
     assert(this->data != NULL);
     memset(data, 0, size);
     data_source = new NpyMemManager(data, data, false, size);
@@ -54,6 +55,7 @@ CArray::CArray(npy_intp dimensions[], int nd, char type, char *buffer)
 {
     init(dimensions, nd, type);
     data = buffer;
+    Log_debug("CArray uses a memory buffer %p", data);
     data_source = new NpyMemManager(data, data, false, size);
 }
 
@@ -61,6 +63,7 @@ CArray::CArray(npy_intp dimensions[], int nd, char type, char *data, PyArrayObje
 {
     init(dimensions, nd, type);
     this->data = data;
+    Log_debug("CArray uses a memory buffer %p", data);
     data_source = new NpyMemManager((char*)source, data, true, size);
 }
 
@@ -68,6 +71,7 @@ CArray::CArray(npy_intp dimensions[], int nd, char type, char *data, NpyMemManag
 {
     init(dimensions, nd, type);
     this->data = data;
+    Log_debug("CArray uses a memory buffer %p", data);
     data_source = source;
 }
 
@@ -78,9 +82,10 @@ CArray::CArray(CArray_RPC *rpc)
     if (rpc->is_npy_memmanager) { 
         data_source = (NpyMemManager*)(rpc->data);
         data = data_source->get_data();
-        data_source = new NpyMemManager(data, data, false, size);
+        Log_debug("CArray uses a memory buffer %p", data);
     } else {
         data = rpc->data;
+        Log_debug("CArray uses a memory buffer %p", data);
         data_source = new NpyMemManager(data, data, false, size);
     }
 }
@@ -88,9 +93,10 @@ CArray::CArray(CArray_RPC *rpc)
 CArray::~CArray()
 {
     if (data_source != NULL) {
-        std::cout << __func__ << " " << std::hex \
+        std::cout << __func__ << " data source = " << std::hex \
+                  << (unsigned long)data_source << " data_source->source = " \
                   << (unsigned long)data_source->get_source() \
-                  << " " << data_source->get_refcount() << std::endl;
+                  << " refcnt = " << data_source->get_refcount() << std::endl;
         delete data_source;
     }
 }
@@ -134,9 +140,10 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
 
     if (full) { /* Special case, no slice */
         *dest = new NpyMemManager(*data_source);
+        Log_debug("Full copy. Do not have to do copy. *dest = %p", *dest);
         return size;
     } else {
-        npy_intp continous_size, all_size;
+        npy_intp copy_size, all_size;
         int i, last_sliced_dim;
 
         for (i = nd - 1; i >= 0; i--) {
@@ -144,20 +151,16 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
             
             dim = ex->lr[i] - ex->ul[i];
             dim = (dim == 0) ? 1 : dim;
+            Log_debug("Copy info: ul[i] = %d, lr[i] = %d, dimensions[i] = %d",
+                      ex->ul[i], ex->lr[i], dimensions[i]);
             if (dim != dimensions[i]) {
                 break;
             }
         }
 
         last_sliced_dim = i;
-        if (last_sliced_dim == nd - 1) {
-            continous_size = dimensions[nd - 1];
-        } else {
-            continous_size = 1;
-            for (i = last_sliced_dim ; i < nd; i++) {
-                continous_size *= dimensions[i];
-            }
-        }
+        copy_size = strides[last_sliced_dim];
+        Log_debug("Copy info : last_sliced_dim = %d, nd = %d", last_sliced_dim, nd);
 
         npy_intp curr_idx[NPY_MAXDIMS], curr_pos;
         for (i = 0; i < nd; i++) {
@@ -170,9 +173,11 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
         char *buf = (char*)malloc(all_size);
         assert(buf != NULL);
         *dest = new NpyMemManager(buf, buf, false, all_size); 
+        Log_debug("Not full copy. *dest = %p, buf = %p, all_size = %d, copy_size = %d",
+                  *dest, buf, all_size, copy_size);
         do {
             curr_pos = ravelled_pos(curr_idx, ex->array_shape, nd);
-            memcpy(buf, source_data + curr_pos, continous_size);
+            memcpy(buf, source_data + curr_pos, copy_size);
 
             for (i = last_sliced_dim; i >= 0; i--) {
                 curr_idx[i] += 1;
@@ -181,9 +186,13 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
                 }
                 curr_idx[i] = ex->ul[i];
             }
-            buf += continous_size;
-            all_size -= continous_size;
+            buf += copy_size;
+            all_size -= copy_size;
         } while(all_size > 0);
+        if (all_size != 0) {
+            Log_error("Something is wrong when doing copy. all_size = %d, copy_size = %d",
+                      all_size, copy_size);
+        }
         return ret;
     }
 }
@@ -192,6 +201,7 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
 static void _capsule_destructor(PyObject *o)
 {
     NpyMemManager *manager = (NpyMemManager*)(PyCapsule_GetPointer(o, _CAPSULE_NAME));
+    Log_debug("%s %p", __func__, manager->get_source());
     if (manager != NULL) {
         delete manager;
     }
@@ -217,7 +227,7 @@ CArray::to_npy(void)
     std::cout << "Before PyCapsule_New" << std::endl;
     PyObject *capsule = PyCapsule_New(manager, _CAPSULE_NAME, _capsule_destructor);
     std::cout << "PyCapsule_New" << std::endl;
-    assert(capsule);
+    assert(capsule != NULL);
     if (PyArray_SetBaseObject(array, capsule) != 0)
         assert(false);
 

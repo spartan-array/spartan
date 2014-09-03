@@ -255,7 +255,6 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
         //PyRun_SimpleString("print mapper_fn(*kw)\n");
         //PyRun_SimpleString("ctx = blob_ctx.get()\n");
     //}
-
         TileId tid;
         while (true) {
             lock(_kernel_lock);
@@ -288,7 +287,7 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
             if (PyRun_String(mapper_cmd, Py_file_input, pLocal, pLocal) == NULL) {
                 PyErr_PrintEx(0);
             } else {
-                Log_info("PyRun_String success ?");
+                Log_debug("PyRun_String success");
             }
         //}
         }

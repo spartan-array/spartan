@@ -234,10 +234,11 @@ struct GetResp {
     GetResp(): own_data(true) {}
     ~GetResp() {
         if (own_data) {
-            delete (bool*)data[0];
+            //delete (bool*)data[0];
             int size = data.size();
             for (int i = 1; i < size; ++i) {
-               delete (NpyMemManager*)data[i];
+                Log_debug("GetResp delete %p", ((NpyMemManager*)(data[i]))->get_source());
+                //delete (NpyMemManager*)data[i];
             }
         }
     }

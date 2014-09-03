@@ -247,10 +247,12 @@ CTile::to_tile_rpc(const CSliceIdx &idx)
         dest.insert(dest.end(), v.begin(), v.end());
         rpc->count = 1;
         if (type == CTILE_MASKED) {
+            Log_debug("Trying to get a masked array");
             std::vector<char*> v = dense->to_carray_rpc(ex);
             dest.insert(dest.end(), v.begin(), v.end());
             rpc->count = 2;
         }
+        Log_debug("The size of the vector of dense->to_carray_rpc is %u", v.size());
 
     } else if (initialized && type == CTILE_SPARSE) {
         if (is_idx_complete(idx)) {
