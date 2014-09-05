@@ -162,7 +162,7 @@ def sparse_diagonal(shape, dtype=np.float32, tile_hint=None):
                            _make_sparse_diagonal)
 
 
-def _diag_mapper(array, ex):
+def _diagflat_mapper(array, ex):
   '''Create a diagonal array section for this extent.
 
   If the extent does not lie on the diagonal, a zero array is returned.
@@ -191,7 +191,33 @@ def diagflat(array):
   :param array: DistArray
     The data to fill the diagonal.
   '''
-  return shuffle(array, _diag_mapper, shape_hint=(array.shape[0], array.shape[0]))
+  return shuffle(array, _diagflat_mapper, shape_hint=(array.shape[0], array.shape[0]))
+
+
+def diag(array, offset=0):
+  '''
+  Extract a diagonal or construct a diagonal array.
+
+  :param array: array_like
+    Array from which the diagonals are taken.
+  :param offset: int, optional
+    Diagonal in question. The default is 0. Use k>0 for diagonals
+    above the main diagonal, and k<0 for diagonals below the main diagonal.
+
+  :rtype ShuffleExpr
+
+  Raises
+  ------
+  ValueError
+    If the dimension of `array` is not 1 or 2.
+  '''
+  #TODO: offset hasn't been implemented
+  if len(array.shape) == 1:
+    return diagflat(array)
+  elif len(array.shape) == 2:
+    return diagonal(array)
+  else:
+    raise ValueError("Input must be 1- or 2-d.")
 
 
 def _diagonal_mapper(array, ex):
