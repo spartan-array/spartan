@@ -183,7 +183,7 @@ def _diag_mapper(array, ex):
   yield (dst_ex, result)
 
 
-def diag(array):
+def diagflat(array):
   '''
   Create a diagonal array with the given data on the diagonal
   the shape should be array.shape[0] * array.shape[0]
