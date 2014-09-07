@@ -42,7 +42,6 @@ def conj_gradient(A, num_iter=15):
     A(Expr): matrix to be processed.
     num_iter(int): max iteration to run.
   '''
-  #A = expr.force(A)
   x = expr.ones((A.shape[1],1))
   
   for iter in range(num_iter):

@@ -83,7 +83,7 @@ def tile_mapper(ex, children, child_to_var, op):
   if id(result) == id(local_values[child_to_var[0]]):
     return LocalKernelResult(result=[(ex, children[0].tiles[ex])])
 
-  #util.log_warn('Result: %s', result)
+  #util.log_info('Result: %s', result)
   Assert.eq(ex.shape, result.shape,
             'Bad shape -- source = %s, result = %s, op = (%s)',
             local_values, result, op)

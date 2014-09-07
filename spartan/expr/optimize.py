@@ -872,7 +872,7 @@ def add_optimization(klass, default):
 
 add_optimization(CollapsedCachedExpressions, True)
 add_optimization(AutomaticTiling, True)
-add_optimization(RotateSlice, True)
+add_optimization(RotateSlice, False)
 add_optimization(MapMapFusion, True)
 if parakeet is not None:
   add_optimization(ParakeetGeneration, True)

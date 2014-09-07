@@ -42,7 +42,7 @@ def benchmark_cg(ctx, timer):
   print "#worker:", ctx.num_workers
   l = int(math.sqrt(ctx.num_workers))
   #n = 2000 * 16
-  n = 1600 * 16
+  n = 400 * l
   la = 20
   niter = 5
   tile_hint = (n, n/ctx.num_workers)
@@ -54,7 +54,6 @@ def benchmark_cg(ctx, timer):
   A = (A + expr.transpose(A))*0.5
   
   I = expr.sparse_diagonal((n,n)) * la
-  #I.force()
   A = A - I
 
   #x1 = numpy_cg(A.glom(), niter)
