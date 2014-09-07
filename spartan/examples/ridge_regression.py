@@ -26,7 +26,7 @@ def ridge_regression(x, y, ridge_lambda, iterations):
   return ridge_reg.train()
 
 def run(N_EXAMPLES, N_DIM, iterations):
-  x = expr.eager(expr.rand(N_EXAMPLES, N_DIM, tile_hint=(N_EXAMPLES / 10, 10)))
-  y = expr.eager(expr.rand(N_EXAMPLES, 1, tile_hint=(N_EXAMPLES / 10, 1)))
+  x = expr.rand(N_EXAMPLES, N_DIM)
+  y = expr.rand(N_EXAMPLES, 1)
   ridge_regression(x, y, 1, iterations)
 

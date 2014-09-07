@@ -84,7 +84,8 @@ def fit(data, labels, label_size, alpha=1.0):
   sum_instance_by_label = expr.shuffle(data,
                                        _sum_instance_by_label_mapper,
                                        target=sum_instance_by_label,
-                                       kw={'labels': labels, 'label_size': label_size})
+                                       kw={'labels': labels, 'label_size': label_size},
+                                       cost_hint={hash(labels):{'00':0, '01':np.prod(labels.shape)}})
 
   # sum up all the weights for each label from the previous step
   weights_per_label = expr.sum(sum_instance_by_label, axis=1, tile_hint=(label_size,))
@@ -93,7 +94,9 @@ def fit(data, labels, label_size, alpha=1.0):
   weights_per_label_and_feature = expr.shuffle(sum_instance_by_label,
                                                _naive_bayes_mapper,
                                                kw={'weights_per_label': weights_per_label, 
-                                                   'alpha':alpha})
+                                                   'alpha':alpha},
+                                               shape_hint=sum_instance_by_label.shape,
+                                               cost_hint={hash(weights_per_label):{'00': 0, '01': np.prod(weights_per_label.shape)}})
   
   return {'scores_per_label_and_feature': weights_per_label_and_feature.force(),
           'scores_per_label': weights_per_label.force(),

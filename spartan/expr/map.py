@@ -83,7 +83,7 @@ def tile_mapper(ex, children, child_to_var, op):
   if id(result) == id(local_values[child_to_var[0]]):
     return LocalKernelResult(result=[(ex, children[0].tiles[ex])])
 
-  #util.log_info('Result: %s', result)
+  #util.log_warn('Result: %s', result)
   Assert.eq(ex.shape, result.shape,
             'Bad shape -- source = %s, result = %s, op = (%s)',
             local_values, result, op)
@@ -107,7 +107,7 @@ class MapExpr(Expr):
 
 
   def pretty_str(self):
-    return 'Map(%s, %s)' % (self.op.pretty_str(),
+    return 'Map[%d](%s, %s)' % (self.expr_id, self.op.pretty_str(),
                             indent(self.children.pretty_str()))
 
 

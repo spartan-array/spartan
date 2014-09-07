@@ -114,7 +114,7 @@ def run(filename):
           run_benchmarks(module, benchmarks, ctx, timer)
           
       timer.prefix = 'opt_disabled'
-      FLAGS.optimization = 0
+      FLAGS.optimization = 1
       run_benchmarks(module, benchmarks, ctx, timer)
 
       spartan.shutdown()

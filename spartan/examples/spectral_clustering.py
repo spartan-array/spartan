@@ -113,7 +113,7 @@ def spectral_cluster(points, k=10, num_iter=10, similarity_measurement='rbf'):
     similarity_measurement(str): distance method used to measure similarity between two points.
   '''  
   # calculate similarity for each pair of points to generate the adjacency matrix A
-  A = expr.shuffle(points, _row_similarity_mapper, kw={'similarity_measurement': similarity_measurement})
+  A = expr.shuffle(points, _row_similarity_mapper, kw={'similarity_measurement': similarity_measurement}, shape_hint=(points.shape[0], points.shape[0]))
   
   num_dims = A.shape[1]
   
@@ -121,7 +121,7 @@ def spectral_cluster(points, k=10, num_iter=10, similarity_measurement='rbf'):
   D = expr.sum(A, axis=1, tile_hint=(A.shape[0],))
   
   # Calculate the normalized Laplacian of the form: L = D^(-0.5)AD^(-0.5)
-  L = expr.shuffle(A, _laplacian_mapper, kw={'D': D})
+  L = expr.shuffle(A, _laplacian_mapper, kw={'D': D}, shape_hint=A.shape)
   
   # Perform eigen-decomposition using Lanczos solver
   overshoot = min(k * 2, num_dims) 

@@ -357,7 +357,7 @@ def from_file_parallel(fn, file_format = 'mm', sparse = True, tile_hint = None):
 
 
   array_tile_hint = distarray.good_tile_shape(shape, num_shards =
-                                                     master.get().num_workers * 1)
+                                                     master.get().num_workers)
 
   array = ndarray(shape = shape, dtype = dtype, sparse = sparse,
                   tile_hint = array_tile_hint)

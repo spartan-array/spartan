@@ -518,6 +518,8 @@ class DictExpr(CollectionExpr):
   def iteritems(self): return self.vals.iteritems()
   def keys(self): return self.vals.keys()
   def values(self): return self.vals.values()
+  def itervalues(self): return self.vals.itervalues()
+  def iterkeys(self): return self.vals.iterkeys()
 
   def pretty_str(self):
     return '{ %s } ' % ',\n'.join(
@@ -528,7 +530,6 @@ class DictExpr(CollectionExpr):
 
   def visit(self, visitor):
     return DictExpr(vals=dict([(k, visitor.visit(v)) for (k, v) in self.vals.iteritems()]))
-
 
 class ListExpr(CollectionExpr):
   def dependencies(self):
