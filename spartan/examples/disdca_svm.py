@@ -1,5 +1,5 @@
 import numpy as np
-from spartan import expr, util
+from spartan import expr, util, blob_ctx
 from spartan.array import extent
 
 def _svm_disdca_train(X, Y, alpha, w, m, scale, lambda_n):
@@ -40,7 +40,7 @@ def _svm_mapper(array, ex, labels, alpha, w, m, scale, lambda_n):
     scale(int): number of tiles
     lambda_n: lambda/size(total train data) which is the parameter of this svm model.
   '''
-  X = array.fetch(ex)
+  X = array.fetch(extent.create((ex.ul[0], 0), (ex.lr[0], array.shape[1]), array.shape))
   Y = labels.fetch(extent.create((ex.ul[0], 0), (ex.lr[0], 1), labels.shape))
   
   tile_id = ex.ul[0]/(ex.lr[0]-ex.ul[0])
@@ -57,24 +57,26 @@ def _svm_mapper(array, ex, labels, alpha, w, m, scale, lambda_n):
   # reduce the weight vector
   yield extent.create((0,0),(array.shape[1],1),(array.shape[1], 1)), new_w
   
-def fit(data, labels, num_tiles, T=50, la=1.0):
+def fit(data, labels, T=50, la=1.0):
   '''
   Train an SVM model using the disdca (2013) algorithm.
  
   Args:
     data(Expr): points to be trained.
     labels(Expr): the correct labels of the training data.
-    num_tiles(int): the total tiles of the training data.
     T(int): max training iterations.
     la(float): lambda parameter of this SVM model.
   '''
   w = None
-  m = data.shape[0] / num_tiles
-  alpha = expr.zeros((m * num_tiles, 1), dtype=np.float64, tile_hint=(m,1)).force()
+  num_workers = blob_ctx.get().num_workers
+  m = data.shape[0] / num_workers
+  alpha = expr.zeros((data.shape[0], 1), dtype=np.float64).optimized().force()
   for i in range(T):
-    new_weight = expr.ndarray((data.shape[1], 1), dtype=np.float64, reduce_fn=np.add, tile_hint=(data.shape[1], 1))
-    new_weight = expr.shuffle(data, _svm_mapper, target=new_weight, kw={'labels': labels, 'alpha': alpha, 'w': w, 'm': m, 'scale': num_tiles, 'lambda_n': la * data.shape[0]})
-    w = new_weight / num_tiles
+    new_weight = expr.shuffle(data, _svm_mapper, target=expr.ndarray((data.shape[1], 1), dtype=np.float64, reduce_fn=np.add), 
+                              kw={'labels': labels, 'alpha': alpha, 'w': w, 'm': m, 'scale': num_workers, 'lambda_n': la * data.shape[0]}, 
+                              cost_hint={ hash(labels) : {'00': 0, '01': np.prod(labels.shape)} })
+    w = new_weight / num_workers
+    w = w.optimized()
   return w
 
 def predict(w, new_data):

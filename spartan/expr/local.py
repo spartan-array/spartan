@@ -44,7 +44,7 @@ class LocalExpr(Node):
 
   def add_dep(self, v):
     self.deps.append(v)
-    assert len(self.deps) <= 2, v
+    #assert len(self.deps) <= 2, v
 
   def input_names(self):
     return util.flatten([v.input_names() for v in self.deps], unique=True)

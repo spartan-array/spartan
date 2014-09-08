@@ -87,7 +87,7 @@ def sort(array, sample_rate=0.1):
   partition_counts = tile_operation(local_sorted_array, fn=_partition_count_mapper, kw={'partition_keys': partition_keys}).force()
   
   # sort the local_sorted_array into global sorted array
-  sorted_array = shuffle(local_sorted_array, fn=_fetch_sort_mapper, kw={'partition_counts': partition_counts})
+  sorted_array = shuffle(local_sorted_array, fn=_fetch_sort_mapper, kw={'partition_counts': partition_counts}, shape_hint=local_sorted_array.shape)
   
   return sorted_array
   

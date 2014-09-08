@@ -20,7 +20,7 @@ def benchmark_lda(ctx, timer):
   # NUM_DOCS = 21578
   # terms_docs_matrix = from_file("/scratch/cq/numpy_dense_matrix", sparse = False, tile_hint = (NUM_TERMS, int((NUM_DOCS + ctx.num_workers - 1) / ctx.num_workers))).force()
   
-  terms_docs_matrix = expr.randint(NUM_TERMS, NUM_DOCS, low=0, high=100, tile_hint=(NUM_TERMS, NUM_DOCS/ctx.num_workers)).force()
+  terms_docs_matrix = expr.randint(NUM_TERMS, NUM_DOCS, low=0, high=100)
   
   max_iter = 3
   k_topics = 10

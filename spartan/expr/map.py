@@ -107,7 +107,7 @@ class MapExpr(Expr):
 
 
   def pretty_str(self):
-    return 'Map(%s, %s)' % (self.op.pretty_str(),
+    return 'Map[%d](%s, %s)' % (self.expr_id, self.op.pretty_str(),
                             indent(self.children.pretty_str()))
 
 

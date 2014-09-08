@@ -202,7 +202,10 @@ class DistArray(object):
       for ex, id in d:
         extents[ex] = id
     return from_table(extents)
-  
+ 
+  def __hash__(self):
+    return id(self)
+ 
   @property
   def ndim(self):
     return len(self.shape)
@@ -429,7 +432,7 @@ def create(shape,
   dtype = np.dtype(dtype)
   shape = tuple(shape)
 
-  extents = compute_extents(shape, tile_hint, ctx.num_workers * 4)
+  extents = compute_extents(shape, tile_hint, ctx.num_workers)
   tiles = {}
   tile_type = tile.TYPE_SPARSE if sparse else tile.TYPE_DENSE
   
