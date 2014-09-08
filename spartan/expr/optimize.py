@@ -657,7 +657,7 @@ class AutomaticTiling(OptimizePass):
         
       for i in xrange(len(tiling_types)):
         tiling_type = tiling_types[i]
-        self.nodes[self.cur_node_id] = self.node_type(expr, tiling_type, [], [])
+        self.nodes[self.cur_node_id] = self.node_type([expr], tiling_type, [], [])
         self.add_edge(child_ids[i], self.cur_node_id, 0)
         
         for child_id in other_child_ids:
