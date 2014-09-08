@@ -203,6 +203,8 @@ def diag(array, offset=0):
   :param offset: int, optional
     Diagonal in question. The default is 0. Use k>0 for diagonals
     above the main diagonal, and k<0 for diagonals below the main diagonal.
+    This argument hasn't been implemented yet.
+
 
   :rtype ShuffleExpr
 
@@ -210,8 +212,12 @@ def diag(array, offset=0):
   ------
   ValueError
     If the dimension of `array` is not 1 or 2.
+  NotImplementedError
+    If offset is being set.
   '''
-  #TODO: offset hasn't been implemented
+  if offset != 0:
+    raise NotImplementedError
+
   if len(array.shape) == 1:
     return diagflat(array)
   elif len(array.shape) == 2:
