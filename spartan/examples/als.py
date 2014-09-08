@@ -56,7 +56,7 @@ def _solve_U_or_M_mapper(array, ex, U_or_M, la, alpha, implicit_feedback):
     alpha(int): confidence parameter used on implicit feedback.
     implicit_feedback(bool): whether using implicit_feedback method for als.
   '''
-  rating_matrix = array.fetch(ex)
+  rating_matrix = array.fetch(extent.create((ex.ul[0], 0), (ex.lr[0], array.shape[1]), array.shape))
   U_or_M = U_or_M[:]
   
   if implicit_feedback:
@@ -118,25 +118,24 @@ def als(A, la=0.065, alpha=40, implicit_feedback=False, num_features=20, num_ite
     num_features(int): dimension of the feature space.
     num_iter(int): max iteration to run.
   '''
-  A = expr.force(A)
-  AT = expr.shuffle(expr.ndarray((A.shape[1], A.shape[0]), dtype=A.dtype,
-                                 tile_hint=(A.shape[1] / len(A.tiles), A.shape[0])),
-                    _transpose_mapper, kw={'orig_array': A})
-  
+  AT = expr.shuffle(expr.ndarray((A.shape[1], A.shape[0]), dtype=np.int),
+                    _transpose_mapper, kw={'orig_array': A},
+                    shape_hint=(A.shape[1], A.shape[0]))
   num_items = A.shape[1]
   
-  avg_rating = expr.sum(A, axis=0, tile_hint=(num_items / len(A.tiles),)) * 1.0 / \
-               expr.count_nonzero(A, axis=0, tile_hint=(num_items / len(A.tiles),))
-  
-  M = expr.shuffle(expr.ndarray((num_items, num_features), 
-                                tile_hint=(num_items / len(A.tiles), num_features)), 
-                   _init_M_mapper, kw={'avg_rating': avg_rating})
+  avg_rating = expr.sum(A, axis=0) * 1.0 / expr.count_nonzero(A, axis=0)
+
+  M = expr.shuffle(expr.ndarray((num_items, num_features)), 
+                   _init_M_mapper, kw={'avg_rating': avg_rating}, shape_hint=(num_items, num_features))
   #util.log_warn('avg_rating:%s M:%s', avg_rating.glom(), M.glom())
   
+  cost_A = np.prod(A.shape)
+  cost_M = A.shape[1] * num_features
+  cost_U = A.shape[0] * num_features
   for i in range(num_iter):
     # Recomputing U
-    U = expr.shuffle(A, _solve_U_or_M_mapper, kw={'U_or_M': M, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback})
+    U = expr.shuffle(A, _solve_U_or_M_mapper, kw={'U_or_M': M, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback}, shape_hint=(A.shape[0], M.shape[1]), cost_hint={hash(M):{'00': cost_M, '01': cost_M + cost_A, '10': cost_M, '11':cost_A + cost_M}}).optimized()
     # Recomputing M
-    M = expr.shuffle(AT, _solve_U_or_M_mapper, kw={'U_or_M': U, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback})
-    
+    M = expr.shuffle(AT, _solve_U_or_M_mapper, kw={'U_or_M': U, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback}, shape_hint=(AT.shape[0], U.shape[1]), cost_hint={hash(U):{'00':cost_U, '01':cost_U + cost_A, '10': cost_U, '11':cost_A + cost_U}}).optimized()
+
   return U, M

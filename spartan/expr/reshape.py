@@ -61,7 +61,7 @@ class Reshape(distarray.DistArray):
     self.tiles = self.base.tiles
     self.bad_tiles = []
     self._tile_shape = distarray.good_tile_shape(shape,
-                                                 master.get().num_workers * 4)
+                                                 master.get().num_workers)
     self.shape_array = None
     self._check_extents()
 

@@ -737,12 +737,10 @@ def bincount(v):
   maxval = max(v).glom()
   assert minval > 0
   target = ndarray((maxval + 1,), dtype=np.int64, reduce_fn=np.add)
-  cost = np.prod(target.shape)
   return shuffle(v, 
       _bincount_mapper, 
       target=target,
-      kw = { 'minlength' : maxval + 1},
-      cost_hint={target:(cost, cost)})
+      kw = { 'minlength' : maxval + 1})
 
 
 def _translate_extent(ex, a, roffset=0, coffset=0):
@@ -790,7 +788,7 @@ def _concatenate_mapper(array, ex, a, b, axis):
     elif data_b is None:
       result[res_idx] = data_a[row]
     else:
-      result[res_idx] = np.concatenate((data_a[row], data_b[row]), axis)
+      result[res_idx] = np.concatenate((data_a[row:row+1], data_b[row:row+1]), axis)
     res_idx += 1
 
   yield ex, result

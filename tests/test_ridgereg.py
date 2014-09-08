@@ -15,8 +15,7 @@ class TestRidgeRegression(test_common.ClusterTest):
 def benchmark_ridgereg(ctx, timer):
   print "#worker:", ctx.num_workers
   #N_EXAMPLES = 100000000 * ctx.num_workers
-  #N_EXAMPLES = 90000000 * ctx.num_workers
-  N_EXAMPLES = 10000000 * 64
+  N_EXAMPLES = 90000000 * ctx.num_workers
   x = expr.rand(N_EXAMPLES, N_DIM)
   y = expr.rand(N_EXAMPLES, 1)
   start = time.time() 

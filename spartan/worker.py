@@ -286,7 +286,7 @@ class Worker(object):
       # the results contain tile_id this worker already has.
       result_tile_id_set = set()
       for result in results.iteritems():
-        if result[1] is not None:
+        if isinstance(result[1], list):
           for _blob in result[1]:
             result_tile_id_set.add(_blob[1])
 

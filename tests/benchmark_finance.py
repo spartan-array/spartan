@@ -64,6 +64,16 @@ def benchmark_optimization(ctx, timer):
   timer.time_op('opt-parakeet', lambda: bs_step(current, strike, maturity, rate, volatility))
   timer.time_op('opt-parakeet', lambda: bs_step(current, strike, maturity, rate, volatility))
 
+  FLAGS.opt_parakeet_gen = 0
+  FLAGS.opt_auto_tiling = 0
+  timer.time_op('opt-tiling = 0', lambda: bs_step(current, strike, maturity, rate, volatility))
+  timer.time_op('opt-tiling = 0', lambda: bs_step(current, strike, maturity, rate, volatility))
+  timer.time_op('opt-tiling = 0', lambda: bs_step(current, strike, maturity, rate, volatility))
+
+  FLAGS.opt_auto_tiling = 1
+  timer.time_op('opt-tiling', lambda: bs_step(current, strike, maturity, rate, volatility))
+  timer.time_op('opt-tiling', lambda: bs_step(current, strike, maturity, rate, volatility))
+  timer.time_op('opt-tiling', lambda: bs_step(current, strike, maturity, rate, volatility))
 
 if __name__ == '__main__':
   test_common.run(__file__)
