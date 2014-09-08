@@ -781,15 +781,17 @@ def _concatenate_mapper(array, ex, a, b, axis):
   if ex_b is not None:
     data_b = b.fetch(ex_b)
 
-  res_idx = 0
-  for row in xrange(ex.lr[0] - ex.ul[0]):
-    if data_a is None:
-      result[res_idx] = data_b[row]
-    elif data_b is None:
-      result[res_idx] = data_a[row]
-    else:
-      result[res_idx] = np.concatenate((data_a[row:row+1], data_b[row:row+1]), axis)
-    res_idx += 1
+  if data_a is not None:
+    s = [slice(0, shape, None) for shape in data_a.shape]
+    result[tuple(s)] = data_a
+    start = data_a.shape
+  else:
+    start = [0] * len(a.shape)
+
+  if data_b is not None:
+    s = [slice(None, None, None)] * len(a.shape)
+    s[axis] = slice(start[axis], None, None)
+    result[tuple(s)] = data_b
 
   yield ex, result
 
