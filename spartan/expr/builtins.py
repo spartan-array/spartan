@@ -788,7 +788,7 @@ def _concatenate_mapper(array, ex, a, b, axis):
     elif data_b is None:
       result[res_idx] = data_a[row]
     else:
-      result[res_idx] = np.concatenate((data_a[row], data_b[row]), axis)
+      result[res_idx] = np.concatenate((data_a[row:row+1], data_b[row:row+1]), axis)
     res_idx += 1
 
   yield ex, result
