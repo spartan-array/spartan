@@ -1,6 +1,6 @@
 import numpy as np
 from numpy import linalg
-from spartan import expr, util
+from spartan import expr, util, blob_ctx
 from spartan.array import distarray, extent
 
 def _lda_train(term_docs_matrix, topic_term_counts, topic_sums, doc_topics, k_topics, alpha, eta, max_iter_per_doc):
@@ -63,6 +63,7 @@ def _lda_mapper(array, ex, k_topics, alpha, eta, max_iter_per_doc, topic_term_co
     max_iter_per_doc(int): the max iterations to train each document.
     topic_term_counts(DistArray): the matrix to save p(topic x | term).
   '''
+  assert ex.shape[0] == array.shape[0]
   term_docs_matrix = array.fetch(extent.create((0, ex.ul[1]), (array.shape[0], ex.lr[1]), array.shape))
   local_topic_term_counts = topic_term_counts[:]
   local_topic_sums = np.linalg.norm(local_topic_term_counts, 1, axis=1)
@@ -106,6 +107,7 @@ def learn_topics(terms_docs_matrix, k_topics, alpha=0.1, eta=0.1, max_iter=10, m
     max_iter(int):the max iterations to train LDA topic model.
     max_iter_per_doc: the max iterations to train each document.
   '''
+  terms_docs_matrix = expr.retile(terms_docs_matrix, tile_hint=(terms_docs_matrix.shape[0], util.divup(terms_docs_matrix.shape[1], blob_ctx.get().num_workers)))
   topic_term_counts = expr.rand(k_topics, terms_docs_matrix.shape[0])
   cost_topic_term_counts = k_topics * terms_docs_matrix.shape[0]
   cost_terms_docs_matrix = np.prod(terms_docs_matrix.shape)
@@ -116,9 +118,9 @@ def learn_topics(terms_docs_matrix, k_topics, alpha=0.1, eta=0.1, max_iter=10, m
                                          'max_iter_per_doc': max_iter_per_doc, 
                                          'topic_term_counts': topic_term_counts},
                                      cost_hint={hash(topic_term_counts):{'00': cost_terms_docs_matrix + cost_topic_term_counts, 
-                                                                             '01': cost_topic_term_counts,
-                                                                             '10': cost_terms_docs_matrix + cost_topic_term_counts, 
-                                                                             '11': cost_topic_term_counts}}).optimized()
+                                                                         '01': cost_topic_term_counts,
+                                                                         '10': cost_terms_docs_matrix + cost_topic_term_counts, 
+                                                                         '11': cost_topic_term_counts}}).optimized()
   # calculate the doc-topic inference
   doc_topics = expr.shuffle(terms_docs_matrix, _lda_doc_topic_mapper, 
                             kw={'k_topics': k_topics, 'alpha': alpha, 'eta':eta, 
@@ -129,7 +131,6 @@ def learn_topics(terms_docs_matrix, k_topics, alpha=0.1, eta=0.1, max_iter=10, m
                                                                 '01': cost_topic_term_counts,
                                                                 '10': cost_terms_docs_matrix + cost_topic_term_counts, 
                                                                 '11': cost_topic_term_counts}}).optimized()
-    
   
   # normalize the topic-term distribution  
   norm_val = expr.reduce(topic_term_counts, axis=1, 
