@@ -40,6 +40,7 @@ from .write_array import write, from_numpy, from_file, from_file_parallel
 from .checkpoint import checkpoint
 from .fio import save, load, pickle, unpickle, partial_load, partial_unpickle
 from .reshape import reshape
+from .retile import retile
 from .transpose import transpose
 from .dot import dot
 from .sort import sort

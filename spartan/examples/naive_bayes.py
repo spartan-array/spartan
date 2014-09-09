@@ -12,7 +12,7 @@ def _naive_bayes_mapper(array, ex, weights_per_label, alpha):
     weights_per_label(DistArray): weights for each label.
     alpha: naive bayes parameter.
   '''
-  weights_per_label_and_feature = array.fetch(ex)
+  weights_per_label_and_feature = array.fetch(extent.create((ex.ul[0], 0), (ex.lr[0], array.shape[1]), array.shape))
   weights_per_label = weights_per_label.fetch(extent.create((ex.ul[0],), (ex.lr[0],), weights_per_label.shape))
   weights_per_label = weights_per_label.reshape((weights_per_label.shape[0], 1))
 
@@ -31,7 +31,7 @@ def _sum_instance_by_label_mapper(array, ex, labels, label_size):
     labels(DistArray): labels of the training data.
     label_size: the number of different labels.
   '''
-  X = array.fetch(ex)
+  X = array.fetch(extent.create((ex.ul[0], 0), (ex.lr[0], array.shape[1]), array.shape))
   Y = labels.fetch(extent.create((ex.ul[0], 0), (ex.lr[0], 1), labels.shape))
   
   sum_instance_by_label = np.zeros((label_size, X.shape[1]))
@@ -50,15 +50,12 @@ def fit(data, labels, label_size, alpha=1.0):
     label_size(int): the number of different labels.
     alpha(float): alpha parameter of naive bayes model.
   '''
-  labels = expr.force(labels)
-  
   # calc document freq
   df = expr.reduce(data,
                    axis=0,
                    dtype_fn=lambda input: input.dtype,
                    local_reduce_fn=lambda ex, data, axis: (data > 0).sum(axis),
-                   accumulate_fn=np.add,
-                   tile_hint=(data.shape[1],))
+                   accumulate_fn=np.add)
   
   idf = expr.log(data.shape[0] * 1.0 / (df + 1)) + 1
    
@@ -68,8 +65,7 @@ def fit(data, labels, label_size, alpha=1.0):
                            axis=1,
                            dtype_fn=lambda input: input.dtype,
                            local_reduce_fn=lambda ex, data, axis: np.square(data).sum(axis),
-                           accumulate_fn=np.add,
-                           tile_hint=(data.shape[0],))
+                           accumulate_fn=np.add)
   
   rms = expr.sqrt(square_sum * 1.0 / data.shape[1])
   
@@ -77,18 +73,14 @@ def fit(data, labels, label_size, alpha=1.0):
   data = data / rms.reshape((data.shape[0], 1)) * idf.reshape((1, data.shape[1]))
   
   # add up all the feature vectors with the same labels
-  sum_instance_by_label = expr.ndarray((label_size, data.shape[1]),
-                                       dtype=np.float64, 
-                                       reduce_fn=np.add,
-                                       tile_hint=(label_size / len(labels.tiles), data.shape[1]))
   sum_instance_by_label = expr.shuffle(data,
                                        _sum_instance_by_label_mapper,
-                                       target=sum_instance_by_label,
+                                       target=expr.ndarray((label_size, data.shape[1]), dtype=np.float64, reduce_fn=np.add),
                                        kw={'labels': labels, 'label_size': label_size},
                                        cost_hint={hash(labels):{'00':0, '01':np.prod(labels.shape)}})
 
   # sum up all the weights for each label from the previous step
-  weights_per_label = expr.sum(sum_instance_by_label, axis=1, tile_hint=(label_size,))
+  weights_per_label = expr.sum(sum_instance_by_label, axis=1)
   
   # generate naive bayes per_label_and_feature weights
   weights_per_label_and_feature = expr.shuffle(sum_instance_by_label,
@@ -98,8 +90,8 @@ def fit(data, labels, label_size, alpha=1.0):
                                                shape_hint=sum_instance_by_label.shape,
                                                cost_hint={hash(weights_per_label):{'00': 0, '01': np.prod(weights_per_label.shape)}})
   
-  return {'scores_per_label_and_feature': weights_per_label_and_feature.force(),
-          'scores_per_label': weights_per_label.force(),
+  return {'scores_per_label_and_feature': weights_per_label_and_feature.optimized().force(),
+          'scores_per_label': weights_per_label.optimized().force(),
           }
   
 def predict(model, new_data):

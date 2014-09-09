@@ -11,9 +11,9 @@ from datetime import datetime
 def benchmark_lda(ctx, timer):
   
   print "#worker:", ctx.num_workers
-  NUM_TERMS = 1000
+  NUM_TERMS = 160
   #NUM_DOCS = 200 * ctx.num_workers
-  NUM_DOCS = 100 * 64
+  NUM_DOCS = 10 * 64
 
   # create data
   # NUM_TERMS = 41807
@@ -23,7 +23,7 @@ def benchmark_lda(ctx, timer):
   terms_docs_matrix = expr.randint(NUM_TERMS, NUM_DOCS, low=0, high=100)
   
   max_iter = 3
-  k_topics = 10
+  k_topics = 16
   
   t1 = datetime.now()
   doc_topics, topic_term_count = learn_topics(terms_docs_matrix, k_topics, max_iter=max_iter)
