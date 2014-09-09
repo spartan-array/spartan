@@ -41,12 +41,12 @@ def _make_randint(input, low=0, high=10):
   return np.random.randint(low, high, size=input.shape)
 
 @disable_parakeet
-def _make_sparse_rand(input, 
-                      density=None, 
-                      dtype=None, 
+def _make_sparse_rand(input,
+                      density=None,
+                      dtype=None,
                       format='csr'):
   Assert.eq(len(input.shape), 2)
-  
+
   return sp.rand(input.shape[0],
                  input.shape[1],
                  density=density,
@@ -72,7 +72,7 @@ def _make_sparse_diagonal(tile, ex):
 def rand(*shape, **kw):
   '''
   Return a random array sampled from the uniform distribution on [0, 1).
-  
+
   :param tile_hint: A tuple indicating the desired tile shape for this array.
   '''
   tile_hint = None
@@ -90,22 +90,22 @@ def rand(*shape, **kw):
 def randn(*shape, **kw):
   '''
   Return a random array sampled from the standard normal distribution.
-  
+
   :param tile_hint: A tuple indicating the desired tile shape for this array.
   '''
   tile_hint = None
   if 'tile_hint' in kw:
     tile_hint = kw['tile_hint']
     del kw['tile_hint']
-  
+
   for s in shape: assert isinstance(s, int)
-  return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randn) 
+  return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randn)
 
 @not_idempotent
 def randint(*shape, **kw):
   '''
   Return a random integer array from the "discrete uniform" distribution in the interval [`low`, `high`).
-  
+
   :param low: Lowest (signed) integer to be drawn from the distribution.
   :param high: Largest (signed) integer to be drawn from the distribution.
   :param tile_hint: A tuple indicating the desired tile shape for this array.
@@ -116,32 +116,32 @@ def randint(*shape, **kw):
     del kw['tile_hint']
 
   for s in shape: assert isinstance(s, int)
-  return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randint, fn_kw=kw) 
+  return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randint, fn_kw=kw)
 
 @not_idempotent
-def sparse_rand(shape, 
+def sparse_rand(shape,
                 density=0.001,
                 format='lil',
-                dtype=np.float32, 
+                dtype=np.float32,
                 tile_hint=None):
   '''Make a distributed sparse random array.
-  
+
   Random values are chosen from the uniform distribution on [0, 1).
-  
+
   Args:
     density(float): Fraction of values to be filled
     format(string): Sparse tile format (lil, coo, csr, csc).
     dtype(np.dtype): Datatype of array.
     tile_hint(tuple or None): Shape of array tiles.
-    
+
   Returns:
     Expr:
   '''
-  
+
   for s in shape: assert isinstance(s, int)
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True),
              fn=_make_sparse_rand,
-             fn_kw = { 'dtype' : dtype, 
+             fn_kw = { 'dtype' : dtype,
                        'density' : density,
                        'format' : format })
 
@@ -149,7 +149,7 @@ def sparse_empty(shape,
                  dtype=np.float32,
                  tile_hint=None):
   '''Return an empty sparse array of the given shape.
-  
+
   :param shape: `tuple`.  Shape of the resulting array.
   :param dtype: `np.dtype`
   :param tile_hint: A tuple indicating the desired tile shape for this array.
@@ -162,7 +162,7 @@ def sparse_diagonal(shape, dtype=np.float32, tile_hint=None):
                            _make_sparse_diagonal)
 
 
-def _diag_mapper(array, ex):
+def _diagflat_mapper(array, ex):
   '''Create a diagonal array section for this extent.
 
   If the extent does not lie on the diagonal, a zero array is returned.
@@ -183,7 +183,7 @@ def _diag_mapper(array, ex):
   yield (dst_ex, result)
 
 
-def diag(array):
+def diagflat(array):
   '''
   Create a diagonal array with the given data on the diagonal
   the shape should be array.shape[0] * array.shape[0]
@@ -191,7 +191,7 @@ def diag(array):
   :param array: DistArray
     The data to fill the diagonal.
   '''
-  return shuffle(array, _diag_mapper, shape_hint=(array.shape[0], array.shape[0]))
+  return shuffle(array, _diagflat_mapper, shape_hint=(array.shape[0], array.shape[0]))
 
 
 def _diagonal_mapper(array, ex):
@@ -234,6 +234,36 @@ def diagonal(a):
 
   return shuffle(a, _diagonal_mapper, shape_hint=(__builtin__.min(a.shape), ))
 
+def diag(array, offset=0):
+  '''
+  Extract a diagonal or construct a diagonal array.
+
+  :param array: array_like
+    Array from which the diagonals are taken.
+  :param offset: int, optional
+    Diagonal in question. The default is 0. Use k>0 for diagonals
+    above the main diagonal, and k<0 for diagonals below the main diagonal.
+    This argument hasn't been implemented yet.
+
+
+  :rtype ShuffleExpr
+
+  Raises
+  ------
+  ValueError
+    If the dimension of `array` is not 1 or 2.
+  NotImplementedError
+    If offset is being set.
+  '''
+  if offset != 0:
+    raise NotImplementedError
+
+  if len(array.shape) == 1:
+    return diagflat(array)
+  elif len(array.shape) == 2:
+    return diagonal(array)
+  else:
+    raise ValueError("Input must be 1- or 2-d.")
 
 def _normalize_mapper(tile, ex, axis, norm_value):
   '''Normalize a region of an array.
@@ -281,15 +311,15 @@ def normalize(array, axis=None):
 def norm(array, ord=2):
   '''
   Norm of ``array``.
-  
+
   The following norms can be calculated:
   =====  ============================  ==========================
   ord    norm for matrices             norm for vectors
   =====  ============================  ==========================
   1      max(sum(abs(array), axis=0))  sum(abs(array))
   2      not support                   sum(abs(array)**2)**(1/2)
-  =====  ============================  ==========================  
-  
+  =====  ============================  ==========================
+
   Args:
     array (Expr): input array
     ord (int): ord must be in {1,2}, the order of the norm.
@@ -298,32 +328,32 @@ def norm(array, ord=2):
     `Expr`: Normed array.
   '''
   assert ord == 1 or ord == 2
-  
-  if ord == 1: 
-    result = reduce(array, 
+
+  if ord == 1:
+    result = reduce(array,
                     axis=0,
                     dtype_fn=lambda input: input.dtype,
                     local_reduce_fn=lambda ex, data, axis:np.abs(data).sum(axis),
                     accumulate_fn=np.add).glom()
     return np.max(result)
   elif len(array.shape) == 1 or len(array.shape) == 2 and array.shape[1] == 1:
-    result = reduce(array, 
+    result = reduce(array,
                     axis=0,
                     dtype_fn=lambda input: input.dtype,
                     local_reduce_fn=lambda ex, data, axis:np.square(data).sum(axis),
                     accumulate_fn=np.add).glom()
     return np.sqrt(result)
-  
+
   assert False, "matrix norm-2 is not support!"
 
-@disable_parakeet 
+@disable_parakeet
 def _tocoo(data):
   return data.tocoo()
 
 def tocoo(array):
   '''
-  Convert ``array`` to use COO (coordinate) format for tiles. 
-  
+  Convert ``array`` to use COO (coordinate) format for tiles.
+
   :param array: Sparse `Expr`.
   :rtype: A new array in COO format.
   '''
@@ -333,7 +363,7 @@ def tocoo(array):
 def zeros(shape, dtype=np.float, tile_hint=None):
   '''
   Create a distributed array over the given shape and dtype, filled with zeros.
-  
+
   :param shape:
   :param dtype:
   :param tile_hint:
@@ -346,7 +376,7 @@ def zeros(shape, dtype=np.float, tile_hint=None):
 def ones(shape, dtype=np.float, tile_hint=None):
   '''
   Create a distributed array over the given shape and dtype, filled with ones.
-  
+
   :param shape:
   :param dtype:
   :param tile_hint:
@@ -428,8 +458,8 @@ def _sum_local(ex, data, axis):
 def sum(x, axis=None, tile_hint=None):
   '''
   Sum ``x`` over ``axis``.
-  
-  
+
+
   :param x: The array to sum.
   :param axis: Either an integer or ``None``.
   '''
@@ -481,9 +511,9 @@ def min(x, axis=None, tile_hint=None):
 def mean(x, axis=None):
   '''
   Compute the mean of ``x`` over ``axis``.
-  
+
   See `numpy.ndarray.mean`.
-  
+
   :param x: `Expr`
   :param axis: integer or ``None``
   '''
@@ -519,7 +549,7 @@ def std(a, axis=None):
 
 def _to_structured_array(*vals):
   '''Create a structured array from the given input arrays.
-  
+
   :param vals: A list of (field_name, `np.ndarray`)
   :rtype: A structured array with fields from ``kw``.
   '''
@@ -562,10 +592,10 @@ def _dual_dtype(input):
 def argmin(x, axis=None):
   '''
   Compute argmin over ``axis``.
-  
+
   See `numpy.ndarray.argmin`.
-  
-  :param x: `Expr` to compute a minimum over. 
+
+  :param x: `Expr` to compute a minimum over.
   :param axis: Axis (integer or None).
   '''
   compute_min = reduce(x, axis,
@@ -581,10 +611,10 @@ def argmin(x, axis=None):
 def argmax(x, axis=None):
   '''
   Compute argmax over ``axis``.
-  
+
   See `numpy.ndarray.argmax`.
-  
-  :param x: `Expr` to compute a maximum over. 
+
+  :param x: `Expr` to compute a maximum over.
   :param axis: Axis (integer or None).
   '''
   compute_max = reduce(x, axis,
@@ -595,7 +625,7 @@ def argmax(x, axis=None):
 
   take_indices = map(compute_max, _take_idx_mapper)
 
-  
+
   return take_indices
 
 def _countnonzero_local(ex, data, axis):
@@ -604,18 +634,18 @@ def _countnonzero_local(ex, data, axis):
       return np.asarray(data.nnz)
     else:
       return np.asarray(np.count_nonzero(data))
-  
-  return (data > 0).sum(axis)  
+
+  return (data > 0).sum(axis)
 
 def count_nonzero(array, axis=None, tile_hint=None):
   '''
   Return the number of nonzero values in the axis of the ``array``.
-  
+
   :param array: DistArray or `Expr`.
   :param axis: the axis to count
   :param tile_hint:
   :rtype: np.int64
-  
+
   '''
   return reduce(array, axis,
                 dtype_fn=lambda input: np.int64,
@@ -626,30 +656,30 @@ def count_nonzero(array, axis=None, tile_hint=None):
 def _countzero_local(ex, data, axis):
   if axis is None:
     return np.asarray(np.prod(ex.shape) - np.count_nonzero(data))
-  
+
   return (data == 0).sum(axis)
 
 def count_zero(array, axis=None):
   '''
   Return the number of zero values in the axis of the ``array``.
-  
+
   :param array: DistArray or `Expr`.
   :param axis: the axis to count
   :rtype: np.int64
-  
+
   '''
   return reduce(array, axis,
                 dtype_fn=lambda input: np.int64,
                 local_reduce_fn=_countzero_local,
                 accumulate_fn = np.add)
- 
+
 
 def size(x, axis=None):
   '''
   Return the size (product of the size of all axes) of ``x``.
-  
+
   See `numpy.ndarray.size`.
-  
+
   :param x: `Expr` to compute the size of.
   '''
   if axis is None:
@@ -663,12 +693,12 @@ def _astype_mapper(t, dtype):
 def astype(x, dtype):
   '''
   Convert ``x`` to a new dtype.
-  
+
   See `numpy.ndarray.astype`.
-  
+
   :param x: `Expr` or `DistArray`
   :param dtype:
-  
+
   '''
   assert x is not None
   return map(x, _astype_mapper, fn_kw={'dtype': np.dtype(dtype).str })
@@ -687,12 +717,12 @@ def _ravel_mapper(array, ex):
 def ravel(v):
   '''
   "Ravel" ``v`` to a one-dimensional array of shape (size(v),).
-  
+
   See `numpy.ndarray.ravel`.
   :param v: `Expr` or `DistArray`
   '''
   return shuffle(v, _ravel_mapper, shape_hint=(np.prod(v.shape),))
-        
+
 def multiply(a, b):
   assert a.shape == b.shape
   return map((a, b), fn=lambda a, b: a.multiply(b) if sp.issparse(a) else a * b)
@@ -725,8 +755,8 @@ def _bincount_mapper(array, ex, minlength=None):
 
 def bincount(v):
   '''
-  Count unique values in ``v``.  
-  See `numpy.bincount` for more information. 
+  Count unique values in ``v``.
+  See `numpy.bincount` for more information.
 
   Arguments:
     v (Expr): Array of non-negative integers
@@ -737,8 +767,8 @@ def bincount(v):
   maxval = max(v).glom()
   assert minval > 0
   target = ndarray((maxval + 1,), dtype=np.int64, reduce_fn=np.add)
-  return shuffle(v, 
-      _bincount_mapper, 
+  return shuffle(v,
+      _bincount_mapper,
       target=target,
       kw = { 'minlength' : maxval + 1})
 

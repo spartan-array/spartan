@@ -80,6 +80,19 @@ class BuiltinTest(test_common.ClusterTest):
         spartan.diagonal(spartan.from_numpy(np_big)).glom(),
         np.diagonal(np_big))
 
+  def test_diag(self):
+    import random
+    dim = random.randint(0, 99)
+    np_array = np.random.randn(dim, dim)
+    Assert.all_eq(
+	spartan.diag(spartan.from_numpy(np_array)).glom(),
+	np.diag(np_array))
+
+    np_array2 = np.random.randn(dim, dim)
+    Assert.all_eq(
+	spartan.diag(spartan.diag(spartan.from_numpy(np_array2))).glom(),
+	np.diag(np.diag(np_array2)))
+
 
   def test_concatenate(self):
     np_1d = np.random.randn(10)
