@@ -727,6 +727,9 @@ def multiply(a, b):
   assert a.shape == b.shape
   return map((a, b), fn=lambda a, b: a.multiply(b) if sp.issparse(a) else a * b)
 
+def power(a, b):
+  return map((a, b), fn=np.power)
+
 def add(a, b): return map((a, b), fn=np.add)
 
 def sub(a, b): return map((a, b), fn=np.subtract)
