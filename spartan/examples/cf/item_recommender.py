@@ -1,20 +1,15 @@
 from spartan import array, blob_ctx, core, expr
 import numpy as np
 from spartan import util
+from spartan.array import extent
 import socket
 from .helper import *
 import numpy as np
 
-def _similarity_mapper(ex, rating_table, similarity_table, item_norm, step):
+def _similarity_mapper(array, ex, item_norm, step):
   ''' Find all pair similarities between items. 
   Parameters
   ----------
-  rating_table : Spartan array of shape (M, N).
-                 Records the ratings of each item from each user.
-
-  similarity_table : Spartan array of shape (N, N)
-                     Records similarities between each item.
-
   item_norm : Spartan array of shape(N,)
               The norm values of each item.
 
@@ -22,10 +17,10 @@ def _similarity_mapper(ex, rating_table, similarity_table, item_norm, step):
          How many items need to be fetched for each iteration, now this equals to 
          the columns of tiles.
   '''
-  M = rating_table.shape[0]
-  N = rating_table.shape[1]
+  M = array.shape[0]
+  N = array.shape[1]
 
-  local_ratings = rating_table.fetch(ex)
+  local_ratings = array.fetch(ex)
   local_item_norm = item_norm[ex.ul[1] : ex.lr[1]]
   local_item_norm = local_item_norm.reshape(local_item_norm.shape[0], 1)
 
@@ -48,7 +43,7 @@ def _similarity_mapper(ex, rating_table, similarity_table, item_norm, step):
     with util.TIMER.item_fetching:
       # Fetch the ratings of remote items. The matrix is sparse, so this step
       # will not be very expensive.
-      remote_ratings = rating_table[:, fetch_start_idx : fetch_start_idx + step]
+      remote_ratings = array[:, fetch_start_idx : fetch_start_idx + step]
       remote_item_norm = item_norm[fetch_start_idx : fetch_start_idx + step]
       remote_item_norm = remote_item_norm.reshape(1, remote_item_norm.shape[0])
 
@@ -80,37 +75,23 @@ def _similarity_mapper(ex, rating_table, similarity_table, item_norm, step):
       similarities = np.nan_to_num(similarities) 
 
     # Update this to global array.
-    similarity_table[local_start_idx : local_start_idx + similarities.shape[0], 
-                     fetch_start_idx : fetch_start_idx + similarities.shape[1]] = similarities
+    yield extent.create((local_start_idx, fetch_start_idx), (local_start_idx + similarities.shape[0], fetch_start_idx + similarities.shape[1]), (array.shape[1], array.shape[1])), similarities
 
     # Update fetch_start_idx, fetch next part of table.
     fetch_start_idx += step
 
-  result = core.LocalKernelResult()
-  result.result = None
-  return result
-
-
-def _select_most_k_similar_mapper(ex, 
-                                  similarity_table, 
-                                  top_k_similar_table, 
+def _select_most_k_similar_mapper(array, ex, 
                                   top_k_similar_indices, 
                                   k):
   ''' Find the top k similar items for each item.
   Parameters
   ----------
-  similarity_table : Spartan array of shape (N, N)
-                     Represents the all pairs similarities.
-
-  top_k_similar_table: Spartan array of shape (N, k)
-                       The top k similarity score for each item.
-
   top_k_similar_indices: Spartan array of shape (N, k)
                          The indices of top k similar items.
 
   k : Integer
   '''
-  local_similarity_table = similarity_table.fetch(ex)
+  local_similarity_table = array.fetch(ex)
   local_top_k_values = np.zeros((ex.shape[0], k)) 
 
   start_idx = ex.ul[0] 
@@ -122,11 +103,7 @@ def _select_most_k_similar_mapper(ex,
     local_top_k_values[i] = local_similarity_table[i, sorted_indices[i]]
   
   top_k_similar_indices[ex.ul[0]:ex.lr[0], :] = sorted_indices
-  top_k_similar_table[ex.ul[0]:ex.lr[0], :] = local_top_k_values 
-
-  result = core.LocalKernelResult()
-  result.result = None
-  return result
+  yield extent.create((ex.ul[0], 0), (ex.lr[0], k), (array.shape[0], k)), local_top_k_values
 
 class ItemBasedRecommender(object):
   def __init__(self, rating_table, k=10):
@@ -143,7 +120,8 @@ class ItemBasedRecommender(object):
     '''
     assert rating_table.shape[1] >= k,\
            "The number of items must be grater or equal than k!"
-    self.rating_table = rating_table
+    self.num_workers = blob_ctx.get().num_workers
+    self.rating_table = expr.retile(rating_table, tile_hint=(rating_table.shape[0], util.divup(rating_table.shape[1], self.num_workers)))
     self.k = k
 
   def _get_norm_of_each_item(self, rating_table):
@@ -160,12 +138,7 @@ class ItemBasedRecommender(object):
                 item_norm[i] equals || rating_table[:,i] || 
 
     """
-    ctx = blob_ctx.get()
-    if isinstance(rating_table, array.distarray.DistArray):
-      rating_table = expr.lazify(rating_table)
-    res = expr.sqrt(expr.sum(expr.multiply(rating_table, rating_table), axis=0, 
-                             tile_hint=(rating_table.shape[1] / ctx.num_workers, )))
-    return res.force()
+    return expr.sqrt(expr.sum(expr.multiply(rating_table, rating_table), axis=0))
 
   def precompute(self):
     '''Precompute the most k similar items for each item.
@@ -181,39 +154,17 @@ class ItemBasedRecommender(object):
     '''
     M = self.rating_table.shape[0]
     N = self.rating_table.shape[1]
-    self.rating_table = expr.force(self.rating_table)
-    
-    assert self.rating_table.tile_shape()[0] == M, \
-           "rating table is only allowed to tile by columns!"
 
-    self.similarity_table = expr.zeros(shape=(N, N), 
-                                       tile_hint=(self.rating_table.tile_shape()[1], N)).force() 
-
-    self.item_norm = self._get_norm_of_each_item(self.rating_table) 
-
-    self.rating_table.foreach_tile(mapper_fn=_similarity_mapper,
-                                   kw={'rating_table' : self.rating_table,
-                                       'similarity_table' : self.similarity_table,
-                                       'item_norm' : self.item_norm,
-                                       'step' : self.rating_table.tile_shape()[1]})
+    self.similarity_table = expr.shuffle(self.rating_table, _similarity_mapper, kw={'item_norm': self._get_norm_of_each_item(self.rating_table), 'step': util.divup(self.rating_table.shape[1], self.num_workers)}, shape_hint=(N, N))
 
     # Release the memory for item_norm
-    self.item_norm = None
-    k = self.k
-    top_k_similar_table = expr.zeros((N, k), 
-                                      tile_hint=(self.rating_table.tile_shape()[1], k)).force()
-
-    top_k_similar_indices = expr.zeros((N, k), 
-                                        tile_hint=(self.rating_table.tile_shape()[1], k), 
-                                                   dtype=np.int).force()
+    top_k_similar_indices = expr.zeros((N, self.k), dtype=np.int)
     
     # Find top-k similar items for each item.
     # Store the similarity scores into table top_k_similar table.
     # Store the indices of top k items into table top_k_similar_indices.
-    self.similarity_table.foreach_tile(mapper_fn=_select_most_k_similar_mapper,
-                                       kw={'similarity_table' : self.similarity_table,
-                                           'top_k_similar_table' : top_k_similar_table,
-                                           'top_k_similar_indices' : top_k_similar_indices,
-                                           'k' : k})
-    self.top_k_similar_table = top_k_similar_table.glom()
-    self.top_k_similar_indices = top_k_similar_indices.glom()
+    cost = np.prod(top_k_similar_indices.shape)
+    top_k_similar_table = expr.shuffle(self.similarity_table, _select_most_k_similar_mapper, 
+            kw = {'top_k_similar_indices': top_k_similar_indices, 'k': self.k}, shape_hint=(N, self.k), cost_hint={hash(top_k_similar_indices):{'00': 0, '01': cost, '10': cost, '11': cost}})
+    self.top_k_similar_table = top_k_similar_table.optimized().glom()
+    self.top_k_similar_indices = top_k_similar_indices.optimized().glom()
