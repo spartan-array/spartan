@@ -67,9 +67,10 @@ def fit(data, labels, T=50, la=1.0):
     T(int): max training iterations.
     la(float): lambda parameter of this SVM model.
   '''
-  w = None
   num_workers = blob_ctx.get().num_workers
+  data = expr.retile(data, tile_hint=(util.divup(data.shape[0], num_workers), data.shape[1]))
   m = data.shape[0] / num_workers
+  w = None
   alpha = expr.zeros((data.shape[0], 1), dtype=np.float64).optimized().force()
   for i in range(T):
     new_weight = expr.shuffle(data, _svm_mapper, target=expr.ndarray((data.shape[1], 1), dtype=np.float64, reduce_fn=np.add), 

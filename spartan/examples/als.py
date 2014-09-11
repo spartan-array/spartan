@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.linalg import lstsq
-from spartan import expr, util
+from spartan import expr, util, blob_ctx
 from spartan.array import extent
 
 def _als_solver(feature_vectors, rating_vector, la):
@@ -92,18 +92,6 @@ def _init_M_mapper(array, ex, avg_rating):
     M[i, 1:] = np.random.rand(M.shape[1]-1)
   yield ex, M
   
-def _transpose_mapper(array, ex, orig_array):
-  '''
-  Transpose ``orig_array`` into ``array``.
-  
-  Args:
-    array(DistArray): destination array.
-    ex(Extent): region being processed.
-    orig_array(DistArray): array to be transposed.
-  '''
-  orig_ex = extent.create(ex.ul[::-1], ex.lr[::-1], orig_array.shape)
-  yield ex, orig_array.fetch(orig_ex).transpose()
-  
 def als(A, la=0.065, alpha=40, implicit_feedback=False, num_features=20, num_iter=10):
   '''
   compute the factorization A = U M' using the alternating least-squares (ALS) method.
@@ -118,20 +106,22 @@ def als(A, la=0.065, alpha=40, implicit_feedback=False, num_features=20, num_ite
     num_features(int): dimension of the feature space.
     num_iter(int): max iteration to run.
   '''
-  AT = expr.shuffle(expr.ndarray((A.shape[1], A.shape[0]), dtype=np.int),
-                    _transpose_mapper, kw={'orig_array': A},
-                    shape_hint=(A.shape[1], A.shape[0]))
+  num_workers = blob_ctx.get().num_workers
+  A = expr.retile(A, tile_hint=(util.divup(A.shape[0], num_workers), A.shape[1]))
+  AT = expr.retile(expr.transpose(A), tile_hint=(util.divup(A.shape[1], num_workers), A.shape[0]))
+
+  num_users = A.shape[0]
   num_items = A.shape[1]
   
   avg_rating = expr.sum(A, axis=0) * 1.0 / expr.count_nonzero(A, axis=0)
 
-  M = expr.shuffle(expr.ndarray((num_items, num_features)), 
-                   _init_M_mapper, kw={'avg_rating': avg_rating}, shape_hint=(num_items, num_features))
+  M = expr.rand(num_items, num_features)
+  M = expr.assign(M, np._s[:, 0], avg_rating)
   #util.log_warn('avg_rating:%s M:%s', avg_rating.glom(), M.glom())
   
   cost_A = np.prod(A.shape)
-  cost_M = A.shape[1] * num_features
-  cost_U = A.shape[0] * num_features
+  cost_M = num_items * num_features
+  cost_U = num_users * num_features
   for i in range(num_iter):
     # Recomputing U
     U = expr.shuffle(A, _solve_U_or_M_mapper, kw={'U_or_M': M, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback}, shape_hint=(A.shape[0], M.shape[1]), cost_hint={hash(M):{'00': cost_M, '01': cost_M + cost_A, '10': cost_M, '11':cost_A + cost_M}}).optimized()

@@ -73,22 +73,25 @@ def fit(data, labels, label_size, alpha=1.0):
   data = data / rms.reshape((data.shape[0], 1)) * idf.reshape((1, data.shape[1]))
   
   # add up all the feature vectors with the same labels
-  sum_instance_by_label = expr.shuffle(data,
-                                       _sum_instance_by_label_mapper,
-                                       target=expr.ndarray((label_size, data.shape[1]), dtype=np.float64, reduce_fn=np.add),
-                                       kw={'labels': labels, 'label_size': label_size},
-                                       cost_hint={hash(labels):{'00':0, '01':np.prod(labels.shape)}})
+  weights_per_label_and_feature = expr.shuffle(expr.retile(data, tile_hint=(util.divup(data.shape[0], num_workers), data.shape[1])),
+                                               _sum_instance_by_label_mapper,
+                                               target=expr.ndarray((label_size, data.shape[1]), dtype=np.float64, reduce_fn=np.add),
+                                               kw={'labels': labels, 'label_size': label_size},
+                                               cost_hint={hash(labels):{'00':0, '01':np.prod(labels.shape)}})
 
   # sum up all the weights for each label from the previous step
-  weights_per_label = expr.sum(sum_instance_by_label, axis=1)
+  weights_per_label = expr.sum(weights_per_label_and_feature, axis=1)
   
   # generate naive bayes per_label_and_feature weights
-  weights_per_label_and_feature = expr.shuffle(sum_instance_by_label,
-                                               _naive_bayes_mapper,
-                                               kw={'weights_per_label': weights_per_label, 
-                                                   'alpha':alpha},
-                                               shape_hint=sum_instance_by_label.shape,
-                                               cost_hint={hash(weights_per_label):{'00': 0, '01': np.prod(weights_per_label.shape)}})
+  weights_per_label_and_feature = expr.log((weights_per_label_and_feature + alpha) / 
+                                           (weights_per_label.reshape((weights_per_label.shape[0], 1)) + 
+                                            alpha * weights_per_label_and_feature.shape[1]))
+#  weights_per_label_and_feature = expr.shuffle(sum_instance_by_label,
+#                                               _naive_bayes_mapper,
+#                                               kw={'weights_per_label': weights_per_label, 
+#                                                   'alpha':alpha},
+#                                               shape_hint=sum_instance_by_label.shape,
+#                                               cost_hint={hash(weights_per_label):{'00': 0, '01': np.prod(weights_per_label.shape)}})
   
   return {'scores_per_label_and_feature': weights_per_label_and_feature.optimized().force(),
           'scores_per_label': weights_per_label.optimized().force(),
