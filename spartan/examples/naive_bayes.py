@@ -1,5 +1,5 @@
 import numpy as np
-from spartan import expr, util
+from spartan import expr, util, blob_ctx
 from spartan.array import extent, distarray
 
 def _naive_bayes_mapper(array, ex, weights_per_label, alpha):
@@ -73,6 +73,7 @@ def fit(data, labels, label_size, alpha=1.0):
   data = data / rms.reshape((data.shape[0], 1)) * idf.reshape((1, data.shape[1]))
   
   # add up all the feature vectors with the same labels
+  num_workers = blob_ctx.get().num_workers
   weights_per_label_and_feature = expr.shuffle(expr.retile(data, tile_hint=(util.divup(data.shape[0], num_workers), data.shape[1])),
                                                _sum_instance_by_label_mapper,
                                                target=expr.ndarray((label_size, data.shape[1]), dtype=np.float64, reduce_fn=np.add),

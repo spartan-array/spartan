@@ -60,29 +60,31 @@ def not_idempotent(fn):
     return result
   return wrapped
 
+visited_expr = {}
+
 class OptimizePass(object):
   def __init__(self):
-    self.visited = {}
+    self.visited = visited_expr
 
   def visit(self, op):
     if not isinstance(op, Expr):
       return op
 
-    if op in self.visited:
-      return self.visited[op]
+    if op.expr_id in self.visited:
+      return self.visited[op.expr_id]
 
     #assert not op in self.visited, 'Infinite recursion during optimization %s' % op
     #self.visited.add(op)
 
     #util.log_info('VISIT %s: %s', op.typename(), hash(op))
     if hasattr(self, 'visit_default'):
-      self.visited[op] = self.visit_default(op)
+      self.visited[op.expr_id] = self.visit_default(op)
     elif hasattr(self, 'visit_%s' % op.typename()):
-      self.visited[op] = getattr(self, 'visit_%s' % op.typename())(op)
+      self.visited[op.expr_id] = getattr(self, 'visit_%s' % op.typename())(op)
     else:
-      self.visited[op] = op.visit(self)
+      self.visited[op.expr_id] = op.visit(self)
 
-    return self.visited[op]
+    return self.visited[op.expr_id]
 
 
 def fusable(v):

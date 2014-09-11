@@ -116,7 +116,7 @@ def als(A, la=0.065, alpha=40, implicit_feedback=False, num_features=20, num_ite
   avg_rating = expr.sum(A, axis=0) * 1.0 / expr.count_nonzero(A, axis=0)
 
   M = expr.rand(num_items, num_features)
-  M = expr.assign(M, np._s[:, 0], avg_rating)
+  M = expr.assign(M, np.s_[:, 0], avg_rating.reshape((avg_rating.shape[0], 1)))
   #util.log_warn('avg_rating:%s M:%s', avg_rating.glom(), M.glom())
   
   cost_A = np.prod(A.shape)
