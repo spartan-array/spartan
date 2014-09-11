@@ -4,7 +4,7 @@ from spartan import expr, util
 import parakeet
 from spartan.array import distarray, extent
 
-
+'''
 @util.synchronized
 @parakeet.jit
 def _find_closest(pts, centers):
@@ -45,6 +45,7 @@ def _find_cluster_mapper(inputs, ex, d_pts, old_centers,
   labels.update(extent.create(ex.ul, (ex.lr[0], 1), labels.shape),
                 closest.reshape(pts.shape[0], 1))
   return []
+'''
 
 
 class KMeans(object):

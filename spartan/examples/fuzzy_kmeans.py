@@ -2,15 +2,8 @@ import numpy as np
 from spartan import expr, util
 from spartan.array import extent
 
+'''
 def _calc_probability(point, centers, m):
-  '''
-  Calculate the probability of a point belonging to each cluster.
-
-  Args:
-    point(numpy.array): point to be calculated.
-    centers(numpy.array): the centers of each cluster.
-    m(float): the parameter of fuzzy kmeans.
-  '''
   distances = np.square(point - centers).sum(axis=1)
   distances[distances == 0] = 0.0000000001
 
@@ -22,18 +15,6 @@ def _calc_probability(point, centers, m):
 
 
 def _fuzzy_kmeans_mapper(array, ex, old_centers, centers, counts, labels, m):
-  '''
-  Update the new centers, new counts and labels using fuzzy kmeans method.
-
-  Args:
-    array(DistArray): the input data points matrix.
-    ex(Extent): region being processed.
-    old_centers(DistArray): the current centers of each cluster.
-    centers(DistArray): the new centers to be updated.
-    counts(DistArray): the new counts to be updated.
-    labels(DistArray): the new labels for each point to be updated.
-    m(float): the parameter of fuzzy kmeans.
-  '''
   points = array.fetch(ex)
   old_centers = old_centers[:]
 
@@ -53,6 +34,7 @@ def _fuzzy_kmeans_mapper(array, ex, old_centers, centers, counts, labels, m):
   counts.update(extent.from_shape(counts.shape), new_counts)
   labels.update(extent.create((ex.ul[0],), (ex.lr[0],), labels.shape), new_labels)
   return []
+'''
 
 
 def fuzzy_kmeans(points, k=10, num_iter=10, m=2.0, centers=None):
