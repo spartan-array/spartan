@@ -1,9 +1,9 @@
 import test_common
 import numpy as np
-from spartan import expr, util
+from spartan import expr, blob_ctx, util
 import time
 
-DIM = 40000
+base = 2000
 
 class Jacobi_Test(test_common.ClusterTest):
   def jacobi_init(self, size):
@@ -13,7 +13,9 @@ class Jacobi_Test(test_common.ClusterTest):
     return av * bv
 
   def test_jacobi(self):
-    global DIM
+    global base
+    DIM = base * (blob_ctx.get().num_workers)
+
     A = self.jacobi_init(DIM)
     b = A[:,DIM-1:].reshape((DIM, ))
     x = expr.zeros((DIM,))
