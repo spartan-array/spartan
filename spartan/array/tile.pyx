@@ -17,7 +17,7 @@ MASK_ALL_SET = 1
 
 # get: slice -> ndarray or sparse or masked
 # update: right now -- takes a Tile
-#   change to update: takes a (slice, data, reducer) 
+#   change to update: takes a (slice, data, reducer)
 #   where data is dense, masked, or sparse.
 
 ID = iter(xrange(100000000))
@@ -61,20 +61,22 @@ class Tile(object):
       Assert.eq(val.dtype, self.dtype)
 
     self._data = val
-    
+
   def update(self, subslice, data, reducer):
     #util.log_info('Update: %s %s', subslice, data)
     return merge(self, subslice, data, reducer)
 
   def get(self, subslice=None):
     # no data, return an empty array
+    if subslice is not None and not isinstance(subslice, tuple):
+      subslice = (subslice,)
     if self.data is None:
       #self._initialize()
       #util.log_info('EMPTY %s %s', self.id, self.shape)
       if self.type == TYPE_SPARSE:
-        shape = self.shape if subslice == None else tuple([slice.stop - slice.start for slice in subslice])
+        shape = self.shape if subslice is None else tuple([slice.stop - slice.start for slice in subslice])
         return scipy.sparse.coo_matrix(shape, self.dtype)
-        
+
       return np.ndarray(self.shape, self.dtype)[subslice]
 
     # scalars are just returned directly.
@@ -93,16 +95,16 @@ class Tile(object):
         util.log_warn('Trying to slice a sparse tile  -- this will likely fail!')
         result = self.data[subslice]
       return result
-    
+
     # dense, check our mask and return a masked segment or unmasked if
     # the mask is all filled for the selected region.
     self._initialize_mask()
-    
+
     #return self.data[subslice]
     if self.mask is None or np.all(self.mask[subslice]):
       #util.log_info('%s %s %s', self.data, self.mask, subslice)
       return self.data[subslice]
-      
+
     data = self.data[subslice]
     mask = self.mask[subslice]
     result = np.ma.masked_all(data.shape, dtype=data.dtype)
@@ -129,7 +131,7 @@ class Tile(object):
     if self.type == TYPE_SPARSE:
       self.mask = None
       return
-    
+
     if not isinstance(self.mask, np.ndarray):
       if self.mask == MASK_ALL_SET:
         self.mask = np.ones(self.shape, dtype=np.bool)
@@ -165,7 +167,7 @@ def from_shape(shape, dtype, tile_type):
                 dtype=dtype,
                 tile_type=TYPE_SPARSE,
                 mask=None)
-  elif tile_type == TYPE_DENSE: 
+  elif tile_type == TYPE_DENSE:
     return Tile(shape=shape,
                 data=None,
                 dtype=dtype,
@@ -178,7 +180,7 @@ def from_shape(shape, dtype, tile_type):
 def from_intersection(src, overlap, data):
   '''
   Return a tile for ``src``, masked to update the area specifed by ``overlap``.
-  
+
   :param src: `TileExtent`
   :param overlap: `TileExtent`
   :param data:
@@ -216,7 +218,7 @@ def merge(old_tile, subslice, update, reducer):
     return old_tile
 
   assert not isinstance(update, np.ma.MaskedArray)
- 
+
   # Apply a sparse update array to the current tile data (which may be sparse or dense)
   if scipy.sparse.issparse(update):
     if old_tile.type == TYPE_DENSE:
@@ -225,7 +227,7 @@ def merge(old_tile, subslice, update, reducer):
       sparse.sparse_to_dense_update(old_tile.data, old_tile.mask, update_coo.row, update_coo.col, update_coo.data,
                                         sparse.REDUCE_ADD)
       #util.log_info('Update %s', update)
-      #util.log_info('Update COO %s', update_coo) 
+      #util.log_info('Update COO %s', update_coo)
       #util.log_info('New mask: %s', old_tile.mask)
       #if reducer is not None:
       #  old_tile.data[subslice] = reducer(old_tile.data[subslice], update)
@@ -244,21 +246,21 @@ def merge(old_tile, subslice, update, reducer):
                                                      subslice,
                                                      reducer)
     return old_tile
-    
+
   # Apply a dense update array to the current tile data (which may be sparse or dense)
   if old_tile.type == TYPE_DENSE:
     # initialize:
     # old_data[subslice] = data
     #
     # accumulate:
-    # old_data[subslice] = reduce(old_data[subslice], data) 
+    # old_data[subslice] = reduce(old_data[subslice], data)
 
     #util.log_info('%s %s', old_tile.mask, new_tile.mask)
     #util.log_info('REPLACE: %s', replaced)
     #util.log_info('UPDATE: %s', updated)
-    
-    # If the update shape is the same as the tile, 
-    # then avoid doing a (possibly expensive) slice update. 
+
+    # If the update shape is the same as the tile,
+    # then avoid doing a (possibly expensive) slice update.
     if old_tile.data.shape == update.shape:
       if reducer is not None:
         old_tile.data = reducer(old_tile.data, update)
@@ -268,21 +270,21 @@ def merge(old_tile, subslice, update, reducer):
     else:
       replaced = ~old_tile.mask[subslice]
       updated = old_tile.mask[subslice]
-    
-      old_region = old_tile.data[subslice]  
-      if np.any(replaced):  
+
+      old_region = old_tile.data[subslice]
+      if np.any(replaced):
         old_region[replaced] = update[replaced]
-    
+
       if np.any(updated):
         if reducer is not None:
-          old_region[updated] = reducer(old_region[updated], update[updated]) 
+          old_region[updated] = reducer(old_region[updated], update[updated])
         else:
-          old_region[updated] = update[updated] 
-    
+          old_region[updated] = update[updated]
+
       old_tile.mask[subslice] = True
   else:
     if old_tile.data is not None: #and old_tile.data.format == 'coo':
-      old_tile.data = old_tile.data.tolil() 
+      old_tile.data = old_tile.data.tolil()
     #util.log_info('Update dense to sparse')
     # TODO (SPARSE UPDATE)!!!
     # sparse update, no mask, just iterate over data items
