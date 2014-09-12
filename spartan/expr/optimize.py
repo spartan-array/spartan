@@ -792,16 +792,13 @@ class AutomaticTiling(OptimizePass):
     if not self.inited: self.init(expr)
 
     if hash(expr) in _tiled_exprlist or isinstance(expr, DistArray) or \
-       isinstance(expr, (Val, AsArray)):
+       isinstance(expr, (Val, AsArray)) and isinstance(expr.val, DistArray):
       # already partitioned array
       if hash(expr) in _tiled_exprlist:
         tiling = _tiled_exprlist[hash(expr)]
       else:
         array = expr if isinstance(expr, DistArray) else expr.val
-        if hasattr(array, 'tile_shape'):
-          tiling = array.tile_shape()[0] == array.shape[0]
-        else:
-          tiling = True
+        tiling = array.tile_shape()[0] == array.shape[0]
 
       self.nodes[self.cur_node_id] = self.node_type([expr], tiling, [], [])
       expr_node_ids = [self.cur_node_id]
