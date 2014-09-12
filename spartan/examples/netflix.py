@@ -140,7 +140,6 @@ class NetflixSGD(expr.Expr):
 
       worklist = set(stratum)
       expr.shuffle(V, sgd_netflix_mapper,
-                   target=None,
                    kw={'V' : lazify(V), 'M' : lazify(M), 'U' : lazify(U),
                        'worklist' : worklist }).force()
                        

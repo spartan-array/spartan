@@ -23,19 +23,16 @@ def svd(A, k=None):
   S : numpy array of shape (k,)
   V : numpy array of shape (k, k)
   """
-  if k is None:
-    k = A.shape[1]
+  if k is None: k = A.shape[1]
 
-  ctx = blob_ctx.get()
-  Omega = expr.randn(A.shape[1], k, tile_hint=(A.shape[1]/ctx.num_workers, k))
+  Omega = expr.randn(A.shape[1], k)
 
-  r = A.shape[0] / ctx.num_workers
-  Y = expr.dot(A, Omega, tile_hint=(r, k)).force()
+  Y = expr.dot(A, Omega)
   
   Q, R = qr(Y)
   
   B = expr.dot(expr.transpose(Q), A)
-  BTB = expr.dot(B, expr.transpose(B)).glom()
+  BTB = expr.dot(B, expr.transpose(B)).optimized().glom()
 
   S, U_ = np.linalg.eig(BTB)
   S = np.sqrt(S)

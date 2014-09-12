@@ -1,25 +1,6 @@
 import numpy as np
-from spartan import expr, util, blob_ctx
+from spartan import expr, util
 from spartan.array import extent, distarray
-
-def _naive_bayes_mapper(array, ex, weights_per_label, alpha):
-  '''
-  train local naive bayes weights.
-  
-  Args:
-    array(DistArray): weights for each label and feature.
-    ex(Extent): Region being processed.
-    weights_per_label(DistArray): weights for each label.
-    alpha: naive bayes parameter.
-  '''
-  weights_per_label_and_feature = array.fetch(extent.create((ex.ul[0], 0), (ex.lr[0], array.shape[1]), array.shape))
-  weights_per_label = weights_per_label.fetch(extent.create((ex.ul[0],), (ex.lr[0],), weights_per_label.shape))
-  weights_per_label = weights_per_label.reshape((weights_per_label.shape[0], 1))
-
-  weights_per_label_and_feature = np.log((weights_per_label_and_feature + alpha) / 
-                                         (weights_per_label + alpha * weights_per_label_and_feature.shape[1]))
-
-  yield ex, weights_per_label_and_feature
   
 def _sum_instance_by_label_mapper(array, ex, labels, label_size):
   '''
@@ -73,12 +54,15 @@ def fit(data, labels, label_size, alpha=1.0):
   data = data / rms.reshape((data.shape[0], 1)) * idf.reshape((1, data.shape[1]))
   
   # add up all the feature vectors with the same labels
-  num_workers = blob_ctx.get().num_workers
-  weights_per_label_and_feature = expr.shuffle(expr.retile(data, tile_hint=(util.divup(data.shape[0], num_workers), data.shape[1])),
-                                               _sum_instance_by_label_mapper,
-                                               target=expr.ndarray((label_size, data.shape[1]), dtype=np.float64, reduce_fn=np.add),
-                                               kw={'labels': labels, 'label_size': label_size},
-                                               cost_hint={hash(labels):{'00':0, '01':np.prod(labels.shape)}})
+  weights_per_label_and_feature = expr.ndarray((label_size, data.shape[1]), dtype=np.float64)
+  for i in range(lable_size):
+    i_mask = (labels == i)
+    weights_per_label_and_feature = expr.assign(weights_per_label_and_feature, np.s_[i, :], expr.sum(data[i_mask, :], axis=0))
+#  weights_per_label_and_feature = expr.shuffle(expr.retile(data, tile_hint=(util.divup(data.shape[0], num_workers), data.shape[1])),
+#                                               _sum_instance_by_label_mapper,
+#                                               target=expr.ndarray((label_size, data.shape[1]), dtype=np.float64, reduce_fn=np.add),
+#                                               kw={'labels': labels, 'label_size': label_size},
+#                                               cost_hint={hash(labels):{'00':0, '01':np.prod(labels.shape)}})
 
   # sum up all the weights for each label from the previous step
   weights_per_label = expr.sum(weights_per_label_and_feature, axis=1)
@@ -87,13 +71,7 @@ def fit(data, labels, label_size, alpha=1.0):
   weights_per_label_and_feature = expr.log((weights_per_label_and_feature + alpha) / 
                                            (weights_per_label.reshape((weights_per_label.shape[0], 1)) + 
                                             alpha * weights_per_label_and_feature.shape[1]))
-#  weights_per_label_and_feature = expr.shuffle(sum_instance_by_label,
-#                                               _naive_bayes_mapper,
-#                                               kw={'weights_per_label': weights_per_label, 
-#                                                   'alpha':alpha},
-#                                               shape_hint=sum_instance_by_label.shape,
-#                                               cost_hint={hash(weights_per_label):{'00': 0, '01': np.prod(weights_per_label.shape)}})
-  
+
   return {'scores_per_label_and_feature': weights_per_label_and_feature.optimized().force(),
           'scores_per_label': weights_per_label.optimized().force(),
           }

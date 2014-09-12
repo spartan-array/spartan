@@ -136,10 +136,16 @@ class MapExpr(Expr):
         output_shape[i] = max(output_shape[i], v)
     return tuple([output_shape[i] for i in range(len(output_shape))])
 
+  def _evaluate_kw(self, op):
+    for k, v in op.kw.iteritems():
+      if isinstance(v, Expr):
+        if hasattr(v, op): self._evaluate_kw(v.op)
+        op.kw[k] = v.evaluate()
+
   def _evaluate(self, ctx, deps):
     children = deps['children']
     child_to_var = deps['child_to_var']
-    op = self.op
+    self._evaluate_kw(self.op)
     util.log_debug('Evaluating %s.%d', self.op.fn_name(), self.expr_id)
 
     children = broadcast(children)
@@ -156,7 +162,7 @@ class MapExpr(Expr):
 
     return largest.map_to_array(
               tile_mapper, 
-              kw = {'children':children, 'child_to_var':child_to_var, 'op':op})
+              kw = {'children':children, 'child_to_var':child_to_var, 'op':self.op})
 
 
 def map(inputs, fn, numpy_expr=None, fn_kw=None):

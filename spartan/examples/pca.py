@@ -28,7 +28,6 @@ class PCA(object):
     """    
     self.mean_ = expr.mean(X, axis=0)
     X -= self.mean_
-    X = X.force()
     if rank is None:
       rank = min(X.shape[0], X.shape[1])
 

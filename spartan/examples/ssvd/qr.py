@@ -31,7 +31,7 @@ def qr(Y):
   # decomposition, but for now, we use numpy version, it works fine.
 
   # YTY = Y'Y. YTY has shape of (K, K).
-  YTY = expr.dot(expr.transpose(Y), Y).glom() 
+  YTY = expr.dot(expr.transpose(Y), Y).optimized().glom() 
   
   # Do cholesky decomposition and get R.
   R = np.linalg.cholesky(YTY).T
