@@ -137,7 +137,7 @@ class MapExpr(Expr):
     return tuple([output_shape[i] for i in range(len(output_shape))])
 
   def _evaluate_kw(self, op):
-    if 'fn_kw' in op.kw:
+    if isinstance(op, FnCallExpr) and 'fn_kw' in op.kw:
       for k, v in op.kw['fn_kw'].iteritems():
         if isinstance(v, Expr):
           if hasattr(v, 'op'): self._evaluate_kw(v.op)
