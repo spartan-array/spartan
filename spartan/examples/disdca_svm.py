@@ -41,7 +41,7 @@ def _svm_mapper(array, ex, labels, alpha, w, lambda_n):
   old_alpha = alpha.fetch(extent.create((ex.ul[0], 0), (ex.lr[0], 1), alpha.shape))
   old_w = w[:]
   
-  new_alpha = _svm_disdca_train(X, Y, old_alpha, old_w, len(X.tiles), lambda_n)
+  new_alpha = _svm_disdca_train(X, Y, old_alpha, old_w, len(array.tiles), lambda_n)
   
   # update the alpha vector
   yield extent.create((ex.ul[0], 0), (ex.lr[0], 1), alpha.shape), new_alpha
@@ -64,7 +64,7 @@ def fit(data, labels, T=50, la=1.0):
                          kw={'labels': labels, 'alpha': alpha, 'w': w, 'lambda_n': la * data.shape[0]},
                          shape_hint=alpha.shape, 
                          cost_hint={ hash(labels) : {'00': 0, '01': np.prod(labels.shape)}, hash(alpha) : {'00': 0, '01': np.prod(alpha.shape)} })
-    w = expr.sum(data * alpha * 1.0 / lambda_n, axis=0).reshape((data.shape[1], 1))
+    w = expr.sum(data * alpha * 1.0 / la / data.shape[0], axis=0).reshape((data.shape[1], 1))
     w = w.optimized()
   return w
 

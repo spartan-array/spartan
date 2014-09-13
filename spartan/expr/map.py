@@ -25,7 +25,7 @@ from ..node import indent
 from ..util import Assert
 from .base import ListExpr, Expr, as_array
 from .broadcast import Broadcast, broadcast
-from .local import (LocalInput, LocalCtx, LocalExpr, LocalMapExpr,
+from .local import (FnCallExpr, LocalInput, LocalCtx, LocalExpr, LocalMapExpr,
     LocalMapLocationExpr, make_var)
 
 
@@ -137,10 +137,15 @@ class MapExpr(Expr):
     return tuple([output_shape[i] for i in range(len(output_shape))])
 
   def _evaluate_kw(self, op):
-    for k, v in op.kw.iteritems():
-      if isinstance(v, Expr):
-        if hasattr(v, op): self._evaluate_kw(v.op)
-        op.kw[k] = v.evaluate()
+    if 'fn_kw' in op.kw:
+      for k, v in op.kw['fn_kw'].iteritems():
+        if isinstance(v, Expr):
+          if hasattr(v, 'op'): self._evaluate_kw(v.op)
+          op.kw['fn_kw'][k] = v.evaluate()
+
+    for d in op.deps:
+      if isinstance(d, FnCallExpr):
+        self._evaluate_kw(d)
 
   def _evaluate(self, ctx, deps):
     children = deps['children']

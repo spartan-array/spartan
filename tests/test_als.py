@@ -13,8 +13,8 @@ def benchmark_als(ctx, timer):
   num_features = 20
   num_iter = 2
   
-  #A = expr.randint(USER_SIZE, MOVIE_SIZE, low=0, high=5, tile_hint=(USER_SIZE, util.divup(MOVIE_SIZE, ctx.num_workers)))
-  A = expr.randint(USER_SIZE, MOVIE_SIZE, low=0, high=5)
+  A = expr.randint(USER_SIZE, MOVIE_SIZE, low=0, high=5, tile_hint=(USER_SIZE, util.divup(MOVIE_SIZE, ctx.num_workers)))
+  #A = expr.randint(USER_SIZE, MOVIE_SIZE, low=0, high=5)
   
   util.log_warn('begin als!')
   t1 = datetime.now()

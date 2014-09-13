@@ -12,6 +12,7 @@ lower code to Parakeet.
 from collections import namedtuple
 import operator, math
 from tiling import mincost_tiling
+import weakref
 
 from ..config import FLAGS, BoolFlag
 from ..array.distarray import DistArray
@@ -60,11 +61,17 @@ def not_idempotent(fn):
     return result
   return wrapped
 
-visited_expr = {}
+visited_expr = {'map_fusion': weakref.WeakValueDictionary(), 
+                'reduce_fusion': weakref.WeakValueDictionary(), 
+                'collapse_cached': weakref.WeakValueDictionary(),
+                'parakeet_gen': weakref.WeakValueDictionary(),
+                'rotate_slice': weakref.WeakValueDictionary(),
+                'auto_tiling': weakref.WeakValueDictionary()
+                }
 
 class OptimizePass(object):
   def __init__(self):
-    self.visited = visited_expr
+    self.visited = visited_expr[self.name]
 
   def visit(self, op):
     if not isinstance(op, Expr):
@@ -76,15 +83,17 @@ class OptimizePass(object):
     #assert not op in self.visited, 'Infinite recursion during optimization %s' % op
     #self.visited.add(op)
 
-    #util.log_info('VISIT %s: %s', op.typename(), hash(op))
+    util.log_info('VISIT %s: %s', op.typename(), hash(op))
+    opt_op = None
     if hasattr(self, 'visit_default'):
-      self.visited[op.expr_id] = self.visit_default(op)
+      opt_op = self.visit_default(op)
     elif hasattr(self, 'visit_%s' % op.typename()):
-      self.visited[op.expr_id] = getattr(self, 'visit_%s' % op.typename())(op)
+      opt_op = getattr(self, 'visit_%s' % op.typename())(op)
     else:
-      self.visited[op.expr_id] = op.visit(self)
+      opt_op = op.visit(self)
 
-    return self.visited[op.expr_id]
+    self.visited[opt_op.expr_id] = opt_op
+    return opt_op
 
 
 def fusable(v):

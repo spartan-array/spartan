@@ -54,15 +54,15 @@ def fit(data, labels, label_size, alpha=1.0):
   data = data / rms.reshape((data.shape[0], 1)) * idf.reshape((1, data.shape[1]))
   
   # add up all the feature vectors with the same labels
-  weights_per_label_and_feature = expr.ndarray((label_size, data.shape[1]), dtype=np.float64)
-  for i in range(lable_size):
-    i_mask = (labels == i)
-    weights_per_label_and_feature = expr.assign(weights_per_label_and_feature, np.s_[i, :], expr.sum(data[i_mask, :], axis=0))
-#  weights_per_label_and_feature = expr.shuffle(expr.retile(data, tile_hint=(util.divup(data.shape[0], num_workers), data.shape[1])),
-#                                               _sum_instance_by_label_mapper,
-#                                               target=expr.ndarray((label_size, data.shape[1]), dtype=np.float64, reduce_fn=np.add),
-#                                               kw={'labels': labels, 'label_size': label_size},
-#                                               cost_hint={hash(labels):{'00':0, '01':np.prod(labels.shape)}})
+  #weights_per_label_and_feature = expr.ndarray((label_size, data.shape[1]), dtype=np.float64)
+  #for i in range(label_size):
+  #  i_mask = (labels == i)
+  #  weights_per_label_and_feature = expr.assign(weights_per_label_and_feature, np.s_[i, :], expr.sum(data[i_mask, :], axis=0))
+  weights_per_label_and_feature = expr.shuffle(expr.retile(data, tile_hint=util.calc_tile_hint(data, axis=0)),
+                                               _sum_instance_by_label_mapper,
+                                               target=expr.ndarray((label_size, data.shape[1]), dtype=np.float64, reduce_fn=np.add),
+                                               kw={'labels': labels, 'label_size': label_size},
+                                               cost_hint={hash(labels):{'00':0, '01':np.prod(labels.shape)}})
 
   # sum up all the weights for each label from the previous step
   weights_per_label = expr.sum(weights_per_label_and_feature, axis=1)
