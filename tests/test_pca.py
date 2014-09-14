@@ -5,6 +5,8 @@ import numpy as np
 from numpy import absolute
 from sklearn.decomposition import PCA as SK_PCA
 from spartan.config import FLAGS
+from test_common import millis
+from datetime import datetime
 
 DIM = (40, 20)
 N_COMPONENTS = 10
@@ -23,3 +25,16 @@ class TestPCA(test_common.ClusterTest):
     print m2.components_ - m.components_
     assert np.allclose(absolute(m.components_), absolute(m2.components_))
 
+def benchmark_pca(ctx, timer):
+  DIM = (2400, 640)
+  A = expr.randn(*DIM, dtype=np.float64, tile_hint = util.calc_tile_hint(DIM, axis=0))
+  t1 = datetime.now()
+  m = PCA(N_COMPONENTS)
+  m.fit(A)
+  t2 = datetime.now()
+  cost_time = millis(t1, t2)
+    
+  print "total cost time:%s ms" % (cost_time)
+
+if __name__ == '__main__':
+  test_common.run(__file__)
