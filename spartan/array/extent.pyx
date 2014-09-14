@@ -4,6 +4,7 @@ import collections
 from spartan import util
 from spartan.util import Assert
 import numpy as np
+import math
 cimport numpy as np
 
 cimport cython
@@ -21,14 +22,14 @@ cdef enum:
 
 cdef class TileExtent(object):
   '''A rectangular tile of a distributed array.
-  
+
   These correspond (roughly) to a `slice` taken from an array
   (without any step component).
-  
+
   Arrays are indexed from the upper-left; for an array of shape
-  (sx, sy, sz): (0,0...) is the upper-left corner of an array, 
+  (sx, sy, sz): (0,0...) is the upper-left corner of an array,
   and (sx,sy,sz...) the lower-right.
-  
+
   Extents are represented by an upper-left corner (inclusive) and
   a lower right corner (exclusive): [ul, lr).  In addition, they
   carry the shape of the array they are a part of; this is used to
@@ -116,7 +117,7 @@ cdef class TileExtent(object):
 
   def ravelled_pos(self):
     return ravelled_pos(self.ul, self.array_shape)
-  
+
   def to_global(self, idx, axis):
     '''Convert ``idx`` from a local offset in this tile to a global offset.'''
     if axis is not None:
@@ -133,7 +134,7 @@ cdef class TileExtent(object):
 
   def clone(self):
     return c_create(self._ul, self._lr, self.array_shape, self._ul_len)
- 
+
 #import traceback
 counts = collections.defaultdict(int)
 
@@ -156,12 +157,12 @@ cdef c_create(coordinate_t *ul, coordinate_t *lr, array_shape, unsigned int ul_l
   ex._ul_len = ul_len
 
   return _valid(ex, ul, lr, array_shape)
-  
+
 cpdef create(ul, lr, array_shape):
   '''
   Create a new extent with the given coordinates and array shape.
-  
-  :param ul: `tuple`: 
+
+  :param ul: `tuple`:
   :param lr:
   :param array_shape:
   '''
@@ -188,29 +189,29 @@ def from_shape(shp):
   return c_create(ul, lr, shp, ul_len)
 
 @cython.cdivision(True)
-cpdef unravelled_pos(idx, array_shape): 
+cpdef unravelled_pos(idx, array_shape):
   '''
   Unravel ``idx`` into an index into an array of shape ``array_shape``.
   :param idx: `int`
   :param array_shape: `tuple`
   :rtype: `tuple` indexing into ``array_shape``
   '''
-  
+
   unravelled = []
   for dim in reversed(array_shape):
     unravelled.append(idx % dim)
     idx /= dim
-  
+
   return tuple(reversed(unravelled))
-    
+
 cpdef ravelled_pos(idx, array_shape):
   rpos = 0
   mul = 1
-  
+
   for i in range(len(array_shape) - 1, -1, -1):
     rpos += mul * idx[i]
     mul *= array_shape[i]
-  
+
   return rpos
 
 @cython.boundscheck(False)
@@ -248,8 +249,8 @@ def find_rect(ravelled_ul, ravelled_lr, shape):
 
 def find_overlapping(extents, region):
   '''
-  Return the extents that overlap with ``region``.   
-  
+  Return the extents that overlap with ``region``.
+
   :param extents: List of extents to search over.
   :param region: `Extent` to match.
   '''
@@ -257,10 +258,10 @@ def find_overlapping(extents, region):
     overlap = intersection(ex, region)
     if overlap is not None:
       yield (ex, overlap)
-      
+
 def compute_slice(TileExtent base, idx):
   '''Return a new ``TileExtent`` representing ``base[idx]``
-  
+
   :param base: `TileExtent`
   :param idx: int, slice, or tuple(slice,...)
   '''
@@ -270,7 +271,7 @@ def compute_slice(TileExtent base, idx):
 
   if not isinstance(idx, tuple):
     idx = (idx,)
-    
+
   cdef coordinate_t ul[MAX_DIM]
   cdef coordinate_t lr[MAX_DIM]
   cdef unsigned int i
@@ -287,14 +288,14 @@ def compute_slice(TileExtent base, idx):
       start, stop, step = axis_idx.indices(base.shape[i])
       ul[i] = base.ul[i] + start
       lr[i] = base.ul[i] + stop
-  
+
   return c_create(ul, lr, array_shape, base._ul_len)
 
 def offset_from(TileExtent base, TileExtent other):
   '''
   :param base: `TileExtent` to use as basis
   :param other: `TileExtent` into the same array.
-  :rtype: A new extent using this extent as a basis, instead of (0,0,0...) 
+  :rtype: A new extent using this extent as a basis, instead of (0,0,0...)
   '''
   cdef coordinate_t ul[MAX_DIM]
   cdef coordinate_t lr[MAX_DIM]
@@ -321,38 +322,38 @@ cpdef offset_slice(TileExtent base, TileExtent other):
 def from_slice(idx, shape):
   '''
   Construct a `TileExtent` from a slice or tuple of slices.
-  
+
   :param idx: int, slice, or tuple(slice...)
   :param shape: shape of the input array
   :rtype: `TileExtent` corresponding to ``idx``.
   '''
   if not isinstance(idx, tuple):
     idx = (idx,)
-  
+
   if len(idx) < len(shape):
-    idx = tuple(list(idx) + [slice(None, None, None) 
+    idx = tuple(list(idx) + [slice(None, None, None)
                              for _ in range(len(shape) - len(idx))])
-    
+
   cdef coordinate_t ul[MAX_DIM]
-  cdef coordinate_t lr[MAX_DIM] 
+  cdef coordinate_t lr[MAX_DIM]
   cdef unsigned int ul_len, i
- 
+
   ul_len = len(shape)
   for i in range(ul_len):
     dim = shape[i]
     slc = idx[i]
-    
+
     if np.isscalar(slc):
       slc = int(slc)
       slc = slice(slc, slc + 1, None)
-    
+
     if slc.start > 0: assert slc.start <= dim
     if slc.stop > 0: assert slc.stop <= dim
-    
+
     indices = slc.indices(dim)
     ul[i] = indices[0]
     lr[i] = indices[1]
-    
+
   return c_create(ul, lr, shape, ul_len)
 
 def from_tuple(tuple tup):
@@ -361,14 +362,14 @@ def from_tuple(tuple tup):
 
 cpdef intersection(TileExtent a, TileExtent b):
   '''
-  :rtype: The intersection of the 2 extents as a `TileExtent`, 
-          or None if the intersection is empty.  
+  :rtype: The intersection of the 2 extents as a `TileExtent`,
+          or None if the intersection is empty.
   '''
   if a is None:
     return None
-    
+
   Assert.eq(a.array_shape, b.array_shape, 'Tiles must have compatible shapes!')
-  
+
   cdef coordinate_t ul[MAX_DIM]
   cdef coordinate_t lr[MAX_DIM]
   cdef unsigned int i
@@ -378,13 +379,13 @@ cpdef intersection(TileExtent a, TileExtent b):
     if a._lr[i] < b._ul[i]: return None
     ul[i] = a._ul[i] if a._ul[i] >= b._ul[i] else b._ul[i]
     lr[i] = a._lr[i] if a._lr[i] <  b._lr[i] else b._lr[i]
-  
+
   return c_create(ul, lr, a.array_shape, a._ul_len)
 
 
 def shape_for_reduction(input_shape, axis):
   '''
-  Return the shape for the result of applying a reduction along ``axis`` to 
+  Return the shape for the result of applying a reduction along ``axis`` to
   an input of shape ``input_shape``.
   :param input_shape:
   :param axis:
@@ -397,7 +398,7 @@ def shape_for_reduction(input_shape, axis):
 
 def shapes_match(offset, data):
   '''
-  Return true if the shape of ``data`` matches the extent ``offset``. 
+  Return true if the shape of ``data`` matches the extent ``offset``.
   :param offset:
   :param data:
   '''
@@ -406,7 +407,7 @@ def shapes_match(offset, data):
 def drop_axis(TileExtent ex, axis):
   if axis is None: return create((), (), ())
   if axis < 0: axis = ex._ul_len + axis
-  
+
   cdef coordinate_t ul[MAX_DIM]
   cdef coordinate_t lr[MAX_DIM]
   cdef unsigned int i
@@ -422,10 +423,10 @@ def drop_axis(TileExtent ex, axis):
     lr[i - 1] = ex._lr[i]
 
   return c_create(ul, lr, shape, ex._ul_len - 1)
- 
+
 def index_for_reduction(index, axis):
   return drop_axis(index, axis)
-        
+
 def find_shape(extents):
   '''
   Given a list of extents, return the shape of the array
@@ -457,3 +458,32 @@ def is_complete(shape, slices):
     if slice.start > 0: return False
     if slice.stop < dim: return False
   return True
+
+def change_partition_axis(ex, axis):
+  if axis < 0:
+    axis += len(ex.array_shape)
+
+  old_axis = []
+  for i in range(len(ex.shape)):
+    if ex.shape[i] != ex.array_shape[i]:
+      old_axis.append(i)
+
+  if len(old_axis) > 1:
+    # The meaning of this API for block partition is unclear.
+    util.log_warn(str((old_axis, ex.shape, ex.array_shape)))
+    return None
+
+  if len(old_axis) == 0 or old_axis[0] == axis:
+    return ex
+
+  old_axis = old_axis[0]
+
+  new_ul = list(ex.ul[:])
+  new_lr = list(ex.lr[:])
+  new_ul[axis] = util.divup(new_ul[old_axis] * ex.array_shape[axis],
+                            ex.array_shape[old_axis])
+  new_ul[old_axis] = 0
+  new_lr[axis] = util.divup(new_lr[old_axis] * ex.array_shape[axis],
+                            ex.array_shape[old_axis])
+  new_lr[old_axis] = ex.array_shape[old_axis]
+  return create(new_ul, new_lr, ex.array_shape)

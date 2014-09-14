@@ -42,7 +42,7 @@ from .reshape import reshape
 from .retile import retile
 from .transpose import transpose
 from .dot import dot
-from .sort import sort
+from .sort import sort, argsort, argpartition
 
 Expr.outer = outer
 Expr.sum = sum
