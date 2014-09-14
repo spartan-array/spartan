@@ -42,6 +42,6 @@ def svd(A, k=None):
   S = S[si]
   U_ = U_[:, si]
 
-  U = expr.dot(Q, U_).force()
-  V = np.dot(np.dot(expr.transpose(B).glom(), U_), np.diag(np.ones(S.shape[0]) / S))
+  U = expr.dot(Q, U_).optimized().force()
+  V = np.dot(np.dot(expr.transpose(B).optimized().glom(), U_), np.diag(np.ones(S.shape[0]) / S))
   return U, S, V.T 

@@ -401,7 +401,10 @@ def divup(a, b):
 
 
 def calc_tile_hint(array, axis=0):
-  tile_hint = list(array.shape)
+  if isinstance(array, tuple):
+    tile_hint = list(array)
+  else:
+    tile_hint = list(array.shape)
   tile_hint[axis] = divup(tile_hint[axis], FLAGS.num_workers)
   return tile_hint
 
