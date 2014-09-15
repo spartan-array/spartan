@@ -45,7 +45,6 @@ def benchmark_cg(ctx, timer):
   n = 400 * l
   la = 20
   niter = 5
-  tile_hint = (n, n/ctx.num_workers)
   
   #nonzer = 7
   #nz = n * (nonzer + 1) * (nonzer + 1) + n * (nonzer + 2)
