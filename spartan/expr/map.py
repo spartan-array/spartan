@@ -25,7 +25,7 @@ from ..node import indent
 from ..util import Assert
 from .base import ListExpr, Expr, as_array
 from .broadcast import Broadcast, broadcast
-from .local import (LocalInput, LocalCtx, LocalExpr, LocalMapExpr,
+from .local import (FnCallExpr, LocalInput, LocalCtx, LocalExpr, LocalMapExpr,
     LocalMapLocationExpr, make_var)
 
 
@@ -136,10 +136,29 @@ class MapExpr(Expr):
         output_shape[i] = max(output_shape[i], v)
     return tuple([output_shape[i] for i in range(len(output_shape))])
 
+  def _evaluate_kw(self, op):
+    '''
+    Evaluate all the exprs in the map kws. It is used mostly by region_map which will contain exprs in its kws.
+    It can avoid expr tree optimization being interrupted by the region_map. This evaluation will not affect the 
+    map fusion optimization. It just turns the exprs in the kws into DistArray.
+
+    Args:
+      op (LocalExpr): the map Local operations.
+    '''
+    if isinstance(op, FnCallExpr) and 'fn_kw' in op.kw:
+      for k, v in op.kw['fn_kw'].iteritems():
+        if isinstance(v, Expr):
+          if hasattr(v, 'op'): self._evaluate_kw(v.op)
+          op.kw['fn_kw'][k] = v.evaluate()
+
+    for d in op.deps:
+      if isinstance(d, FnCallExpr):
+        self._evaluate_kw(d)
+
   def _evaluate(self, ctx, deps):
     children = deps['children']
     child_to_var = deps['child_to_var']
-    op = self.op
+    self._evaluate_kw(self.op)
     util.log_debug('Evaluating %s.%d', self.op.fn_name(), self.expr_id)
 
     children = broadcast(children)
@@ -156,7 +175,7 @@ class MapExpr(Expr):
 
     return largest.map_to_array(
               tile_mapper, 
-              kw = {'children':children, 'child_to_var':child_to_var, 'op':op})
+              kw = {'children':children, 'child_to_var':child_to_var, 'op':self.op})
 
 
 def map(inputs, fn, numpy_expr=None, fn_kw=None):

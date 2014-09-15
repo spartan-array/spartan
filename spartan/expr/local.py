@@ -89,8 +89,8 @@ class FnCallExpr(LocalExpr):
   def pretty_str(self):
     # drop modules from the prettified string
     pretty_fn = self.fn_name().split('.')[-1]
-    return '%s(%s)' % (
-      pretty_fn, indent(','.join([v.pretty_str() for v in self.deps if not isinstance(v, LocalInput)]))
+    return '%s(%s,kw=%s)' % (
+      pretty_fn, indent(','.join([v.pretty_str() for v in self.deps if not isinstance(v, LocalInput)])), indent(','.join(['(k=%s v=%s)'%(k,v) for k,v in self.kw.iteritems()]))
     )
 
   def fn_name(self):

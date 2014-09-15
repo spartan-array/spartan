@@ -75,34 +75,6 @@ def _solve_U_or_M_mapper(array, ex, U_or_M, la, alpha, implicit_feedback):
       result[i] = _als_solver(feature_vectors, rating_vector, la)
     
   yield extent.create((ex.ul[0], 0), (ex.lr[0], U_or_M.shape[1]), (array.shape[0], U_or_M.shape[1])), result
-
-def _init_M_mapper(array, ex, avg_rating):
-  '''
-  Initialize the M matrix with its first column equals to avg_rating.
-  
-  Args:
-    array(DistArray): the array to be created.
-    ex(Extent): region being processed.
-    avg_rating(DistArray): the average rating for each item.
-  '''
-  avg_rating = avg_rating.fetch(extent.create((ex.ul[0],), (ex.lr[0],), avg_rating.shape))
-  M = np.zeros(ex.shape)
-  for i in avg_rating.nonzero()[0]:
-    M[i, 0] = avg_rating[i]
-    M[i, 1:] = np.random.rand(M.shape[1]-1)
-  yield ex, M
-  
-def _transpose_mapper(array, ex, orig_array):
-  '''
-  Transpose ``orig_array`` into ``array``.
-  
-  Args:
-    array(DistArray): destination array.
-    ex(Extent): region being processed.
-    orig_array(DistArray): array to be transposed.
-  '''
-  orig_ex = extent.create(ex.ul[::-1], ex.lr[::-1], orig_array.shape)
-  yield ex, orig_array.fetch(orig_ex).transpose()
   
 def als(A, la=0.065, alpha=40, implicit_feedback=False, num_features=20, num_iter=10):
   '''
@@ -118,24 +90,29 @@ def als(A, la=0.065, alpha=40, implicit_feedback=False, num_features=20, num_ite
     num_features(int): dimension of the feature space.
     num_iter(int): max iteration to run.
   '''
-  AT = expr.shuffle(expr.ndarray((A.shape[1], A.shape[0]), dtype=np.int),
-                    _transpose_mapper, kw={'orig_array': A},
-                    shape_hint=(A.shape[1], A.shape[0]))
+  num_users = A.shape[0]
   num_items = A.shape[1]
   
   avg_rating = expr.sum(A, axis=0) * 1.0 / expr.count_nonzero(A, axis=0)
 
-  M = expr.shuffle(expr.ndarray((num_items, num_features)), 
-                   _init_M_mapper, kw={'avg_rating': avg_rating}, shape_hint=(num_items, num_features))
-  #util.log_warn('avg_rating:%s M:%s', avg_rating.glom(), M.glom())
+  M = expr.rand(num_items, num_features)
+  M = expr.assign(M, np.s_[:, 0], avg_rating.reshape((avg_rating.shape[0], 1)))
   
   cost_A = np.prod(A.shape)
-  cost_M = A.shape[1] * num_features
-  cost_U = A.shape[0] * num_features
+  cost_M = num_items * num_features
+  cost_U = num_users * num_features
   for i in range(num_iter):
     # Recomputing U
-    U = expr.shuffle(A, _solve_U_or_M_mapper, kw={'U_or_M': M, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback}, shape_hint=(A.shape[0], M.shape[1]), cost_hint={hash(M):{'00': cost_M, '01': cost_M + cost_A, '10': cost_M, '11':cost_A + cost_M}}).optimized()
+    U = expr.shuffle(expr.retile(A, tile_hint=util.calc_tile_hint(A, axis=0)), 
+                     _solve_U_or_M_mapper, 
+                     kw={'U_or_M': M, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback}, 
+                     shape_hint=(A.shape[0], M.shape[1]), 
+                     cost_hint={hash(M):{'00': cost_M, '01': cost_M + cost_A, '10': cost_M, '11':cost_A + cost_M}}).optimized()
     # Recomputing M
-    M = expr.shuffle(AT, _solve_U_or_M_mapper, kw={'U_or_M': U, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback}, shape_hint=(AT.shape[0], U.shape[1]), cost_hint={hash(U):{'00':cost_U, '01':cost_U + cost_A, '10': cost_U, '11':cost_A + cost_U}}).optimized()
+    M = expr.shuffle(expr.retile(expr.transpose(A), tile_hint=util.calc_tile_hint(A, axis=1)[::-1]), 
+                     _solve_U_or_M_mapper, 
+                     kw={'U_or_M': U, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback}, 
+                     shape_hint=(A.shape[1], U.shape[1]), 
+                     cost_hint={hash(U):{'00':cost_U, '01':cost_U + cost_A, '10': cost_U, '11':cost_A + cost_U}}).optimized()
 
   return U, M

@@ -23,13 +23,13 @@ def _init_label_mapper(array, ex):
 def benchmark_svm(ctx, timer):
   
   print "#worker:", ctx.num_workers
-  max_iter = 5
+  max_iter = 2
   #N = 200000 * ctx.num_workers
-  N = 100000 * 64
-  D = 2
+  N = 1000 * 64
+  D = 64
   
   # create data
-  data = expr.randn(N, D, dtype=np.float64)
+  data = expr.randn(N, D, dtype=np.float64, tile_hint=(N, util.divup(D, ctx.num_workers)))
   labels = expr.shuffle(data, _init_label_mapper, shape_hint=(data.shape[0], 1))
   
   t1 = datetime.now()

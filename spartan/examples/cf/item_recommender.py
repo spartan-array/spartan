@@ -120,8 +120,7 @@ class ItemBasedRecommender(object):
     '''
     assert rating_table.shape[1] >= k,\
            "The number of items must be grater or equal than k!"
-    self.num_workers = blob_ctx.get().num_workers
-    self.rating_table = expr.retile(rating_table, tile_hint=(rating_table.shape[0], util.divup(rating_table.shape[1], self.num_workers)))
+    self.rating_table = expr.retile(rating_table, tile_hint=util.calc_tile_hint(rating_table, axis=1))
     self.k = k
 
   def _get_norm_of_each_item(self, rating_table):
@@ -155,7 +154,10 @@ class ItemBasedRecommender(object):
     M = self.rating_table.shape[0]
     N = self.rating_table.shape[1]
 
-    self.similarity_table = expr.shuffle(self.rating_table, _similarity_mapper, kw={'item_norm': self._get_norm_of_each_item(self.rating_table), 'step': util.divup(self.rating_table.shape[1], self.num_workers)}, shape_hint=(N, N))
+    self.similarity_table = expr.shuffle(self.rating_table, _similarity_mapper, 
+                                         kw={'item_norm': self._get_norm_of_each_item(self.rating_table), 
+                                             'step': util.divup(self.rating_table.shape[1], blob_ctx.get().num_workers)}, 
+                                         shape_hint=(N, N))
 
     # Release the memory for item_norm
     top_k_similar_indices = expr.zeros((N, self.k), dtype=np.int)
@@ -165,6 +167,8 @@ class ItemBasedRecommender(object):
     # Store the indices of top k items into table top_k_similar_indices.
     cost = np.prod(top_k_similar_indices.shape)
     top_k_similar_table = expr.shuffle(self.similarity_table, _select_most_k_similar_mapper, 
-            kw = {'top_k_similar_indices': top_k_similar_indices, 'k': self.k}, shape_hint=(N, self.k), cost_hint={hash(top_k_similar_indices):{'00': 0, '01': cost, '10': cost, '11': cost}})
+                                       kw = {'top_k_similar_indices': top_k_similar_indices, 'k': self.k}, 
+                                       shape_hint=(N, self.k), 
+                                       cost_hint={hash(top_k_similar_indices):{'00': 0, '01': cost, '10': cost, '11': cost}})
     self.top_k_similar_table = top_k_similar_table.optimized().glom()
     self.top_k_similar_indices = top_k_similar_indices.optimized().glom()

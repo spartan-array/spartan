@@ -400,6 +400,15 @@ def divup(a, b):
   return int(ceil(float(a) / b))
 
 
+def calc_tile_hint(array, axis=0):
+  if isinstance(array, tuple):
+    tile_hint = list(array)
+  else:
+    tile_hint = list(array.shape)
+  tile_hint[axis] = divup(tile_hint[axis], FLAGS.num_workers)
+  return tile_hint
+
+
 def is_iterable(x):
   return hasattr(x, '__iter__')
 

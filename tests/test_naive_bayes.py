@@ -25,7 +25,7 @@ def benchmark_naive_bayes(ctx, timer):
   D = 128
   
   # create data
-  data = expr.randint(N, D, low=0, high=D)
+  data = expr.randint(N, D, low=0, high=D, tile_hint=(N, D/ctx.num_workers))
   labels = expr.shuffle(expr.ndarray((data.shape[0], 1), dtype=np.int), _init_label_mapper,
                         kw={'data': data}, shape_hint=(data.shape[0], 1), 
                         cost_hint={hash(data):{'00': 0, '10': np.prod(data.shape)}}

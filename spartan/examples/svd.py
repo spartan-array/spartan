@@ -23,7 +23,7 @@ def svds(A, k=6):
   vt : ndarray, shape=(k, N)
       Unitary matrix having right singular vectors as rows.  
   """
-  AT = expr.transpose(A).force()
+  AT = expr.transpose(A)
   d, u = lanczos.solve(AT, A, k)
   d, v =  lanczos.solve(A, AT, k)
   return u, np.sqrt(d), v.T
