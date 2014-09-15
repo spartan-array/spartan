@@ -123,7 +123,7 @@ static PyObject* mincost_tiling(PyObject *self, PyObject *args) {
 	for (u = 0; u < t; u++)
 		if (vis[u]) PySet_Add(ans, Py_BuildValue("i", u));
 
-	printf("mincost:%d\n", mincost);
+	//printf("mincost:%d\n", mincost);
 	return ans;
 }
 

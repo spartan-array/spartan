@@ -13,6 +13,7 @@ import imp
 import time
 import numpy as np
 
+import scipy.sparse as sp
 from spartan import util
 from spartan.util import Assert
 from spartan.node import Node, indent
@@ -110,8 +111,15 @@ class FnCallExpr(LocalExpr):
     deps = [d.evaluate(ctx) for d in self.deps]
 
     #util.log_info('Evaluating %s.%d [%s]', self.fn_name(), self.id, deps)
+    
+    # Not all Numpy operations are compatible with mixed sparse and dense arrays.
+    # To address this, if only one of the inputs is sparse, we convert it to
+    # dense before computing our result.
+    if isinstance(self.fn, np.ufunc) and len(deps) == 2 and sp.issparse(deps[0]) ^ sp.issparse(deps[1]):
+      for i in range(2):
+        if sp.issparse(deps[i]):
+          deps[i] = deps[i].todense()
     return self.fn(*deps, **self.kw)
-
 
 # The local operation of map and reduce expressions is practically
 # identical.  Reductions take an axis and extent argument in

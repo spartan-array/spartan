@@ -27,7 +27,7 @@ class TestPCA(test_common.ClusterTest):
 
 def benchmark_pca(ctx, timer):
   DIM = (2400, 640)
-  A = expr.randn(*DIM, dtype=np.float64, tile_hint = util.calc_tile_hint(DIM, axis=0))
+  A = expr.randn(*DIM, dtype=np.float64)
   t1 = datetime.now()
   m = PCA(N_COMPONENTS)
   m.fit(A)

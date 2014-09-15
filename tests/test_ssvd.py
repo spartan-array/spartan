@@ -24,7 +24,7 @@ class TestSSVD(test_common.ClusterTest):
 
 def benchmark_ssvd(ctx, timer):
   DIM = (2400, 640)
-  A = expr.randn(*DIM, dtype=np.float64, tile_hint = util.calc_tile_hint(DIM, axis=0))
+  A = expr.randn(*DIM, dtype=np.float64)
   t1 = datetime.now()
   U,S,VT = svd(A)
   t2 = datetime.now()

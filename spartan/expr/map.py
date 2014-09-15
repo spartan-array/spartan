@@ -15,7 +15,6 @@ the same behavior as Numpy broadcasting).
 '''
 
 import collections
-from scipy import sparse as sp
 from traits.api import Instance
 
 from .. import util, blob_ctx
@@ -41,14 +40,6 @@ def get_local_values(ex, children, child_to_var):
       local_val = child.fetch(ex)
     local_values[childv] = local_val
 
-  # Not all Numpy operations are compatible with mixed sparse and dense arrays.
-  #   To address this, if only one of the inputs is sparse, we convert it to
-  #   dense before computing our result.
-  vals = local_values.values()
-  if len(vals) == 2 and sp.issparse(vals[0]) ^ sp.issparse(vals[1]):
-    for (k,v) in local_values.iteritems():
-      if sp.issparse(v):
-        local_values[k] = v.todense()
   return local_values
 
 
