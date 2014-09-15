@@ -389,6 +389,7 @@ class DistArrayImpl(DistArray):
       for ex, tile_id in self.tiles.iteritems():
         slices.append((tile_id, ex.to_slice(), extent.offset_slice(ex, ex)))
     else:
+      util.log_info('\n\ntiles = %s\nregion = %s\n', self.tiles, region)
       splits = list(extent.find_overlapping(self.tiles, region))
       #util.log_info('%s: Updating %s tiles with data:%s', region, len(splits), data)
       
