@@ -137,6 +137,14 @@ class MapExpr(Expr):
     return tuple([output_shape[i] for i in range(len(output_shape))])
 
   def _evaluate_kw(self, op):
+    '''
+    Evaluate all the exprs in the map kws. It is used mostly by region_map which will contain exprs in its kws.
+    It can avoid expr tree optimization being interrupted by the region_map. This evaluation will not affect the 
+    map fusion optimization. It just turns the exprs in the kws into DistArray.
+
+    Args:
+      op (LocalExpr): the map Local operations.
+    '''
     if isinstance(op, FnCallExpr) and 'fn_kw' in op.kw:
       for k, v in op.kw['fn_kw'].iteritems():
         if isinstance(v, Expr):
