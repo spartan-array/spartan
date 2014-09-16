@@ -13,6 +13,7 @@ import imp
 import time
 import numpy as np
 
+import scipy.sparse as sp
 from spartan import util
 from spartan.util import Assert
 from spartan.node import Node, indent
@@ -44,7 +45,7 @@ class LocalExpr(Node):
 
   def add_dep(self, v):
     self.deps.append(v)
-    assert len(self.deps) <= 2, v
+    #assert len(self.deps) <= 2, v
 
   def input_names(self):
     return util.flatten([v.input_names() for v in self.deps], unique=True)
@@ -89,8 +90,8 @@ class FnCallExpr(LocalExpr):
   def pretty_str(self):
     # drop modules from the prettified string
     pretty_fn = self.fn_name().split('.')[-1]
-    return '%s(%s)' % (
-      pretty_fn, indent(','.join([v.pretty_str() for v in self.deps if not isinstance(v, LocalInput)]))
+    return '%s(%s,kw=%s)' % (
+      pretty_fn, indent(','.join([v.pretty_str() for v in self.deps if not isinstance(v, LocalInput)])), indent(','.join(['(k=%s v=%s)'%(k,v) for k,v in self.kw.iteritems()]))
     )
 
   def fn_name(self):
@@ -110,8 +111,15 @@ class FnCallExpr(LocalExpr):
     deps = [d.evaluate(ctx) for d in self.deps]
 
     #util.log_info('Evaluating %s.%d [%s]', self.fn_name(), self.id, deps)
+    
+    # Not all Numpy operations are compatible with mixed sparse and dense arrays.
+    # To address this, if only one of the inputs is sparse, we convert it to
+    # dense before computing our result.
+    if isinstance(self.fn, np.ufunc) and len(deps) == 2 and sp.issparse(deps[0]) ^ sp.issparse(deps[1]):
+      for i in range(2):
+        if sp.issparse(deps[i]):
+          deps[i] = deps[i].todense()
     return self.fn(*deps, **self.kw)
-
 
 # The local operation of map and reduce expressions is practically
 # identical.  Reductions take an axis and extent argument in

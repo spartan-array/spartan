@@ -117,12 +117,14 @@ def stencil(images, filters, stride=1):
                    reduce_fn=np.add,
                    tile_hint=tile_hint)
   
+  cost = np.prod(target.shape)
   return shuffle(images,
                  stencil_mapper,
                  target=target,
                  kw=dict(images=images,
                          filters=filters,
-                         target_shape=target.shape))
+                         target_shape=target.shape),
+                 cost_hint={hash(target):{'00': 0, '01': cost, '10': cost, '11': cost}})
 
 
 def _maxpool_mapper(array, ex, pool_size, stride, target_shape):

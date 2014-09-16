@@ -21,7 +21,7 @@ def logistic_regression(x, y, iterations):
   return logreg.train()
 
 def run(N_EXAMPLES, N_DIM, iterations):
-  x = expr.eager(expr.rand(N_EXAMPLES, N_DIM, tile_hint=(N_EXAMPLES / 10, 10)))
-  y = expr.eager(expr.rand(N_EXAMPLES, 1, tile_hint=(N_EXAMPLES / 10, 1)))
+  x = expr.rand(N_EXAMPLES, N_DIM)
+  y = expr.rand(N_EXAMPLES, 1)
   logistic_regression(x, y, iterations)
 

@@ -88,7 +88,7 @@ setup(
               sources = ['spartan/expr/tiling.cc'],
               language='c++',
               extra_compile_args=["-std=c++0x"],
-              extra_link_args=["-std=c++11", "-lpython2.7"]),
+              extra_link_args=["-std=c++11", "-fPIC"]),
   ],
   cmdclass=cmdclass,
 )

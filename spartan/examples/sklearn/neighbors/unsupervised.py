@@ -2,6 +2,7 @@ import numpy as np
 from spartan import expr, core, array, blob_ctx
 from sklearn.neighbors import NearestNeighbors as SKNN
 
+
 def _knn_mapper(ex,
                 X,
                 Q,
@@ -9,14 +10,14 @@ def _knn_mapper(ex,
                 algorithm):
   """
   knn kernel for finding k(n_neighbors) nearest neighbors of a giving query set(Q).
-  
+
   Each kernel call finds k nearest neighbors of subset(one tile) of X. Then we sends
   the KNN candidates to master to find out the real KNN.
 
   Parameters
   ----------
   X : array. The search set. We'll try to find KNN of Q set in one tile of X.
-  
+
   Q : array. Query set, we'll try to find its KNN candidates in X.
 
   n_neighbors : integer. Specify the K.
@@ -27,20 +28,20 @@ def _knn_mapper(ex,
   result = core.LocalKernelResult()
   row_start = ex.ul[0]
   col_start = ex.ul[1]
- 
-  # If it's not started with the first column, we skip. 
-  # Let the tile starts with first column does the computation. 
+
+  # If it's not started with the first column, we skip.
+  # Let the tile starts with first column does the computation.
   if col_start != 0:
     return result
-  
+
   ul = ex.ul
   lr = (ex.lr[0], X.shape[1])
   ex = array.extent.create(ul, lr, ex.array_shape)
   X = X.fetch(ex)
   Q = Q.glom()
-  
+
   # Run sklearn SKK locally to find the KNN candidates.
-  nbrs = SKNN(n_neighbors=n_neighbors, 
+  nbrs = SKNN(n_neighbors=n_neighbors,
                 algorithm=algorithm).fit(X)
 
   dist, ind = nbrs.kneighbors(Q)
@@ -51,7 +52,7 @@ def _knn_mapper(ex,
 
 
 class NearestNeighbors(object):
-  """ 
+  """
   Unsupervised learner for implementing neighbor searches.
 
     Parameters
@@ -71,16 +72,14 @@ class NearestNeighbors(object):
         Note: fitting on sparse input will override the setting of
         this parameter, using brute force.
   """
-  def __init__(self,
-                n_neighbors=5,
-                algorithm='auto'):
+  def __init__(self, n_neighbors=5, algorithm='auto'):
     self.n_neighbors = n_neighbors
     self.algorithm = algorithm
 
   def fit(self, X):
     ctx = blob_ctx.get()
     if isinstance(X, np.ndarray):
-      X = expr.from_numpy(X, tile_hint=(X.shape[0] / ctx.num_workers, X.shape[1]))    
+      X = expr.from_numpy(X, tile_hint=(X.shape[0] / ctx.num_workers, X.shape[1]))
     if isinstance(X, expr.Expr):
       X = X.force()
 
@@ -115,26 +114,37 @@ class NearestNeighbors(object):
 
     if isinstance(X, np.ndarray):
       X = expr.from_numpy(X)
-    
+
     if isinstance(X, expr.Expr):
       X = X.force()
 
-    results = self.X.foreach_tile(mapper_fn = _knn_mapper,
-                                  kw = {'X' : self.X, 'Q' : X,
-                                        'n_neighbors' : self.n_neighbors,
-                                        'algorithm' : self.algorithm})
-    dist = None
-    ind = None
-    """ Get the KNN candidates for each tile of X, then find out the real KNN """
-    for k, v in results.iteritems():
-      if dist is None:
-        dist = v[0]
-        ind = v[1]
-      else:
-        dist = np.concatenate((dist, v[0]), axis=1)
-        ind = np.concatenate((ind, v[1]), axis=1)
+    if self.algorithm in ('auto', 'brute'):
+      X_broadcast = expr.reshape(X, (X.shape[0], 1, X.shape[1]))
+      fit_X_broadcast = expr.reshape(self.X, (1, self.X.shape[0], self.X.shape[1]))
+      distances = expr.sum((X_broadcast - fit_X_broadcast) ** 2, axis=2)
+      distances.force()
+      neigh_ind = expr.argsort(distances, axis=1)
+      neigh_ind = neigh_ind[:, :n_neighbors].glom()
+      neigh_dist = expr.sort(distances, axis=1)
+      neigh_dist = expr.sqrt(neigh_dist[:, :n_neighbors]).glom()
+      return neigh_dist, neigh_ind
+    else:
+      results = self.X.foreach_tile(mapper_fn=_knn_mapper,
+                                    kw={'X': self.X, 'Q': X,
+                                        'n_neighbors': self.n_neighbors,
+                                        'algorithm': self.algorithm})
+      dist = None
+      ind = None
+      """ Get the KNN candidates for each tile of X, then find out the real KNN """
+      for k, v in results.iteritems():
+        if dist is None:
+          dist = v[0]
+          ind = v[1]
+        else:
+          dist = np.concatenate((dist, v[0]), axis=1)
+          ind = np.concatenate((ind, v[1]), axis=1)
 
-    mask = np.argsort(dist, axis=1)[:, :self.n_neighbors]
-    new_dist = np.array([dist[i][mask[i]] for i, r in enumerate(dist)])
-    new_ind = np.array([ind[i][mask[i]] for i, r in enumerate(ind)]) 
-    return new_dist, new_ind
+      mask = np.argsort(dist, axis=1)[:, :self.n_neighbors]
+      new_dist = np.array([dist[i][mask[i]] for i, r in enumerate(dist)])
+      new_ind = np.array([ind[i][mask[i]] for i, r in enumerate(ind)])
+      return new_dist, new_ind

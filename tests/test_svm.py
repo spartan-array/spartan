@@ -7,7 +7,7 @@ import numpy as np
 from datetime import datetime
 
 def _init_label_mapper(array, ex):
-  data = array.fetch(ex)
+  data = array.fetch(extent.create((ex.ul[0], 0), (ex.lr[0], array.shape[1]), array.shape))
   
   labels = np.zeros((data.shape[0], 1), dtype=np.int64)
   for i in range(data.shape[0]):
@@ -23,17 +23,17 @@ def _init_label_mapper(array, ex):
 def benchmark_svm(ctx, timer):
   
   print "#worker:", ctx.num_workers
-  max_iter = 5
+  max_iter = 2
   #N = 200000 * ctx.num_workers
-  N = 100000 * 64
-  D = 2
+  N = 1000 * 64
+  D = 64
   
   # create data
-  data = expr.randn(N, D, dtype=np.float64, tile_hint=[N/ctx.num_workers, D])
-  labels = expr.eager(expr.shuffle(data, _init_label_mapper))
+  data = expr.randn(N, D, dtype=np.float64, tile_hint=(N, util.divup(D, ctx.num_workers)))
+  labels = expr.shuffle(data, _init_label_mapper, shape_hint=(data.shape[0], 1))
   
   t1 = datetime.now()
-  w = fit(data, labels, ctx.num_workers, T=max_iter).force()
+  w = fit(data, labels, T=max_iter).force()
   t2 = datetime.now()
   util.log_warn('train time per iteration:%s ms, final w:%s', millis(t1,t2)/max_iter, w.glom().T)
   

@@ -9,11 +9,10 @@ import time
 
 from spartan import util
 from spartan.examples import swaption
-
+from spartan.config import FLAGS
 NUM_PATHS = 10
 
-
-def benchmark_swaption(ctx, timer):
+def fn(ctx, timer):
   # Start dates for a series of swaptions.
   ts_all = [[1, 2, 3], [2, 3, 4], [5, 6, 7, 8, 9], [10, 12, 14, 16, 18]]
 
@@ -31,6 +30,16 @@ def benchmark_swaption(ctx, timer):
     
   end_time  = time.time()
   print "run time:", end_time - start_time
+
+
+def benchmark_swaption(ctx, timer):
+  print 'without auto tiling'
+  FLAGS.opt_auto_tiling = 0
+  fn(ctx, timer)
+
+  print 'with auto tiling'
+  FLAGS.opt_auto_tiling = 1
+  fn(ctx, timer)
 
 if __name__ == '__main__':
   test_common.run(__file__)

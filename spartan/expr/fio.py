@@ -226,7 +226,8 @@ def load(prefix, path = '.', iszip = False):
                          tile_hint=info['tile_hint'], sparse=info['sparse']), 
                  fn = _load_mapper, 
                  kw = {'path' : path, 'prefix' : prefix, 'sparse' : info['sparse'], 
-                       'dtype' : info['dtype'], 'iszip' : iszip})
+                       'dtype' : info['dtype'], 'iszip' : iszip},
+                 shape_hint=info['shape'])
 
 def _pickle_reducer(ex, tile, axis, path = None, prefix = None, sparse = None, iszip = None):
   if not os.path.exists(path + '/' + prefix):
@@ -309,7 +310,8 @@ def unpickle(prefix, path = '.', iszip = False):
   return shuffle(ndarray(info['shape'], dtype=info['dtype'], 
                          tile_hint=info['tile_hint'], sparse=info['sparse']), 
                  fn = _unpickle_mapper, 
-                 kw = {'path' : path, 'prefix' : prefix, 'iszip' : iszip})
+                 kw = {'path' : path, 'prefix' : prefix, 'iszip' : iszip},
+                 shape_hint=info['shape'])
 
 def _tile_mapper(tile_id, blob, tiles = None, user_fn=None, **kw):
   for k, v in tiles.iteritems():

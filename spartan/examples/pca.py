@@ -28,7 +28,6 @@ class PCA(object):
     """    
     self.mean_ = expr.mean(X, axis=0)
     X -= self.mean_
-    X = X.force()
     if rank is None:
       rank = min(X.shape[0], X.shape[1])
 
@@ -49,7 +48,7 @@ class PCA(object):
     X_new : reduced dimension numpy.array, shape (n_samples, n_components)
     """
     X_transformed = X - self.mean_
-    X_transformed = expr.dot(X_transformed, self.components_.T).glom()
+    X_transformed = expr.dot(X_transformed, self.components_.T).optimized().glom()
     return X_transformed
 
   def inverse_transform(self, X):
@@ -63,6 +62,6 @@ class PCA(object):
     X_original: numpyarray of shape (n_samples, n_features). 
     """
     if isinstance(X, expr.Expr) or isinstance(X, array.distarray.DistArray):
-      return (expr.dot(X, self.components_) + self.mean_).force()
+      return (expr.dot(X, self.components_) + self.mean_).optimized().force()
     else:
       return np.dot(X, self.components_) + self.mean_.glom()

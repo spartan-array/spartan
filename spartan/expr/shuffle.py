@@ -22,7 +22,8 @@ def shuffle(v, fn, cost_hint=None, shape_hint=None, target=None, kw=None):
     ShuffleExpr:
   '''
   if kw is None: kw = {}
-  
+  if cost_hint is None: cost_hint = {}
+ 
   kw = lazify(kw)
   v = lazify(v)
   #util.log_info('%s', kw)
@@ -35,7 +36,6 @@ def shuffle(v, fn, cost_hint=None, shape_hint=None, target=None, kw=None):
                      shape_hint=shape_hint,
                      target=target,
                      fn_kw=kw)
-
 
 def target_mapper(ex, map_fn=None, source=None, target=None, fn_kw=None):
   '''
@@ -54,7 +54,7 @@ def target_mapper(ex, map_fn=None, source=None, target=None, fn_kw=None):
     LocalKernelResult: No result data (all output is written to ``target``). 
   '''
   result = list(map_fn(source, ex, **fn_kw))
-  
+
   futures = rpc.FutureGroup()
   if result is not None:
     for ex, v in result:
@@ -102,10 +102,11 @@ class ShuffleExpr(Expr):
   target = PythonValue(None, desc="DistArray or Expr")
   cost_hint = PythonValue(None, desc='Dict or None')
   shape_hint = PythonValue(None, desc='Tuple or None')
-  fn_kw = Instance(DictExpr) 
+  fn_kw = PythonValue(None, desc='DictExpr') 
   
   def __str__(self):
-    return 'shuffle[%d](%s, %s)' % (self.expr_id, self.map_fn, self.array)
+    cost_str = '{ %s }' % ',\n'.join(['%s: %s' % (hash(k), v) for k, v in self.cost_hint.iteritems()])
+    return 'shuffle[%d](%s, %s, %s, %s)' % (self.expr_id, self.map_fn, self.array, cost_str, self.fn_kw)
 
   def _evaluate(self, ctx, deps):
     v = deps['array']

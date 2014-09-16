@@ -60,10 +60,10 @@ def region_map(array, region, fn, fn_kw=None):
   if isinstance(region, extent.TileExtent):
     region = list([region])
 
-  if fn_kw is not None:
-    for k, v in fn_kw.iteritems():
-      if isinstance(v, Expr):
-        fn_kw[k] = v.evaluate()
+#  if fn_kw is not None:
+#    for k, v in fn_kw.iteritems():
+#      if isinstance(v, Expr):
+#        fn_kw[k] = v.optimized().evaluate()
 
   kw = {'fn_kw': fn_kw, 'user_fn': fn, 'region': region}
   return map_with_location(array, fn=_region_mapper, fn_kw=kw)

@@ -8,7 +8,7 @@ represented using a graph of `Expr` nodes.  Expression graphs can be
 evaluated using the `Expr.evaluate` or `Expr.force` methods.
 
 The `base` module contains the definition of `Expr`, the base class for all
-types of expressions.  It also defines subclasses for wrapping common 
+types of expressions.  It also defines subclasses for wrapping common
 Python values: lists (`ListExpr`), dicts (`DictExpr`) and tuples ((`TupleExpr`).
 
 Operations are built up using a few high-level operations -- these all
@@ -18,13 +18,12 @@ live in their own modules:
 * Map over an array :py:mod:`spartan.expr.map` and `spartan.expr.shuffle`
 * Reduce over an array `spartan.expr.reduce`
 * Apply a stencil/convolution to an array `spartan.expr.stencil`
-* Slicing/indexing `spartan.expr.index`.   
+* Slicing/indexing `spartan.expr.index`.
 
 Optimizations on DAGs live in `spartan.expr.optimize`.
 """
 
-from base import Expr, evaluate, optimized_dag, glom, eager, lazify, force,  NotShapeable
-
+from base import Expr, evaluate, optimized_dag, glom, eager, lazify, as_array, force, NotShapeable
 from .builtins import *
 from .assign import assign
 from .map import map
@@ -40,9 +39,10 @@ from .write_array import write, from_numpy, from_file, from_file_parallel
 from .checkpoint import checkpoint
 from .fio import save, load, pickle, unpickle, partial_load, partial_unpickle
 from .reshape import reshape
+from .retile import retile
 from .transpose import transpose
 from .dot import dot
-from .sort import sort
+from .sort import sort, argsort, argpartition
 
 Expr.outer = outer
 Expr.sum = sum

@@ -100,7 +100,7 @@ class ReshapeTest(test_common.ClusterTest):
     t1 = expr.from_numpy(npa1)
     t2 = expr.from_numpy(npa2)
     t3 = expr.dot(expr.reshape(t1, (1071, 31)), t2)
-    Assert.all_eq(result, t3.glom())
+    Assert.all_eq(result, t3.glom(), 10e-9)
 
     npa1 = np.random.random((357, 718))
     npa2 = np.random.random((718, ))
@@ -109,7 +109,7 @@ class ReshapeTest(test_common.ClusterTest):
     t1 = expr.from_numpy(npa1)
     t2 = expr.from_numpy(npa2)
     t3 = expr.dot(t1, expr.reshape(t2, (718, 1)))
-    Assert.all_eq(result, t3.glom())
+    Assert.all_eq(result, t3.glom(), 10e-9)
 
     npa1 = np.random.random((718, ))
     npa2 = np.random.random((1, 357))
@@ -118,5 +118,5 @@ class ReshapeTest(test_common.ClusterTest):
     t1 = expr.from_numpy(npa1)
     t2 = expr.from_numpy(npa2)
     t3 = expr.dot(expr.reshape(t1, (718, 1)), t2)
-    Assert.all_eq(result, t3.glom())
+    Assert.all_eq(result, t3.glom(), 10e-9)
 

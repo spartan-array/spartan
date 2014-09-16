@@ -31,7 +31,7 @@ def qr(Y):
   # decomposition, but for now, we use numpy version, it works fine.
 
   # YTY = Y'Y. YTY has shape of (K, K).
-  YTY = expr.dot(expr.transpose(Y), Y).glom() 
+  YTY = expr.dot(expr.transpose(Y), Y).optimized().glom() 
   
   # Do cholesky decomposition and get R.
   R = np.linalg.cholesky(YTY).T
@@ -40,6 +40,6 @@ def qr(Y):
   inv_R = np.linalg.inv(R)
 
   # Q = Y * inv(R)
-  Q = expr.dot(Y, inv_R, tile_hint=(Y.tile_shape()[0], inv_R.shape[1])).force()
+  Q = expr.dot(Y, inv_R).optimized().force()
 
   return Q, R 
