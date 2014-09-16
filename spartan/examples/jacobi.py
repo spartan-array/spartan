@@ -21,7 +21,9 @@ def jacobi_init(size):
     av = expr.arange(start = 2, stop = size + 2)
     bv = expr.arange(start = 4, stop = size + 4).reshape((size, 1))
 
-    return av * bv, (av * bv)[:, -1:].reshape((size, ))
+    A = av * bv
+
+    return A, A[:, -1:].reshape((size, ))
 
 def jacobi_method(A, b, _iter = 100):
   """
@@ -41,9 +43,6 @@ def jacobi_method(A, b, _iter = 100):
   result : Expr - vector
       Approximated solution.
   """
-  #A = A = jacobi_init(DIM)
-  #b = A[:, DIM-1:].reshape((DIM, ))
-
   util.Assert.eq(A.shape[0], b.shape[0])
 
   x = expr.zeros((A.shape[0],))
