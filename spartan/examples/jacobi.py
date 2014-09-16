@@ -15,47 +15,43 @@ def jacobi_init(size):
     ----------
     av * bv : spartan nd array
         Formatted input array to computation
+    (av * bv)[:, -1].reshape((DIM, )) : Expr
+        RHS vector extracted from input array
     """
     av = expr.arange(start = 2, stop = size + 2)
     bv = expr.arange(start = 4, stop = size + 4).reshape((size, 1))
 
-    return av * bv
+    return av * bv, (av * bv)[:, -1:].reshape((size, ))
 
-def jacobi_method(base):
+def jacobi_method(A, b, _iter = 100):
   """
   Iterative algorithm for approximating the solutions of a diagonally dominant system of linear equations. 
 
   Parameters
   ----------
-  base : int
-      Factor for the shape of array.
-      e.g., if base is 100, then shape of array will be ((100 * num_workers), (100 * num_workers))
+  A : ndarray or Expr - 2d
+      Input matrix
+  b : ndarray or Expr - vector
+      RHS vector
+  _iter : int
+      Times of iteration needed, default to be 100
 
  Returns
   -------
-  result : vector
+  result : Expr - vector
       Approximated solution.
   """
+  #A = A = jacobi_init(DIM)
+  #b = A[:, DIM-1:].reshape((DIM, ))
 
-    DIM = base * (blob_ctx.get().num_workers)
+  util.Assert.eq(A.shape[0], b.shape[0])
 
-    A = A = self.jacobi_init(DIM)
-    b = A[:, DIM-1:].reshape((DIM, ))
-    #b = expr.randn(DIM)
+  x = expr.zeros((A.shape[0],))
 
-    x = expr.zeros((DIM,))
+  D = expr.diag(A)
+  R = A - expr.diagflat(D)
 
-    D = expr.diag(A)
-    R = A - expr.diagflat(D)
+  for i in xrange(_iter):
+    x = (b - expr.dot(R, x)) / D
 
-    start = time.time()
-
-    for i in xrange(100):
-      x = (b - expr.dot(R, x)) / D
-
-    result = x.glom()
-
-    cost = time.time() - start
-
-    util.log_info('cost =', cost)
-    return result
+  return x
