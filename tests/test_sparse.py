@@ -48,6 +48,5 @@ class TestReduce(test_common.ClusterTest):
     print 'test multiply'
     z = expr.dot(x, x)
     print z.glom().todense()
-
 if __name__ == '__main__':
   unittest.main()

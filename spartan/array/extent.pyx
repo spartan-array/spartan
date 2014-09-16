@@ -255,7 +255,6 @@ def find_overlapping(extents, region):
   :param region: `Extent` to match.
   '''
   for ex in extents:
-    util.log_debug("ex = %s region = %s\n", ex, region)
     overlap = intersection(ex, region)
     if overlap is not None:
       yield (ex, overlap)
