@@ -489,10 +489,11 @@ class AutomaticTiling(OptimizePass):
       
   def add_edge(self, edge_from, edge_to, edge_cost=0):
     #util.log_warn('add_edge:%d %d cost:%d', edge_from, edge_to, edge_cost)
+    if (edge_from, edge_to) not in self.edges:
+      self.nodes[edge_from].parents.append(edge_to)
+      self.nodes[edge_to].children.append(edge_from)
     self.edges[(edge_from, edge_to)] = edge_cost
-    self.nodes[edge_from].parents.append(edge_to)
-    self.nodes[edge_to].children.append(edge_from)
-      
+  
   def remove_edge(self, edge_from, edge_to):
     del self.edges[(edge_from, edge_to)]
     self.nodes[edge_from].parents.remove(edge_to)
