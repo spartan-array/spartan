@@ -382,7 +382,7 @@ class Expr(Node):
     from .reshape import ReshapeExpr
 
     if isinstance(idx, (int, tuple, slice)):
-      if newaxis in idx:
+      if not isinstance(idx, slice) and  newaxis in idx:
         #The idea is to replace the original slice idx with shapes and dimensions if needed
         #Example:
         #  a = expr.arange((10, 10))
