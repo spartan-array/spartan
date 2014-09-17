@@ -382,7 +382,7 @@ class Expr(Node):
     from .reshape import ReshapeExpr
 
     if isinstance(idx, (int, tuple, slice)):
-      if not isinstance(idx, slice) and  newaxis in idx:
+      if not isinstance(idx, slice) and not isinstance(idx, int) and newaxis in idx:
         #The idea is to replace the original slice idx with shapes and dimensions if needed
         #Example:
         #  a = expr.arange((10, 10))
@@ -439,6 +439,10 @@ class Expr(Node):
   @property
   def size(self):
     return np.prod(self.shape)
+
+  @property
+  def newaxis(self):
+    return newaxis
 
   def force(self):
     'Evaluate this expression (and all dependencies).'
