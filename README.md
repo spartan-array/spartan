@@ -18,6 +18,9 @@ Check out the
 
 #### From source
 
+    # For numpy and scipy, we suggest you use binary install to
+    # get better performance.
+    apt-get install python-numpy python-scipy libzmq3-dev
     pip install --user dsltools
     pip install --user pyzmq
     pip install --user cython
