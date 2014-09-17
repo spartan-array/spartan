@@ -20,6 +20,11 @@ from traits.api import Any, Instance, Int, PythonValue
 
 FLAGS.add(BoolFlag('opt_expression_cache', True, 'Enable expression caching.'))
 
+class newaxis(object):
+  '''
+  Work as flags to invoke reshape rather than slice expr
+  '''
+
 class NotShapeable(Exception):
   '''
   Thrown when the shape for an expression cannot be computed without 
@@ -374,9 +379,31 @@ class Expr(Node):
   def __getitem__(self, idx):
     from .slice import SliceExpr
     from .filter import FilterExpr
+    from .reshape import ReshapeExpr
 
     if isinstance(idx, (int, tuple, slice)):
-      return SliceExpr(src=self, idx=idx)
+      util.log_info('idx: %s', idx)
+
+      if newaxis in idx:
+        new_shape = tuple([slice(x, None, None) if isinstance(x, int) else x for x in idx if not x == newaxis])
+        ret = SliceExpr(src=self, idx = new_shape)
+
+        
+        #Re-organize shape of new array.
+        shape_ptr = 0
+        idx_ptr = 0
+        new_shape = list()
+        while shape_ptr < len(ret.shape):
+          if idx_ptr < len(idx) and idx[idx_ptr] == newaxis:
+            new_shape.append(1)
+          else:
+            new_shape.append(ret.shape[shape_ptr])
+            shape_ptr += 1
+          idx_ptr += 1
+
+	return ReshapeExpr(array=ret, new_shape=new_shape)
+      else:
+        return SliceExpr(src=self, idx=idx)
     else:
       return FilterExpr(src=self, idx=idx)
 
