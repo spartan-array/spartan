@@ -440,10 +440,6 @@ class Expr(Node):
   def size(self):
     return np.prod(self.shape)
 
-  @property
-  def newaxis(self):
-    return newaxis
-
   def force(self):
     'Evaluate this expression (and all dependencies).'
     return self.evaluate()
