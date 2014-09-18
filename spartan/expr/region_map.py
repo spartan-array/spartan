@@ -40,7 +40,7 @@ def _region_mapper(tile, ex, region, user_fn, fn_kw=None):
   return tile
 
 
-def region_map(array, region, fn, fn_kw=None):
+def region_map(array, region, fn, fn_kw={}):
   '''
   Map ``fn`` over a subset of ``array``.
   This returns a new array of the same shape as the input.
