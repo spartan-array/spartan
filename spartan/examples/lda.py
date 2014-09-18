@@ -106,38 +106,28 @@ def learn_topics(terms_docs_matrix, k_topics, alpha=0.1, eta=0.1, max_iter=10, m
     max_iter(int):the max iterations to train LDA topic model.
     max_iter_per_doc: the max iterations to train each document.
   '''
-  topic_term_counts = expr.rand(k_topics, terms_docs_matrix.shape[0])
-  
-  cost_topic_term_counts = k_topics * terms_docs_matrix.shape[0]
-  cost_terms_docs_matrix = np.prod(terms_docs_matrix.shape)
+  num_terms = terms_docs_matrix.shape[0]
+  num_docs = terms_docs_matrix.shape[1]
+
+  topic_term_counts = expr.rand(k_topics, num_terms)
   for i in range(max_iter):
     topic_term_counts = expr.shuffle(expr.retile(terms_docs_matrix, tile_hint=util.calc_tile_hint(terms_docs_matrix, axis=1)), 
                                      _lda_mapper, 
-                                     target=expr.ndarray((k_topics, terms_docs_matrix.shape[0]), dtype=np.float64, reduce_fn=np.add), 
-                                     kw={'k_topics': k_topics, 'alpha': alpha, 'eta':eta, 
-                                         'max_iter_per_doc': max_iter_per_doc, 
-                                         'topic_term_counts': topic_term_counts},
-                                     cost_hint={hash(topic_term_counts):{'00': cost_terms_docs_matrix + cost_topic_term_counts, 
-                                                                         '01': cost_topic_term_counts,
-                                                                         '10': cost_terms_docs_matrix + cost_topic_term_counts, 
-                                                                         '11': cost_topic_term_counts}}).optimized()
+                                     target=expr.ndarray((k_topics, num_terms), dtype=np.float64, reduce_fn=np.add), 
+                                     kw={'k_topics': k_topics, 'alpha': alpha, 'eta':eta, 'max_iter_per_doc': max_iter_per_doc, 
+                                         'topic_term_counts': topic_term_counts}).optimized()
   # calculate the doc-topic inference
   doc_topics = expr.shuffle(expr.retile(terms_docs_matrix, tile_hint=util.calc_tile_hint(terms_docs_matrix, axis=1)), 
                             _lda_doc_topic_mapper, 
-                            kw={'k_topics': k_topics, 'alpha': alpha, 'eta':eta, 
-                                'max_iter_per_doc': max_iter_per_doc, 
+                            kw={'k_topics': k_topics, 'alpha': alpha, 'eta':eta, 'max_iter_per_doc': max_iter_per_doc, 
                                 'topic_term_counts': topic_term_counts}, 
-                            shape_hint=(terms_docs_matrix.shape[1], k_topics),
-                            cost_hint={hash(topic_term_counts):{'00': cost_terms_docs_matrix + cost_topic_term_counts, 
-                                                                '01': cost_topic_term_counts,
-                                                                '10': cost_terms_docs_matrix + cost_topic_term_counts, 
-                                                                '11': cost_topic_term_counts}}).optimized()
+                            shape_hint=(num_docs, k_topics)).optimized()
   
   # normalize the topic-term distribution  
   norm_val = expr.reduce(topic_term_counts, axis=1, 
                          dtype_fn=lambda input: input.dtype, 
                          local_reduce_fn=lambda ex, data, axis:np.abs(data).sum(axis), 
                          accumulate_fn=np.add)
-  topic_term_counts = topic_term_counts / norm_val.reshape((topic_term_counts.shape[0], 1))
+  topic_term_counts = topic_term_counts / norm_val.reshape((k_topics, 1))
   topic_term_counts = topic_term_counts.optimized()
   return doc_topics, topic_term_counts
