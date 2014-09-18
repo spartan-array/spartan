@@ -2,7 +2,7 @@
 Functions for managing a cluster of machines.
 
 Spartan currently supports running workers as either threads in the
-current process, or by using ssh to connect to one or more 
+current process, or by using ssh to connect to one or more
 machines.
 
 A Spartan "worker" is a single process; more than one worker can be
@@ -63,9 +63,9 @@ FLAGS.add(IntFlag('worker_failed_heartbeat_threshold', default=10, help='the max
 def start_remote_worker(worker, st, ed):
   '''
   Start processes on a worker machine.
-  
-  The machine will launch worker processes ``st`` through ``ed``. 
-  
+
+  The machine will launch worker processes ``st`` through ``ed``.
+
   :param worker: hostname to connect to.
   :param st: First process index to start.
   :param ed: Last process to start.
@@ -83,9 +83,9 @@ def start_remote_worker(worker, st, ed):
   util.log_info('Starting worker %d:%d on host %s', st, ed, worker)
   if FLAGS.oprofile:
     os.system('mkdir operf.%s' % worker)
-    
+
   ssh_args = ['ssh', '-oForwardX11=no', worker ]
- 
+
   args = ['cd %s && ' % os.path.abspath(os.path.curdir)]
 
   if FLAGS.xterm:
@@ -106,15 +106,15 @@ def start_remote_worker(worker, st, ed):
   for (name, value) in FLAGS:
     if name in ['worker_list', 'print_options']: continue
     args += [repr(value)]
- 
-  #print >>sys.stderr, args 
+
+  #print >>sys.stderr, args
   util.log_debug('Running worker %s', ' '.join(args))
   time.sleep(0.1)
   if worker != 'localhost':
     p = subprocess.Popen(ssh_args + args, executable='ssh')
   else:
     p = subprocess.Popen(' '.join(args), shell=True, stdin=subprocess.PIPE)
-    
+
   return p
 
 def start_cluster(num_workers, use_cluster_workers):
@@ -158,6 +158,7 @@ def start_cluster(num_workers, use_cluster_workers):
   master.wait_for_initialization()
 
   # Kill the now unnecessary ssh processes.
-  for process in ssh_processes:
-    process.kill()
+  # Fegin : if we kill these processes, we can't get log from workers.
+  #for process in ssh_processes:
+    #process.kill()
   return master
