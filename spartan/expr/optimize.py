@@ -83,7 +83,7 @@ class OptimizePass(object):
     #assert not op in self.visited, 'Infinite recursion during optimization %s' % op
     #self.visited.add(op)
 
-    util.log_info('VISIT %s: %s', op.typename(), hash(op))
+    util.log_debug('VISIT %s: %s', op.typename(), hash(op))
     opt_op = None
     if hasattr(self, 'visit_default'):
       opt_op = self.visit_default(op)
@@ -489,10 +489,11 @@ class AutomaticTiling(OptimizePass):
       
   def add_edge(self, edge_from, edge_to, edge_cost=0):
     #util.log_warn('add_edge:%d %d cost:%d', edge_from, edge_to, edge_cost)
+    if (edge_from, edge_to) not in self.edges:
+      self.nodes[edge_from].parents.append(edge_to)
+      self.nodes[edge_to].children.append(edge_from)
     self.edges[(edge_from, edge_to)] = edge_cost
-    self.nodes[edge_from].parents.append(edge_to)
-    self.nodes[edge_to].children.append(edge_from)
-      
+  
   def remove_edge(self, edge_from, edge_to):
     del self.edges[(edge_from, edge_to)]
     self.nodes[edge_from].parents.remove(edge_to)
@@ -533,7 +534,7 @@ class AutomaticTiling(OptimizePass):
     
     child_ids = self.visit_children([largest])      
     other_child_ids = self.visit_children(expr.children.vals, largest)
-    
+    kw_ids = self.visit_children(expr.op.kw['fn_kw'].itervalues()) if 'fn_kw' in expr.op.kw else []
     # one input map, reuse child expr
     if len(other_child_ids) == 0: 
       for child_id in child_ids: self.nodes[child_id].expr.append(expr)
@@ -555,7 +556,10 @@ class AutomaticTiling(OptimizePass):
       for child_id in other_child_ids:
         child = self.nodes[child_id]
         e_cost = reduce(operator.mul, child.expr[0].shape, 1) if child.tiling != tiling_type else 0
-        self.add_edge(child_id, self.cur_node_id, e_cost)       
+        self.add_edge(child_id, self.cur_node_id, e_cost)
+
+      for child_id in kw_ids:
+        self.add_edge(child_id, self.cur_node_id, reduce(operator.mul, self.nodes[child_id].expr[0].shape, 1))
       self.cur_node_id += 1 
         
     return expr_node_ids
@@ -773,6 +777,11 @@ class AutomaticTiling(OptimizePass):
         self.visited_nodes.add(parent_id)
     return edges
   
+  def tile_expr(self, expr, tiling):
+    if isinstance(expr, (NdArrayExpr, ReduceExpr, DotExpr)) and len(expr.shape) > 0:
+      expr.tile_hint = list(expr.shape)
+      expr.tile_hint[tiling] = int(math.ceil(float(expr.tile_hint[tiling]) / FLAGS.num_workers))
+ 
   def calc_tiling(self, expr):
     # add T node for graph
     if self.cur_node_id - 1 in self.split_nodes:
@@ -788,33 +797,46 @@ class AutomaticTiling(OptimizePass):
     # give expr the best tiling hint
     for node_id in nodes:
       node = self.nodes[node_id]
-      #print node.expr.typename(), 'tiling:', node.tiling
-      if node.tiling >= 0:
-        for cur_expr in node.expr:
-          _tiled_exprlist[hash(cur_expr)] = node.tiling
-          if isinstance(cur_expr, (NdArrayExpr, ReduceExpr, DotExpr)) and len(cur_expr.shape) > 0:
-            cur_expr.tile_hint = list(cur_expr.shape)
-            cur_expr.tile_hint[node.tiling] = int(math.ceil(float(cur_expr.tile_hint[node.tiling]) / FLAGS.num_workers))
+      for cur_expr in node.expr:
+        _tiled_exprlist[hash(cur_expr)] = node.tiling
+        self.tile_expr(cur_expr, node.tiling)
       
     self.inited = False
     return expr
+  
+  def tile_cached_expr(self, expr):
+    if not isinstance(expr, Expr) or isinstance(expr, (Val, AsArray)): return
     
+    self.tile_expr(expr, _tiled_exprlist[hash(expr)])
+    
+    if hasattr(expr, 'array'): self.tile_cached_expr(expr.array)
+    if hasattr(expr, 'src'): self.tile_cached_expr(expr.src)
+    if hasattr(expr, 'target'): self.tile_cached_expr(expr.target)
+    if isinstance(expr, DotExpr):
+      self.tile_cached_expr(expr.matrix_a)
+      self.tile_cached_expr(expr.matrix_b)
+
+    if hasattr(expr, 'children'): 
+      for child in expr.children.vals: 
+        self.tile_cached_expr(child)
+    if hasattr(expr, 'fn_kw'):
+      for child in expr.fn_kw.itervalues():
+        self.tile_cached_expr(child)
+    if hasattr(expr, 'op') and 'fn_kw' in expr.op.kw:
+      for child in expr.op.kw['fn_kw'].itervalues():
+        self.tile_cached_expr(child)
+
   def visit_default(self, expr):
     if not self.inited: self.init(expr)
     
-    if hash(expr) in _tiled_exprlist or isinstance(expr, DistArray) or \
-       isinstance(expr, (Val, AsArray)) and isinstance(expr.val, DistArray):
-      # already partitioned array
-      if hash(expr) in _tiled_exprlist:
-        tiling = _tiled_exprlist[hash(expr)]
-      else:
-        array = expr if isinstance(expr, DistArray) else expr.val
-        tiling = array.tile_shape()[0] == array.shape[0]
+    if hash(expr) in _tiled_exprlist:
+      self.tile_cached_expr(expr)
+      tiling = _tiled_exprlist[hash(expr)]
       self.nodes[self.cur_node_id] = self.node_type([expr], tiling, [], [])
       expr_node_ids = [self.cur_node_id]
       self.add_edge(0, self.cur_node_id, 0)
       self.cur_node_id += 1
-        
+ 
     elif hash(expr) in self.expr_to_nodes:
       # cached expr
       expr_node_ids = self.expr_to_nodes[hash(expr)]
@@ -822,6 +844,15 @@ class AutomaticTiling(OptimizePass):
         node = self.nodes[node_id]
         node.expr.append(expr)
 
+    elif isinstance(expr, DistArray) or isinstance(expr, (Val, AsArray)) and isinstance(expr.val, DistArray):
+      # already partitioned array
+      array = expr if isinstance(expr, DistArray) else expr.val
+      tiling = array.tile_shape()[0] == array.shape[0]
+      self.nodes[self.cur_node_id] = self.node_type([expr], tiling, [], [])
+      expr_node_ids = [self.cur_node_id]
+      self.add_edge(0, self.cur_node_id, 0)
+      self.cur_node_id += 1
+ 
     elif isinstance(expr, CollectionExpr):
       # DictExpr, ListExpr, TupleExpr
       children = expr.itervalues() if expr.typename() == 'DictExpr' else expr.vals

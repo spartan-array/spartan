@@ -7,27 +7,30 @@ const int nMax = 5000;
 const int INF = 1000000000;
 
 struct Edge {
-	int u, v, cost, next;
+    int u, v, next;
+    long cost;
 } edge[eMax];
 
 std::unordered_map<int, int> split_nodes;
-int mincost, e, head[nMax], dis[nMax];
+int e, head[nMax];
+long mincost, dis[nMax];
 bool vis[nMax];
 
-void add_edge(int u, int v, int cost) {
+void add_edge(int u, int v, long cost) {
 	edge[e].u = u; edge[e].v = v; edge[e].cost = cost;
     edge[e].next = head[u]; head[u] = e++;
 }
 
-void print_choices(int s, int t, bool* vis, int mincost) {
-	printf("%d choose (cost=%d):", s, mincost);
+void print_choices(int s, int t, bool* vis, long mincost) {
+	printf("%d choose (cost=%ld):", s, mincost);
 	for (int u = 0; u <= t; u++)
 		if (vis[u]) printf("%d ", u);
 	printf("\n");
 }
 
-int find_mincost_tiling(int s, int t, bool* vis) {
-	int mincost = 0, i, j, v, sp_v, size;
+long find_mincost_tiling(int s, int t, bool* vis) {
+	long mincost = 0;
+    int i, j, v, sp_v, size;
 	std::list<int> child_edges;
 	for (i = head[s]; i != -1; i = edge[i].next) child_edges.push_back(i);
 	size = child_edges.size();
@@ -60,8 +63,8 @@ int find_mincost_tiling(int s, int t, bool* vis) {
 					memcpy(vis2, vis, t * sizeof(bool));
 					dis[v] = find_mincost_tiling(v, t, vis1);
 					dis[sp_v] = find_mincost_tiling(sp_v, t, vis2);
-					int cmp = dis[v] + edge[i].cost - dis[sp_v] - edge[j].cost;
-					if (cmp == 0 && size > 0) {
+					long cmp = dis[v] + edge[i].cost - dis[sp_v] - edge[j].cost;
+                    if (cmp == 0 && size > 0) {
 						child_edges.push_back(i);
 						child_edges.push_back(j);
 					} else if (cmp < 0) {
@@ -91,7 +94,8 @@ int find_mincost_tiling(int s, int t, bool* vis) {
 static PyObject* mincost_tiling(PyObject *self, PyObject *args) {
 	PyObject *list, *ans;
 	Py_ssize_t pos;
-	int t, u, v, cost;
+	int t, u, v;
+    long cost;
 
 	// init t node
 	t = (int)PyInt_AsLong(PyTuple_GetItem(args, 0));
@@ -101,9 +105,9 @@ static PyObject* mincost_tiling(PyObject *self, PyObject *args) {
 	memset(head, -1, sizeof(head));
 	list = PyTuple_GetItem(args, 1);
 	for (pos = 0; pos < PyList_Size(list); pos++) {
-		PyArg_ParseTuple(PyList_GetItem(list, pos), "iii", &u, &v, &cost);
+		PyArg_ParseTuple(PyList_GetItem(list, pos), "iik", &u, &v, &cost);
 		add_edge(u, v, cost);
-		//printf("add edge:(%d, %d, cost=%d)\n", u, v, cost);
+		//printf("add edge:(%d, %d, cost=%ld)\n", u, v, cost);
 	}
 
 	// init splited nodes
@@ -123,7 +127,7 @@ static PyObject* mincost_tiling(PyObject *self, PyObject *args) {
 	for (u = 0; u < t; u++)
 		if (vis[u]) PySet_Add(ans, Py_BuildValue("i", u));
 
-	//printf("mincost:%d\n", mincost);
+	//printf("mincost:%ld\n", mincost);
 	return ans;
 }
 
