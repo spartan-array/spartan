@@ -31,6 +31,11 @@ def good_tile_shape(shape, num_shards=-1):
     list: tile_shape for the array
   '''
   if num_shards != -1:
+    if len(shape) > 1 and shape[1] != 1:
+      return util.calc_tile_hint(shape, axis=1)
+    return util.calc_tile_hint(shape, axis=0)
+  
+  if num_shards != -1:
     tile_size = np.prod(shape) / num_shards
   else:
     tile_size = DEFAULT_TILE_SIZE
