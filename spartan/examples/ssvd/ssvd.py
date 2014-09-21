@@ -25,7 +25,9 @@ def svd(A, k=None):
   """
   if k is None: k = A.shape[1]
 
-  Omega = expr.randn(A.shape[1], k)
+  Omega = np.random.randn(A.shape[1], k)
+  Omega = expr.from_numpy(Omega)
+  #Omega = expr.randn(A.shape[1], k)
 
   Y = expr.dot(A, Omega)
   

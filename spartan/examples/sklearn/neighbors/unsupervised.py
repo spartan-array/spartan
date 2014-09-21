@@ -77,11 +77,8 @@ class NearestNeighbors(object):
     self.algorithm = algorithm
 
   def fit(self, X):
-    ctx = blob_ctx.get()
     if isinstance(X, np.ndarray):
-      X = expr.from_numpy(X, tile_hint=(X.shape[0] / ctx.num_workers, X.shape[1]))
-    if isinstance(X, expr.Expr):
-      X = X.force()
+      X = expr.from_numpy(X)
 
     self.X = X
     return self
@@ -115,18 +112,14 @@ class NearestNeighbors(object):
     if isinstance(X, np.ndarray):
       X = expr.from_numpy(X)
 
-    if isinstance(X, expr.Expr):
-      X = X.force()
-
     if self.algorithm in ('auto', 'brute'):
       X_broadcast = expr.reshape(X, (X.shape[0], 1, X.shape[1]))
       fit_X_broadcast = expr.reshape(self.X, (1, self.X.shape[0], self.X.shape[1]))
       distances = expr.sum((X_broadcast - fit_X_broadcast) ** 2, axis=2)
-      distances.force()
       neigh_ind = expr.argsort(distances, axis=1)
-      neigh_ind = neigh_ind[:, :n_neighbors].glom()
+      neigh_ind = neigh_ind[:, :n_neighbors].optimized().glom()
       neigh_dist = expr.sort(distances, axis=1)
-      neigh_dist = expr.sqrt(neigh_dist[:, :n_neighbors]).glom()
+      neigh_dist = expr.sqrt(neigh_dist[:, :n_neighbors]).optimized().glom()
       return neigh_dist, neigh_ind
     else:
       results = self.X.foreach_tile(mapper_fn=_knn_mapper,

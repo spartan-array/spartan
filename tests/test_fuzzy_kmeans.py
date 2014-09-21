@@ -6,13 +6,12 @@ from datetime import datetime
 
 def benchmark_fuzzy_kmeans(ctx, timer):
   #N_PTS = 40000 * ctx.num_workers
-  N_PTS = 20000 * 64
-  N_DIM = 2
+  N_PTS = 1000 * 256
+  N_DIM = 512
   ITER = 5
   N_CENTERS = 10
   
-  pts = expr.rand(N_PTS, N_DIM,
-                  tile_hint=(N_PTS / ctx.num_workers, N_DIM)).force()
+  pts = expr.rand(N_PTS, N_DIM)
 
   t1 = datetime.now()
   cluster_result = fuzzy_kmeans(pts, k=N_CENTERS, num_iter=ITER).force()

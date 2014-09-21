@@ -58,7 +58,7 @@ FLAGS.add(BoolFlag(
   help='When running locally, use threads instead of forking. (slow, for debugging)',
   default=True))
 FLAGS.add(IntFlag('heartbeat_interval', default=3, help='Heartbeat Interval in each worker'))
-FLAGS.add(IntFlag('worker_failed_heartbeat_threshold', default=10, help='the max number of heartbeat that a worker can delay'))
+FLAGS.add(IntFlag('worker_failed_heartbeat_threshold', default=10000, help='the max number of heartbeat that a worker can delay'))
 
 def start_remote_worker(worker, st, ed):
   '''

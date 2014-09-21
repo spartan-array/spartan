@@ -73,15 +73,15 @@ class KMeans(object):
     X : spartan matrix, shape=(n_samples, n_features). It should be tiled by rows.
     centers : numpy.ndarray. The initial centers. If None, it will be randomly generated.
     """
-    X = expr.force(X)
     num_dim = X.shape[1]
-    labels = expr.zeros((X.shape[0], 1), dtype=np.int, tile_hint=X.tile_shape())
+    num_points = X.shape[0]
+
+    labels = expr.zeros((num_points, 1), dtype=np.int)
 
     if centers is None:
-      centers = np.random.rand(self.n_clusters, num_dim)
+      centers = expr.from_numpy(np.random.rand(self.n_clusters, num_dim))
 
     for i in range(self.n_iter):
-      centers = expr.as_array(centers)
       X_broadcast = expr.reshape(X, (X.shape[0], 1, X.shape[1]))
       centers_broadcast = expr.reshape(centers, (1, centers.shape[0], centers.shape[1]))
       distances = expr.sum(expr.square(X_broadcast - centers_broadcast), axis=2)
@@ -94,8 +94,8 @@ class KMeans(object):
                                                               matches.shape[1], 1)),
                          axis=0)
 
-      counts = counts.glom()
-      centers = centers.glom()
+      counts = counts.optimized().glom()
+      centers = centers.optimized().glom()
 
       # If any centroids don't have any points assigined to them.
       zcount_indices = (counts == 0).reshape(self.n_clusters)
@@ -110,8 +110,8 @@ class KMeans(object):
         centers[zcount_indices, :] = np.random.randn(n_points, num_dim)
 
       centers = centers / counts.reshape(centers.shape[0], 1)
-
-    return centers, labels
+      centers = expr.from_numpy(centers)
+    return centers, labels	
 
     '''
     for i in range(self.n_iter):

@@ -22,9 +22,9 @@ class TestKmeans(test_common.ClusterTest):
 
 def benchmark_kmeans(ctx, timer):
   print "#worker:", ctx.num_workers
-  N_PTS = 100 * 64
+  N_PTS = 1000 * 256
   N_CENTERS = 10
-  N_DIM = 5
+  N_DIM = 512
   ITER = 1
   pts = expr.rand(N_PTS, N_DIM)
   k = KMeans(N_CENTERS, ITER)

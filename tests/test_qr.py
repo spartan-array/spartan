@@ -23,9 +23,11 @@ class TestQR(test_common.ClusterTest):
     assert np.allclose(np.absolute(R1), np.absolute(R2))
 
 def benchmark_qr(ctx, timer):
-  M = 2400
-  N = 640
-  Y = expr.randn(M, N)
+  M = 1280
+  N = 1280
+  Y = np.random.randn(M, N)
+  Y = expr.from_numpy(Y)
+  #Y = expr.randn(M, N)
 
   t1 = datetime.now()
   Q, R = qr(Y)
