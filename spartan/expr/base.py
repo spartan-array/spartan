@@ -342,12 +342,21 @@ class Expr(Node):
   def __gt__(self, other):
     return _map(self, other, fn=np.greater)
 
+  def __and__(self, other):
+    return _map(self, other, fn=np.logical_and)
+
+  def __or__(self, other):
+    return _map(self, other, fn=np.logical_or)
+
+  def __xor(self, other):
+    return _map(self, other, fn=np.logical_xor)
+
   def __pow__(self, other):
     return _map(self, other, fn=np.power)
 
   def __neg__(self):
     return _map(self, fn=np.negative)
-  
+
   def __rsub__(self, other):
     return _map(other, self, fn=np.subtract)
 
