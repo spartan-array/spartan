@@ -22,7 +22,7 @@ FLAGS.add(BoolFlag('opt_expression_cache', True, 'Enable expression caching.'))
 
 class newaxis(object):
   '''
-  Work as flags to invoke reshape rather than slice expr
+  The newaxis object indicates that users wish to add a new dimension
   '''
 
 class NotShapeable(Exception):
@@ -391,14 +391,14 @@ class Expr(Node):
             del_dim.append(x)
 
       if isinstance(idx, int) or is_del_dim or (isinstance(idx, tuple) and (newaxis in idx)):
-        #It means dimension here needs an update
+	#The shape has to be updated
         if isinstance(idx, tuple):
           new_shape = tuple([slice(x, None, None) if x == -1 else x for x in idx if not x == newaxis])
         else:
           new_shape = idx
         ret = SliceExpr(src=self, idx = new_shape)
 
-        new_shape = list()
+        new_shape = []
         if isinstance(idx, tuple):
           shape_ptr = idx_ptr = 0
           while shape_ptr < len(ret.shape) or idx_ptr < len(idx):
@@ -421,36 +421,6 @@ class Expr(Node):
         #This means it's just a simple slice op
         return SliceExpr(src=self, idx=idx)
       
-      """
-      if not isinstance(idx, slice) and not isinstance(idx, int) and newaxis in idx:
-        #The idea is to replace the original slice idx with shapes and dimensions if needed
-        #Example:
-        #  a = expr.arange((10, 10))
-        #  a.shape = (10, 10)
-        #  a[expr.newaxis, 2:7, expr.newaxis, expr.newaxis, 4:8, expr.newaxis]
-        #  >>> slice tuple passed in will be (class newaxis, slice(2, 7, None), class newaxis, slice(4, 8, None), class newaxis)
-        #  First step: slice original (10, 10) with (slice(2, 7, None), slice(4, 8, None))
-        #  Second step:  Re-organize shape attr
-        #  (class newaxis, slice(2, 7, None), class newaxis, slice(4, 8, None), class newaxis)
-        #  >>> (1, 5, 1, 4, 1)
-
-        new_shape = tuple([x for x in idx if not x == newaxis])
-        ret = SliceExpr(src=self, idx = new_shape)
-        
-        #Re-organize shape of new array.
-        shape_ptr = idx_ptr = 0
-        new_shape = list()
-        while shape_ptr < len(ret.shape) or idx_ptr < len(idx):
-          if idx_ptr < len(idx) and idx[idx_ptr] == newaxis:
-            new_shape.append(1)
-          else:
-            new_shape.append(ret.shape[shape_ptr])
-            shape_ptr += 1
-          idx_ptr += 1
-        return ReshapeExpr(array=ret, new_shape=new_shape)
-      else:
-        return SliceExpr(src=self, idx=idx)
-      """
     else:
       return FilterExpr(src=self, idx=idx)
 
