@@ -20,6 +20,11 @@ from traits.api import Any, Instance, Int, PythonValue
 
 FLAGS.add(BoolFlag('opt_expression_cache', True, 'Enable expression caching.'))
 
+class newaxis(object):
+  '''
+  The newaxis object indicates that users wish to add a new dimension
+  '''
+
 class NotShapeable(Exception):
   '''
   Thrown when the shape for an expression cannot be computed without 
@@ -383,9 +388,48 @@ class Expr(Node):
   def __getitem__(self, idx):
     from .slice import SliceExpr
     from .filter import FilterExpr
-
+    from .reshape import ReshapeExpr
+    
     if isinstance(idx, (int, tuple, slice)):
-      return SliceExpr(src=self, idx=idx)
+      is_del_dim = False
+      del_dim = list()
+      if isinstance(idx, tuple):
+        for x in xrange(len(idx)):
+          if isinstance(idx[x], int):
+            is_del_dim = True
+            del_dim.append(x)
+
+      if isinstance(idx, int) or is_del_dim or (isinstance(idx, tuple) and (newaxis in idx)):
+	#The shape has to be updated
+        if isinstance(idx, tuple):
+          new_shape = tuple([slice(x, None, None) if x == -1 else x for x in idx if not x == newaxis])
+        else:
+          new_shape = idx
+        ret = SliceExpr(src=self, idx = new_shape)
+
+        new_shape = []
+        if isinstance(idx, tuple):
+          shape_ptr = idx_ptr = 0
+          while shape_ptr < len(ret.shape) or idx_ptr < len(idx):
+            if idx_ptr < len(idx) and idx[idx_ptr] == newaxis:
+              new_shape.append(1)
+            else:
+              new_shape.append(ret.shape[shape_ptr])
+              shape_ptr += 1
+            idx_ptr += 1
+        else:
+          new_shape = list(ret.shape)
+          del_dim.append(0)
+
+        #Delete dimension if needed
+        if is_del_dim:
+          for i in del_dim:
+            new_shape.pop(i)
+        return ReshapeExpr(array=ret, new_shape=new_shape)
+      else:
+        #This means it's just a simple slice op
+        return SliceExpr(src=self, idx=idx)
+      
     else:
       return FilterExpr(src=self, idx=idx)
 

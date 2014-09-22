@@ -23,7 +23,7 @@ live in their own modules:
 Optimizations on DAGs live in `spartan.expr.optimize`.
 """
 
-from base import Expr, evaluate, optimized_dag, glom, eager, lazify, as_array, force, NotShapeable
+from base import Expr, evaluate, optimized_dag, glom, eager, lazify, as_array, force, NotShapeable, newaxis
 from .builtins import *
 from .assign import assign
 from .map import map
