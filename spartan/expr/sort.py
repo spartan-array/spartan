@@ -108,8 +108,28 @@ def sort(array, axis=-1, sample_rate=0.1):
 
 
 # TODO: Support partition with axis
+def _partition_mapper(array, ex, kth=None, axis=None):
+  axis_ex = extent.change_partition_axis(ex, axis)
+  assert axis_ex is not None, "Spartan doesn't support argpartition for block partition"
+  tile = array.fetch(axis_ex)
+  yield axis_ex, np.argpartition(tile, kth, axis=axis)
+
 def partition(array, kth, axis=-1):
-  raise NotImplementedError
+  """
+  Return a partitioned copy of an array.
+
+  Args: array:	DistArray or Expr
+		  array to be sorted
+  	kth:	int or list of ints
+		  Index to partition by
+	axis:	int or None, optional
+		  Axis along which to sort.
+  
+  RETURN: ndarray expr
+  """
+  assert axis is not None, "Spartan doesn't support partition when axis == None now"
+  return shuffle(array, _partition_mapper, kw={'axis': axis},
+		 shape_hint=array.shape)
 
 
 def _argsort_mapper(array, ex, axis=None):
@@ -150,5 +170,5 @@ def argpartition(array, kth, axis=-1):
     axis(int): axis
   '''
   assert axis is not None, "Spartan doesn't support argpartition when axis == None now"
-  return shuffle(array, _argsort_mapper, kw={'axis': axis},
+  return shuffle(array, _argpartition_mapper, kw={'axis': axis},
                  shape_hint=array.shape)
