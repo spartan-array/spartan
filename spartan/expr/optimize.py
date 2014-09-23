@@ -798,7 +798,7 @@ class AutomaticTiling(OptimizePass):
     # give expr the best tiling hint
     for node_id in nodes:
       node = self.nodes[node_id]
-      if node_id == 1: print node.expr[0]
+      #if node_id == 1: print node.expr[0]
       for cur_expr in node.expr:
         _tiled_exprlist[hash(cur_expr)] = node.tiling
         self.tile_expr(cur_expr, node.tiling)
