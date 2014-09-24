@@ -471,7 +471,7 @@ def change_partition_axis(ex, axis):
   if len(old_axis) > 1:
     # The meaning of this API for block partition is unclear.
     util.log_warn(str((old_axis, ex.shape, ex.array_shape)))
-    return None
+    raise NotImplementedError
 
   if len(old_axis) == 0 or old_axis[0] != axis:
     return ex

@@ -72,10 +72,9 @@ def _fetch_sort_mapper(array, ex, partition_counts):
 
 def _sort_mapper(array, ex, axis=None):
   axis_ex = extent.change_partition_axis(ex, axis)
-  assert axis_ex is not None, "Spartan doesn't support sort for block partition"
-  tile = array.fetch(axis_ex)
-  yield axis_ex, np.sort(tile, axis=axis)
-
+  if axis_ex is not None:
+    tile = array.fetch(axis_ex)
+    yield axis_ex, np.sort(tile, axis=axis)
 
 def sort(array, axis=-1, sample_rate=0.1):
   '''
@@ -110,9 +109,9 @@ def sort(array, axis=-1, sample_rate=0.1):
 # TODO: Support partition with axis
 def _partition_mapper(array, ex, kth=None, axis=None):
   axis_ex = extent.change_partition_axis(ex, axis)
-  assert axis_ex is not None, "Spartan doesn't support argpartition for block partition"
-  tile = array.fetch(axis_ex)
-  yield axis_ex, np.argpartition(tile, kth, axis=axis)
+  if axis_ex is not None:
+    tile = array.fetch(axis_ex)
+    yield axis_ex, np.partition(tile, kth, axis=axis)
 
 def partition(array, kth, axis=-1):
   """
@@ -134,9 +133,9 @@ def partition(array, kth, axis=-1):
 
 def _argsort_mapper(array, ex, axis=None):
   axis_ex = extent.change_partition_axis(ex, axis)
-  assert axis_ex is not None, "Spartan doesn't support argsort for block partition"
-  tile = array.fetch(axis_ex)
-  yield axis_ex, np.argsort(tile, axis=axis)
+  if axis_ex is not None:
+    tile = array.fetch(axis_ex)
+    yield axis_ex, np.argsort(tile, axis=axis)
 
 
 def argsort(array, axis=-1):
@@ -154,9 +153,9 @@ def argsort(array, axis=-1):
 
 def _argpartition_mapper(array, ex, kth=None, axis=None):
   axis_ex = extent.change_partition_axis(ex, axis)
-  assert axis_ex is not None, "Spartan doesn't support argpartition for block partition"
-  tile = array.fetch(axis_ex)
-  yield axis_ex, np.argpartition(tile, kth, axis=axis)
+  if axis_ex is not None:
+    tile = array.fetch(axis_ex)
+    yield axis_ex, np.argpartition(tile, kth, axis=axis)
 
 
 def argpartition(array, kth, axis=-1):
