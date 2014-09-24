@@ -464,7 +464,7 @@ def change_partition_axis(ex, axis):
     axis += len(ex.array_shape)
 
   old_axis = []
-  for i in range(len(ex.shape)):
+  for i in xrange(len(ex.shape)):
     if ex.shape[i] != ex.array_shape[i]:
       old_axis.append(i)
 
@@ -473,17 +473,19 @@ def change_partition_axis(ex, axis):
     util.log_warn(str((old_axis, ex.shape, ex.array_shape)))
     return None
 
-  if len(old_axis) == 0 or old_axis[0] == axis:
+  if len(old_axis) == 0 or old_axis[0] != axis:
     return ex
 
   old_axis = old_axis[0]
-
+  axis = len(ex.array_shape) - axis - 1
+  #XXX: Only support 2d array changing axis for now
   new_ul = list(ex.ul[:])
   new_lr = list(ex.lr[:])
   new_ul[axis] = util.divup(new_ul[old_axis] * ex.array_shape[axis],
-                            ex.array_shape[old_axis])
+                    ex.array_shape[old_axis])
   new_ul[old_axis] = 0
   new_lr[axis] = util.divup(new_lr[old_axis] * ex.array_shape[axis],
                             ex.array_shape[old_axis])
   new_lr[old_axis] = ex.array_shape[old_axis]
+
   return create(new_ul, new_lr, ex.array_shape)

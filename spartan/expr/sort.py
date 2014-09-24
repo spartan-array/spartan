@@ -147,7 +147,6 @@ def argsort(array, axis=-1):
     array(DistArray or Expr): array to be sorted
     axis(int): axis
   '''
-
   assert axis is not None, "Spartan doesn't support argsort when axis == None now"
   return shuffle(array, _argsort_mapper, kw={'axis': axis},
                  shape_hint=array.shape)
