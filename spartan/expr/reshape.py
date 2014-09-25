@@ -154,8 +154,11 @@ class Reshape(distarray.DistArray):
     #        the base region being fetched is continous. But it is not
     #        true when the `ex` doesn't contain complete rows.
     #XXX: What about vector?
-    util.log_info('self.shape[1]:%s ex.shape[1]:%s', self.shape[1], ex.shape[1])
-    step = self.shape[1] - ex.shape[1]
+    util.log_info('self.shape:%s ex.shape:%s', self.shape, ex.shape)
+    if len(self.shape) == 1:
+      step = 0
+    else:
+      step = self.shape[1] - ex.shape[1]
     ravelled_ul, ravelled_lr = _ravelled_ex(ex.ul, ex.lr, self.shape)
     util.log_info('ravelled_ul:%s ravelled_lr:%s\n', ravelled_ul, ravelled_lr)
     base_ravelled_ul, base_ravelled_lr = extent.find_rect(ravelled_ul,
