@@ -153,19 +153,42 @@ class Reshape(distarray.DistArray):
     # TODO : Following code can't handle `column fetch`. Since it assume
     #        the base region being fetched is continous. But it is not
     #        true when the `ex` doesn't contain complete rows.
+    #XXX: What about vector?
+    util.log_info('self.shape[1]:%s ex.shape[1]:%s', self.shape[1], ex.shape[1])
+    step = self.shape[1] - ex.shape[1]
     ravelled_ul, ravelled_lr = _ravelled_ex(ex.ul, ex.lr, self.shape)
+    util.log_info('ravelled_ul:%s ravelled_lr:%s\n', ravelled_ul, ravelled_lr)
     base_ravelled_ul, base_ravelled_lr = extent.find_rect(ravelled_ul,
                                                           ravelled_lr,
                                                           self.base.shape)
+    util.log_info('base_ravelled_ul:%s base_ravelled_lr:%s\n', base_ravelled_ul, base_ravelled_lr)
     base_ul, base_lr = _unravelled_ex(base_ravelled_ul,
                                       base_ravelled_lr,
                                       self.base.shape)
+    util.log_info('base_ul:%s base_lr:%s (%s, %s)\n', base_ul, base_lr, len(base_ul), len(base_lr))
     base_ex = extent.create(base_ul, np.array(base_lr) + 1, self.base.shape)
-
+    util.log_info('base_ex: ul%s lr%s\n', base_ex.ul, base_ex.lr)
     tile = self.base.fetch(base_ex)
+    util.log_info('\n\ntile:\n%s\n', tile)
+
+    util.log_info('step:%s', step)
+
     if not self.base.sparse:
       tile = np.ravel(tile)
-      tile = tile[(ravelled_ul - base_ravelled_ul):(ravelled_lr - base_ravelled_ul) + 1]
+      if step == 0:
+        #For continuous data fetch
+        tile = tile[(ravelled_ul - base_ravelled_ul):(ravelled_lr - base_ravelled_ul) + 1]
+      else:
+        #For segmented data fetch
+	tmp = []
+	util.log_info('self.base.shape:%s self.shape:%s ravelled_ul:%s', self.base.shape, self.shape, ravelled_ul)
+	util.log_info('for i in xrange(start = %s, stop = %s, step = %s', ravelled_ul % self.base.shape[1], len(tile), step + ex.shape[1])
+	for i in xrange(ravelled_ul % self.base.shape[1], len(tile), step + ex.shape[1]):
+	  tmp.append(tile[i:i+ex.shape[1]])
+	util.log_info('tmp:\n%s', tmp)
+	tile = np.array(tmp)
+
+      util.log_info('final:%s', tile)
       assert np.prod(tile.shape) == np.prod(ex.shape), (tile.shape, ex.shape)
 
       return tile.reshape(ex.shape)
