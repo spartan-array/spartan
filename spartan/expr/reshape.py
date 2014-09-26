@@ -153,28 +153,29 @@ class Reshape(distarray.DistArray):
     # TODO : Following code can't handle `column fetch`. Since it assume
     #        the base region being fetched is continous. But it is not
     #        true when the `ex` doesn't contain complete rows.
-    #XXX: What about vector?
-    util.log_info('self.shape:%s ex.shape:%s', self.shape, ex.shape)
-    if len(self.shape) == 1:
-      step = 0
-    else:
-      step = self.shape[1] - ex.shape[1]
     ravelled_ul, ravelled_lr = _ravelled_ex(ex.ul, ex.lr, self.shape)
-    util.log_info('ravelled_ul:%s ravelled_lr:%s\n', ravelled_ul, ravelled_lr)
+    #util.log_info('ravelled_ul:%s ravelled_lr:%s\n', ravelled_ul, ravelled_lr)
     base_ravelled_ul, base_ravelled_lr = extent.find_rect(ravelled_ul,
                                                           ravelled_lr,
                                                           self.base.shape)
-    util.log_info('base_ravelled_ul:%s base_ravelled_lr:%s\n', base_ravelled_ul, base_ravelled_lr)
+    #util.log_info('base_ravelled_ul:%s base_ravelled_lr:%s\n', base_ravelled_ul, base_ravelled_lr)
     base_ul, base_lr = _unravelled_ex(base_ravelled_ul,
                                       base_ravelled_lr,
                                       self.base.shape)
-    util.log_info('base_ul:%s base_lr:%s (%s, %s)\n', base_ul, base_lr, len(base_ul), len(base_lr))
+    #util.log_info('base_ul:%s base_lr:%s (%s, %s)\n', base_ul, base_lr, len(base_ul), len(base_lr))
     base_ex = extent.create(base_ul, np.array(base_lr) + 1, self.base.shape)
-    util.log_info('base_ex: ul%s lr%s\n', base_ex.ul, base_ex.lr)
+    #util.log_info('base_ex: ul%s lr%s\n', base_ex.ul, base_ex.lr)
     tile = self.base.fetch(base_ex)
-    util.log_info('\n\ntile:\n%s\n', tile)
+    #util.log_info('\n\ntile:\n%s\n', tile)
 
-    util.log_info('step:%s', step)
+    if len(self.shape) == 1 or base_ravelled_ul / self.shape[1] == base_ravelled_lr / self.shape[1]:
+    #Case 1: Vector is itself continuous data
+    #Case 2: Result is continuous
+      step = 0
+    else:
+      step = self.shape[1] - ex.shape[1]
+
+    #util.log_info('step:%s', step)
 
     if not self.base.sparse:
       tile = np.ravel(tile)
@@ -184,14 +185,15 @@ class Reshape(distarray.DistArray):
       else:
         #For segmented data fetch
 	tmp = []
-	util.log_info('self.base.shape:%s self.shape:%s ravelled_ul:%s', self.base.shape, self.shape, ravelled_ul)
-	util.log_info('for i in xrange(start = %s, stop = %s, step = %s', ravelled_ul % self.base.shape[1], len(tile), step + ex.shape[1])
-	for i in xrange(ravelled_ul % self.base.shape[1], len(tile), step + ex.shape[1]):
-	  tmp.append(tile[i:i+ex.shape[1]])
-	util.log_info('tmp:\n%s', tmp)
+	#util.log_info('ex.shape: %s self.base.shape:%s self.shape:%s ravelled_ul:%s', ex.shape, self.base.shape, self.shape, ravelled_ul)
+	#util.log_info('for i in xrange(start = %s, stop = %s, step = %s)', ravelled_ul % self.base.shape[1], len(tile), step + ex.shape[1])
+	start = ravelled_ul % self.base.shape[1]
+	step += ex.shape[1]
+	for i in xrange(ex.shape[0]):
+	  tmp.append(tile[start + (i*step) : (start + (i*step)) + ex.shape[1]].tolist())
 	tile = np.array(tmp)
 
-      util.log_info('final:%s', tile)
+      #util.log_info('final:%s', tile)
       assert np.prod(tile.shape) == np.prod(ex.shape), (tile.shape, ex.shape)
 
       return tile.reshape(ex.shape)
