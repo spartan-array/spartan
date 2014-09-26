@@ -120,36 +120,3 @@ class ReshapeTest(test_common.ClusterTest):
     t3 = expr.dot(expr.reshape(t1, (718, 1)), t2)
     Assert.all_eq(result, t3.glom(), 10e-9)
 
-  def test_rowslice_reshape(self):
-
-    na = np.arange(35).reshape(5,7)
-    a = expr.from_numpy(na)
-
-    na = na.reshape(7, 5)
-    a = a.reshape((7, 5))
-
-    Assert.all_eq(na[2:4, :], a[2:4, :].glom())
-
-  def test_colslice_reshape(self):
-    n_orig = np.arange(start = 1, stop = 25).reshape(4, 6)
-    a_orig = expr.from_numpy(n_orig)
-
-    na = n_orig.reshape(3, 8)
-    a  = a_orig.reshape((3, 8))
-
-    Assert.all_eq(na[:, 3:5], a[:, 3:5].glom())
-    Assert.all_eq(na[1:, 4:5], a[1:, 4:5].glom())
-    Assert.all_eq(na[2:, :1], a[2:, :1].glom())
-
-    na = n_orig.reshape(8, 3)
-    a  = a_orig.reshape((8, 3))
-
-    Assert.all_eq(na[:, 1:2], a[:, 1:2].glom())
-    Assert.all_eq(na[2:, 1:], a[2:, 1:].glom())
-    Assert.all_eq(na[2:6, 2:], a[2:6, 2:].glom())
-
-    na = n_orig.reshape(6, 4)
-    a  = a_orig.reshape((6, 4))
-
-    Assert.all_eq(na[:, 2:], a[:, 2:].glom())
-    Assert.all_eq(na[:2, 2:], a[:2, 2:].glom())
