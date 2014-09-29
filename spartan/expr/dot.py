@@ -120,7 +120,7 @@ class DotExpr(Expr):
 
     nptype = isinstance(bv, np.ndarray)
     dot2d = False
-    tile_hint = self.tile_hint
+
     if len(av.shape) == 1:
       if av.shape[0] != bv.shape[0]:
         raise ValueError("objects are not aligned")
@@ -141,12 +141,12 @@ class DotExpr(Expr):
       else:
         #2d array * 2d array
         shape = (av.shape[0], bv.shape[1])
-        #tile_hint = (av.tile_shape()[0], bv.shape[1]) if self.tile_hint is None else self.tile_hint
+        tile_hint = (av.tile_shape()[0], bv.shape[1]) if self.tile_hint is None else self.tile_hint
         dot2d = True
 
     if nptype:
-      #if not dot2d:
-      #  tile_hint = (av.tile_shape()[0],) if self.tile_hint is None else self.tile_hint
+      if not dot2d:
+        tile_hint = (av.tile_shape()[0],) if self.tile_hint is None else self.tile_hint
 
       target = distarray.create(shape, dtype=av.dtype,
                                 tile_hint = tile_hint, reducer=np.add)
@@ -159,8 +159,8 @@ class DotExpr(Expr):
                                 fn_kw  = fn_kw))
     else:
       sparse = (av.sparse and bv.sparse)
-      #if not dot2d:
-      #  tile_hint = np.maximum((av.tile_shape()[0],), (bv.tile_shape()[0],)) if self.tile_hint is None else self.tile_hint
+      if not dot2d:
+        tile_hint = np.maximum((av.tile_shape()[0],), (bv.tile_shape()[0],)) if self.tile_hint is None else self.tile_hint
       target = distarray.create(shape, dtype=av.dtype,
                                 tile_hint = tile_hint, reducer=np.add, sparse = sparse)
       fn_kw = dict(av = av, bv = bv)

@@ -13,7 +13,6 @@ from collections import namedtuple
 import operator, math
 from tiling import mincost_tiling
 import weakref
-import copy
 
 from ..config import FLAGS, BoolFlag
 from ..array.distarray import DistArray
@@ -794,11 +793,10 @@ class AutomaticTiling(OptimizePass):
     # compute best tiling for all exprs
     self.visited_nodes = set()
     nodes = mincost_tiling(self.cur_node_id - 1, self.generate_edges(), self.split_nodes.items())
-    
+
     # give expr the best tiling hint
     for node_id in nodes:
       node = self.nodes[node_id]
-      #if node_id == 1: print node.expr[0]
       for cur_expr in node.expr:
         _tiled_exprlist[hash(cur_expr)] = node.tiling
         self.tile_expr(cur_expr, node.tiling)
