@@ -3,6 +3,7 @@ import spartan
 from spartan.examples.sklearn.cluster import KMeans
 from spartan import expr
 from spartan.util import divup
+from spartan.config import FLAGS
 from datetime import datetime
 from test_common import millis
 
@@ -13,10 +14,8 @@ ITER = 5
 
 class TestKmeans(test_common.ClusterTest):
   def test_kmeans_expr(self):
-    ctx = spartan.blob_ctx.get()
-    pts = expr.rand(N_PTS, N_DIM,
-                  tile_hint=(divup(N_PTS, ctx.num_workers), N_DIM)).force()
-
+    FLAGS.opt_parakeet_gen = 0
+    pts = expr.rand(N_PTS, N_DIM)
     k = KMeans(N_CENTERS, ITER)
     k.fit(pts)
 
