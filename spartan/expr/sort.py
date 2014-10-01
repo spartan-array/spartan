@@ -69,7 +69,6 @@ def _fetch_sort_mapper(array, ex, partition_counts):
   result = np.concatenate([resp.data for resp in futures.wait()], axis=None)
   yield extent.create((dst_idx,), (dst_idx+result.size,), (np.prod(array.shape),)), np.sort(result, axis=None)
 
-
 def _sort_mapper(array, ex, axis=None):
   axis_ex = extent.change_partition_axis(ex, axis)
   if axis_ex is not None:
