@@ -26,8 +26,10 @@ class TestPCA(test_common.ClusterTest):
     assert np.allclose(absolute(m.components_), absolute(m2.components_))
 
 def benchmark_pca(ctx, timer):
-  DIM = (2400, 640)
-  A = expr.randn(*DIM, dtype=np.float64)
+  DIM = (1280, 512)
+  data = np.random.randn(*DIM)
+  A = expr.from_numpy(data)
+  #A = expr.randn(*DIM, dtype=np.float64)
   t1 = datetime.now()
   m = PCA(N_COMPONENTS)
   m.fit(A)

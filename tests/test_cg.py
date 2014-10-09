@@ -42,7 +42,7 @@ def benchmark_cg(ctx, timer):
   print "#worker:", ctx.num_workers
   l = int(math.sqrt(ctx.num_workers))
   #n = 2000 * 16
-  n = 400 * l
+  n = 500 * ctx.num_workers
   la = 20
   niter = 5
   

@@ -105,8 +105,7 @@ def pagerank_sparse(num_pages,
 #@test_common.with_ctx
 #def test_pr(ctx):
 def benchmark_pr(ctx, timer):
-  num_pages = 1000 * 1000 * 3 * ctx.num_workers
-  num_pages = 1000 * 100 * 3 * ctx.num_workers 
+  num_pages = 300 * 1000 * 3 * ctx.num_workers
   num_outlinks = 10
   density = num_outlinks * 1.0 / num_pages
   same_site_prob = 0.9
@@ -145,7 +144,7 @@ def benchmark_pr(ctx, timer):
   sparse_multiply(wts, p, p_tile_hint)
   t2 = datetime.now()
   cost_time = millis(t1, t2)
-  print 'baseline:', baseline[ctx.num_workers], 'current benchmark:', cost_time / num_iter / 1000
+  print 'current benchmark:', cost_time / num_iter / 1000
   #r2 = sparse_multiply(wts, q)
   #print 'r1:',r1
   #print 'r2:',r2

@@ -23,8 +23,10 @@ class TestSSVD(test_common.ClusterTest):
     assert np.allclose(absolute(VT), absolute(VT2))
 
 def benchmark_ssvd(ctx, timer):
-  DIM = (2400, 640)
-  A = expr.randn(*DIM, dtype=np.float64)
+  DIM = (1280, 1280)
+  #A = expr.randn(*DIM, dtype=np.float64)
+  A = np.random.randn(*DIM)
+  A = expr.from_numpy(A)
   t1 = datetime.now()
   U,S,VT = svd(A)
   t2 = datetime.now()
