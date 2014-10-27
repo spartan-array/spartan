@@ -1492,7 +1492,6 @@ DOUBLE_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
         printf("----------------------------------@1 %p %p\n", (void*)ip1, (void*)ip2);
         npy_double in1 = *((npy_double*)ip1);
         npy_double in2 = *((npy_double*)ip2);
-        printf("---------------------------------@1 %f %f\n", in1, in2);
         *((npy_double*)ip1) = in1 + in2;
         printf("..................................@2 %p %p\n", (void*)ip1, (void*)ip2);
     }
@@ -1638,8 +1637,13 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip2, CExtent *ex, REDUCER reducer)
         arrays[0] += (curr_pos - prev_pos) * ip1->get_strides()[ip1->get_nd() - 1];
         func(arrays, &continous_size, inner_steps);
 
-        for (i = last_sliced_dim; i >= 0; i++) {
-            curr_idx[i] += 1;
+        for (i = last_sliced_dim; i >= 0; i--) {
+            if (last_sliced_dim == ip1->get_nd() - 1) {
+                curr_idx[i] = ex->ul[i];
+                continue;
+            } else {
+                curr_idx[i] += 1;
+            }
             if (curr_idx[i] - ex->ul[i] < ex->shape[i]) {
                 break;
             }
@@ -1647,6 +1651,7 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip2, CExtent *ex, REDUCER reducer)
         }
         prev_pos = curr_pos;
         all_size -= continous_size;
+        arrays[1] += continous_size * ip1->get_strides()[ip1->get_nd() - 1];
     } while(all_size > 0);
 }
 
