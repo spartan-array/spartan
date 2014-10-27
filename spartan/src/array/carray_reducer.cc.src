@@ -295,7 +295,7 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip2, CExtent *ex, REDUCER reducer)
     npy_intp inner_steps[1] = {ip1->get_strides()[ip1->get_nd() - 1]};
     int i, last_sliced_dim;
 
-    for (i = ip1->get_nd()- 1; i >= 0; i--) {
+    for (i = ip1->get_nd() - 1; i >= 0; i--) {
         npy_intp dim;
        
         dim = ex->lr[i] - ex->ul[i];
@@ -310,7 +310,7 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip2, CExtent *ex, REDUCER reducer)
         continous_size = ip1->get_dimensions()[ip1->get_nd() - 1];
     } else {
         continous_size = 1;
-        for (i = last_sliced_dim ; i < ip1->get_nd(); i++) {
+        for (i = last_sliced_dim + 1; i < ip1->get_nd(); i++) {
             continous_size *= ip1->get_dimensions()[i];
         }
     }
@@ -324,7 +324,7 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip2, CExtent *ex, REDUCER reducer)
     dense_reducer func = select_dense_reducer(reducer, ip1->get_type());
     do {
         curr_pos = ravelled_pos(curr_idx, ex->array_shape, ip1->get_nd());
-        arrays[0] += (curr_pos - prev_pos);
+        arrays[0] += (curr_pos - prev_pos) * ip1->get_strides()[ip1->get_nd() - 1];
         func(arrays, &continous_size, inner_steps);
 
         for (i = last_sliced_dim; i >= 0; i++) {
@@ -342,17 +342,14 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip2, CExtent *ex, REDUCER reducer)
 void
 trivial_dense_outer_loop(CArray *ip1, CArray *ip2, REDUCER reducer)
 {
-    std::cout << __func__ << std::endl;
     char *arrays[2] = {ip1->get_data(), ip2->get_data()};
     npy_intp inner_steps[1] = {ip1->get_strides()[ip1->get_nd() - 1]};
     npy_intp size = 1;
-    std::cout << __func__ << std::endl;
     for (int i = 0; i < ip1->get_nd(); i++) {
         size *= ip1->get_dimensions()[i];
     }
 
     dense_reducer func = select_dense_reducer(reducer, ip1->get_type());
-    std::cout << __func__ << " " << (void*) func << std::endl;
     func(arrays, &size, inner_steps);
 }
 

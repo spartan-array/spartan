@@ -96,7 +96,7 @@ inline void release_ctile_rpc(CTile_RPC* rpc)
             }
         }
     }
-    free(rpc);
+    delete(rpc);
 }
 
 /**

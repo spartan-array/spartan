@@ -204,7 +204,7 @@ inline rpc::Marshal& operator >>(rpc::Marshal&m, CArray& o)
     m.read(&type, sizeof(char));
     m.read((void*)dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
     o.init(dimensions, nd, type);
-    o.data = (char*) malloc(o.size);
+    o.data = new char[o.size];
     o.data_source = new NpyMemManager(o.data, o.data, false, o.size);
     assert(m.content_size() == o.size);
     m.read(o.data, o.size);

@@ -26,7 +26,8 @@ def _dot_mapper(inputs, ex, av, bv):
   time_a, a = util.timeit(lambda: av.fetch(ex_a))
   #util.log_info('Fetched...%s in %s', ex_a, time_a)
   time_b, b = util.timeit(lambda: bv.fetch(ex_b))
-  util.log_debug('Fetched...ax:%s in %s, bx:%s in %s', ex_a, time_a, ex_b, time_b)
+  util.log_debug('Fetched...ax:%s in %s, bx:%s in %s',
+                 ex_a, time_a, ex_b, time_b)
 
   #util.log_info('%s %s %s', type(a), a.shape, a.dtype)
   #util.log_info('%s %s %s', type(b), b.shape, b.dtype)

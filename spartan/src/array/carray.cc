@@ -44,8 +44,8 @@ std::map<char*, int> NpyMemManager::refcount;
 CArray::CArray(npy_intp dimensions[], int nd, char type)
 {
     init(dimensions, nd, type);
-    data = (char*) malloc(size);
-    Log_debug("CArray create a memory buffer %p", data);
+    data = new char [size];
+    Log_debug("CArray create a memory buffer %p %u", data, size);
     assert(this->data != NULL);
     memset(data, 0, size);
     data_source = new NpyMemManager(data, data, false, size);
@@ -55,7 +55,7 @@ CArray::CArray(npy_intp dimensions[], int nd, char type, char *buffer)
 {
     init(dimensions, nd, type);
     data = buffer;
-    Log_debug("CArray uses a memory buffer %p", data);
+    Log_debug("CArray uses a memory buffer %p %u", data, size);
     data_source = new NpyMemManager(data, data, false, size);
 }
 
@@ -63,7 +63,7 @@ CArray::CArray(npy_intp dimensions[], int nd, char type, char *data, PyArrayObje
 {
     init(dimensions, nd, type);
     this->data = data;
-    Log_debug("CArray uses a memory buffer %p", data);
+    Log_debug("CArray uses a memory buffer %p %u", data, size);
     data_source = new NpyMemManager((char*)source, data, true, size);
 }
 
@@ -71,7 +71,7 @@ CArray::CArray(npy_intp dimensions[], int nd, char type, char *data, NpyMemManag
 {
     init(dimensions, nd, type);
     this->data = data;
-    Log_debug("CArray uses a memory buffer %p", data);
+    Log_debug("CArray uses a memory buffer %p %u", data, size);
     data_source = source;
 }
 
@@ -82,10 +82,10 @@ CArray::CArray(CArray_RPC *rpc)
     if (rpc->is_npy_memmanager) { 
         data_source = (NpyMemManager*)(rpc->data);
         data = data_source->get_data();
-        Log_debug("CArray uses a memory buffer %p", data);
+        Log_debug("CArray uses a memory buffer %p %u", data, size);
     } else {
         data = rpc->data;
-        Log_debug("CArray uses a memory buffer %p", data);
+        Log_debug("CArray uses a memory buffer %p %u", data, size);
         data_source = new NpyMemManager(data, data, false, size);
     }
 }
@@ -139,7 +139,10 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
     }
 
     if (full) { /* Special case, no slice */
+        //char* source = new char[size];
+        //*dest = new NpyMemManager(source, source, false, size);/[>data_source);
         *dest = new NpyMemManager(*data_source);
+        //memcpy(source, data, size);
         Log_debug("Full copy. Do not have to do copy. *dest = %p", *dest);
         return size;
     } else {
@@ -170,7 +173,7 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
         npy_intp ret = all_size;
 
         char *source_data = data;
-        char *buf = (char*)malloc(all_size);
+        char *buf = new char[all_size];
         assert(buf != NULL);
         *dest = new NpyMemManager(buf, buf, false, all_size); 
         Log_debug("Not full copy. *dest = %p, buf = %p, all_size = %d, copy_size = %d",
@@ -239,7 +242,7 @@ CArray::to_carray_rpc(CExtent *ex)
 {
     std::vector <char*> dest;
     std::cout << "CArray::" << __func__ << std::endl;
-    CArray_RPC *rpc = (CArray_RPC*)malloc(sizeof(CArray_RPC));
+    CArray_RPC *rpc = new CArray_RPC;
     dest.push_back((char*)(new NpyMemManager((char*)rpc, (char*)rpc, 
                                              false, sizeof(CArray_RPC))));
 

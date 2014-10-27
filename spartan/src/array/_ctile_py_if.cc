@@ -138,7 +138,7 @@ TileBase_get(PyObject* o, PyObject* args)
 
     std::cout << __func__ << " end" << std::endl;
     if (ret == NULL) {
-        free(rpc);
+        delete(rpc);
     }
     return ret;
 }

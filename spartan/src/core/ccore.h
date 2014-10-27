@@ -234,11 +234,11 @@ struct GetResp {
     GetResp(): own_data(true) {}
     ~GetResp() {
         if (own_data) {
-            //delete (bool*)data[0];
+            delete (bool*)data[0];
             int size = data.size();
             for (int i = 1; i < size; ++i) {
                 Log_debug("GetResp delete %p", ((NpyMemManager*)(data[i]))->get_source());
-                //delete (NpyMemManager*)data[i];
+                delete (NpyMemManager*)data[i];
             }
         }
     }
@@ -277,7 +277,7 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, GetResp& o) {
         unsigned long data_size;
         m.read(&data_size, sizeof(data_size));
         Log_info ("GetResp marshal >> size = %u", data_size);
-        char *buf = (char*)malloc(data_size);
+        char *buf = new char[data_size];
         assert(buf != NULL);
         m.read(buf, data_size);
         o.data.push_back(buf);

@@ -155,6 +155,31 @@ TileExtent_dealloc(PyObject *o)
 }
 
 static PyObject *
+TileExtent_repr(PyObject *o)
+{
+    TileExtent *self = (TileExtent*) o;
+    char s[2048] = "Extent: ul = (";
+    char t1[1024] = "";
+    char t2[1024] = "";
+
+    for (int i = 0; i < self->ndim; ++i) {
+        if (i != self->ndim - 1) {
+            sprintf(t1, "%s%ld,", t1, self->c_ex->ul[i]);
+            sprintf(t2, "%s%ld,", t2, self->c_ex->lr[i]);
+        } else {
+            sprintf(t1, "%s%ld", t1, self->c_ex->ul[i]);
+            sprintf(t2, "%s%ld", t2, self->c_ex->lr[i]);
+        }
+    }
+    strcat(s, t1);
+    strcat(s, "), lr= (");
+    strcat(s, t2);
+    strcat(s, ")");
+
+    return PyString_FromString(s);
+}
+
+static PyObject *
 TileExtent_richcompare(PyObject* o, PyObject *o_other, int op)
 {
     TileExtent *self = (TileExtent*) o;
@@ -379,7 +404,7 @@ static PyTypeObject TileExtentType = {
     0,                           /* tp_getattr */
     0,                           /* tp_setattr */
     0,                           /* tp_compare */
-    0,                           /* tp_repr */
+    TileExtent_repr,             /* tp_repr */
     0,                           /* tp_as_number */
     0,                           /* tp_as_sequence */
     0,                           /* tp_as_mapping */

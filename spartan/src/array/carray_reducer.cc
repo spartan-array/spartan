@@ -320,7 +320,7 @@ LONG_scalar_minimum(char **args)
 
     npy_long in1 = *((npy_long*)ip1);
     npy_long in2 = *((npy_long*)ip2);
-    std::cout << __func__ << "in1 = " << in1 << ", in2 = " << in2 << std::endl;
+    //std::cout << __func__ << "in1 = " << in1 << ", in2 = " << in2 << std::endl;
     *((npy_long*)ip1) = (in1 < in2) ? in1 : in2;
 }
 
@@ -1487,9 +1487,14 @@ void
 DOUBLE_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
 {
     BINARY_DENSE_LOOP {
+        printf("----------------------------------@1 %p %p\n", (void*)ip1, (void*)ip2);
+        printf("----------------------------------@1 %p %p\n", (void*)ip1, (void*)ip2);
+        printf("----------------------------------@1 %p %p\n", (void*)ip1, (void*)ip2);
         npy_double in1 = *((npy_double*)ip1);
         npy_double in2 = *((npy_double*)ip2);
+        printf("---------------------------------@1 %f %f\n", in1, in2);
         *((npy_double*)ip1) = in1 + in2;
+        printf("..................................@2 %p %p\n", (void*)ip1, (void*)ip2);
     }
 }
 
@@ -1601,7 +1606,7 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip2, CExtent *ex, REDUCER reducer)
     npy_intp inner_steps[1] = {ip1->get_strides()[ip1->get_nd() - 1]};
     int i, last_sliced_dim;
 
-    for (i = ip1->get_nd()- 1; i >= 0; i--) {
+    for (i = ip1->get_nd() - 1; i >= 0; i--) {
         npy_intp dim;
        
         dim = ex->lr[i] - ex->ul[i];
@@ -1616,7 +1621,7 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip2, CExtent *ex, REDUCER reducer)
         continous_size = ip1->get_dimensions()[ip1->get_nd() - 1];
     } else {
         continous_size = 1;
-        for (i = last_sliced_dim ; i < ip1->get_nd(); i++) {
+        for (i = last_sliced_dim + 1; i < ip1->get_nd(); i++) {
             continous_size *= ip1->get_dimensions()[i];
         }
     }
@@ -1630,7 +1635,7 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip2, CExtent *ex, REDUCER reducer)
     dense_reducer func = select_dense_reducer(reducer, ip1->get_type());
     do {
         curr_pos = ravelled_pos(curr_idx, ex->array_shape, ip1->get_nd());
-        arrays[0] += (curr_pos - prev_pos);
+        arrays[0] += (curr_pos - prev_pos) * ip1->get_strides()[ip1->get_nd() - 1];
         func(arrays, &continous_size, inner_steps);
 
         for (i = last_sliced_dim; i >= 0; i++) {

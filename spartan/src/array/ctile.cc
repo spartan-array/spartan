@@ -230,7 +230,7 @@ CTile::to_tile_rpc(const CSliceIdx &idx)
     std::vector<char*> dest;
     CExtent *ex = slice_to_ex(idx);
     dest.push_back((char*)(new bool(true)));
-    CTile_RPC *rpc = (CTile_RPC*) malloc(sizeof(CTile_RPC));
+    CTile_RPC *rpc = new CTile_RPC;
 
     rpc->type = type;
     rpc->sparse_type = sparse_type;

@@ -252,9 +252,6 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
 
         PyRun_String(init_cmd, Py_file_input, pLocal, pLocal);
 
-        //PyRun_SimpleString("print mapper_fn(*kw)\n");
-        //PyRun_SimpleString("ctx = blob_ctx.get()\n");
-    //}
         TileId tid;
         while (true) {
             lock(_kernel_lock);
@@ -266,11 +263,6 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
                 unlock(_kernel_lock);
                 break;
             }
-
-
-        //Log_debug("process tile:%s", tid.to_string().c_str());
-        //{
-            //GILHelper gil_helper;
 
 
             PyObject *py_blob;
@@ -289,7 +281,6 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
             } else {
                 Log_debug("PyRun_String success : %s", mapper_cmd);
             }
-        //}
         }
     }
 
