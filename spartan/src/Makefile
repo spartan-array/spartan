@@ -15,15 +15,19 @@ endif
 
 CFLAGS = -I$(CUR_DIR) -I$(CORE_DIR) -I$(ARRAY_DIR) -I$(RPC) -I$(RPCBASE) $(PY_CFLAGS) $(NUMPY) -pthread -std=c++0x -O2 -ggdb
 LDFLAGS = -L$(RPCBASE)/build -L$(RPC)/build -L$(CURDIR) $(PY_LDFLAGS) -lbase -lpython2.7 -std=c++11 -ggdb
+
 OBJS_WORKER = $(CUR_DIR)/core/worker.o
 OBJS_ARRAY = $(ARRAY_DIR)/cslice.o $(ARRAY_DIR)/cextent.o $(ARRAY_DIR)/ctile.o $(ARRAY_DIR)/carray.o $(ARRAY_DIR)/carray_reducer.o
 OBJS_CORE = $(CUR_DIR)/core/cconfig.o
+OBJ_ALL = $(OBJS_WORKER) $(OBJS_ARRAY) $(OBJS_CORE)
 APPS = rpc libcore.so libspartan_array.so worker
+
 
 all: $(APPS)
 
 .cc.o:
 	$(CC) $(CFLAGS) $< -c -o $@ -fPIC
+	$(CC) -MM $(CFLAGS) -MT '$@' $< > $(<:.cc=.d)
 
 .PHONY:base-utils simple-rpc
 base-utils:
@@ -43,12 +47,15 @@ rpc: base-utils simple-rpc
 	cd $(RPC);python waf configure;python waf;
 	#cd $(RPCDIR);python simple-rpc/bin/rpcgen service.rpc --python --cpp;
 
+-include $(OBJS_CORE:.o=.d)
 libcore.so: $(OBJS_CORE)
 	${CC} -o $(CUR_DIR)/$@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach
 
+-include $(OBJS_ARRAY:.o=.d)
 libspartan_array.so: $(OBJS_ARRAY)
 	${CC} -o $(CUR_DIR)/$@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach -lcore
 
+-include $(OBJS_WORKER:.o=.d)
 worker: $(OBJS_WORKER)
 	${CC} -o $(CUR_DIR)/$@ $^ $(LDFLAGS) -lsimplerpc -lspartan_array -lcore
 

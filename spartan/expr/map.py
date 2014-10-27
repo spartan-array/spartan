@@ -125,9 +125,9 @@ class MapExpr(Expr):
 
     #util.log_info('Mapping %s over %d inputs; largest = %s', op, len(children), largest.shape)
 
-    return largest.map_to_array(
-              tile_mapper,
-              kw = {'children':children, 'child_to_var':child_to_var, 'op':op})
+    return largest.map_to_array(tile_mapper, kw={'children': children,
+                                                 'child_to_var': child_to_var,
+                                                 'op': op})
 
 def map(inputs, fn, numpy_expr=None, fn_kw=None):
   '''

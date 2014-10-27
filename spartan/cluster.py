@@ -35,12 +35,12 @@ def start_remote_worker(worker, st, ed):
   if FLAGS.oprofile:
     os.system('mkdir operf.%s' % worker)
 
-  ssh_args = ['ssh', '-oForwardX11=no', worker ]
+  ssh_args = ['ssh', '-oForwardX11=no', worker]
 
   args = ['cd %s && ' % os.path.abspath(os.path.curdir)]
 
   if FLAGS.xterm:
-    args += ['xterm', '-e',]
+    args += ['xterm', '-e']
 
   if FLAGS.oprofile:
     args += ['operf -e CPU_CLK_UNHALTED:100000000', '-g', '-d', 'operf.%s' % worker]
@@ -67,6 +67,7 @@ def start_remote_worker(worker, st, ed):
     p = subprocess.Popen(' '.join(args), shell=True, stdin=subprocess.PIPE)
 
   return p
+
 
 def start_cluster(num_workers, use_cluster_workers):
   '''

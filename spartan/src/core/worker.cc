@@ -287,7 +287,7 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
             if (PyRun_String(mapper_cmd, Py_file_input, pLocal, pLocal) == NULL) {
                 PyErr_PrintEx(0);
             } else {
-                Log_debug("PyRun_String success");
+                Log_debug("PyRun_String success : %s", mapper_cmd);
             }
         //}
         }
@@ -370,6 +370,8 @@ void start_worker(int32_t port, int argc, char** argv) {
 }
 
 int main(int argc, char* argv[]) {
+    FLAGS.add(new StrFlag("master", "0.0.0.0:10000"));
+    FLAGS.add(new IntFlag("count", "1"));
     config_parse(argc, argv);
 
     base::LOG_LEVEL = FLAGS.get_val<LogLevel>("log_level");

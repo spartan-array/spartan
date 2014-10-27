@@ -23,8 +23,6 @@ void init_flags(void)
    
     done = true;
 
-    FLAGS.add(new StrFlag("master", "0.0.0.0:10000"));
-    FLAGS.add(new IntFlag("count", "1"));
     FLAGS.add(new BoolFlag("print_options", "false"));
     FLAGS.add(new BoolFlag("profile_worker", "false"));
     FLAGS.add(new BoolFlag("profile_master", "false"));
