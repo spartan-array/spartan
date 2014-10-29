@@ -25,7 +25,9 @@ CTile::CTile(npy_intp dimensions[], int nd, char dtype,
         this->dimensions[i] = dimensions[i];
     }
     dense = NULL;
+    dense_state = NULL;
     mask = NULL;
+    mask_state = NULL;
     for (i = 0; i < 3; i++) {
         sparse[i] = NULL;
     }
@@ -47,7 +49,9 @@ CTile::CTile(CTile_RPC *rpc)
 
     if (!initialized) {
         dense = NULL;
+        dense_state = NULL;
         mask = NULL;
+        mask_state = NULL;
         for (int i = 0; i < 3; i++) {
             sparse[i] = NULL;
         }
@@ -64,6 +68,7 @@ CTile::CTile(CTile_RPC *rpc)
         } else {
             mask = NULL;
         }
+        dense_state = mask_state = NULL;
     } else {
         dense = mask = NULL;
         for (int i = 0; i < 3; i++) {
@@ -77,7 +82,9 @@ CTile::CTile(CTile_RPC *rpc)
 CTile::~CTile()
 {
     if (dense != NULL) delete dense;
+    if (dense_state != NULL) delete dense_state;
     if (mask != NULL) delete mask;
+    if (mask_state != NULL) delete mask_state;
     for (int i = 0; i < 3; i++) {
        if (sparse[i] != NULL) delete sparse[i]; 
     }
@@ -143,29 +150,30 @@ CTile::reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer)
     CExtent *ex = slice_to_ex(idx);
     bool trivial = is_idx_complete(idx);
 
-    std::cout << __func__ << " reducer = " << (unsigned)reducer << " " << trivial << std::endl;
     if (nd == 0) { // Special case
-        scalar_outer_loop(dense, update.dense, reducer);
+        scalar_outer_loop(dense, dense_state, update.dense, reducer);
     } else if (type == CTILE_DENSE || type == CTILE_MASKED) { 
+        Log_debug("dense_state %p", dense_state);
         if ((update.type == CTILE_DENSE && update.type == CTILE_MASKED) ||
              update.type == CTILE_DENSE) { 
             // Don't have to update mask in both cases.
             if (trivial) {
-                trivial_dense_outer_loop(dense, update.dense, reducer);
+                trivial_dense_outer_loop(dense, dense_state, update.dense, reducer);
             } else {
-                slice_dense_outer_loop(dense, update.dense, ex, reducer);
+                slice_dense_outer_loop(dense, dense_state, update.dense, ex, reducer);
             }
         } else if (update.type != CTILE_SPARSE) {
             if (trivial) {
-                trivial_dense_outer_loop(dense, update.dense, reducer);
-                trivial_dense_outer_loop(mask, update.mask, REDUCER_OR);
+                trivial_dense_outer_loop(dense, dense_state, update.dense, reducer);
+                trivial_dense_outer_loop(mask, mask_state, update.mask, REDUCER_OR);
             } else {
-                slice_dense_outer_loop(dense, update.dense, ex, reducer);
-                slice_dense_outer_loop(mask, update.mask, ex, REDUCER_OR);
+                slice_dense_outer_loop(dense, dense_state, update.dense, ex, reducer);
+                slice_dense_outer_loop(mask, mask_state, update.mask, ex, REDUCER_OR);
             }
         } else { // SPARSE
-            sparse_dense_outer_loop(dense, update.sparse, ex, reducer);
+            sparse_dense_outer_loop(dense, dense_state, update.sparse, ex, reducer);
         }
+
     } else if (type == CTILE_SPARSE) {
         if (update.type == CTILE_DENSE || update.type == CTILE_MASKED) {
             assert(0);
@@ -182,12 +190,13 @@ CTile::update(const CSliceIdx &idx, CTile &update_data, npy_intp reducer)
     if (!initialized) {
         initialize(); 
     }
-    /**
-     * TODO:
-     * The reducer should deal with uninitialized matrix. For those 
-     * data initialized by initialized(), it should be replaced by
-     * the reducer.
-     */
+    if (type != CTILE_SPARSE && dense_state == NULL) {
+        dense_state = new CArray(dimensions, nd, NPY_BOOLLTR);
+    } 
+    if (type == CTILE_MASKED && mask_state == NULL) {
+        mask_state = new CArray(dimensions, nd, NPY_BOOLLTR);
+    }
+
     if (reducer >= REDUCER_BEGIN && reducer <= REDUCER_END) {
         reduce(idx, update_data, (REDUCER)reducer);
     } else {
@@ -248,7 +257,7 @@ CTile::to_tile_rpc(const CSliceIdx &idx)
         rpc->count = 1;
         if (type == CTILE_MASKED) {
             Log_debug("Trying to get a masked array");
-            std::vector<char*> v = dense->to_carray_rpc(ex);
+            std::vector<char*> v = mask->to_carray_rpc(ex);
             dest.insert(dest.end(), v.begin(), v.end());
             rpc->count = 2;
         }

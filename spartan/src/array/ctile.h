@@ -108,7 +108,8 @@ class CTile {
 public:
 
     CTile()
-        : py_c_refcount(0), nd(0), dense(NULL), mask(NULL), sparse {NULL, NULL, NULL} {};
+        : py_c_refcount(0), nd(0), dense(NULL), dense_state(NULL), 
+          mask(NULL), mask_state(NULL), sparse {NULL, NULL, NULL} {};
     CTile(npy_intp dimensions[], int nd, char dtype,
           CTILE_TYPE tile_type, CTILE_SPARSE_TYPE sparse_type);
     // This constructor will also set data pointers to rpc.
@@ -120,7 +121,10 @@ public:
 
     bool set_data(CArray *dense, CArray *mask);
     bool set_data(CArray **sparse);
-    void clear_data() {dense = mask = sparse[0] = sparse[1] = sparse[2] = NULL;};
+    void clear_data() {
+        dense = mask = dense_state = mask_state = 
+        sparse[0] = sparse[1] = sparse[2] = NULL;
+    };
     void update(const CSliceIdx &idx, CTile &update_data, npy_intp reducer);
 
     // Backward compatible, just call to_tile_rpc.
@@ -164,7 +168,9 @@ private:
     bool initialized;
 
     CArray *dense;
+    CArray *dense_state; // Indicate which parts of dense are initialized.
     CArray *mask;
+    CArray *mask_state; // Indicate which parts of mask are initialized.
     CArray *sparse[3]; // COO, CSR, CSC all use three arrays to represent data.
 
 };
@@ -208,11 +214,14 @@ inline rpc::Marshal& operator>>(rpc::Marshal&m, CTile& o)
         if (o.type == CTILE_DENSE) {
             o.dense = new CArray();
             m >> *(o.dense);
+            o.dense_state = new CArray(o.dimensions, o.nd, NPY_BOOLLTR);
         } else if (o.type == CTILE_MASKED) {
             o.dense = new CArray();
             m >> *(o.dense);
+            o.dense_state = new CArray(o.dimensions, o.nd, NPY_BOOLLTR);
             o.mask = new CArray();
             m >> *(o.mask);
+            o.mask_state = new CArray(o.dimensions, o.nd, NPY_BOOLLTR);
         } else if (o.type == CTILE_SPARSE) {
             for (int i = 0; i < 3; ++i) {
                 o.sparse[i] = new CArray();

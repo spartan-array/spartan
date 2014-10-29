@@ -30,739 +30,999 @@ const char _RP_TYPELTR_ = NPY_INTLTR;
 void
 BOOL_scalar_replace(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
-    //npy_bool in1 = *((npy_bool*)ip1);
     npy_bool in2 = *((npy_bool*)ip2);
     *((npy_bool*)ip1) = in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 BOOL_scalar_add(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_bool in1 = *((npy_bool*)ip1);
     npy_bool in2 = *((npy_bool*)ip2);
-    *((npy_bool*)ip1) = in1 + in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_bool*)ip1) = in2;
+    if (state) {
+        *((npy_bool*)ip1) += in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 BOOL_scalar_multiply(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_bool in1 = *((npy_bool*)ip1);
     npy_bool in2 = *((npy_bool*)ip2);
-    *((npy_bool*)ip1) = in1 * in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_bool*)ip1) = in2;
+    if (state) {
+        *((npy_bool*)ip1) *= in1; 
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 BOOL_scalar_maximum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_bool in1 = *((npy_bool*)ip1);
     npy_bool in2 = *((npy_bool*)ip2);
-    *((npy_bool*)ip1) = (in1 >= in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_bool*)ip1) = (state && in1 >= in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 BOOL_scalar_minimum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_bool in1 = *((npy_bool*)ip1);
     npy_bool in2 = *((npy_bool*)ip2);
-    *((npy_bool*)ip1) = (in1 < in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_bool*)ip1) = (state && in1 < in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 /*
 void
 BOOL_scalar_and(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_bool in1 = *((npy_bool*)ip1);
     npy_bool in2 = *((npy_bool*)ip2);
-    *((npy_bool*)ip1) = in1 & in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_bool*)ip1) = in2;
+    if (state) {
+        *((npy_bool*)ip1) &= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 BOOL_scalar_or(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_bool in1 = *((npy_bool*)ip1);
     npy_bool in2 = *((npy_bool*)ip2);
-    *((npy_bool*)ip1) = in1 | in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_bool*)ip1) = in2;
+    if (state) {
+        *((npy_bool*)ip1) |= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 BOOL_scalar_xor(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_bool in1 = *((npy_bool*)ip1);
     npy_bool in2 = *((npy_bool*)ip2);
-    *((npy_bool*)ip1) = in1 xor in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_bool*)ip1) = in2;
+    if (state) {
+        *((npy_bool*)ip1) ^= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 */
 
 void
 INT_scalar_replace(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
-    //npy_int in1 = *((npy_int*)ip1);
     npy_int in2 = *((npy_int*)ip2);
     *((npy_int*)ip1) = in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 INT_scalar_add(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_int in1 = *((npy_int*)ip1);
     npy_int in2 = *((npy_int*)ip2);
-    *((npy_int*)ip1) = in1 + in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_int*)ip1) = in2;
+    if (state) {
+        *((npy_int*)ip1) += in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 INT_scalar_multiply(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_int in1 = *((npy_int*)ip1);
     npy_int in2 = *((npy_int*)ip2);
-    *((npy_int*)ip1) = in1 * in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_int*)ip1) = in2;
+    if (state) {
+        *((npy_int*)ip1) *= in1; 
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 INT_scalar_maximum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_int in1 = *((npy_int*)ip1);
     npy_int in2 = *((npy_int*)ip2);
-    *((npy_int*)ip1) = (in1 >= in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_int*)ip1) = (state && in1 >= in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 INT_scalar_minimum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_int in1 = *((npy_int*)ip1);
     npy_int in2 = *((npy_int*)ip2);
-    *((npy_int*)ip1) = (in1 < in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_int*)ip1) = (state && in1 < in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 /*
 void
 INT_scalar_and(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_int in1 = *((npy_int*)ip1);
     npy_int in2 = *((npy_int*)ip2);
-    *((npy_int*)ip1) = in1 & in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_int*)ip1) = in2;
+    if (state) {
+        *((npy_int*)ip1) &= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 INT_scalar_or(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_int in1 = *((npy_int*)ip1);
     npy_int in2 = *((npy_int*)ip2);
-    *((npy_int*)ip1) = in1 | in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_int*)ip1) = in2;
+    if (state) {
+        *((npy_int*)ip1) |= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 INT_scalar_xor(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_int in1 = *((npy_int*)ip1);
     npy_int in2 = *((npy_int*)ip2);
-    *((npy_int*)ip1) = in1 xor in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_int*)ip1) = in2;
+    if (state) {
+        *((npy_int*)ip1) ^= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 */
 
 void
 UINT_scalar_replace(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
-    //npy_uint in1 = *((npy_uint*)ip1);
     npy_uint in2 = *((npy_uint*)ip2);
     *((npy_uint*)ip1) = in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 UINT_scalar_add(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_uint in1 = *((npy_uint*)ip1);
     npy_uint in2 = *((npy_uint*)ip2);
-    *((npy_uint*)ip1) = in1 + in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_uint*)ip1) = in2;
+    if (state) {
+        *((npy_uint*)ip1) += in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 UINT_scalar_multiply(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_uint in1 = *((npy_uint*)ip1);
     npy_uint in2 = *((npy_uint*)ip2);
-    *((npy_uint*)ip1) = in1 * in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_uint*)ip1) = in2;
+    if (state) {
+        *((npy_uint*)ip1) *= in1; 
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 UINT_scalar_maximum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_uint in1 = *((npy_uint*)ip1);
     npy_uint in2 = *((npy_uint*)ip2);
-    *((npy_uint*)ip1) = (in1 >= in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_uint*)ip1) = (state && in1 >= in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 UINT_scalar_minimum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_uint in1 = *((npy_uint*)ip1);
     npy_uint in2 = *((npy_uint*)ip2);
-    *((npy_uint*)ip1) = (in1 < in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_uint*)ip1) = (state && in1 < in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 /*
 void
 UINT_scalar_and(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_uint in1 = *((npy_uint*)ip1);
     npy_uint in2 = *((npy_uint*)ip2);
-    *((npy_uint*)ip1) = in1 & in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_uint*)ip1) = in2;
+    if (state) {
+        *((npy_uint*)ip1) &= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 UINT_scalar_or(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_uint in1 = *((npy_uint*)ip1);
     npy_uint in2 = *((npy_uint*)ip2);
-    *((npy_uint*)ip1) = in1 | in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_uint*)ip1) = in2;
+    if (state) {
+        *((npy_uint*)ip1) |= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 UINT_scalar_xor(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_uint in1 = *((npy_uint*)ip1);
     npy_uint in2 = *((npy_uint*)ip2);
-    *((npy_uint*)ip1) = in1 xor in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_uint*)ip1) = in2;
+    if (state) {
+        *((npy_uint*)ip1) ^= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 */
 
 void
 LONG_scalar_replace(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
-    //npy_long in1 = *((npy_long*)ip1);
     npy_long in2 = *((npy_long*)ip2);
     *((npy_long*)ip1) = in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 LONG_scalar_add(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_long in1 = *((npy_long*)ip1);
     npy_long in2 = *((npy_long*)ip2);
-    *((npy_long*)ip1) = in1 + in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_long*)ip1) = in2;
+    if (state) {
+        *((npy_long*)ip1) += in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 LONG_scalar_multiply(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_long in1 = *((npy_long*)ip1);
     npy_long in2 = *((npy_long*)ip2);
-    *((npy_long*)ip1) = in1 * in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_long*)ip1) = in2;
+    if (state) {
+        *((npy_long*)ip1) *= in1; 
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 LONG_scalar_maximum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_long in1 = *((npy_long*)ip1);
     npy_long in2 = *((npy_long*)ip2);
-    *((npy_long*)ip1) = (in1 >= in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_long*)ip1) = (state && in1 >= in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 LONG_scalar_minimum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_long in1 = *((npy_long*)ip1);
     npy_long in2 = *((npy_long*)ip2);
-    //std::cout << __func__ << "in1 = " << in1 << ", in2 = " << in2 << std::endl;
-    *((npy_long*)ip1) = (in1 < in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_long*)ip1) = (state && in1 < in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 /*
 void
 LONG_scalar_and(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_long in1 = *((npy_long*)ip1);
     npy_long in2 = *((npy_long*)ip2);
-    *((npy_long*)ip1) = in1 & in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_long*)ip1) = in2;
+    if (state) {
+        *((npy_long*)ip1) &= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 LONG_scalar_or(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_long in1 = *((npy_long*)ip1);
     npy_long in2 = *((npy_long*)ip2);
-    *((npy_long*)ip1) = in1 | in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_long*)ip1) = in2;
+    if (state) {
+        *((npy_long*)ip1) |= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 LONG_scalar_xor(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_long in1 = *((npy_long*)ip1);
     npy_long in2 = *((npy_long*)ip2);
-    *((npy_long*)ip1) = in1 xor in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_long*)ip1) = in2;
+    if (state) {
+        *((npy_long*)ip1) ^= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 */
 
 void
 ULONG_scalar_replace(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
-    //npy_ulong in1 = *((npy_ulong*)ip1);
     npy_ulong in2 = *((npy_ulong*)ip2);
     *((npy_ulong*)ip1) = in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 ULONG_scalar_add(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulong in1 = *((npy_ulong*)ip1);
     npy_ulong in2 = *((npy_ulong*)ip2);
-    *((npy_ulong*)ip1) = in1 + in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulong*)ip1) = in2;
+    if (state) {
+        *((npy_ulong*)ip1) += in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 ULONG_scalar_multiply(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulong in1 = *((npy_ulong*)ip1);
     npy_ulong in2 = *((npy_ulong*)ip2);
-    *((npy_ulong*)ip1) = in1 * in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulong*)ip1) = in2;
+    if (state) {
+        *((npy_ulong*)ip1) *= in1; 
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 ULONG_scalar_maximum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulong in1 = *((npy_ulong*)ip1);
     npy_ulong in2 = *((npy_ulong*)ip2);
-    *((npy_ulong*)ip1) = (in1 >= in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulong*)ip1) = (state && in1 >= in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 ULONG_scalar_minimum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulong in1 = *((npy_ulong*)ip1);
     npy_ulong in2 = *((npy_ulong*)ip2);
-    *((npy_ulong*)ip1) = (in1 < in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulong*)ip1) = (state && in1 < in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 /*
 void
 ULONG_scalar_and(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulong in1 = *((npy_ulong*)ip1);
     npy_ulong in2 = *((npy_ulong*)ip2);
-    *((npy_ulong*)ip1) = in1 & in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulong*)ip1) = in2;
+    if (state) {
+        *((npy_ulong*)ip1) &= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 ULONG_scalar_or(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulong in1 = *((npy_ulong*)ip1);
     npy_ulong in2 = *((npy_ulong*)ip2);
-    *((npy_ulong*)ip1) = in1 | in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulong*)ip1) = in2;
+    if (state) {
+        *((npy_ulong*)ip1) |= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 ULONG_scalar_xor(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulong in1 = *((npy_ulong*)ip1);
     npy_ulong in2 = *((npy_ulong*)ip2);
-    *((npy_ulong*)ip1) = in1 xor in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulong*)ip1) = in2;
+    if (state) {
+        *((npy_ulong*)ip1) ^= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 */
 
 void
 LONGLONG_scalar_replace(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
-    //npy_longlong in1 = *((npy_longlong*)ip1);
     npy_longlong in2 = *((npy_longlong*)ip2);
     *((npy_longlong*)ip1) = in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 LONGLONG_scalar_add(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_longlong in1 = *((npy_longlong*)ip1);
     npy_longlong in2 = *((npy_longlong*)ip2);
-    *((npy_longlong*)ip1) = in1 + in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_longlong*)ip1) = in2;
+    if (state) {
+        *((npy_longlong*)ip1) += in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 LONGLONG_scalar_multiply(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_longlong in1 = *((npy_longlong*)ip1);
     npy_longlong in2 = *((npy_longlong*)ip2);
-    *((npy_longlong*)ip1) = in1 * in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_longlong*)ip1) = in2;
+    if (state) {
+        *((npy_longlong*)ip1) *= in1; 
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 LONGLONG_scalar_maximum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_longlong in1 = *((npy_longlong*)ip1);
     npy_longlong in2 = *((npy_longlong*)ip2);
-    *((npy_longlong*)ip1) = (in1 >= in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_longlong*)ip1) = (state && in1 >= in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 LONGLONG_scalar_minimum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_longlong in1 = *((npy_longlong*)ip1);
     npy_longlong in2 = *((npy_longlong*)ip2);
-    *((npy_longlong*)ip1) = (in1 < in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_longlong*)ip1) = (state && in1 < in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 /*
 void
 LONGLONG_scalar_and(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_longlong in1 = *((npy_longlong*)ip1);
     npy_longlong in2 = *((npy_longlong*)ip2);
-    *((npy_longlong*)ip1) = in1 & in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_longlong*)ip1) = in2;
+    if (state) {
+        *((npy_longlong*)ip1) &= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 LONGLONG_scalar_or(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_longlong in1 = *((npy_longlong*)ip1);
     npy_longlong in2 = *((npy_longlong*)ip2);
-    *((npy_longlong*)ip1) = in1 | in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_longlong*)ip1) = in2;
+    if (state) {
+        *((npy_longlong*)ip1) |= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 LONGLONG_scalar_xor(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_longlong in1 = *((npy_longlong*)ip1);
     npy_longlong in2 = *((npy_longlong*)ip2);
-    *((npy_longlong*)ip1) = in1 xor in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_longlong*)ip1) = in2;
+    if (state) {
+        *((npy_longlong*)ip1) ^= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 */
 
 void
 ULONGLONG_scalar_replace(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
-    //npy_ulonglong in1 = *((npy_ulonglong*)ip1);
     npy_ulonglong in2 = *((npy_ulonglong*)ip2);
     *((npy_ulonglong*)ip1) = in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 ULONGLONG_scalar_add(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulonglong in1 = *((npy_ulonglong*)ip1);
     npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-    *((npy_ulonglong*)ip1) = in1 + in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulonglong*)ip1) = in2;
+    if (state) {
+        *((npy_ulonglong*)ip1) += in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 ULONGLONG_scalar_multiply(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulonglong in1 = *((npy_ulonglong*)ip1);
     npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-    *((npy_ulonglong*)ip1) = in1 * in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulonglong*)ip1) = in2;
+    if (state) {
+        *((npy_ulonglong*)ip1) *= in1; 
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 ULONGLONG_scalar_maximum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulonglong in1 = *((npy_ulonglong*)ip1);
     npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-    *((npy_ulonglong*)ip1) = (in1 >= in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulonglong*)ip1) = (state && in1 >= in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 ULONGLONG_scalar_minimum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulonglong in1 = *((npy_ulonglong*)ip1);
     npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-    *((npy_ulonglong*)ip1) = (in1 < in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulonglong*)ip1) = (state && in1 < in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 /*
 void
 ULONGLONG_scalar_and(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulonglong in1 = *((npy_ulonglong*)ip1);
     npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-    *((npy_ulonglong*)ip1) = in1 & in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulonglong*)ip1) = in2;
+    if (state) {
+        *((npy_ulonglong*)ip1) &= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 ULONGLONG_scalar_or(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulonglong in1 = *((npy_ulonglong*)ip1);
     npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-    *((npy_ulonglong*)ip1) = in1 | in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulonglong*)ip1) = in2;
+    if (state) {
+        *((npy_ulonglong*)ip1) |= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 ULONGLONG_scalar_xor(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_ulonglong in1 = *((npy_ulonglong*)ip1);
     npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-    *((npy_ulonglong*)ip1) = in1 xor in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_ulonglong*)ip1) = in2;
+    if (state) {
+        *((npy_ulonglong*)ip1) ^= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 */
 
 void
 FLOAT_scalar_replace(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
-    //npy_float in1 = *((npy_float*)ip1);
     npy_float in2 = *((npy_float*)ip2);
     *((npy_float*)ip1) = in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 FLOAT_scalar_add(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_float in1 = *((npy_float*)ip1);
     npy_float in2 = *((npy_float*)ip2);
-    *((npy_float*)ip1) = in1 + in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_float*)ip1) = in2;
+    if (state) {
+        *((npy_float*)ip1) += in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 FLOAT_scalar_multiply(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_float in1 = *((npy_float*)ip1);
     npy_float in2 = *((npy_float*)ip2);
-    *((npy_float*)ip1) = in1 * in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_float*)ip1) = in2;
+    if (state) {
+        *((npy_float*)ip1) *= in1; 
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 FLOAT_scalar_maximum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_float in1 = *((npy_float*)ip1);
     npy_float in2 = *((npy_float*)ip2);
-    *((npy_float*)ip1) = (in1 >= in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_float*)ip1) = (state && in1 >= in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 FLOAT_scalar_minimum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_float in1 = *((npy_float*)ip1);
     npy_float in2 = *((npy_float*)ip2);
-    *((npy_float*)ip1) = (in1 < in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_float*)ip1) = (state && in1 < in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 /*
 void
 FLOAT_scalar_and(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_float in1 = *((npy_float*)ip1);
     npy_float in2 = *((npy_float*)ip2);
-    *((npy_float*)ip1) = in1 & in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_float*)ip1) = in2;
+    if (state) {
+        *((npy_float*)ip1) &= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 FLOAT_scalar_or(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_float in1 = *((npy_float*)ip1);
     npy_float in2 = *((npy_float*)ip2);
-    *((npy_float*)ip1) = in1 | in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_float*)ip1) = in2;
+    if (state) {
+        *((npy_float*)ip1) |= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 FLOAT_scalar_xor(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_float in1 = *((npy_float*)ip1);
     npy_float in2 = *((npy_float*)ip2);
-    *((npy_float*)ip1) = in1 xor in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_float*)ip1) = in2;
+    if (state) {
+        *((npy_float*)ip1) ^= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 */
 
 void
 DOUBLE_scalar_replace(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
-    //npy_double in1 = *((npy_double*)ip1);
     npy_double in2 = *((npy_double*)ip2);
     *((npy_double*)ip1) = in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 DOUBLE_scalar_add(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_double in1 = *((npy_double*)ip1);
     npy_double in2 = *((npy_double*)ip2);
-    *((npy_double*)ip1) = in1 + in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_double*)ip1) = in2;
+    if (state) {
+        *((npy_double*)ip1) += in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 DOUBLE_scalar_multiply(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_double in1 = *((npy_double*)ip1);
     npy_double in2 = *((npy_double*)ip2);
-    *((npy_double*)ip1) = in1 * in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_double*)ip1) = in2;
+    if (state) {
+        *((npy_double*)ip1) *= in1; 
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 DOUBLE_scalar_maximum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_double in1 = *((npy_double*)ip1);
     npy_double in2 = *((npy_double*)ip2);
-    *((npy_double*)ip1) = (in1 >= in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_double*)ip1) = (state && in1 >= in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 void
 DOUBLE_scalar_minimum(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_double in1 = *((npy_double*)ip1);
     npy_double in2 = *((npy_double*)ip2);
-    *((npy_double*)ip1) = (in1 < in2) ? in1 : in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_double*)ip1) = (state && in1 < in2) ? in1 : in2;
+    *(bool*)ip1_state = true;
 }
 
 /*
 void
 DOUBLE_scalar_and(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_double in1 = *((npy_double*)ip1);
     npy_double in2 = *((npy_double*)ip2);
-    *((npy_double*)ip1) = in1 & in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_double*)ip1) = in2;
+    if (state) {
+        *((npy_double*)ip1) &= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 DOUBLE_scalar_or(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_double in1 = *((npy_double*)ip1);
     npy_double in2 = *((npy_double*)ip2);
-    *((npy_double*)ip1) = in1 | in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_double*)ip1) = in2;
+    if (state) {
+        *((npy_double*)ip1) |= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 
 void
 DOUBLE_scalar_xor(char **args)
 {
-    char *ip1 = args[0], *ip2 = args[1];
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];
 
     npy_double in1 = *((npy_double*)ip1);
     npy_double in2 = *((npy_double*)ip2);
-    *((npy_double*)ip1) = in1 xor in2;
+    bool state = *(bool*)ip1_state;
+    *((npy_double*)ip1) = in2;
+    if (state) {
+        *((npy_double*)ip1) ^= in1;
+    }
+    *(bool*)ip1_state = true;
 }
 */
 
@@ -796,7 +1056,6 @@ select_scalar_reducer(REDUCER reducer, char type)
 {
     int i;
 
-    std::cout << __func__ << " reducer = " << reducer << std::endl;
     for (i = 0; scalar_funcs_type[i] != ' '; i++) {
         if (scalar_funcs_type[i] == type)
             return scalar_functions[reducer - REDUCER_BEGIN][i];
@@ -805,10 +1064,10 @@ select_scalar_reducer(REDUCER reducer, char type)
 }
 
 void
-scalar_outer_loop(CArray *ip1, CArray *ip2, REDUCER reducer)
+scalar_outer_loop(CArray *ip1, CArray *ip1_state, CArray *ip2, REDUCER reducer)
 {
     std::cout << __func__ << std::endl;
-    char *arrays[2] = {ip1->get_data(), ip2->get_data()};
+    char *arrays[3] = {ip1->get_data(), ip1_state->get_data(), ip2->get_data()};
 
     scalar_reducer func = select_scalar_reducer(reducer, ip1->get_type());
     func(arrays);
@@ -818,11 +1077,11 @@ scalar_outer_loop(CArray *ip1, CArray *ip2, REDUCER reducer)
  * Dense array to dense array
  */
 #define BINARY_DENSE_LOOP\
-    char *ip1 = args[0], *ip2 = args[1];\
+    char *ip1 = args[0], *ip1_state = args[1], *ip2 = args[2];\
     npy_intp sp = steps[0];\
     npy_intp n = dimensions[0];\
     npy_intp i;\
-    for(i = 0; i < n; i++, ip1 += sp, ip2 += sp)
+    for(i = 0; i < n; i++, ip1 += sp, ip1_state++, ip2 += sp)
 
 
 
@@ -832,6 +1091,7 @@ BOOL_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_bool in2 = *((npy_bool*)ip2);
         *((npy_bool*)ip1) = in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -841,7 +1101,12 @@ BOOL_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_bool in1 = *((npy_bool*)ip1);
         npy_bool in2 = *((npy_bool*)ip2);
-        *((npy_bool*)ip1) = in1 + in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_bool*)ip1) = in2;
+        if (state) {
+            *((npy_bool*)ip1) += in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -851,7 +1116,12 @@ BOOL_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_bool in1 = *((npy_bool*)ip1);
         npy_bool in2 = *((npy_bool*)ip2);
-        *((npy_bool*)ip1) = in1 * in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_bool*)ip1) = in2;
+        if (state) {
+            *((npy_bool*)ip1) *= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -861,7 +1131,9 @@ BOOL_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_bool in1 = *((npy_bool*)ip1);
         npy_bool in2 = *((npy_bool*)ip2);
-        *((npy_bool*)ip1) = (in1 >= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_bool*)ip1) = (state && in1 >= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -871,7 +1143,9 @@ BOOL_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_bool in1 = *((npy_bool*)ip1);
         npy_bool in2 = *((npy_bool*)ip2);
-        *((npy_bool*)ip1) = (in1 <= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_bool*)ip1) = (state && in1 <= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -882,7 +1156,12 @@ BOOL_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_bool in1 = *((npy_bool*)ip1);
         npy_bool in2 = *((npy_bool*)ip2);
-        *((npy_bool*)ip1) = in1 and in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_bool*)ip1) = in2;
+        if (state) {
+            *((npy_bool*)ip1) &= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -892,7 +1171,12 @@ BOOL_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_bool in1 = *((npy_bool*)ip1);
         npy_bool in2 = *((npy_bool*)ip2);
-        *((npy_bool*)ip1) = in1 or in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_bool*)ip1) = in2;
+        if (state) {
+            *((npy_bool*)ip1) |= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -902,7 +1186,12 @@ BOOL_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_bool in1 = *((npy_bool*)ip1);
         npy_bool in2 = *((npy_bool*)ip2);
-        *((npy_bool*)ip1) = in1 xor in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_bool*)ip1) = in2;
+        if (state) {
+            *((npy_bool*)ip1) ^= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 */
@@ -913,6 +1202,7 @@ INT_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_int in2 = *((npy_int*)ip2);
         *((npy_int*)ip1) = in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -922,7 +1212,12 @@ INT_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_int in1 = *((npy_int*)ip1);
         npy_int in2 = *((npy_int*)ip2);
-        *((npy_int*)ip1) = in1 + in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_int*)ip1) = in2;
+        if (state) {
+            *((npy_int*)ip1) += in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -932,7 +1227,12 @@ INT_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_int in1 = *((npy_int*)ip1);
         npy_int in2 = *((npy_int*)ip2);
-        *((npy_int*)ip1) = in1 * in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_int*)ip1) = in2;
+        if (state) {
+            *((npy_int*)ip1) *= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -942,7 +1242,9 @@ INT_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_int in1 = *((npy_int*)ip1);
         npy_int in2 = *((npy_int*)ip2);
-        *((npy_int*)ip1) = (in1 >= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_int*)ip1) = (state && in1 >= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -952,7 +1254,9 @@ INT_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_int in1 = *((npy_int*)ip1);
         npy_int in2 = *((npy_int*)ip2);
-        *((npy_int*)ip1) = (in1 <= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_int*)ip1) = (state && in1 <= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -963,7 +1267,12 @@ INT_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_int in1 = *((npy_int*)ip1);
         npy_int in2 = *((npy_int*)ip2);
-        *((npy_int*)ip1) = in1 and in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_int*)ip1) = in2;
+        if (state) {
+            *((npy_int*)ip1) &= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -973,7 +1282,12 @@ INT_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_int in1 = *((npy_int*)ip1);
         npy_int in2 = *((npy_int*)ip2);
-        *((npy_int*)ip1) = in1 or in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_int*)ip1) = in2;
+        if (state) {
+            *((npy_int*)ip1) |= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -983,7 +1297,12 @@ INT_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_int in1 = *((npy_int*)ip1);
         npy_int in2 = *((npy_int*)ip2);
-        *((npy_int*)ip1) = in1 xor in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_int*)ip1) = in2;
+        if (state) {
+            *((npy_int*)ip1) ^= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 */
@@ -994,6 +1313,7 @@ UINT_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_uint in2 = *((npy_uint*)ip2);
         *((npy_uint*)ip1) = in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1003,7 +1323,12 @@ UINT_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_uint in1 = *((npy_uint*)ip1);
         npy_uint in2 = *((npy_uint*)ip2);
-        *((npy_uint*)ip1) = in1 + in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_uint*)ip1) = in2;
+        if (state) {
+            *((npy_uint*)ip1) += in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1013,7 +1338,12 @@ UINT_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_uint in1 = *((npy_uint*)ip1);
         npy_uint in2 = *((npy_uint*)ip2);
-        *((npy_uint*)ip1) = in1 * in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_uint*)ip1) = in2;
+        if (state) {
+            *((npy_uint*)ip1) *= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1023,7 +1353,9 @@ UINT_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_uint in1 = *((npy_uint*)ip1);
         npy_uint in2 = *((npy_uint*)ip2);
-        *((npy_uint*)ip1) = (in1 >= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_uint*)ip1) = (state && in1 >= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1033,7 +1365,9 @@ UINT_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_uint in1 = *((npy_uint*)ip1);
         npy_uint in2 = *((npy_uint*)ip2);
-        *((npy_uint*)ip1) = (in1 <= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_uint*)ip1) = (state && in1 <= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1044,7 +1378,12 @@ UINT_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_uint in1 = *((npy_uint*)ip1);
         npy_uint in2 = *((npy_uint*)ip2);
-        *((npy_uint*)ip1) = in1 and in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_uint*)ip1) = in2;
+        if (state) {
+            *((npy_uint*)ip1) &= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1054,7 +1393,12 @@ UINT_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_uint in1 = *((npy_uint*)ip1);
         npy_uint in2 = *((npy_uint*)ip2);
-        *((npy_uint*)ip1) = in1 or in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_uint*)ip1) = in2;
+        if (state) {
+            *((npy_uint*)ip1) |= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1064,7 +1408,12 @@ UINT_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_uint in1 = *((npy_uint*)ip1);
         npy_uint in2 = *((npy_uint*)ip2);
-        *((npy_uint*)ip1) = in1 xor in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_uint*)ip1) = in2;
+        if (state) {
+            *((npy_uint*)ip1) ^= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 */
@@ -1075,6 +1424,7 @@ LONG_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_long in2 = *((npy_long*)ip2);
         *((npy_long*)ip1) = in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1084,7 +1434,12 @@ LONG_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_long in1 = *((npy_long*)ip1);
         npy_long in2 = *((npy_long*)ip2);
-        *((npy_long*)ip1) = in1 + in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_long*)ip1) = in2;
+        if (state) {
+            *((npy_long*)ip1) += in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1094,7 +1449,12 @@ LONG_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_long in1 = *((npy_long*)ip1);
         npy_long in2 = *((npy_long*)ip2);
-        *((npy_long*)ip1) = in1 * in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_long*)ip1) = in2;
+        if (state) {
+            *((npy_long*)ip1) *= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1104,7 +1464,9 @@ LONG_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_long in1 = *((npy_long*)ip1);
         npy_long in2 = *((npy_long*)ip2);
-        *((npy_long*)ip1) = (in1 >= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_long*)ip1) = (state && in1 >= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1114,7 +1476,9 @@ LONG_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_long in1 = *((npy_long*)ip1);
         npy_long in2 = *((npy_long*)ip2);
-        *((npy_long*)ip1) = (in1 <= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_long*)ip1) = (state && in1 <= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1125,7 +1489,12 @@ LONG_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_long in1 = *((npy_long*)ip1);
         npy_long in2 = *((npy_long*)ip2);
-        *((npy_long*)ip1) = in1 and in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_long*)ip1) = in2;
+        if (state) {
+            *((npy_long*)ip1) &= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1135,7 +1504,12 @@ LONG_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_long in1 = *((npy_long*)ip1);
         npy_long in2 = *((npy_long*)ip2);
-        *((npy_long*)ip1) = in1 or in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_long*)ip1) = in2;
+        if (state) {
+            *((npy_long*)ip1) |= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1145,7 +1519,12 @@ LONG_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_long in1 = *((npy_long*)ip1);
         npy_long in2 = *((npy_long*)ip2);
-        *((npy_long*)ip1) = in1 xor in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_long*)ip1) = in2;
+        if (state) {
+            *((npy_long*)ip1) ^= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 */
@@ -1156,6 +1535,7 @@ ULONG_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulong in2 = *((npy_ulong*)ip2);
         *((npy_ulong*)ip1) = in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1165,7 +1545,12 @@ ULONG_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulong in1 = *((npy_ulong*)ip1);
         npy_ulong in2 = *((npy_ulong*)ip2);
-        *((npy_ulong*)ip1) = in1 + in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulong*)ip1) = in2;
+        if (state) {
+            *((npy_ulong*)ip1) += in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1175,7 +1560,12 @@ ULONG_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulong in1 = *((npy_ulong*)ip1);
         npy_ulong in2 = *((npy_ulong*)ip2);
-        *((npy_ulong*)ip1) = in1 * in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulong*)ip1) = in2;
+        if (state) {
+            *((npy_ulong*)ip1) *= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1185,7 +1575,9 @@ ULONG_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulong in1 = *((npy_ulong*)ip1);
         npy_ulong in2 = *((npy_ulong*)ip2);
-        *((npy_ulong*)ip1) = (in1 >= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulong*)ip1) = (state && in1 >= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1195,7 +1587,9 @@ ULONG_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulong in1 = *((npy_ulong*)ip1);
         npy_ulong in2 = *((npy_ulong*)ip2);
-        *((npy_ulong*)ip1) = (in1 <= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulong*)ip1) = (state && in1 <= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1206,7 +1600,12 @@ ULONG_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulong in1 = *((npy_ulong*)ip1);
         npy_ulong in2 = *((npy_ulong*)ip2);
-        *((npy_ulong*)ip1) = in1 and in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulong*)ip1) = in2;
+        if (state) {
+            *((npy_ulong*)ip1) &= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1216,7 +1615,12 @@ ULONG_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulong in1 = *((npy_ulong*)ip1);
         npy_ulong in2 = *((npy_ulong*)ip2);
-        *((npy_ulong*)ip1) = in1 or in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulong*)ip1) = in2;
+        if (state) {
+            *((npy_ulong*)ip1) |= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1226,7 +1630,12 @@ ULONG_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulong in1 = *((npy_ulong*)ip1);
         npy_ulong in2 = *((npy_ulong*)ip2);
-        *((npy_ulong*)ip1) = in1 xor in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulong*)ip1) = in2;
+        if (state) {
+            *((npy_ulong*)ip1) ^= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 */
@@ -1237,6 +1646,7 @@ LONGLONG_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_longlong in2 = *((npy_longlong*)ip2);
         *((npy_longlong*)ip1) = in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1246,7 +1656,12 @@ LONGLONG_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_longlong in1 = *((npy_longlong*)ip1);
         npy_longlong in2 = *((npy_longlong*)ip2);
-        *((npy_longlong*)ip1) = in1 + in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_longlong*)ip1) = in2;
+        if (state) {
+            *((npy_longlong*)ip1) += in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1256,7 +1671,12 @@ LONGLONG_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_longlong in1 = *((npy_longlong*)ip1);
         npy_longlong in2 = *((npy_longlong*)ip2);
-        *((npy_longlong*)ip1) = in1 * in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_longlong*)ip1) = in2;
+        if (state) {
+            *((npy_longlong*)ip1) *= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1266,7 +1686,9 @@ LONGLONG_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_longlong in1 = *((npy_longlong*)ip1);
         npy_longlong in2 = *((npy_longlong*)ip2);
-        *((npy_longlong*)ip1) = (in1 >= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_longlong*)ip1) = (state && in1 >= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1276,7 +1698,9 @@ LONGLONG_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_longlong in1 = *((npy_longlong*)ip1);
         npy_longlong in2 = *((npy_longlong*)ip2);
-        *((npy_longlong*)ip1) = (in1 <= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_longlong*)ip1) = (state && in1 <= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1287,7 +1711,12 @@ LONGLONG_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_longlong in1 = *((npy_longlong*)ip1);
         npy_longlong in2 = *((npy_longlong*)ip2);
-        *((npy_longlong*)ip1) = in1 and in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_longlong*)ip1) = in2;
+        if (state) {
+            *((npy_longlong*)ip1) &= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1297,7 +1726,12 @@ LONGLONG_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_longlong in1 = *((npy_longlong*)ip1);
         npy_longlong in2 = *((npy_longlong*)ip2);
-        *((npy_longlong*)ip1) = in1 or in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_longlong*)ip1) = in2;
+        if (state) {
+            *((npy_longlong*)ip1) |= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1307,7 +1741,12 @@ LONGLONG_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_longlong in1 = *((npy_longlong*)ip1);
         npy_longlong in2 = *((npy_longlong*)ip2);
-        *((npy_longlong*)ip1) = in1 xor in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_longlong*)ip1) = in2;
+        if (state) {
+            *((npy_longlong*)ip1) ^= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 */
@@ -1318,6 +1757,7 @@ ULONGLONG_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulonglong in2 = *((npy_ulonglong*)ip2);
         *((npy_ulonglong*)ip1) = in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1327,7 +1767,12 @@ ULONGLONG_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulonglong in1 = *((npy_ulonglong*)ip1);
         npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-        *((npy_ulonglong*)ip1) = in1 + in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulonglong*)ip1) = in2;
+        if (state) {
+            *((npy_ulonglong*)ip1) += in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1337,7 +1782,12 @@ ULONGLONG_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulonglong in1 = *((npy_ulonglong*)ip1);
         npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-        *((npy_ulonglong*)ip1) = in1 * in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulonglong*)ip1) = in2;
+        if (state) {
+            *((npy_ulonglong*)ip1) *= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1347,7 +1797,9 @@ ULONGLONG_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulonglong in1 = *((npy_ulonglong*)ip1);
         npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-        *((npy_ulonglong*)ip1) = (in1 >= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulonglong*)ip1) = (state && in1 >= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1357,7 +1809,9 @@ ULONGLONG_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulonglong in1 = *((npy_ulonglong*)ip1);
         npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-        *((npy_ulonglong*)ip1) = (in1 <= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulonglong*)ip1) = (state && in1 <= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1368,7 +1822,12 @@ ULONGLONG_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulonglong in1 = *((npy_ulonglong*)ip1);
         npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-        *((npy_ulonglong*)ip1) = in1 and in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulonglong*)ip1) = in2;
+        if (state) {
+            *((npy_ulonglong*)ip1) &= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1378,7 +1837,12 @@ ULONGLONG_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulonglong in1 = *((npy_ulonglong*)ip1);
         npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-        *((npy_ulonglong*)ip1) = in1 or in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulonglong*)ip1) = in2;
+        if (state) {
+            *((npy_ulonglong*)ip1) |= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1388,7 +1852,12 @@ ULONGLONG_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_ulonglong in1 = *((npy_ulonglong*)ip1);
         npy_ulonglong in2 = *((npy_ulonglong*)ip2);
-        *((npy_ulonglong*)ip1) = in1 xor in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_ulonglong*)ip1) = in2;
+        if (state) {
+            *((npy_ulonglong*)ip1) ^= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 */
@@ -1399,6 +1868,7 @@ FLOAT_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_float in2 = *((npy_float*)ip2);
         *((npy_float*)ip1) = in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1408,7 +1878,12 @@ FLOAT_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_float in1 = *((npy_float*)ip1);
         npy_float in2 = *((npy_float*)ip2);
-        *((npy_float*)ip1) = in1 + in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_float*)ip1) = in2;
+        if (state) {
+            *((npy_float*)ip1) += in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1418,7 +1893,12 @@ FLOAT_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_float in1 = *((npy_float*)ip1);
         npy_float in2 = *((npy_float*)ip2);
-        *((npy_float*)ip1) = in1 * in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_float*)ip1) = in2;
+        if (state) {
+            *((npy_float*)ip1) *= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1428,7 +1908,9 @@ FLOAT_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_float in1 = *((npy_float*)ip1);
         npy_float in2 = *((npy_float*)ip2);
-        *((npy_float*)ip1) = (in1 >= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_float*)ip1) = (state && in1 >= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1438,7 +1920,9 @@ FLOAT_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_float in1 = *((npy_float*)ip1);
         npy_float in2 = *((npy_float*)ip2);
-        *((npy_float*)ip1) = (in1 <= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_float*)ip1) = (state && in1 <= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1449,7 +1933,12 @@ FLOAT_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_float in1 = *((npy_float*)ip1);
         npy_float in2 = *((npy_float*)ip2);
-        *((npy_float*)ip1) = in1 and in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_float*)ip1) = in2;
+        if (state) {
+            *((npy_float*)ip1) &= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1459,7 +1948,12 @@ FLOAT_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_float in1 = *((npy_float*)ip1);
         npy_float in2 = *((npy_float*)ip2);
-        *((npy_float*)ip1) = in1 or in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_float*)ip1) = in2;
+        if (state) {
+            *((npy_float*)ip1) |= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1469,7 +1963,12 @@ FLOAT_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_float in1 = *((npy_float*)ip1);
         npy_float in2 = *((npy_float*)ip2);
-        *((npy_float*)ip1) = in1 xor in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_float*)ip1) = in2;
+        if (state) {
+            *((npy_float*)ip1) ^= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 */
@@ -1480,6 +1979,7 @@ DOUBLE_dense_replace(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_double in2 = *((npy_double*)ip2);
         *((npy_double*)ip1) = in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1487,13 +1987,14 @@ void
 DOUBLE_dense_add(char **args, npy_intp *dimensions, npy_intp *steps)
 {
     BINARY_DENSE_LOOP {
-        printf("----------------------------------@1 %p %p\n", (void*)ip1, (void*)ip2);
-        printf("----------------------------------@1 %p %p\n", (void*)ip1, (void*)ip2);
-        printf("----------------------------------@1 %p %p\n", (void*)ip1, (void*)ip2);
         npy_double in1 = *((npy_double*)ip1);
         npy_double in2 = *((npy_double*)ip2);
-        *((npy_double*)ip1) = in1 + in2;
-        printf("..................................@2 %p %p\n", (void*)ip1, (void*)ip2);
+        bool state = *((bool*)ip1_state);
+        *((npy_double*)ip1) = in2;
+        if (state) {
+            *((npy_double*)ip1) += in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1503,7 +2004,12 @@ DOUBLE_dense_multiply(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_double in1 = *((npy_double*)ip1);
         npy_double in2 = *((npy_double*)ip2);
-        *((npy_double*)ip1) = in1 * in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_double*)ip1) = in2;
+        if (state) {
+            *((npy_double*)ip1) *= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1513,7 +2019,9 @@ DOUBLE_dense_maximum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_double in1 = *((npy_double*)ip1);
         npy_double in2 = *((npy_double*)ip2);
-        *((npy_double*)ip1) = (in1 >= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_double*)ip1) = (state && in1 >= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1523,7 +2031,9 @@ DOUBLE_dense_minimum(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_double in1 = *((npy_double*)ip1);
         npy_double in2 = *((npy_double*)ip2);
-        *((npy_double*)ip1) = (in1 <= in2) ? in1 : in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_double*)ip1) = (state && in1 <= in2) ? in1 : in2;
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1534,7 +2044,12 @@ DOUBLE_dense_and(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_double in1 = *((npy_double*)ip1);
         npy_double in2 = *((npy_double*)ip2);
-        *((npy_double*)ip1) = in1 and in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_double*)ip1) = in2;
+        if (state) {
+            *((npy_double*)ip1) &= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1544,7 +2059,12 @@ DOUBLE_dense_or(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_double in1 = *((npy_double*)ip1);
         npy_double in2 = *((npy_double*)ip2);
-        *((npy_double*)ip1) = in1 or in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_double*)ip1) = in2;
+        if (state) {
+            *((npy_double*)ip1) |= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 
@@ -1554,7 +2074,12 @@ DOUBLE_dense_xor(char **args, npy_intp *dimensions, npy_intp *steps)
     BINARY_DENSE_LOOP {
         npy_double in1 = *((npy_double*)ip1);
         npy_double in2 = *((npy_double*)ip2);
-        *((npy_double*)ip1) = in1 xor in2;
+        bool state = *((bool*)ip1_state);
+        *((npy_double*)ip1) = in2;
+        if (state) {
+            *((npy_double*)ip1) ^= in1;
+        }
+        *(bool*)ip1_state = true;
     }
 }
 */
@@ -1598,9 +2123,9 @@ select_dense_reducer(REDUCER reducer, char type)
 
 /* reducer(ip1[ex], ip2) */
 void
-slice_dense_outer_loop(CArray *ip1, CArray *ip2, CExtent *ex, REDUCER reducer)
+slice_dense_outer_loop(CArray *ip1, CArray *ip1_state, CArray *ip2, CExtent *ex, REDUCER reducer)
 {
-    char *arrays[2] = {ip1->get_data(), ip2->get_data()};
+    char *arrays[3] = {ip1->get_data(), ip1_state->get_data(), ip2->get_data()};
     npy_intp continous_size, all_size;
     npy_intp inner_steps[1] = {ip1->get_strides()[ip1->get_nd() - 1]};
     int i, last_sliced_dim;
@@ -1635,6 +2160,7 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip2, CExtent *ex, REDUCER reducer)
     do {
         curr_pos = ravelled_pos(curr_idx, ex->array_shape, ip1->get_nd());
         arrays[0] += (curr_pos - prev_pos) * ip1->get_strides()[ip1->get_nd() - 1];
+        arrays[1] += (curr_pos - prev_pos); 
         func(arrays, &continous_size, inner_steps);
 
         for (i = last_sliced_dim; i >= 0; i--) {
@@ -1651,14 +2177,14 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip2, CExtent *ex, REDUCER reducer)
         }
         prev_pos = curr_pos;
         all_size -= continous_size;
-        arrays[1] += continous_size * ip1->get_strides()[ip1->get_nd() - 1];
+        arrays[2] += continous_size * ip1->get_strides()[ip1->get_nd() - 1];
     } while(all_size > 0);
 }
 
 void
-trivial_dense_outer_loop(CArray *ip1, CArray *ip2, REDUCER reducer)
+trivial_dense_outer_loop(CArray *ip1, CArray *ip1_state, CArray *ip2, REDUCER reducer)
 {
-    char *arrays[2] = {ip1->get_data(), ip2->get_data()};
+    char *arrays[3] = {ip1->get_data(), ip1_state->get_data(), ip2->get_data()};
     npy_intp inner_steps[1] = {ip1->get_strides()[ip1->get_nd() - 1]};
     npy_intp size = 1;
     for (int i = 0; i < ip1->get_nd(); i++) {
@@ -1674,7 +2200,8 @@ trivial_dense_outer_loop(CArray *ip1, CArray *ip2, REDUCER reducer)
  */
 
 #define BINARY_BEGIN_SPARSE_LOOP \
-    char *dp = args[0], *rp = args[1], *cp = args[2], *vp = args[3]; \
+    char *dp = args[0], *dp_state = args[1], *rp = args[2], *cp = args[3], *vp = args[4]; \
+    *dp_state = 'a'; \
     npy_intp dense_row_stride = dimensions[0]; \
     npy_intp dense_col_stride = dimensions[1]; \
     npy_intp n = dimensions[2]; \
@@ -2013,9 +2540,11 @@ select_sparse_dense_reducer(REDUCER reducer, char type)
 }
 
 void
-sparse_dense_outer_loop(CArray *dense, CArray *sparse[], CExtent *ex, REDUCER reducer)
+sparse_dense_outer_loop(CArray *dense, CArray *dense_state, CArray *sparse[], 
+                        CExtent *ex, REDUCER reducer)
 {
-    char *arrays[4] = {dense->get_data(), sparse[0]->get_data(), sparse[1]->get_data(), sparse[2]->get_data()};
+    char *arrays[5] = {dense->get_data(), dense_state->get_data(), sparse[0]->get_data(), 
+                       sparse[1]->get_data(), sparse[2]->get_data()};
     npy_intp dimensions[3] = {dense->get_strides()[0], dense->get_strides()[1],
                               sparse[0]->get_dimensions()[0]};
     npy_intp base[2] = {ex->ul[0], ex->ul[1]};
