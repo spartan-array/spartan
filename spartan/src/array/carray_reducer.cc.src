@@ -366,7 +366,7 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip1_state, CArray *ip2, CExtent *ex,
 
     last_sliced_dim = i;
     if (last_sliced_dim == ip1->get_nd() - 1) {
-        continous_size = ip1->get_dimensions()[ip1->get_nd() - 1];
+        continous_size = ex->lr[last_sliced_dim] - ex->ul[last_sliced_dim];
     } else {
         continous_size = 1;
         for (i = last_sliced_dim + 1; i < ip1->get_nd(); i++) {
@@ -388,7 +388,7 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip1_state, CArray *ip2, CExtent *ex,
         func(arrays, &continous_size, inner_steps);
 
         for (i = last_sliced_dim; i >= 0; i--) {
-            if (last_sliced_dim == ip1->get_nd() - 1) {
+            if (last_sliced_dim == ip1->get_nd() - 1 && i == last_sliced_dim) {
                 curr_idx[i] = ex->ul[i];
                 continue;
             } else {
@@ -406,7 +406,7 @@ slice_dense_outer_loop(CArray *ip1, CArray *ip1_state, CArray *ip2, CExtent *ex,
 }
 
 void
-trivial_dense_outer_loop(CArray *ip1, CArray *ip1_state, CArray *ip2, REDUCER reducer)
+full_dense_outer_loop(CArray *ip1, CArray *ip1_state, CArray *ip2, REDUCER reducer)
 {
     char *arrays[3] = {ip1->get_data(), ip1_state->get_data(), ip2->get_data()};
     npy_intp inner_steps[1] = {ip1->get_strides()[ip1->get_nd() - 1]};
@@ -490,7 +490,7 @@ sparse_dense_reducer sparse_dense_add_functions[] = {/*_RP_BEGIN_*/_RP_NAME__spa
 
 char sparse_funcs_type[] = {/*_RP_BEGIN_*/_RP_TYPELTR_, /*_RP_END_*/' '};
 /* This must be sync with REDUCER enumeration */
-/* Only support add and or now. These two are trivial to implement */
+/* Only support add and or now. These two are full to implement */
 sparse_dense_reducer* sparse_dense_functions[] = {
                                      NULL,                            /* REDUCER_REPLACE */
                                      sparse_dense_add_functions,      /* REDUCER_ADD */

@@ -164,7 +164,9 @@ TileBase__update(PyObject* o, PyObject* args)
     }
 
     if (ttype != CTILE_SPARSE) {
+        /* TODO:Release dense*/
         PyArrayObject *dense = (PyArrayObject*)PyTuple_GetItem(data, 0);
+        dense = PyArray_GETCONTIGUOUS(dense);
         CTile tile(dense->dimensions, dense->nd, dense->descr->type, ttype, CTILE_SPARSE_NONE);
         CArray *dense_array = new CArray(dense->dimensions, dense->nd,
                                          dense->descr->type, dense->data,

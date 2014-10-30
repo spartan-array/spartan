@@ -19,7 +19,7 @@ enum REDUCER {
 void scalar_outer_loop(CArray *ip1, CArray *ip1_state, CArray *ip2, REDUCER reducer);
 void slice_dense_outer_loop(CArray *ip1, CArray *ip1_state, CArray *ip2, 
                             CExtent *ex, REDUCER reducer);
-void trivial_dense_outer_loop(CArray *ip1, CArray *ip1_state, CArray *ip2, REDUCER reducer);
+void full_dense_outer_loop(CArray *ip1, CArray *ip1_state, CArray *ip2, REDUCER reducer);
 void sparse_dense_outer_loop(CArray *dense, CArray *dense_state, CArray *sparse[3], 
                              CExtent *ex, REDUCER reducer);
 

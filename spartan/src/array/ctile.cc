@@ -148,24 +148,22 @@ void
 CTile::reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer)
 {
     CExtent *ex = slice_to_ex(idx);
-    bool trivial = is_idx_complete(idx);
+    bool full = is_idx_complete(idx);
 
     if (nd == 0) { // Special case
         scalar_outer_loop(dense, dense_state, update.dense, reducer);
     } else if (type == CTILE_DENSE || type == CTILE_MASKED) { 
-        Log_debug("dense_state %p", dense_state);
         if ((update.type == CTILE_DENSE && update.type == CTILE_MASKED) ||
              update.type == CTILE_DENSE) { 
-            // Don't have to update mask in both cases.
-            if (trivial) {
-                trivial_dense_outer_loop(dense, dense_state, update.dense, reducer);
+            if (full) {
+                full_dense_outer_loop(dense, dense_state, update.dense, reducer);
             } else {
                 slice_dense_outer_loop(dense, dense_state, update.dense, ex, reducer);
             }
         } else if (update.type != CTILE_SPARSE) {
-            if (trivial) {
-                trivial_dense_outer_loop(dense, dense_state, update.dense, reducer);
-                trivial_dense_outer_loop(mask, mask_state, update.mask, REDUCER_OR);
+            if (full) {
+                full_dense_outer_loop(dense, dense_state, update.dense, reducer);
+                full_dense_outer_loop(mask, mask_state, update.mask, REDUCER_OR);
             } else {
                 slice_dense_outer_loop(dense, dense_state, update.dense, ex, reducer);
                 slice_dense_outer_loop(mask, mask_state, update.mask, ex, REDUCER_OR);
@@ -424,7 +422,9 @@ ctile_creator(PyObject *args)
     if (data != Py_None) {
         assert(PyTuple_Check(data) != 0);
         if (tile_type != CTILE_SPARSE) {
+            /* TODO: release dense */
             PyArrayObject *dense = (PyArrayObject*)PyTuple_GetItem(data, 0);
+            dense = PyArray_GETCONTIGUOUS(dense);
             CArray *dense_array = new CArray(dense->dimensions, dense->nd,
                                              dense->descr->type, dense->data,
                                              dense);
