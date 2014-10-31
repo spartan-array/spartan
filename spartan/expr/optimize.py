@@ -481,7 +481,7 @@ class AutomaticTiling(OptimizePass):
   def init(self, expr):
     self.cur_node_id = 1
     self.edges = {}
-    self.nodes = {0: self.node_type(None, -1, [], [])}
+    self.nodes = {0: self.node_type([], -1, [], [])}
     self.expr_to_nodes = {}
     self.split_nodes = {}
     self.init_expr = id(expr)
@@ -784,11 +784,11 @@ class AutomaticTiling(OptimizePass):
  
   def calc_tiling(self, expr):
     # add T node for graph
+    self.nodes[self.cur_node_id] = self.node_type([expr], -1, [], [])
+    self.add_edge(self.cur_node_id - 1, self.cur_node_id, 0)
     if self.cur_node_id - 1 in self.split_nodes:
-      self.nodes[self.cur_node_id] = self.node_type([expr], -1, [], [])
       self.add_edge(self.cur_node_id - 2, self.cur_node_id, 0)
-      self.add_edge(self.cur_node_id - 1, self.cur_node_id, 0)
-      self.cur_node_id += 1
+    self.cur_node_id += 1
     
     # compute best tiling for all exprs
     self.visited_nodes = set()

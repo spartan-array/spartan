@@ -123,9 +123,9 @@ static PyObject* mincost_tiling(PyObject *self, PyObject *args) {
 	memset(vis, false, sizeof(vis));
 	mincost = find_mincost_tiling(0, t, vis);
 
-	ans = PySet_New(NULL);
+	ans = PyList_New(0);
 	for (u = 0; u < t; u++)
-		if (vis[u]) PySet_Add(ans, Py_BuildValue("i", u));
+		if (vis[u]) PyList_Append(ans, Py_BuildValue("i", u));
 
 	//printf("mincost:%ld\n", mincost);
 	return ans;

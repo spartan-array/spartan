@@ -51,9 +51,9 @@ def fuzzy_kmeans(points, k=10, num_iter=10, m=2.0, centers=None):
   points = expr.force(points)
   num_dim = points.shape[1]
   if centers is None:
-      centers = expr.rand(k, num_dim, tile_hint=(1, num_dim))
+      centers = expr.rand(k, num_dim)
 
-  labels = expr.zeros((points.shape[0],), dtype=np.int, tile_hint=(points.shape[0]/len(points.tiles),))
+  labels = expr.zeros((points.shape[0],), dtype=np.int)
 
   for iter in range(num_iter):
     centers = expr.as_array(centers)
