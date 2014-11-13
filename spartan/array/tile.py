@@ -3,6 +3,7 @@ import numpy.ma as ma
 import scipy.sparse as sp
 from _ctile_py_if import TileBase
 from spartan import util
+from spartan.array import sparse
 
 TYPE_DENSE = TileBase.TILE_DENSE
 TYPE_MASKED = TileBase.TILE_MASKED
@@ -31,6 +32,10 @@ def npdata_to_internal(array):
     elif isinstance(array, sp.csr_matrix):
       stype = TileBase.TILE_SPARSE_CSR
       data = (array.indices, array.inptr, array.data)
+    else:
+      stype = TileBase.TILE_SPARSE_COO
+      array = array.tocoo()
+      data = (array.row, array.col, array.data)
   elif isinstance(array, ma.MaskedArray):
     ttype = TileBase.TILE_MASKED
     data = (array.data, array.mask)
@@ -59,7 +64,7 @@ class Tile(TileBase):
       return super(Tile, self).get(subslice)
 
   def update(self, subslice, data, reducer):
-    _, _, sparse_type, tile_type, tile_data = npdata_to_internal(data)
+    _, _, tile_type, sparse_type, tile_data = npdata_to_internal(data)
 
     if builtin_reducers.get(reducer, None) is None:
       _reducer = reducer
@@ -76,7 +81,7 @@ class Tile(TileBase):
 
 def from_data(data):
   util.log_info("from_data %s", str(type(data)))
-  if not isinstance(data, np.ndarray):
+  if not isinstance(data, np.ndarray) and not sp.issparse(data):
     data = np.asarray(data)
   shape, dtype, tile_type, sparse_type, tile_data = npdata_to_internal(data)
 
@@ -98,7 +103,7 @@ def from_shape(shape, dtype, tile_type, sparse_type=TileBase.TILE_SPARSE_COO):
 
 
 # DONT use this API. This API is only for internal usage.
-def _internal_update(data, subslice, update, reducer):
+def _internal_update(old_tile, subslice, update, reducer):
   # zero-dimensional arrays; just use data == None as a mask.
   if len(old_tile.shape) == 0:
     if old_tile.data is None or reducer is None:
@@ -111,27 +116,28 @@ def _internal_update(data, subslice, update, reducer):
 
   # Apply a sparse update array to the current tile data (which may be sparse or dense)
   if sp.issparse(update):
-    if isinstance(data) == np.ndarray:
+    if isinstance(old_tile) == np.ndarray:
       assert False, "dense = reducer(dense[subslice], sparse) doesn't support customized reducer."
     else:
-      if data.shape == update.shape:
-        data = reducer(old_tile.data, update)
+      if old_tile.shape == update.shape:
+        old_tile = reducer(old_tile.data, update)
       else:
-        data = compute_sparse_update(old_tile.data, update, subslice, reducer)
+        old_tile = sparse.compute_sparse_update(old_tile.data, update, subslice, reducer)
   # Apply a dense update array to the current tile data (which may be sparse or dense)
   else:
-    if isinstance(data) == np.ndarray:
-      if data.shape == update.shape:
-        data = reducer(data, update)
+    if isinstance(old_tile) == np.ndarray:
+      if old_tile.shape == update.shape:
+        old_tile = reducer(old_tile, update)
       else:
-        data[subslice] = reducer(data[subslice], update)
+        old_tile[subslice] = reducer(old_tile[subslice], update)
     else:
       # TODO (SPARSE UPDATE)!!!
       # sparse update, no mask, just iterate over data items
       # TODO(POWER) -- this is SLOW!
-      if data is not None: #and old_tile.data.format == 'coo':
-        data = old_tile.data.tolil()
-      assert sp.issparse(update)
-      data[subslice] = reducer(data[subslice], update)
+      assert False
+      #if old_tile is not None and old_tile.data.format == 'coo':
+        #old_tile = old_tile.data.tolil()
+      #assert sp.issparse(update)
+      #old_tile[subslice] = reducer(old_tile[subslice], update)
 
-  return data
+  return old_tile

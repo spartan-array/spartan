@@ -155,6 +155,7 @@ public:
 
     // This won't call Python APIs
     std::vector <char*> to_carray_rpc(CExtent *ex);
+    std::vector <char*> to_carray_rpc(void);
     // This will call Python APIs
     PyObject* to_npy(void);
 

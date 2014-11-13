@@ -151,8 +151,10 @@ CTile::reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer)
     bool full = is_idx_complete(idx);
 
     if (nd == 0) { // Special case
+        std::cout << "CTILE::reduce 0" << std::endl;
         scalar_outer_loop(dense, dense_state, update.dense, reducer);
     } else if (type == CTILE_DENSE || type == CTILE_MASKED) { 
+        std::cout << "CTILE::reduce 1" << std::endl;
         if ((update.type == CTILE_DENSE && update.type == CTILE_MASKED) ||
              update.type == CTILE_DENSE) { 
             if (full) {
@@ -173,6 +175,7 @@ CTile::reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer)
         }
 
     } else if (type == CTILE_SPARSE) {
+        std::cout << "CTILE::reduce 2" << std::endl;
         if (update.type == CTILE_DENSE || update.type == CTILE_MASKED) {
             assert(0);
         } else { 
@@ -233,7 +236,7 @@ CTile::get(const CSliceIdx &idx)
 std::vector <char*>
 CTile::to_tile_rpc(const CSliceIdx &idx)
 {
-    std::cout << __func__ << std::endl;
+    std::cout << __func__ << " " << type << std::endl;
     std::vector<char*> dest;
     CExtent *ex = slice_to_ex(idx);
     dest.push_back((char*)(new bool(true)));
@@ -265,7 +268,7 @@ CTile::to_tile_rpc(const CSliceIdx &idx)
         if (is_idx_complete(idx)) {
             rpc->count = 3;
             for (int i = 0; i < 3; i++) {
-                std::vector<char*> v = sparse[i]->to_carray_rpc(ex);
+                std::vector<char*> v = sparse[i]->to_carray_rpc();
                 dest.insert(dest.end(), v.begin(), v.end());
             }
         } else {
@@ -404,10 +407,10 @@ ctile_creator(PyObject *args)
     const char* dtype;
     unsigned long tile_type, sparse_type;
 
-    std::cout << __func__ << std::endl;
     if (!PyArg_ParseTuple(args, "OskkO", &shape, &dtype, &tile_type, &sparse_type, &data))
         return NULL;
 
+    std::cout << __func__ << " type = " << tile_type << std::endl;
     int nd = PyTuple_Size(shape);
     npy_intp dimensions[NPY_MAXDIMS];
     for (int i = 0; i < nd; i++) {

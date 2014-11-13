@@ -135,7 +135,9 @@ void CWorker::get_tile_info(const TileIdMessage& req, TileInfoResp* resp) {
 void CWorker::create(const CreateTileReq& req, TileIdMessage* resp) {
     resp->tile_id.worker = id;
     resp->tile_id.id = _id_counter++;
-    Log_debug("RPC %s %s", __func__, resp->tile_id.to_string().c_str());
+    Log_debug("RPC %s %s, CTile type = %d", __func__, 
+              resp->tile_id.to_string().c_str(),
+              req.data->get_type());
     lock(_blob_lock);
     _blobs[resp->tile_id] = req.data;
     // Tell Python's Tile that there is someone else using this CTile.

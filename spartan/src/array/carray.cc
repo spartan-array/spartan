@@ -106,7 +106,7 @@ CArray::init(npy_intp dimensions[], int nd, char type)
 {
     int i;
 
-    std::cout << "CArray::" << __func__ << (unsigned)type << std::endl;
+    std::cout << "CArray::" << __func__ << " " << (unsigned)type << std::endl;
     type_size = npy_type_token_to_size(type);
     this->nd = nd;
     this->type = type;
@@ -241,7 +241,7 @@ std::vector <char*>
 CArray::to_carray_rpc(CExtent *ex)
 {
     std::vector <char*> dest;
-    std::cout << "CArray::" << __func__ << std::endl;
+    std::cout << "CArray::" << __func__ << " " << size << std::endl;
     CArray_RPC *rpc = new CArray_RPC;
     dest.push_back((char*)(new NpyMemManager((char*)rpc, (char*)rpc, 
                                              false, sizeof(CArray_RPC))));
@@ -261,6 +261,15 @@ CArray::to_carray_rpc(CExtent *ex)
     dest.push_back(rpc->data);
 
     return dest;
+}
+
+std::vector <char*>
+CArray::to_carray_rpc(void)
+{
+    CExtent *ex = extent_from_shape(dimensions, nd);
+    std::vector <char*> ret = to_carray_rpc(ex);
+    delete ex;
+    return ret;
 }
 
 // This is the entry when loading the shared library
