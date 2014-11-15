@@ -82,7 +82,7 @@ def rand(*shape, **kw):
 
   assert len(kw) == 0, 'Unknown keywords %s' % kw
 
-  for s in shape: assert isinstance(s, int)
+  for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
              fn=_make_rand)
 
@@ -98,7 +98,7 @@ def randn(*shape, **kw):
     tile_hint = kw['tile_hint']
     del kw['tile_hint']
 
-  for s in shape: assert isinstance(s, int)
+  for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randn)
 
 @not_idempotent
@@ -115,7 +115,7 @@ def randint(*shape, **kw):
     tile_hint = kw['tile_hint']
     del kw['tile_hint']
 
-  for s in shape: assert isinstance(s, int)
+  for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randint, fn_kw=kw)
 
 @not_idempotent
@@ -138,7 +138,7 @@ def sparse_rand(shape,
     Expr:
   '''
 
-  for s in shape: assert isinstance(s, int)
+  for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True),
              fn=_make_sparse_rand,
              fn_kw = { 'dtype' : dtype,
@@ -584,9 +584,30 @@ def _dual_combiner(a, b, op):
 
 
 def _dual_dtype(input):
-  dtype = np.dtype('i8,%s' % input.dtype.str)
+  dtype = np.dtype('i8,%s' % np.dtype(input.dtype).str)
   dtype.names = ('idx', 'val')
   return dtype
+
+
+def _arg_mapper(a, b, ex, axis=None):
+  c = np.zeros(a.shape)
+  c[a == b] = 1
+  max_index = np.argmax(c, axis)
+  if axis is not None:
+    shape = list(a.shape)
+    shape[axis] = 1
+    global_index = max_index.reshape(tuple(shape)) + ex[0][axis]
+  else:
+    ex_shape = []
+    for i in range(len(ex[0])):
+      ex_shape.append(ex[1][i] - ex[0][i])
+      ex_shape[i] = 1 if ex_shape[i] == 0 else ex_shape[i]
+    local_index = extent.unravelled_pos(max_index, ex_shape)
+    global_index = extent.ravelled_pos(np.asarray(ex[0]) + local_index, ex_shape)
+
+  c = np.zeros(a.shape, dtype=np.int64) + global_index
+  c[a != b] = np.prod(np.asarray(ex[2]))
+  return c
 
 
 def argmin(x, axis=None):
@@ -598,14 +619,14 @@ def argmin(x, axis=None):
   :param x: `Expr` to compute a minimum over.
   :param axis: Axis (integer or None).
   '''
-  compute_min = reduce(x, axis,
-                       dtype_fn=_dual_dtype,
-                       local_reduce_fn=_dual_reducer,
-                       accumulate_fn=lambda a, b: _dual_combiner(a, b, np.less),
-                       fn_kw={'idx_f': np.argmin, 'val_f': np.min})
-
-  take_indices = map(compute_min, _take_idx_mapper)
-  return take_indices
+  compute_min = min(x, axis)
+  if axis is not None:
+    shape = list(x.shape)
+    shape[axis] = 1
+    compute_min = compute_min.reshape(tuple(shape))
+  argument = map_with_location((x, compute_min), _arg_mapper,
+                               fn_kw={'axis': axis})
+  return min(argument, axis)
 
 
 def argmax(x, axis=None):
@@ -617,16 +638,15 @@ def argmax(x, axis=None):
   :param x: `Expr` to compute a maximum over.
   :param axis: Axis (integer or None).
   '''
-  compute_max = reduce(x, axis,
-                       dtype_fn=_dual_dtype,
-                       local_reduce_fn=_dual_reducer,
-                       accumulate_fn=lambda a, b: _dual_combiner(a, b, np.greater),
-                       fn_kw={'idx_f': np.argmax, 'val_f': np.max})
+  compute_max = max(x, axis)
+  if axis is not None:
+    shape = list(x.shape)
+    shape[axis] = 1
+    compute_max = compute_max.reshape(tuple(shape))
+  argument = map_with_location((x, compute_max), _arg_mapper,
+                               fn_kw={'axis': axis})
+  return min(argument, axis)
 
-  take_indices = map(compute_max, _take_idx_mapper)
-
-
-  return take_indices
 
 def _countnonzero_local(ex, data, axis):
   if axis is None:
@@ -636,6 +656,7 @@ def _countnonzero_local(ex, data, axis):
       return np.asarray(np.count_nonzero(data))
 
   return (data > 0).sum(axis)
+
 
 def count_nonzero(array, axis=None, tile_hint=None):
   '''
@@ -650,7 +671,7 @@ def count_nonzero(array, axis=None, tile_hint=None):
   return reduce(array, axis,
                 dtype_fn=lambda input: np.int64,
                 local_reduce_fn=_countnonzero_local,
-                accumulate_fn = np.add,
+                accumulate_fn=np.add,
                 tile_hint=tile_hint)
 
 def _countzero_local(ex, data, axis):
@@ -840,7 +861,7 @@ def concatenate(a, b, axis=0):
     new_shape[index] = dim1
     if dim1 != dim2:
       raise ValueError('all the input array dimensions except for the' \
-          'concatenation axis must match exactly')
+                       'concatenation axis must match exactly')
 
   return shuffle(ndarray(new_shape),
                  _concatenate_mapper,

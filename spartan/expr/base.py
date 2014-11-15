@@ -1,5 +1,5 @@
 '''
-Defines the base class of all expressions (`Expr`), as 
+Defines the base class of all expressions (`Expr`), as
 well as common subclasses for collections.
 '''
 
@@ -27,8 +27,8 @@ class newaxis(object):
 
 class NotShapeable(Exception):
   '''
-  Thrown when the shape for an expression cannot be computed without 
-  first evaluating the expression. 
+  Thrown when the shape for an expression cannot be computed without
+  first evaluating the expression.
   '''
 
 unique_id = iter(xrange(10000000))
@@ -106,11 +106,11 @@ class EvalCache(object):
 class ExprTrace(object):
   '''
   Captures the stack trace for an expression.
-  
+
   Lazy evaluation and optimization can result in stack traces that are very far
   from the actual source of an error.  To combat this, expressions track their
   original creation point, which is logged when an error occurs.
-  
+
   Multiple stack traces can be tracked, as certain optimizations
   will combine multiple expressions together.
   '''
@@ -151,15 +151,15 @@ eval_cache = EvalCache()
 class Expr(Node):
   '''
   Base class for all expressions.
-  
+
   `Expr` objects capture user operations.
-  
+
   An expression can have one or more dependencies, which must
   be evaluated before the expression itself.
-  
-  Expressions may be evaluated (using `Expr.force`), the 
+
+  Expressions may be evaluated (using `Expr.force`), the
   result of evaluating an expression is cached until the expression
-  itself is reclaimed. 
+  itself is reclaimed.
   '''
   expr_id = PythonValue(None, desc="Integer or None")
   stack_trace = Instance(ExprTrace)
@@ -180,9 +180,9 @@ class Expr(Node):
   def cache(self):
     '''
     Return a cached value for this `Expr`.
-    
+
     If a cached value is not available, or the cached array is
-    invalid (missing tiles), returns None. 
+    invalid (missing tiles), returns None.
     '''
     result = eval_cache.get(self.expr_id)
     if result is not None and len(result.bad_tiles) == 0:
@@ -200,16 +200,16 @@ class Expr(Node):
   def dependencies(self):
     '''
     Returns:
-      Dictionary mapping from name to `Expr`. 
+      Dictionary mapping from name to `Expr`.
     '''
     return dict([(k, getattr(self, k)) for k in self.members])
 
   def compute_shape(self):
     '''
     Compute the shape of this expression.
-    
+
     If the shape is not available (data dependent), raises `NotShapeable`.
-    
+
     Returns:
       tuple: Shape of this expression.
     '''
@@ -218,9 +218,9 @@ class Expr(Node):
   def visit(self, visitor):
     '''
     Apply visitor to all children of this node, returning a new `Expr` of the same type.
-     
+
     :param visitor: `OptimizePass`
-    
+
     '''
     deps = {}
     for k in self.members:
@@ -255,15 +255,15 @@ class Expr(Node):
 
     eval_cache.register(self.expr_id)
     self.needs_cache = self.needs_cache and FLAGS.opt_expression_cache
-    
+
   def evaluate(self):
     '''
-    Evaluate an `Expr`.  
-   
+    Evaluate an `Expr`.
+
     Dependencies are evaluated prior to evaluating the expression.
     The result of the evaluation is stored in the expression cache,
     future calls to evaluate will return the cached value.
-    
+
     Returns:
       DistArray:
     '''
@@ -302,7 +302,7 @@ class Expr(Node):
   def _evaluate(self, ctx, deps):
     '''
     Evaluate this expression.
-    
+
     Args:
       ctx: `BlobCtx` for interacting with the cluster
       deps (dict): Map from name to `DistArray` or scalar.
@@ -324,7 +324,7 @@ class Expr(Node):
   def __mul__(self, other):
     '''
     Multiply 2 expressions.
-    
+
     :param other: `Expr`
     '''
     return _map(self, other, fn=np.multiply)
@@ -376,11 +376,11 @@ class Expr(Node):
 
   def reshape(self, new_shape):
     '''
-    Return a new array with shape``new_shape``, and data from 
+    Return a new array with shape``new_shape``, and data from
     this array.
-    
+
     :param new_shape: `tuple` with same total size as original shape.
-    
+
     '''
     from . import reshape
     return reshape(self, new_shape)
@@ -389,7 +389,7 @@ class Expr(Node):
     from .slice import SliceExpr
     from .filter import FilterExpr
     from .reshape import ReshapeExpr
-    
+
     if isinstance(idx, (int, tuple, slice)):
       is_del_dim = False
       del_dim = list()
@@ -429,7 +429,7 @@ class Expr(Node):
       else:
         #This means it's just a simple slice op
         return SliceExpr(src=self, idx=idx)
-      
+
     else:
       return FilterExpr(src=self, idx=idx)
 
@@ -439,11 +439,11 @@ class Expr(Node):
   @property
   def shape(self):
     '''Try to compute the shape of this expression.
-    
+
     If the value has been computed already this always succeeds.
-    
+
     :rtype: `tuple`
-    
+
     '''
     cache = self.cache()
     if cache is not None:
@@ -467,9 +467,9 @@ class Expr(Node):
   def optimized(self):
     '''
     Return an optimized version of this expression graph.
-    
+
     :rtype: `Expr`
-    
+
     '''
     # If the expr has been optimized, return the cached optimized expr.
     if self.optimized_expr is None:
@@ -481,11 +481,11 @@ class Expr(Node):
 
   def glom(self):
     '''
-    Evaluate this expression and convert the resulting 
+    Evaluate this expression and convert the resulting
     distributed array into a Numpy array.
-    
+
     :rtype: `np.ndarray`
-    
+
     '''
     return glom(self)
 
@@ -550,7 +550,7 @@ class Val(Expr):
 class CollectionExpr(Expr):
   '''
   `CollectionExpr` subclasses wrap normal tuples, lists and dicts with `Expr` semantics.
-  
+
   `CollectionExpr.visit` and `CollectionExpr.evaluate` will visit or evaluate
   all of the tuple, list or dictionary elements in this expression.
   '''
@@ -629,7 +629,7 @@ class TupleExpr(CollectionExpr):
 
 def glom(value):
   '''
-  Evaluate this expression and return the result as a `numpy.ndarray`. 
+  Evaluate this expression and return the result as a `numpy.ndarray`.
   '''
   if isinstance(value, Expr):
     value = evaluate(value)
@@ -643,7 +643,7 @@ def glom(value):
 def optimized_dag(node):
   '''
   Optimize and return the DAG representing this expression.
-  
+
   :param node: The node to compute a DAG for.
   '''
   if not isinstance(node, Expr):
@@ -663,7 +663,7 @@ def force(node):
 def evaluate(node):
   '''
   Evaluate ``node``.
-  
+
   :param node: `Expr`
   '''
   if isinstance(node, Expr):
@@ -675,7 +675,7 @@ def evaluate(node):
 def eager(node):
   '''
   Eagerly evaluate ``node`` and convert the result back into an `Expr`.
-  
+
   :param node: `Expr` to evaluate.
   '''
   result = force(node)
@@ -685,9 +685,9 @@ def eager(node):
 def lazify(val):
   '''
   Lift ``val`` into an Expr node.
- 
+
   If ``val`` is already an expression, it is returned unmodified.
-   
+
   :param val: anything.
   '''
   #util.log_info('Lazifying... %s', val)
@@ -709,7 +709,7 @@ def lazify(val):
 def as_array(v):
   '''
   Convert a numpy value or scalar into an `Expr`.
-  
+
   :param v: `Expr`, numpy value or scalar.
   '''
   if isinstance(v, Expr):

@@ -53,15 +53,15 @@ class Transpose(distarray.DistArray):
   def extent_for_blob(self, id):
     base_ex = self.base.blob_to_ex[id]
     return extent.create(base_ex.ul[::-1], base_ex.lr[::-1], self.base.shape)
-  
+
   def fetch(self, ex):
     base_ex = extent.create(ex.ul[::-1], ex.lr[::-1], self.base.shape)
     base_tile = self.base.fetch(base_ex)
     return base_tile.transpose()
 
 class TransposeExpr(Expr):
-  array = Instance(Expr) 
-  tile_hint = PythonValue(None, desc="Tuple or None") 
+  array = Instance(Expr)
+  tile_hint = PythonValue(None, desc="Tuple or None")
 
   def __str__(self):
     return 'Transpose[%d] %s' % (self.expr_id, self.array)
@@ -78,10 +78,10 @@ class TransposeExpr(Expr):
 def transpose(array, tile_hint = None):
   '''
   Transpose ``array``.
-  
+
   Args:
     array: `Expr` to transpose.
-    
+
   Returns:
     `TransposeExpr`: Transpose array.
   '''

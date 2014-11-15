@@ -115,7 +115,7 @@ class DotExpr(Expr):
     if len(self.matrix_a.shape) == 1:
       if len(self.matrix_b.shape) == 1:
         #vec * vec = scaler
-	return (1, )
+        return (1, )
       else:
         #vec * array = vector
         return (self.matrix_b.shape[1], )

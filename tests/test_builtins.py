@@ -124,12 +124,15 @@ class BuiltinTest(test_common.ClusterTest):
         spartan.max(spartan.from_numpy(src)).glom(),
         np.max(src))
 
-
   def test_min(self):
     src = np.asarray([1, 1, 1, 2, 2, 5, 5, 10])
     Assert.all_eq(
         spartan.min(spartan.from_numpy(src)).glom(),
         np.min(src))
+    src = np.arange(100).reshape(10, 10)
+    Assert.all_eq(
+        spartan.min(spartan.from_numpy(src), axis=1).glom(),
+        np.min(src, axis=1))
 
 
 if __name__ == '__main__':
