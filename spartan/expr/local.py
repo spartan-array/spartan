@@ -71,10 +71,10 @@ class LocalInput(LocalExpr):
 
 class FnCallExpr(LocalExpr):
   '''Evaluate a function call.
-  
+
   Dependencies that are variable should be specified via the ``deps`` attribute,
   and will be evaluated and supplied to the function when called.
-  
+
   Constants (axis of a reduction, datatype, etc), can be supplied via the ``kw``
   argument.
   '''
@@ -111,7 +111,7 @@ class FnCallExpr(LocalExpr):
     deps = [d.evaluate(ctx) for d in self.deps]
 
     #util.log_info('Evaluating %s.%d [%s]', self.fn_name(), self.id, deps)
-    
+
     # Not all Numpy operations are compatible with mixed sparse and dense arrays.
     # To address this, if only one of the inputs is sparse, we convert it to
     # dense before computing our result.
@@ -158,7 +158,7 @@ def compile_parakeet_source(src):
   tmpfile = tempfile.NamedTemporaryFile(delete=True, prefix='spartan-local-', suffix='.py')
   tmpfile.write(src)
   tmpfile.flush()
-  
+
   #util.log_info('File: %s, Source: \n %s \n', tmpfile.name, src)
 
   #os.rename(tmpfile.name, srcfile)
@@ -170,7 +170,7 @@ def compile_parakeet_source(src):
     util.log_info('Failed to build parakeet wrapper')
     util.log_debug('Source was: %s', src)
     raise CodegenException(ex.message, ex.args)
-  
+
   source_files.append(tmpfile)
   return module._jit_fn
 
@@ -188,12 +188,12 @@ class ParakeetExpr(LocalExpr):
   def evaluate(self, ctx):
     names = self.input_names()
     fn = compile_parakeet_source(self.source)
-    
+
     kw_args = {}
     for var in names:
       value = ctx.inputs[var]
       kw_args[var] = value
-    
+
     if FLAGS.use_cuda:
       return fn(_backend='cuda', **kw_args)
     else:

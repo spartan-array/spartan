@@ -82,7 +82,7 @@ def rand(*shape, **kw):
 
   assert len(kw) == 0, 'Unknown keywords %s' % kw
 
-  for s in shape: assert isinstance(s, int)
+  for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
              fn=_make_rand)
 
@@ -98,7 +98,7 @@ def randn(*shape, **kw):
     tile_hint = kw['tile_hint']
     del kw['tile_hint']
 
-  for s in shape: assert isinstance(s, int)
+  for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randn)
 
 @not_idempotent
@@ -115,7 +115,7 @@ def randint(*shape, **kw):
     tile_hint = kw['tile_hint']
     del kw['tile_hint']
 
-  for s in shape: assert isinstance(s, int)
+  for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randint, fn_kw=kw)
 
 @not_idempotent
@@ -138,7 +138,7 @@ def sparse_rand(shape,
     Expr:
   '''
 
-  for s in shape: assert isinstance(s, int)
+  for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True),
              fn=_make_sparse_rand,
              fn_kw = { 'dtype' : dtype,
@@ -584,7 +584,7 @@ def _dual_combiner(a, b, op):
 
 
 def _dual_dtype(input):
-  dtype = np.dtype('i8,%s' % input.dtype.str)
+  dtype = np.dtype('i8,%s' % np.dtype(input.dtype).str)
   dtype.names = ('idx', 'val')
   return dtype
 

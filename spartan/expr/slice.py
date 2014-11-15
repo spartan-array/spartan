@@ -78,7 +78,7 @@ class Slice(distarray.DistArray):
   def extent_for_blob(self, id):
     base_ex = self.base.blob_to_ex[id]
     return extent.intersection(self.slice, base_ex)
- 
+
   def fetch(self, idx):
     offset = extent.compute_slice(self.slice, idx.to_slice())
     return self.base.fetch(offset)
@@ -92,9 +92,9 @@ class SliceExpr(base.Expr):
     idx: `tuple` (for slicing) or `Expr` (for bool/integer indexing)
     broadcast_to: shape to broadcast to before slicing
   '''
-  src = Instance(base.Expr) 
-  idx = PythonValue(None, desc="Tuple or Expr") 
-  broadcast_to = PythonValue 
+  src = Instance(base.Expr)
+  idx = PythonValue(None, desc="Tuple or Expr")
+  broadcast_to = PythonValue
 
   def __init__(self, *args, **kw):
     super(SliceExpr, self).__init__(*args, **kw)
@@ -103,7 +103,7 @@ class SliceExpr(base.Expr):
     assert not isinstance(self.idx, base.TupleExpr)
 
   def compute_shape(self):
-    if isinstance(self.idx, (int, slice, tuple)):
+    if isinstance(self.idx, (int, long, slice, tuple)):
       src_shape = self.src.compute_shape()
       ex = extent.from_shape(src_shape)
       slice_ex = extent.compute_slice(ex, self.idx)

@@ -8,10 +8,10 @@ from .. import blob_ctx
 from traits.api import Bool, Str, Instance, PythonValue, HasTraits
 
 class CheckpointExpr(Expr):
-  src = Instance(Expr) 
-  path = Str 
+  src = Instance(Expr)
+  path = Str
   mode = Str
-  ready = Bool 
+  ready = Bool
 
   def __str__(self):
     return 'checkpoint(expr_id=%s, path=%s)' % (self.expr_id, self.disk)
@@ -20,7 +20,7 @@ class CheckpointExpr(Expr):
     util.log_info('expr:%s load_data from checkpoint node', self.expr_id)
     if not self.ready:
       return None
-    
+
     if self.mode == 'disk':
       if cached_result is not None:
         util.log_info('load partial disk data')
@@ -36,12 +36,12 @@ class CheckpointExpr(Expr):
         return cached_result
     else: # replica
       return None
-     
-  def _evaluate(self, ctx, deps): 
+
+  def _evaluate(self, ctx, deps):
     result = deps['src']
     if self.mode == 'disk':
-      save(result, "%s" % self.expr_id, path = self.path, iszip = False) 
-        
+      save(result, "%s" % self.expr_id, path = self.path, iszip = False)
+
     self.ready = True
     return result
 
