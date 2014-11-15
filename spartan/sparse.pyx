@@ -285,6 +285,7 @@ def multiple_slice(X not None, list slices):
     if isinstance(X, scipy.sparse.coo_matrix) and X.shape[1] == 1:
         return multiple_slice_coo(X, slices)
     elif scipy.sparse.issparse(X):
+        X = X.tocsr()
         l = []
         for (tile_id, src_slice, dst_slice) in slices:
             result = X[src_slice]

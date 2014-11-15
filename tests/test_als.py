@@ -4,6 +4,8 @@ import test_common
 from test_common import millis
 from datetime import datetime
 
+#@test_common.with_ctx
+#def test_als(ctx):
 def benchmark_als(ctx, timer):
   print "#worker:", ctx.num_workers
   #USER_SIZE = 100 * ctx.num_workers

@@ -92,27 +92,23 @@ def als(A, la=0.065, alpha=40, implicit_feedback=False, num_features=20, num_ite
   '''
   num_users = A.shape[0]
   num_items = A.shape[1]
-  
+ 
+  AT = expr.transpose(A)
+
   avg_rating = expr.sum(A, axis=0) * 1.0 / expr.count_nonzero(A, axis=0)
 
   M = expr.rand(num_items, num_features)
   M = expr.assign(M, np.s_[:, 0], avg_rating.reshape((avg_rating.shape[0], 1)))
   
-  cost_A = np.prod(A.shape)
-  cost_M = num_items * num_features
-  cost_U = num_users * num_features
   for i in range(num_iter):
     # Recomputing U
     U = expr.shuffle(expr.retile(A, tile_hint=util.calc_tile_hint(A, axis=0)), 
                      _solve_U_or_M_mapper, 
                      kw={'U_or_M': M, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback}, 
-                     shape_hint=(A.shape[0], M.shape[1]), 
-                     cost_hint={hash(M):{'00': cost_M, '01': cost_M + cost_A, '10': cost_M, '11':cost_A + cost_M}}).optimized()
+                     shape_hint=(num_users, num_features)).optimized()
     # Recomputing M
-    M = expr.shuffle(expr.retile(expr.transpose(A), tile_hint=util.calc_tile_hint(A, axis=1)[::-1]), 
+    M = expr.shuffle(expr.retile(AT, tile_hint=util.calc_tile_hint(AT, axis=0)), 
                      _solve_U_or_M_mapper, 
                      kw={'U_or_M': U, 'la': la, 'alpha': alpha, 'implicit_feedback': implicit_feedback}, 
-                     shape_hint=(A.shape[1], U.shape[1]), 
-                     cost_hint={hash(U):{'00':cost_U, '01':cost_U + cost_A, '10': cost_U, '11':cost_A + cost_U}}).optimized()
-
+                     shape_hint=(num_items, num_features)).optimized()
   return U, M

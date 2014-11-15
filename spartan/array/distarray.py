@@ -102,7 +102,6 @@ def compute_extents(shape, tile_hint=None, num_shards=-1):
     ex = extent.create(ul, lr, shape)
     result[ex] = idx
     idx += 1
-  
   return result
 
 def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):

@@ -112,7 +112,20 @@ class DotExpr(Expr):
 
   def compute_shape(self):
     # May raise NotShapeable
-    return (self.matrix_a.shape[0], self.matrix_b.shape[1])
+    if len(self.matrix_a.shape) == 1:
+      if len(self.matrix_b.shape) == 1:
+        #vec * vec = scaler
+	return (1, )
+      else:
+        #vec * array = vector
+        return (self.matrix_b.shape[1], )
+    else:
+      if len(self.matrix_b.shape) == 1:
+        #array * vector = vector
+        return (self.matrix_a.shape[0], )
+      else:
+        #array * array = array
+        return (self.matrix_a.shape[0], self.matrix_b.shape[1])
 
   def _evaluate(self, ctx, deps):
     av = deps['matrix_a']
