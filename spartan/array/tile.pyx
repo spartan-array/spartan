@@ -265,7 +265,7 @@ def merge(old_tile, subslice, update, reducer):
       if reducer is not None and old_tile.mask[np.unravel_index(0, old_tile.data.shape)]:
         old_tile.data = reducer(old_tile.data, update)
       else:
-        old_tile.data = update
+        old_tile.data = update.astype(old_tile.data.dtype)
       old_tile.mask = np.ones(old_tile.shape, dtype=np.bool)
     else:
       replaced = ~old_tile.mask[subslice]
