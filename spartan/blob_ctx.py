@@ -168,12 +168,11 @@ class BlobCtx(object):
     '''
     ctile = rpc.rpc_array.numpy_to_ctile(data)
     if builtin_reducers.get(reducer, None) is None:
-      assert False, reducer
       _reducer = reducer
     else:
       _reducer = builtin_reducers[reducer]
     future = self._cblob_ctx.update(tile_id, region, ctile, _reducer)
-    #rpc_array.release_ctile(ctile)
+    #rpc.rpc_array.release_ctile(ctile)
 
     if wait:
       return future.result

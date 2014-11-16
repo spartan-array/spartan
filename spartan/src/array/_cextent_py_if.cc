@@ -361,6 +361,34 @@ TileExtent_clone(PyObject* o)
     return _TileExtent_create_helper(self->c_ex->clone(), false);
 }
 
+static PyObject *
+TileExtent_to_tuple(PyObject *o)
+{
+    TileExtent *self = (TileExtent*) o;
+    PyObject *tuple, *ul, *lr, *array;
+
+    tuple = PyTuple_New(3);
+    RETURN_IF_NULL(tuple);
+    ul = PyTuple_New(self->ndim);
+    RETURN_IF_NULL(ul);
+    lr = PyTuple_New(self->ndim);
+    RETURN_IF_NULL(lr);
+    array= PyTuple_New(self->ndim);
+    RETURN_IF_NULL(array);
+
+    for (int i = 0; i < self->ndim; i++) {
+        PyTuple_SetItem(ul, i, PyLong_FromLongLong(self->c_ex->ul[i]));
+        PyTuple_SetItem(lr, i, PyLong_FromLongLong(self->c_ex->lr[i]));
+        PyTuple_SetItem(array, i, PyLong_FromLongLong(self->c_ex->array_shape[i]));
+    }
+    PyTuple_SetItem(tuple, 0, ul);
+    PyTuple_SetItem(tuple, 1, lr);
+    PyTuple_SetItem(tuple, 2, array);
+
+    return tuple;
+}
+
+
 static PyMemberDef TileExtent_members[] = {
     {(char*)"ndim", T_INT, offsetof(TileExtent, ndim), 0, (char*)"number of dimenesions"},
     {(char*)"size", T_LONGLONG, offsetof(TileExtent, size), 0, (char*)"size"},
@@ -390,6 +418,8 @@ static PyMethodDef TileExtent_methods[] = {
      "Add a dimension to this extent."},
     {(char*)"clone", (PyCFunction)TileExtent_clone, METH_NOARGS,
      (char*)"Clone the extent."},
+    {"to_tuple", (PyCFunction)TileExtent_to_tuple, METH_VARARGS,
+     "Transform the extent to a tuple"},
     {NULL} /* Sentinel */
 };
 

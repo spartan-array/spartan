@@ -4,6 +4,7 @@ import itertools
 import collections
 import traceback
 
+import appdirs
 import scipy.sparse
 import numpy as np
 
@@ -138,6 +139,9 @@ class DistArray(object):
   def foreach_tile(self, mapper_fn, kw):
     raise NotImplementedError
 
+  def extent_for_blob(self, id):
+    raise NotImplementedError
+
   def real_size(self):
     '''The actual number of elements contained by this array.
 
@@ -145,6 +149,10 @@ class DistArray(object):
     For mapping across data, we want to ignore this.
     '''
     return np.prod(self.shape)
+
+  def __len__(self):
+    ''' Alias of real_size(self). '''
+    return self.shape[0]
 
   def __repr__(self):
     return '%s(id=%s, shape=%s, dtype=%s)' % (self.__class__.__name__, id(self), self.shape, self.dtype)
@@ -175,11 +183,10 @@ class DistArray(object):
       result = self.select(slice(idx, idx + 1))
       return result[0]
 
+
     ex = extent.from_slice(idx, self.shape)
-    util.log_info('Select: %s + %s -> %s', idx, self.shape, ex)
-    ret = self.fetch(ex)
-    util.log_info('Select: done')
-    return ret
+    #util.log_info('Select: %s + %s -> %s', idx, self.shape, ex)
+    return self.fetch(ex)
 
   def __getitem__(self, idx):
     return self.select(idx)
@@ -195,6 +202,9 @@ class DistArray(object):
       for ex, id in d:
         extents[ex] = id
     return from_table(extents)
+
+  def __hash__(self):
+    return id(self)
 
   @property
   def ndim(self):
@@ -289,7 +299,7 @@ class DistArrayImpl(DistArray):
     Assert.eq(region.array_shape, self.shape)
     Assert.eq(len(region.ul), len(self.shape))
     assert np.all(region.lr <= self.shape), 'Requested region is out of bounds: %s > %s' % (region, self.shape)
-    util.log_info('FETCH: %s %s %d', self.shape, region, len(self.tiles))
+    #util.log_info('FETCH: %s %s', self.shape, region)
 
     ctx = blob_ctx.get()
 
@@ -452,7 +462,10 @@ def create(shape,
   elif FLAGS.tile_assignment_strategy == 'static':
     all_extents = list(extents.iterkeys())
     all_extents.sort()
-    map_file = appdirs.user_data_dir('Spartan', 'rjpower.org') + '/tiles_map'
+    if hasattr(appdirs, 'user_config_dir'):  # user_config_dir new to v1.3.0
+      map_file = appdirs.user_config_dir('spartan') + '/tiles_map'
+    else:
+      map_file = appdirs.user_data_dir('spartan') + '/tiles_map'
     with open(map_file) as fp:
       for ex in all_extents:
         worker = int(fp.readline().strip())

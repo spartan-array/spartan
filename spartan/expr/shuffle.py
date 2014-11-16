@@ -1,14 +1,15 @@
 from spartan import rpc
 
 from .. import blob_ctx, util
-from ..array import tile
+from ..array import distarray, tile
 from ..core import LocalKernelResult
+from ..node import Node
 from ..util import is_iterable, Assert
 from .base import Expr, lazify
-from traits.api import Instance, Function, PythonValue
+from traits.api import Instance, Function, PythonValue, HasTraits
 from .base import DictExpr, NotShapeable
 
-def shuffle(v, fn, tile_hint=None, target=None, kw=None):
+def shuffle(v, fn, cost_hint=None, shape_hint=None, target=None, kw=None):
   '''
   Evaluate ``fn`` over each extent of ``v``.
 
@@ -21,6 +22,7 @@ def shuffle(v, fn, tile_hint=None, target=None, kw=None):
     ShuffleExpr:
   '''
   if kw is None: kw = {}
+  if cost_hint is None: cost_hint = {}
 
   kw = lazify(kw)
   v = lazify(v)
@@ -30,10 +32,10 @@ def shuffle(v, fn, tile_hint=None, target=None, kw=None):
 
   return ShuffleExpr(array=v,
                      map_fn=fn,
-                     tile_hint=tile_hint,
+                     cost_hint=cost_hint,
+                     shape_hint=shape_hint,
                      target=target,
                      fn_kw=kw)
-
 
 def target_mapper(ex, map_fn=None, source=None, target=None, fn_kw=None):
   '''
@@ -88,7 +90,7 @@ def notarget_mapper(ex, array=None, map_fn=None, source=None, fn_kw=None):
     for ex, v in user_result:
       Assert.eq(ex.shape, v.shape, 'Bad shape from %s' % map_fn)
       result_tile = tile.from_data(v)
-      tile_id = ctx.create(result_tile).result.tile_id
+      tile_id = blob_ctx.get().create(result_tile).result.tile_id
       results.append((ex, tile_id))
 
   return LocalKernelResult(result=results, futures=None)
@@ -98,11 +100,13 @@ class ShuffleExpr(Expr):
   array = PythonValue(None, desc="DistArray or Expr")
   map_fn = Function
   target = PythonValue(None, desc="DistArray or Expr")
-  tile_hint = PythonValue(None, desc="Tuple or None")
-  fn_kw = Instance(DictExpr)
+  cost_hint = PythonValue(None, desc='Dict or None')
+  shape_hint = PythonValue(None, desc='Tuple or None')
+  fn_kw = PythonValue(None, desc='DictExpr')
 
   def __str__(self):
-    return 'shuffle[%d](%s, %s)' % (self.expr_id, self.map_fn, self.array)
+    cost_str = '{ %s }' % ',\n'.join(['%s: %s' % (hash(k), v) for k, v in self.cost_hint.iteritems()])
+    return 'shuffle[%d](%s, %s, %s, %s)' % (self.expr_id, self.map_fn, self.array, cost_str, self.fn_kw)
 
   def _evaluate(self, ctx, deps):
     v = deps['array']
@@ -124,6 +128,8 @@ class ShuffleExpr(Expr):
   def compute_shape(self):
     if self.target != None:
       return self.target.shape
+    elif self.shape_hint != None:
+      return self.shape_hint
     else:
       # We don't know the shape after shuffle.
       raise NotShapeable

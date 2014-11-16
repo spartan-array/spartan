@@ -167,6 +167,11 @@ setup(
               extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc"],
               extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
                                "-lbase", "-lpython2.7"]),
+    Extension('spartan.expr.tiling',
+              sources=['spartan/expr/tiling.cc'],
+              language='c++',
+              extra_compile_args=["-std=c++0x"],
+              extra_link_args=["-std=c++11", "-fPIC"]),
 
     # Spartan extensions, cython part.
     Extension('spartan.rpc.serialization_buffer',
