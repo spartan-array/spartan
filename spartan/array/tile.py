@@ -26,12 +26,24 @@ def npdata_to_internal(array):
     if isinstance(array, sp.coo_matrix):
       stype = TileBase.TILE_SPARSE_COO
       data = (array.row, array.col, array.data)
+      util.log_info('npdate_to_internal %s %s %s',
+                    str(array.row.shape),
+                    str(array.col.shape),
+                    str(array.data.shape))
     elif isinstance(array, sp.csc_matrix):
       stype = TileBase.TILE_SPARSE_CSC
-      data = (array.indices, array.inptr, array.data)
+      data = (array.indices, array.indptr, array.data)
+      util.log_info('npdate_to_internal %s %s %s',
+                    str(array.indices.shape),
+                    str(array.indptr.shape),
+                    str(array.data.shape))
     elif isinstance(array, sp.csr_matrix):
       stype = TileBase.TILE_SPARSE_CSR
-      data = (array.indices, array.inptr, array.data)
+      data = (array.indices, array.indptr, array.data)
+      util.log_info('npdate_to_internal %s %s %s',
+                    str(array.indices.shape),
+                    str(array.indptr.shape),
+                    str(array.data.shape))
     else:
       stype = TileBase.TILE_SPARSE_COO
       array = array.tocoo()

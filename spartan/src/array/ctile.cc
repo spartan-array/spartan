@@ -347,35 +347,66 @@ CTile::to_npy(void)
             npy_sparse[i] = sparse[i]->to_npy(); 
         }
 
-        for (int i = 0; i < 3; i++) {
-            tuple[i] = PyTuple_New(2);
-            assert(tuple[i] != NULL);
-        }
-        PyTuple_SET_ITEM(tuple[0], 0, PyLong_FromLongLong(dimensions[0]));
-        PyTuple_SET_ITEM(tuple[0], 1, PyLong_FromLongLong(dimensions[1]));
-        PyTuple_SET_ITEM(tuple[1], 0, npy_sparse[0]);
-        PyTuple_SET_ITEM(tuple[1], 1, npy_sparse[1]);
-        PyTuple_SET_ITEM(tuple[2], 0, npy_sparse[2]);
-        PyTuple_SET_ITEM(tuple[2], 1, tuple[1]);
-        sargs = PyTuple_New(1);
-        assert(sargs != NULL);
-        PyTuple_SET_ITEM(sargs, 0, tuple[2]);
-        kwords = PyString_FromString("shape");
-        assert(kwords != NULL);
-        kargs = PyDict_New();
-        assert(kargs != NULL);
-        PyDict_SetItem(kargs, kwords, tuple[0]);
-        sp = PyImport_ImportModule("scipy.sparse.coo");
+        sp = PyImport_ImportModule("scipy.sparse");
         assert(sp != NULL);
-        if (sparse_type == CTILE_SPARSE_COO) {
+        switch (sparse_type) {
+        case CTILE_SPARSE_COO:
+            for (int i = 0; i < 3; i++) {
+                tuple[i] = PyTuple_New(2);
+                assert(tuple[i] != NULL);
+            }
+
+            // coo_matrix((data, ij), shape)
+            PyTuple_SET_ITEM(tuple[0], 0, PyLong_FromLongLong(dimensions[0]));
+            PyTuple_SET_ITEM(tuple[0], 1, PyLong_FromLongLong(dimensions[1]));
+            PyTuple_SET_ITEM(tuple[1], 0, npy_sparse[0]); // row
+            PyTuple_SET_ITEM(tuple[1], 1, npy_sparse[1]); // col
+            PyTuple_SET_ITEM(tuple[2], 0, npy_sparse[2]); // data
+            PyTuple_SET_ITEM(tuple[2], 1, tuple[1]);
+            sargs = PyTuple_New(1);
+            assert(sargs != NULL);
+            PyTuple_SET_ITEM(sargs, 0, tuple[2]);
+            kwords = PyString_FromString("shape");
+            assert(kwords != NULL);
+            kargs = PyDict_New();
+            assert(kargs != NULL);
+            PyDict_SetItem(kargs, kwords, tuple[0]);
+            std::cout << "ctile->to_npy() coo" << std::endl;
             object = PyObject_GetAttrString(sp, "coo_matrix");
-        } else if (sparse_type == CTILE_SPARSE_CSR) {
-            object = PyObject_GetAttrString(sp, "csr_matrix");
-        } else if (sparse_type == CTILE_SPARSE_CSC) {
-            object = PyObject_GetAttrString(sp, "csc_matrix");
-        } else {
-            object = NULL;
+            break;
+        case CTILE_SPARSE_CSR:
+        case CTILE_SPARSE_CSC:
+            tuple[0] = PyTuple_New(2);
+            assert(tuple[0] != NULL);
+            tuple[1] = PyTuple_New(3);
+            assert(tuple[1] != NULL);
+
+            // csr_matrix/csc_matrix((data, indeices, indptr), shape)
+            PyTuple_SET_ITEM(tuple[0], 0, PyLong_FromLongLong(dimensions[0]));
+            PyTuple_SET_ITEM(tuple[0], 1, PyLong_FromLongLong(dimensions[1]));
+            PyTuple_SET_ITEM(tuple[1], 1, npy_sparse[0]); // indices
+            PyTuple_SET_ITEM(tuple[1], 2, npy_sparse[1]); // indptr
+            PyTuple_SET_ITEM(tuple[1], 0, npy_sparse[2]); // data
+            sargs = PyTuple_New(1);
+            assert(sargs != NULL);
+            PyTuple_SET_ITEM(sargs, 0, tuple[1]);
+            kwords = PyString_FromString("shape");
+            assert(kwords != NULL);
+            kargs = PyDict_New();
+            assert(kargs != NULL);
+            PyDict_SetItem(kargs, kwords, tuple[0]);
+            if (sparse_type == CTILE_SPARSE_CSR) {
+                std::cout << "ctile->to_npy() csr" << std::endl;
+                object = PyObject_GetAttrString(sp, "csr_matrix");
+            } else {
+                std::cout << "ctile->to_npy() csc" << std::endl;
+                object = PyObject_GetAttrString(sp, "csc_matrix");
+            }
+            break;
+        default:
+            assert(0);
         }
+
         assert(object != NULL);
         ret = PyObject_Call(object, sargs, kargs);
         assert(dense != NULL);

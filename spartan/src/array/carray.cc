@@ -241,22 +241,29 @@ std::vector <char*>
 CArray::to_carray_rpc(CExtent *ex)
 {
     std::vector <char*> dest;
-    std::cout << "CArray::" << __func__ << " " << size << std::endl;
+    std::cout << "CArray::" << __func__ << " array_size = " << size << std::endl;
     CArray_RPC *rpc = new CArray_RPC;
     dest.push_back((char*)(new NpyMemManager((char*)rpc, (char*)rpc, 
                                              false, sizeof(CArray_RPC))));
 
     rpc->item_size = type_size;
     rpc->item_type = type;
-    rpc->size = size;
     rpc->nd = nd;
     rpc->is_npy_memmanager = true;
-    for (int i = 0; i < nd; ++i) {
-        rpc->dimensions[i] = ex->lr[i] - ex->ul[i]; //dimensions[i];
-        rpc->dimensions[i] = (rpc->dimensions[i] == 0) ? 1 : rpc->dimensions[i];
+    if (ex == NULL) { // shape is zero (0,)
+        rpc->size = 0;
+        assert(nd == 1 && dimensions[0] == 0);
+        rpc->dimensions[0] = 0;
+        rpc->data = NULL;
+    } else {
+        rpc->size = ex->size;
+        for (int i = 0; i < nd; ++i) {
+            rpc->dimensions[i] = ex->lr[i] - ex->ul[i]; //dimensions[i];
+            rpc->dimensions[i] = (rpc->dimensions[i] == 0) ? 1 : rpc->dimensions[i];
+        }
     }
-    if (copy_slice(ex, (NpyMemManager**)(&(rpc->data))) != size) {
-        assert(false);
+    if (copy_slice(ex, (NpyMemManager**)(&(rpc->data))) != ex->size) {
+        assert(0);
     }
     dest.push_back(rpc->data);
 
@@ -268,7 +275,9 @@ CArray::to_carray_rpc(void)
 {
     CExtent *ex = extent_from_shape(dimensions, nd);
     std::vector <char*> ret = to_carray_rpc(ex);
-    delete ex;
+    if (ex != NULL) {
+        delete ex;
+    }
     return ret;
 }
 

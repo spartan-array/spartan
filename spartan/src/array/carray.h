@@ -191,7 +191,9 @@ inline rpc::Marshal& operator <<(rpc::Marshal& m, const CArray& o)
     m << o.nd;
     m.write(&(o.type), sizeof(o.type));
     m.write((void*)o.dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
-    m.write(o.data, o.size);
+    if (o.size > 0) {
+        m.write(o.data, o.size);
+    }
     return m;
 }
 
@@ -205,10 +207,12 @@ inline rpc::Marshal& operator >>(rpc::Marshal&m, CArray& o)
     m.read(&type, sizeof(char));
     m.read((void*)dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
     o.init(dimensions, nd, type);
-    o.data = new char[o.size];
-    o.data_source = new NpyMemManager(o.data, o.data, false, o.size);
-    assert(m.content_size() == o.size);
-    m.read(o.data, o.size);
+    if (o.size > 0) {
+        o.data = new char[o.size];
+        o.data_source = new NpyMemManager(o.data, o.data, false, o.size);
+        assert(m.content_size() == o.size);
+        m.read(o.data, o.size);
+    }
     return m;
 }
 #endif

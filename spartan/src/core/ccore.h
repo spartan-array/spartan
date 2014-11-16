@@ -322,7 +322,9 @@ struct UpdateReq {
     UpdateReq(const TileId& i, const CSliceIdx& r, CTile *d, unsigned long red)
               : id(i), region(r), reducer(red), data(d) {}
     UpdateReq() : data(NULL){}
-    ~UpdateReq() {delete data;}
+    /* FIXME: It seems weird to delete data here */
+    //~UpdateReq() {delete data;}
+    ~UpdateReq() {}
 };
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const UpdateReq& o) {
