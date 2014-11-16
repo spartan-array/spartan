@@ -70,7 +70,7 @@ CTile::CTile(CTile_RPC *rpc)
         }
         dense_state = mask_state = NULL;
     } else {
-        dense = mask = NULL;
+        dense = dense_state = mask = mask_state = NULL;
         for (int i = 0; i < 3; i++) {
             sparse[i] = new CArray(rpc->array[i]);
         }
