@@ -132,6 +132,16 @@ typedef struct CArray_RPC_t {
     char *data;
 } CArray_RPC;
 
+inline bool check_carray_rpc_empty (CArray_RPC *rpc) {
+    return (rpc->nd == 1 && rpc->dimensions[0] == 0);
+}
+
+inline void set_carray_rpc_empty (CArray_RPC *rpc) {
+    rpc->nd = 1;
+    rpc->dimensions[0] = 0;
+    rpc->data = NULL;
+}
+
 class CArray {
 public:
     CArray(void) : nd(0), type(NPY_INTLTR), type_size(sizeof(npy_int)) {};
@@ -204,7 +214,7 @@ inline rpc::Marshal& operator >>(rpc::Marshal&m, CArray& o)
     char type;
 
     m >> nd;
-    m.read(&type, sizeof(char));
+    m.read(&type, sizeof(o.type));
     m.read((void*)dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
     o.init(dimensions, nd, type);
     if (o.size > 0) {

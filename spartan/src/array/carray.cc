@@ -264,20 +264,19 @@ CArray::to_carray_rpc(CExtent *ex)
     if (ex == NULL) { // shape is zero (0,)
         rpc->size = 0;
         assert(nd == 1 && dimensions[0] == 0);
-        rpc->dimensions[0] = 0;
-        rpc->data = NULL;
+        set_carray_rpc_empty(rpc);
     } else {
-        rpc->size = ex->size;
+        rpc->size = ex->size * type_size;
         for (int i = 0; i < nd; ++i) {
             rpc->dimensions[i] = ex->lr[i] - ex->ul[i]; //dimensions[i];
             rpc->dimensions[i] = (rpc->dimensions[i] == 0) ? 1 : rpc->dimensions[i];
         }
+        if (copy_slice(ex, (NpyMemManager**)(&(rpc->data))) != rpc->size) {
+            std::cout << "copy_slice copied different size" << rpc->size << std::endl;
+            assert(0);
+        }
+        dest.push_back(rpc->data);
     }
-    if (copy_slice(ex, (NpyMemManager**)(&(rpc->data))) != ex->size * type_size) {
-        std::cout << "copy_slice copied different size" << std::endl;
-        assert(0);
-    }
-    dest.push_back(rpc->data);
 
     return dest;
 }

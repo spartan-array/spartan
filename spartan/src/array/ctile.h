@@ -60,25 +60,34 @@ inline CTile_RPC* vector_to_ctile_rpc(std::vector<char*> &buffers) {
         mgr->clear();
         delete mgr;
         rpc->array[0] = rpc->array[1] = rpc->array[2] = NULL;
-        for (unsigned i = 2, array_idx = 0; i < buffers.size(); i += 2, array_idx++) {
+        for (unsigned i = 2, array_idx = 0; i < buffers.size(); array_idx++) {
             assert((i + 1) < buffers.size());
-            mgr = (NpyMemManager*)buffers[i];
+            mgr = (NpyMemManager*)buffers[i++];
             rpc->array[array_idx] = (CArray_RPC*) mgr->get_data();
             mgr->clear();
             delete mgr;
             rpc->array[array_idx]->is_npy_memmanager = true;
-            rpc->array[array_idx]->data = buffers[i + 1];
+            if (check_carray_rpc_empty(rpc->array[array_idx])) {
+                rpc->array[array_idx]->data = NULL;
+            } else {
+                rpc->array[array_idx]->data = buffers[i++];
+            }
         }
     } else {
         rpc = (CTile_RPC*)buffers[1];
         rpc->array[0] = rpc->array[1] = rpc->array[2] = NULL;
         std::cout << __func__ << std::endl;
-        for (unsigned i = 2, array_idx = 0; i < buffers.size(); i += 2, array_idx++) {
+        for (unsigned i = 2, array_idx = 0; i < buffers.size(); array_idx++) {
             assert((i + 1) < buffers.size());
-            rpc->array[array_idx] = (CArray_RPC*) buffers[i];
+            rpc->array[array_idx] = (CArray_RPC*) buffers[i++];
             rpc->array[array_idx]->is_npy_memmanager = false;
-            rpc->array[array_idx]->data = buffers[i + 1];
-            std::cout <<  __func__ << " " << std::hex << (unsigned long)buffers[i + 1] << std::endl;
+            if (check_carray_rpc_empty(rpc->array[array_idx])) {
+                rpc->array[array_idx]->data = NULL;
+            } else {
+                std::cout <<  __func__ << " " << std::hex
+                          << (unsigned long)buffers[i] << std::endl;
+                rpc->array[array_idx]->data = buffers[i++];
+            }
         }
     }
 

@@ -54,8 +54,8 @@ def npdata_to_internal(array):
   else:
     ttype = TileBase.TILE_DENSE
     data = (array,)
-    util.log_info("npdata_to_internal %s %s %d %s %s", str(array),
-                  repr(array.data), array.nbytes, repr(array.base), repr(array.base.data))
+    #util.log_info("npdata_to_internal %s %s %d %s", str(array),
+                  #repr(array.data), array.nbytes, array.base))
 
   return array.shape, array.dtype.char, ttype, stype, data
 

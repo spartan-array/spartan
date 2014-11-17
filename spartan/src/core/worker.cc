@@ -344,6 +344,7 @@ void start_worker(int32_t port, int argc, char** argv) {
             PyRun_SimpleString("import sys");
             PyRun_SimpleString("import spartan");
             PyRun_SimpleString("spartan.config.parse(sys.argv)");
+            PyRun_SimpleString("sys.path.append('./tests')");
         }
 
         w->register_to_master();
