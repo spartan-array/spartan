@@ -154,15 +154,21 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
             
             dim = ex->lr[i] - ex->ul[i];
             dim = (dim == 0) ? 1 : dim;
-            Log_debug("Copy info: ul[i] = %d, lr[i] = %d, dimensions[i] = %d",
-                      ex->ul[i], ex->lr[i], dimensions[i]);
+            Log_debug("Copy info: slice_ul[%d] = %d, slice_lr[%d] = %d,"
+                      "slice_array_shape[%d] = %d, dimensions[%d] = %d",
+                      i, ex->ul[i], i, ex->lr[i], i, ex->array_shape[i],
+                      i, dimensions[i]);
             if (dim != dimensions[i]) {
                 break;
             }
         }
 
         last_sliced_dim = i;
-        copy_size = strides[last_sliced_dim];
+        if (last_sliced_dim == nd - 1) {
+            copy_size = ex->shape[nd - 1] * type_size;
+        } else {
+            copy_size = strides[last_sliced_dim];
+        }
         Log_debug("Copy info : last_sliced_dim = %d, nd = %d", last_sliced_dim, nd);
 
         npy_intp curr_idx[NPY_MAXDIMS], curr_pos;
@@ -180,14 +186,19 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
                   *dest, buf, all_size, copy_size);
         do {
             curr_pos = ravelled_pos(curr_idx, ex->array_shape, nd);
-            memcpy(buf, source_data + curr_pos, copy_size);
+            memcpy(buf, source_data + curr_pos * type_size, copy_size);
 
             for (i = last_sliced_dim; i >= 0; i--) {
-                curr_idx[i] += 1;
+                if (i == nd - 1) {
+                    curr_idx[i] += ex->lr[i] - ex->ul[i];
+                } else {
+                    curr_idx[i] += 1;
+                }
                 if (curr_idx[i] - ex->ul[i] < ex->shape[i]) {
                     break; 
+                } else {
+                    curr_idx[i] = ex->ul[i];
                 }
-                curr_idx[i] = ex->ul[i];
             }
             buf += copy_size;
             all_size -= copy_size;
@@ -262,7 +273,8 @@ CArray::to_carray_rpc(CExtent *ex)
             rpc->dimensions[i] = (rpc->dimensions[i] == 0) ? 1 : rpc->dimensions[i];
         }
     }
-    if (copy_slice(ex, (NpyMemManager**)(&(rpc->data))) != ex->size) {
+    if (copy_slice(ex, (NpyMemManager**)(&(rpc->data))) != ex->size * type_size) {
+        std::cout << "copy_slice copied different size" << std::endl;
         assert(0);
     }
     dest.push_back(rpc->data);

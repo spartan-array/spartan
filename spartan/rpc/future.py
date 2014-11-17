@@ -92,7 +92,6 @@ class Future_Get(simplerpc.future.Future):
       return self.rep
 
     self.wait()
-    util.log_info(self.rep)
     self.rep = rpc_array.get_resp_to_tile(self.rep)
 
     if self.is_flatten:

@@ -459,9 +459,27 @@ ctile_creator(PyObject *args)
             /* TODO: release dense */
             PyArrayObject *dense = (PyArrayObject*)PyTuple_GetItem(data, 0);
             dense = PyArray_GETCONTIGUOUS(dense);
+            PyArrayObject *target = dense;
+            while (target->base != NULL) {
+                // The memory is contiguous, but it is a viewed array
+                // such as np.arange(10).reshape(2, 5).
+                // TODO: Not sure if this covers everything we will encounter.
+                assert(PyArray_Check(target->base));
+                target = (PyArrayObject*) target->base;
+            }
+            char *base_data = target->data;
+            //std::cout << "ctile_creater creates from an array " << target
+                      //<< ", data is " << (unsigned long) base_data 
+                      //<< ", dense data is " << (unsigned long) dense->data 
+                      //<< std::endl;
+            //for (int i = 0; i < 16 ; i++) {
+                //std::cout << "FUCK " << i  << " "
+                          //<< (unsigned)*(unsigned char*)(base_data + i) << std::endl;
+            //}
+
             CArray *dense_array = new CArray(dense->dimensions, dense->nd,
-                                             dense->descr->type, dense->data,
-                                             dense);
+                                             dense->descr->type, base_data, dense);
+            /* TODO: Should do the same transformation as dense */
             CArray *mask_array = NULL;
             if (tile_type == CTILE_MASKED) {
                 PyArrayObject *mask = (PyArrayObject*)PyTuple_GetItem(data, 1);
@@ -472,6 +490,7 @@ ctile_creator(PyObject *args)
             tile->set_data(dense_array, mask_array);
         } else {
             CArray *sparse_array[3];
+            /* TODO: Should do the same transformation as dense */
             for (int i = 0; i < 3; i++) {
                 PyArrayObject *sparse = (PyArrayObject*)PyTuple_GetItem(data, i);
                 sparse_array[i] = new CArray(sparse->dimensions, sparse->nd,
