@@ -158,8 +158,10 @@ CTile::reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer)
         if ((update.type == CTILE_DENSE && update.type == CTILE_MASKED) ||
              update.type == CTILE_DENSE) { 
             if (full) {
+                std::cout << "CTILE::reduce 1 full" << std::endl;
                 full_dense_outer_loop(dense, dense_state, update.dense, reducer);
             } else {
+                std::cout << "CTILE::reduce 1 slice" << std::endl;
                 slice_dense_outer_loop(dense, dense_state, update.dense, ex, reducer);
             }
         } else if (update.type != CTILE_SPARSE) {
@@ -257,7 +259,7 @@ CTile::to_tile_rpc(const CSliceIdx &idx)
         dest.insert(dest.end(), v.begin(), v.end());
         rpc->count = 1;
         if (type == CTILE_MASKED) {
-            Log_debug("Trying to get a masked array");
+            Log_debug("Fetching a masked array");
             std::vector<char*> v = mask->to_carray_rpc(ex);
             dest.insert(dest.end(), v.begin(), v.end());
             rpc->count = 2;
@@ -459,26 +461,26 @@ ctile_creator(PyObject *args)
             /* TODO: release dense */
             PyArrayObject *dense = (PyArrayObject*)PyTuple_GetItem(data, 0);
             dense = PyArray_GETCONTIGUOUS(dense);
-            PyArrayObject *target = dense;
-            while (target->base != NULL) {
-                // The memory is contiguous, but it is a viewed array
-                // such as np.arange(10).reshape(2, 5).
-                // TODO: Not sure if this covers everything we will encounter.
-                assert(PyArray_Check(target->base));
-                target = (PyArrayObject*) target->base;
-            }
-            char *base_data = target->data;
+            //PyArrayObject *target = dense;
+            //while (target->base != NULL) {
+                //// The memory is contiguous, but it is a viewed array
+                //// such as np.arange(10).reshape(2, 5).
+                //// TODO: Not sure if this covers everything we will encounter.
+                //assert(PyArray_Check(target->base));
+                //target = (PyArrayObject*) target->base;
+            //}
+            //char *base_data = target->data;
             //std::cout << "ctile_creater creates from an array " << target
                       //<< ", data is " << (unsigned long) base_data 
                       //<< ", dense data is " << (unsigned long) dense->data 
                       //<< std::endl;
-            //for (int i = 0; i < 16 ; i++) {
-                //std::cout << "FUCK " << i  << " "
-                          //<< (unsigned)*(unsigned char*)(base_data + i) << std::endl;
+            //for (int i = 0; i < 4; i++) {
+                //std::cout << "OnlyForDebug " << i << " "
+                          //<< *(unsigned long*)(base_data + i * 8) << std::endl;
             //}
 
             CArray *dense_array = new CArray(dense->dimensions, dense->nd,
-                                             dense->descr->type, base_data, dense);
+                                             dense->descr->type, dense->data, dense);
             /* TODO: Should do the same transformation as dense */
             CArray *mask_array = NULL;
             if (tile_type == CTILE_MASKED) {

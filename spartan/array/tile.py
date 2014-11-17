@@ -54,8 +54,7 @@ def npdata_to_internal(array):
   else:
     ttype = TileBase.TILE_DENSE
     data = (array,)
-    #util.log_info("npdata_to_internal %s %s %d %s", str(array),
-                  #repr(array.data), array.nbytes, array.base))
+    util.log_info("npdata_to_internal %s %d", str(array.shape), array.nbytes)
 
   return array.shape, array.dtype.char, ttype, stype, data
 
@@ -84,6 +83,8 @@ class Tile(TileBase):
       _reducer = reducer
     else:
       _reducer = builtin_reducers[reducer]
+
+    util.log_info('Tile.update %s %s', subslice, str(_reducer))
     self._update(subslice, tile_type, sparse_type,
                  tile_data, _reducer)
     return self
@@ -94,7 +95,7 @@ class Tile(TileBase):
 
 
 def from_data(data):
-  util.log_info("from_data %s", str(type(data)))
+  util.log_info('from_data %s', str(type(data)))
   if not isinstance(data, np.ndarray) and not sp.issparse(data):
     data = np.asarray(data)
   shape, dtype, tile_type, sparse_type, tile_data = npdata_to_internal(data)
