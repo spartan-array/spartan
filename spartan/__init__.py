@@ -53,6 +53,7 @@ def initialize(argv=None):
 
   # Shutdown workers at exit; necessary for cluster mode.
   atexit.register(shutdown)
+  return CTX
 
 
 def shutdown():
