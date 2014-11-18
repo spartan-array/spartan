@@ -63,10 +63,10 @@ TileBase_dealloc(PyObject *o)
     Log_debug("%s, tile = %p, ctile = %p", __func__, o, self->c_tile);
     self->c_tile->decrease_py_c_refcount();
     if (self->c_tile->can_release()) {
-        Log_debug("%s, can release the ctile %p", self->c_tile);
+        Log_debug("%s, can release the ctile %p", __func__, self->c_tile);
         delete self->c_tile;
     } else {
-        Log_debug("%s, can't release the ctile %p", self->c_tile);
+        Log_debug("%s, can't release the ctile %p", __func__, self->c_tile);
     }
     self->c_tile = NULL;
     Py_DECREF(self->shape);

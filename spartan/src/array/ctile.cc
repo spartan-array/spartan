@@ -179,8 +179,10 @@ CTile::reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer)
     } else if (type == CTILE_SPARSE) {
         Log_debug("CTILE::reduce, sparse");
         if (update.type == CTILE_DENSE || update.type == CTILE_MASKED) {
+            Log_debug("CTILE::reduce, sparse <- dense");
             assert(0);
         } else { 
+            Log_debug("CTILE::reduce, sparse <- sparse");
             assert(0);
         }
     }
@@ -268,12 +270,14 @@ CTile::to_tile_rpc(const CSliceIdx &idx)
 
     } else if (initialized && type == CTILE_SPARSE) {
         if (is_idx_complete(idx)) {
+            Log_info("Sparse full get");
             rpc->count = 3;
             for (int i = 0; i < 3; i++) {
                 std::vector<char*> v = sparse[i]->to_carray_rpc();
                 dest.insert(dest.end(), v.begin(), v.end());
             }
         } else {
+            Log_warn("Sparse slice get");
             /* TODO: Sparse Slicing ..... */
             assert(0);
             //memcpy(base, &rpc, sizeof(CTile_RPC));
