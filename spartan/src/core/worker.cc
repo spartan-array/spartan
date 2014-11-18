@@ -114,7 +114,7 @@ void CWorker::wait_for_shutdown() {
 void CWorker::initialize(const InitializeReq& req, EmptyMessage* resp) {
     id = req.id;
     for (auto& it : req.peers) {
-        std::cout << "CWorker::initialize " << it.first << " " << it.second << std::endl;
+        Log_info("CWorker::initialize %d %s", it.first, it.second.c_str());
         _peers[it.first] = new spartan::WorkerProxy(_clt_pool->get_client(it.second));
     }
     _ctx = new CBlobCtx(id, &_peers, this);
@@ -184,12 +184,11 @@ void CWorker::get(const GetReq& req, GetResp* resp) {
     unlock(_blob_lock);
     assert(it != _blobs.end());
     resp->data = it->second->get(req.subslice);
-    Log_debug("feginfegin c\n");
 
 }
 
 void CWorker::get_flatten(const GetReq& req, GetResp* resp) {
-    Log_debug("RPC %s\n", __func__);
+    Log_debug("RPC %s", __func__);
     Log_debug("receive get_flatten %s[%d:%d:%d]", req.id.to_string().c_str(),
               req.subslice.get_slice(0).start, req.subslice.get_slice(0).stop,
               req.subslice.get_slice(0).step);
@@ -202,7 +201,7 @@ void CWorker::get_flatten(const GetReq& req, GetResp* resp) {
 }
 
 void CWorker::cancel_tile(const TileIdMessage& req, rpc::i8* resp) {
-    Log_debug("RPC %s\n", __func__);
+    Log_debug("RPC %s", __func__);
     Log_info("receive cancel_tile %s", req.tile_id.to_string().c_str());
     *resp = 0;
     lock(_kernel_lock);
@@ -214,7 +213,7 @@ void CWorker::cancel_tile(const TileIdMessage& req, rpc::i8* resp) {
 }
 
 void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
-    Log_debug("RPC %s\n", __func__);
+    Log_debug("RPC %s", __func__);
     lock(_blob_lock);
     for (auto& tid : req.blobs) {
         if (tid.worker == id)

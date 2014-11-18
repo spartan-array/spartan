@@ -60,19 +60,18 @@ static void
 TileBase_dealloc(PyObject *o)
 {
     TileBase *self = (TileBase*) o;
-    std::cout << __func__ << " " << o << " " << self->c_tile << std::endl;
+    Log_debug("%s, tile = %p, ctile = %p", __func__, o, self->c_tile);
     self->c_tile->decrease_py_c_refcount();
     if (self->c_tile->can_release()) {
-        std::cout << __func__ << " Can release the ctile" << std::endl;
+        Log_debug("%s, can release the ctile %p", self->c_tile);
         delete self->c_tile;
     } else {
-        std::cout << __func__ << " Can't release the ctile" << std::endl;
+        Log_debug("%s, can't release the ctile %p", self->c_tile);
     }
     self->c_tile = NULL;
     Py_DECREF(self->shape);
     Py_DECREF(self->dtype);
     self->ob_type->tp_free((PyObject*)self);
-    std::cout << __func__ << " done" << std::endl;
 }
 
 //static PyObject *
@@ -96,7 +95,7 @@ TileBase_reduce(PyObject* o)
     PyObject *mod, *result, *tuple, *obj;
     PyObject *shape, *dtype, *tile_type, *sparse_type;
 
-    std::cout << "__reduce__" << std::endl;
+    Log_debug("%s", __func__);
     result = PyTuple_New(2);
     tuple = PyTuple_New(4);
     char dtype_str[] = {self->c_tile->get_dtype(), '\0'};
@@ -126,6 +125,8 @@ TileBase_get(PyObject* o, PyObject* args)
     TileBase *self = (TileBase*)o;
     PyObject *slice;
 
+    Log_debug("%s", __func__);
+
     if (!PyArg_ParseTuple(args, "O",  &slice))
         return NULL;
 
@@ -136,7 +137,6 @@ TileBase_get(PyObject* o, PyObject* args)
     CTile *ctile = new CTile(rpc);
     PyObject *ret = ctile->to_npy();
 
-    std::cout << __func__ << " end" << std::endl;
     if (ret == NULL) {
         delete(rpc);
     }
@@ -149,7 +149,7 @@ TileBase__update(PyObject* o, PyObject* args)
     TileBase *self = (TileBase*)o;
     PyObject *slice, *data, *tile_type, *sparse_type, *reducer;
 
-    std::cout << __func__ << std::endl;
+    Log_debug("%s", __func__);
     if (!PyArg_ParseTuple(args, "OOOOO", &slice, &tile_type, &sparse_type, &data, &reducer))
         return NULL;
 
@@ -204,7 +204,7 @@ static int
 TileBase_init(PyObject *o, PyObject *args, PyObject *kwds)
 {
     PyObject *cid = NULL;
-    std::cout << __func__ << " " << kwds << std::endl;
+    Log_debug("%s", __func__);
     if (kwds != Py_None) {
         assert(PyDict_Check(kwds) != 0);
         cid = PyDict_GetItemString(kwds, (char*)"ctile_id");
@@ -236,7 +236,7 @@ TileBase_init(PyObject *o, PyObject *args, PyObject *kwds)
     self->type = self->c_tile->get_type();
     // Tell c++ part that someone else is using this CTile.
     self->c_tile->increase_py_c_refcount();
-    std::cout << __func__ << " done" << std::endl;
+    Log_debug("%s done", __func__);
     return 0;
 }
 

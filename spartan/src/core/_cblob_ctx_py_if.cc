@@ -234,7 +234,7 @@ CBlobCtx_Py_init(PyObject *o, PyObject *args, PyObject *kwds)
     unsigned long worker_id, ctx_u;
     PyObject *workers;
 
-    std::cout << __func__ << std::endl;
+    Log_debug("%s done", __func__);
     if (!PyArg_ParseTuple(args, "kOk", &worker_id, &workers, &ctx_u))
         return -1;
 

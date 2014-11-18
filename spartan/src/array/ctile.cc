@@ -15,7 +15,7 @@ CTile::CTile(npy_intp dimensions[], int nd, char dtype,
 {
     int i;
 
-    std::cout << __func__ << " A"<< std::endl;
+    Log_debug("CTile::CTile(...)");
     initialized = false;
     type = (CTILE_TYPE)tile_type;
     this->sparse_type = (CTILE_SPARSE_TYPE)sparse_type;
@@ -31,13 +31,12 @@ CTile::CTile(npy_intp dimensions[], int nd, char dtype,
     for (i = 0; i < 3; i++) {
         sparse[i] = NULL;
     }
-    std::cout << __func__ << " A Done" << std::endl;
 }
 
 CTile::CTile(CTile_RPC *rpc)
     : py_c_refcount(0)
 {
-    std::cout << __func__ << " B" << std::endl;
+    Log_debug("CTile::CTile(CTile_RPC)");
     type = (CTILE_TYPE)rpc->type;
     sparse_type = (CTILE_SPARSE_TYPE)rpc->sparse_type;
     initialized = rpc->initialized;
@@ -76,7 +75,6 @@ CTile::CTile(CTile_RPC *rpc)
         }
     }
 
-    std::cout << __func__ << " B Done" << std::endl;
 }
 
 CTile::~CTile()
@@ -118,7 +116,7 @@ CTile::set_data(CArray **sparse)
 void
 CTile::initialize(void)
 {
-    std::cout << "CTile::" << __func__ << std::endl;
+    Log_debug("CTile::initialize");
     if (type == CTILE_SPARSE) {
          sparse[0] = new CArray(dimensions, 1, NPY_INTPLTR);
          sparse[1] = new CArray(dimensions, 1, NPY_INTPLTR);
@@ -150,18 +148,19 @@ CTile::reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer)
     CExtent *ex = slice_to_ex(idx);
     bool full = is_idx_complete(idx);
 
+    Log_debug("CTILE::reduce");
     if (nd == 0) { // Special case
-        std::cout << "CTILE::reduce 0" << std::endl;
+        Log_debug("CTILE::reduce, scalar");
         scalar_outer_loop(dense, dense_state, update.dense, reducer);
     } else if (type == CTILE_DENSE || type == CTILE_MASKED) { 
-        std::cout << "CTILE::reduce 1" << std::endl;
+        Log_debug("CTILE::reduce, dense or masked");
         if ((update.type == CTILE_DENSE && update.type == CTILE_MASKED) ||
              update.type == CTILE_DENSE) { 
             if (full) {
-                std::cout << "CTILE::reduce 1 full" << std::endl;
+                Log_debug("CTILE::reduce, dense full");
                 full_dense_outer_loop(dense, dense_state, update.dense, reducer);
             } else {
-                std::cout << "CTILE::reduce 1 slice" << std::endl;
+                Log_debug("CTILE::reduce, dense slice");
                 slice_dense_outer_loop(dense, dense_state, update.dense, ex, reducer);
             }
         } else if (update.type != CTILE_SPARSE) {
@@ -173,11 +172,12 @@ CTile::reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer)
                 slice_dense_outer_loop(mask, mask_state, update.mask, ex, REDUCER_OR);
             }
         } else { // SPARSE
+            Log_debug("CTILE::reduce, dense_sparse");
             sparse_dense_outer_loop(dense, dense_state, update.sparse, ex, reducer);
         }
 
     } else if (type == CTILE_SPARSE) {
-        std::cout << "CTILE::reduce 2" << std::endl;
+        Log_debug("CTILE::reduce, sparse");
         if (update.type == CTILE_DENSE || update.type == CTILE_MASKED) {
             assert(0);
         } else { 
@@ -189,7 +189,7 @@ CTile::reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer)
 void 
 CTile::update(const CSliceIdx &idx, CTile &update_data, npy_intp reducer)
 {
-    std::cout << __func__ << " reducer = " << (unsigned)reducer << std::endl;
+    Log_debug("CTile::update, reducer = %X", (unsigned)reducer);
     if (!initialized) {
         initialize(); 
     }
@@ -238,7 +238,7 @@ CTile::get(const CSliceIdx &idx)
 std::vector <char*>
 CTile::to_tile_rpc(const CSliceIdx &idx)
 {
-    std::cout << __func__ << " " << type << std::endl;
+    Log_debug("CTile::%s, type = %d", __func__, type);
     std::vector<char*> dest;
     CExtent *ex = slice_to_ex(idx);
     dest.push_back((char*)(new bool(true)));
@@ -281,16 +281,15 @@ CTile::to_tile_rpc(const CSliceIdx &idx)
         }
     }
     delete ex;
-    std::cout << __func__ << " done" << std::endl;
     return dest;
 }
 
 PyObject*
 CTile::to_npy(void)
 {
-    std::cout << "CTile::" << __func__ <<  " " << type << std::endl;
+    Log_debug("CTile::%s, type = %d", __func__, type);
     if (!initialized) {
-        std::cout << "get a uninitialized tile" << std::endl;
+        Log_debug("Getting a uninitialized tile");
         PyObject *mod, *object, *npy_dimensions;
         npy_dimensions = PyTuple_New(nd);
         assert(npy_dimensions != NULL);
@@ -315,9 +314,7 @@ CTile::to_npy(void)
             }
             assert(object != NULL);
         }
-        std::cout << "Before creating a matric " << mod << " " << object << std::endl;
         PyObject *ret = PyObject_CallFunctionObjArgs(object, npy_dimensions, NULL);
-        std::cout << "After creating a matric" << std::endl;
         return ret;
     } else if (type == CTILE_DENSE) {
         return dense->to_npy();
@@ -443,7 +440,7 @@ ctile_creator(PyObject *args)
     if (!PyArg_ParseTuple(args, "OskkO", &shape, &dtype, &tile_type, &sparse_type, &data))
         return NULL;
 
-    std::cout << __func__ << " type = " << tile_type << std::endl;
+    Log_debug("CTile::%s, type = %u", __func__, tile_type);
     int nd = PyTuple_Size(shape);
     npy_intp dimensions[NPY_MAXDIMS];
     for (int i = 0; i < nd; i++) {
@@ -503,6 +500,5 @@ ctile_creator(PyObject *args)
         }
     }
 
-    std::cout << __func__ << " address = " << std::hex << (unsigned long) tile << std::endl;
     return tile;
 }

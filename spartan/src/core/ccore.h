@@ -237,7 +237,7 @@ struct GetResp {
             delete (bool*)data[0];
             int size = data.size();
             for (int i = 1; i < size; ++i) {
-                Log_debug("GetResp delete %p", ((NpyMemManager*)(data[i]))->get_source());
+                Log_debug("GetResp delete sources %d %p", i, ((NpyMemManager*)(data[i]))->get_source());
                 delete (NpyMemManager*)data[i];
             }
         }
@@ -249,7 +249,7 @@ inline rpc::Marshal& operator <<(rpc::Marshal& m, const GetResp& o) {
 
     m << o.id;
     m << size;
-    Log_info ("GetResp marshal << %d %d", size, o.id);
+    Log_debug("GetResp marshal << %d %d", size, o.id);
     // The first one is for the destructor of GetResp use only,
     // but we still send it to RPC for consistency.
     m.write(o.data[0], sizeof(bool));
@@ -270,7 +270,7 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, GetResp& o) {
     o.own_data = false;
     m >> o.id;
     m >> size;
-    Log_info ("GetResp marshal >> size = %d, id = %d", size, o.id);
+    Log_debug("GetResp marshal >> size = %d, id = %d", size, o.id);
     m.read(&dummy, sizeof(bool));
     o.data.push_back((char*)(new bool(false)));
     for (int i = 1; i < size; ++i) {
@@ -329,8 +329,7 @@ struct UpdateReq {
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const UpdateReq& o) {
     m << o.id;
-    //std::cout <<  __func__ << o.id.to_string().c_str() << std::endl;
-    Log_debug("Marshal::%s id = %s, reducer = %u", 
+    Log_debug("Marshal::%s id = %s, reducer = %u",
               __func__, o.id.to_string().c_str(), o.reducer);
     m << o.region;
     m << o.reducer;

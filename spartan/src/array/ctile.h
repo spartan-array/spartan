@@ -54,6 +54,7 @@ inline CTile_RPC* vector_to_ctile_rpc(std::vector<char*> &buffers) {
 
     CTile_RPC *rpc;
     if (is_npy_memmanager) {
+        Log_debug("%s, from local", __func__);
         NpyMemManager* mgr;
         mgr = (NpyMemManager*)buffers[1];
         rpc = (CTile_RPC*)mgr->get_data();
@@ -74,9 +75,10 @@ inline CTile_RPC* vector_to_ctile_rpc(std::vector<char*> &buffers) {
             }
         }
     } else {
+        Log_debug("%s, from RPC", __func__);
         rpc = (CTile_RPC*)buffers[1];
         rpc->array[0] = rpc->array[1] = rpc->array[2] = NULL;
-        std::cout << __func__ << std::endl;
+
         for (unsigned i = 2, array_idx = 0; i < buffers.size(); array_idx++) {
             assert((i + 1) < buffers.size());
             rpc->array[array_idx] = (CArray_RPC*) buffers[i++];
@@ -84,8 +86,6 @@ inline CTile_RPC* vector_to_ctile_rpc(std::vector<char*> &buffers) {
             if (check_carray_rpc_empty(rpc->array[array_idx])) {
                 rpc->array[array_idx]->data = NULL;
             } else {
-                std::cout <<  __func__ << " " << std::hex
-                          << (unsigned long)buffers[i] << std::endl;
                 rpc->array[array_idx]->data = buffers[i++];
             }
         }
@@ -192,7 +192,7 @@ inline rpc::Marshal& operator<<(rpc::Marshal& m, const CTile& o)
     m.write(o.dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
     m.write(&o.dtype, sizeof(o.dtype));
     m.write(&o.initialized, sizeof(o.initialized));
-    Log_debug("Marshal::%s , type = %d, nd = %d, initialized = %u, dtype = %c",
+    Log_debug("CTile Marshal::%s , type = %d, nd = %d, initialized = %u, dtype = %c",
               __func__, o.type, o.nd, o.initialized, o.dtype);
     if (o.initialized) {
         if (o.type == CTILE_DENSE) {
@@ -217,7 +217,7 @@ inline rpc::Marshal& operator>>(rpc::Marshal&m, CTile& o)
     m.read(o.dimensions, sizeof(npy_intp) * NPY_MAXDIMS);
     m.read(&o.dtype, sizeof(o.dtype));
     m.read(&o.initialized, sizeof(o.initialized));
-    Log_debug("Marshal::%s , type = %d, nd = %d, initialized = %u, dtype = %c",
+    Log_debug("CTile Marshal::%s , type = %d, nd = %d, initialized = %u, dtype = %c",
               __func__, o.type, o.nd, o.initialized, o.dtype);
     if (o.initialized) {
         if (o.type == CTILE_DENSE) {
