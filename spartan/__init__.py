@@ -26,7 +26,7 @@ except:
   print 'Pyximport failed (this is likely not a problem unless you are changing Cython files)'
 
 
-import signal
+import atexit
 import sys
 
 import core
@@ -37,15 +37,6 @@ from .cluster import start_cluster
 
 
 CTX = None
-
-
-def signal_shutdown(signum, frame):
-  '''Shutdown Spartan and revert to orignal signal handler.'''
-  shutdown()
-  if signum == signal.SIGINT:
-    signal.signal(signum, signal.default_int_handler)  # KeyboardInterrupt
-  else:
-    signal.signal(signum, signal.SIG_DFL)  # default signal handler
 
 
 def initialize(argv=None):
@@ -60,11 +51,8 @@ def initialize(argv=None):
   config.parse(argv)
   CTX = start_cluster(FLAGS.num_workers, FLAGS.cluster)
 
-  # If spartan is running in cluster mode, we need to shutdown the workers
-  #   manually. The user can either explicitly call `spartan.shutdown()` or
-  #   they can use the interrupt signal (signal.SIGINT) a.k.a. `ctrl-C`
-  if FLAGS.cluster:
-    signal.signal(signal.SIGINT, signal_shutdown)
+  # Shutdown workers at exit; necessary for cluster mode.
+  atexit.register(shutdown)
   return CTX
 
 
