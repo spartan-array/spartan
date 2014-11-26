@@ -171,27 +171,32 @@ def _diagflat_mapper(array, ex):
   :param ex: Extent
     Region being processed.
   '''
-  dst_ul = (ex.ul[0], 0)
-  dst_lr = (ex.lr[0], array.shape[0])
-  dst_shape = (array.shape[0], array.shape[0])
-  dst_ex = extent.create(dst_ul, dst_lr, dst_shape)
+  new_ul = (ex.ul[0] * array.shape[1], 0)
+  new_lr = (ex.lr[0] * array.shape[1], np.prod(array.shape))
+  new_shape = (np.prod(array.shape), np.prod(array.shape))
+  new_ex = extent.create(new_ul, new_lr, new_shape)
 
-  data = array.fetch(ex)
-  result = np.zeros((ex.lr[0] - ex.ul[0], array.shape[0]))
-  for i in range(0, ex.lr[0]-ex.ul[0]):
-    result[i, i + ex.ul[0]] = data[i]
-  yield (dst_ex, result)
+  util.log_info('new_ul: %s new_lr: %s new_shape: %s', new_ul, new_lr, new_shape)
+  data = np.ravel(array.fetch(ex))
 
+  util.log_info('data: %s %s', data, data.shape)
+
+  result = np.zeros((new_lr[0] - new_ul[0], new_lr[1] - new_ul[1]))
+  for i in xrange(data.shape[0]):
+    result[i, new_ul[0] + i] = data[i]
+
+  yield new_ex, result
 
 def diagflat(array):
   '''
   Create a diagonal array with the given data on the diagonal
-  the shape should be array.shape[0] * array.shape[0]
+  the shape should be (array.shape[0] * array.shape[1]) x (array.shape[0] * array.shape[1])
 
-  :param array: DistArray
+  :param array: 2D DistArray
     The data to fill the diagonal.
   '''
-  return shuffle(array, _diagflat_mapper, shape_hint=(array.shape[0], array.shape[0]))
+  Assert.eq(len(array.shape), 2)
+  return shuffle(array, _diagflat_mapper, shape_hint=(np.prod(array.shape), np.prod(array.shape)))
 
 
 def _diagonal_mapper(array, ex):
