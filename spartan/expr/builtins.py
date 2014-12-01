@@ -171,6 +171,9 @@ def _diagflat_mapper(array, ex):
   :param ex: Extent
     Region being processed.
   '''
+  util.log_info('ex.ul: %s ex.lr: %s ex.shape: %s', ex.ul, ex.lr, ex.shape)
+  util.log_info('array.shape: %s', array.shape)
+
   new_ul = (ex.ul[0] * array.shape[1], 0)
   new_lr = (ex.lr[0] * array.shape[1], np.prod(array.shape))
   new_shape = (np.prod(array.shape), np.prod(array.shape))
