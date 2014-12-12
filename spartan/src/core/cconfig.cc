@@ -9,16 +9,17 @@
 #include <vector>
 #include <iostream>
 #include "cconfig.h"
+#include "base/logging.h"
 
 CFlags FLAGS;
 void init_flags(void)
 {
     static bool done = false;
     if (done) {
-        std::cout << __func__ << " done" << std::endl;
+        //std::cout << __func__ << " done" << std::endl;
         return;
     } else {
-        std::cout << __func__ << " not done" << std::endl;
+        //std::cout << __func__ << " not done" << std::endl;
     }
    
     done = true;
@@ -103,10 +104,10 @@ std::map<std::string, std::string> parse_argv(int argc, char **argv)
 void config_parse(int argc, char **argv)
 {
     if (FLAGS.is_parsed()) {
-        std::cout << __func__ << " is_parsed" << std::endl;
+        //std::cout << __func__ << " is_parsed" << std::endl;
         return;
     } else {
-        std::cout << __func__ << " is not parsed" << std::endl;
+        //std::cout << __func__ << " is not parsed" << std::endl;
     }
 
     init_flags();
@@ -138,6 +139,11 @@ std::vector<const char*> get_flags_info(void)
         list.push_back(flag->help.c_str());
     }
     return list;
+}
+
+void parse_done(void)
+{
+    base::LOG_LEVEL = FLAGS.get_val<LogLevel>("log_level");
 }
 
 #ifdef __UNIT_TEST__

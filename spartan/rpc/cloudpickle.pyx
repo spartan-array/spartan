@@ -1271,7 +1271,8 @@ def whichmodule(func, funcname):
           if name != '__main__' and getattr(module, funcname, None) is func:
               break
         except Exception as e:
-          util.log_warn(e)
+          #util.log_info(e)
+          pass
     else:
         name = '__main__'
     classmap[func] = name

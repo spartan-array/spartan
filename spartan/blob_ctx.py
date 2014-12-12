@@ -173,7 +173,7 @@ class BlobCtx(object):
       _reducer = builtin_reducers[reducer]
     future = self._cblob_ctx.update(tile_id, region, ctile, _reducer)
     # FIXME: Is this necessary?
-    rpc.rpc_array.release_ctile(ctile)
+    #rpc.rpc_array.release_ctile(ctile)
 
     if wait:
       return future.result

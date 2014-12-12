@@ -5,9 +5,20 @@
 #include <vector>
 #include <map>
 #include <iostream>
+#include <sys/types.h>
+#include <unistd.h>
 #include "array/ctile.h"
 #include "array/cslice.h"
 #include "base/logging.h"
+
+inline unsigned get_rpc_id(unsigned rpc_count) 
+{
+    static unsigned rpc_id = 0;
+    if (rpc_id == 0) {
+        rpc_id = getpid() << 16;
+    }
+    return rpc_id + rpc_count;
+}
 
 /**
  * A `TileId` uniquely identifies a tile in a Spartan execution.
@@ -204,21 +215,31 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, InitializeReq& o) {
  * Fetch a region from a tile.
  */
 struct GetReq {
+    static unsigned rpc_count;
+    unsigned rpc_id;
     TileId id;
     CSliceIdx subslice;
-    GetReq(const TileId& i, const CSliceIdx& s): id(i), subslice(s) {}
+    GetReq(const TileId& i, const CSliceIdx& s): id(i), subslice(s) {
+        this->rpc_id = get_rpc_id(GetReq::rpc_count++);
+    }
     GetReq() {}
 };
 
+unsigned GetReq::rpc_count = 0;
+
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const GetReq& o) {
+    m << o.rpc_id;
     m << o.id;
     m << o.subslice;
+    Log_debug("GetReq %X marshal << %d", o.rpc_id, o.id);
     return m;
 }
 
 inline rpc::Marshal& operator >>(rpc::Marshal& m, GetReq& o) {
+    m >> o.rpc_id;
     m >> o.id;
     m >> o.subslice;
+    Log_debug("GetReq %X marshal >> %d", o.rpc_id, o.id);
     return m;
 }
 
@@ -226,6 +247,7 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, GetReq& o) {
  * The result of a fetch operation: the tile fetched from and the resulting data.
  */
 struct GetResp {
+    unsigned rpc_id;
     TileId id;
     std::vector<char*> data;
     bool own_data;
@@ -237,7 +259,7 @@ struct GetResp {
             delete (bool*)data[0];
             int size = data.size();
             for (int i = 1; i < size; ++i) {
-                Log_debug("GetResp delete sources %d %p", i, ((NpyMemManager*)(data[i]))->get_source());
+                //Log_debug("GetResp delete sources %d %p", i, ((NpyMemManager*)(data[i]))->get_source());
                 delete (NpyMemManager*)data[i];
             }
         }
@@ -247,9 +269,9 @@ struct GetResp {
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const GetResp& o) {
     int size = o.data.size();
 
+    m << o.rpc_id;
     m << o.id;
     m << size;
-    Log_debug("GetResp marshal << %d %d", size, o.id);
     // The first one is for the destructor of GetResp use only,
     // but we still send it to RPC for consistency.
     m.write(o.data[0], sizeof(bool));
@@ -260,6 +282,7 @@ inline rpc::Marshal& operator <<(rpc::Marshal& m, const GetResp& o) {
         m.write(&mgr->size, sizeof(mgr->size));
         m.write(mgr->get_data(), mgr->size);
     }
+    Log_debug("GetResp %X marshal << %d %d", o.rpc_id, size, o.id);
     return m;
 }
 
@@ -268,20 +291,21 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, GetResp& o) {
     bool dummy;
 
     o.own_data = false;
+    m >> o.rpc_id;
     m >> o.id;
     m >> size;
-    Log_debug("GetResp marshal >> size = %d, id = %d", size, o.id);
     m.read(&dummy, sizeof(bool));
     o.data.push_back((char*)(new bool(false)));
     for (int i = 1; i < size; ++i) {
         unsigned long data_size;
         m.read(&data_size, sizeof(data_size));
-        Log_info ("GetResp marshal >> size = %u", data_size);
+        //Log_info ("GetResp marshal >> size = %u", data_size);
         char *buf = new char[data_size];
         assert(buf != NULL);
         m.read(buf, data_size);
         o.data.push_back(buf);
     }
+    Log_debug("GetResp %X marshal >> size = %d, id = %d", o.rpc_id, size, o.id);
     return m;
 }
 
@@ -312,6 +336,8 @@ inline rpc::Marshal& operator >>(rpc::Marshal& m, DestroyReq& o) {
  *  existing tile data using the supplied reducer function.
  */
 struct UpdateReq {
+    static unsigned rpc_count;
+    unsigned rpc_id;
     TileId id;
     CSliceIdx region;
     unsigned long reducer;
@@ -320,30 +346,36 @@ struct UpdateReq {
      * bool own_data*/
 
     UpdateReq(const TileId& i, const CSliceIdx& r, CTile *d, unsigned long red)
-              : id(i), region(r), reducer(red), data(d) {}
-    UpdateReq() : data(NULL){}
+              : id(i), region(r), reducer(red), data(d) {
+        this->rpc_id = get_rpc_id(UpdateReq::rpc_count++);
+    }
+    UpdateReq() : data(NULL){this->rpc_id = get_rpc_id(UpdateReq::rpc_count++);};
     /* FIXME: It seems weird to delete data here */
     //~UpdateReq() {delete data;}
     ~UpdateReq() {}
 };
 
+unsigned UpdateReq::rpc_count = 0;
+
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const UpdateReq& o) {
+    m << o.rpc_id;
     m << o.id;
-    Log_debug("Marshal::%s id = %s, reducer = %u",
-              __func__, o.id.to_string().c_str(), o.reducer);
     m << o.region;
     m << o.reducer;
     m << *(o.data);
+    Log_debug("UpdateReq %X marshal << id = %s, reducer = %u",
+              o.rpc_id, o.id.to_string().c_str(), o.reducer);
     return m;
 }
 
 inline rpc::Marshal& operator >>(rpc::Marshal& m, UpdateReq& o) {
+    m >> o.rpc_id;
     m >> o.id;
-    Log_debug("Marshal::%s %s", __func__, o.id.to_string().c_str());
     m >> o.region;
     m >> o.reducer;
     o.data = new CTile();
     m >> *(o.data);
+    Log_debug("UpdateReq %X marshal >> %s", o.rpc_id, o.id.to_string().c_str());
     return m;
 }
 

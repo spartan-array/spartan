@@ -4,6 +4,7 @@
 #include <numpy/arrayobject.h>
 #include <iostream>
 #include <assert.h>
+#include <pthread.h>
 #include "cextent.h"
 #include "rpc/marshal.h"
 #include "base/logging.h"
@@ -41,9 +42,6 @@ npy_type_token_to_number(char token)
 }
 
 #include <map>
-/**
- * TODO: Is this class has to be locked ?
- */
 class NpyMemManager {
 public:
     NpyMemManager(void) : size(0), source(NULL), data(NULL), own_by_npy(false){};
@@ -54,13 +52,18 @@ public:
         this->data = data;
         this->own_by_npy = own_by_npy;
         this->size = size;
+        pthread_mutex_lock(&this->mutex);
         if ((it = NpyMemManager::refcount.find(source)) == NpyMemManager::refcount.end()) {
             refcount[source] = 1; 
+            pthread_mutex_unlock(&this->mutex);
             if (own_by_npy) {
+                PyGILState_STATE gil_state = PyGILState_Ensure();
                 Py_INCREF(source);
+                PyGILState_Release(gil_state);
             }
         } else {
             it->second += 1;
+            pthread_mutex_unlock(&this->mutex);
         }
     }
 
@@ -69,14 +72,18 @@ public:
         data = mgr.data;
         own_by_npy = mgr.own_by_npy;
         size = mgr.size;
+        pthread_mutex_lock(&this->mutex);
         refcount[source] += 1;
+        pthread_mutex_unlock(&this->mutex);
     }
 
     ~NpyMemManager(void) {
+        pthread_mutex_lock(&this->mutex);
         auto it = NpyMemManager::refcount.find(source);
         if (it != NpyMemManager::refcount.end()) {
             if (it->second == 1) {
                 refcount.erase(source);
+                pthread_mutex_unlock(&this->mutex);
                 if (own_by_npy) {
                     Log_debug("~NpyMemManager decreases the refcnt of a npy %p", source);
                     PyGILState_STATE gil_state = PyGILState_Ensure();
@@ -87,25 +94,33 @@ public:
                     delete source;
                 }
             } else {
-                Log_debug("~NpyMemManager got another free %p", source);
                 it->second -= 1;
+                pthread_mutex_unlock(&this->mutex);
+                Log_debug("~NpyMemManager got another free %p", source);
             }
+        } else {
+            pthread_mutex_unlock(&this->mutex);
         }
     }
 
     // A dangerous function which should only be used when you actually know what this is for.
     void clear() {
+        pthread_mutex_lock(&this->mutex);
         auto it = NpyMemManager::refcount.find(source);
         if (it != NpyMemManager::refcount.end()) {
             refcount.erase(source);
         }
+        pthread_mutex_unlock(&this->mutex);
     }
 
     int get_refcount(void) {
+        pthread_mutex_lock(&this->mutex);
         auto it = NpyMemManager::refcount.find(source);
         if (it != NpyMemManager::refcount.end()) {
+            pthread_mutex_unlock(&this->mutex);
             return it->second;
         } else {
+            pthread_mutex_unlock(&this->mutex);
             return -1;
         }
     }
@@ -115,8 +130,9 @@ public:
 
     unsigned long size;
 private:
-    NpyMemManager& operator=(const NpyMemManager& obj) = delete;
     static std::map<char*, int> refcount;
+    static pthread_mutex_t mutex;
+    NpyMemManager& operator=(const NpyMemManager& obj) = delete;
     char* source;
     char* data;
     bool own_by_npy;

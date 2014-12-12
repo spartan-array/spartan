@@ -58,6 +58,7 @@ public:
     rpc::Future* get(const TileId& tile_id, const CSliceIdx& subslice, GetResp* resp,
                      bool wait=true, int32_t timeout=CBlobCtx::RPC_TIMEOUT) {
         GetReq req(tile_id, subslice);
+        Log_debug("Send GetReq %u", req.rpc_id);
         /* Transfer data ownership to ctile */
         resp->own_data = false;
         return _send<GetReq, GetResp>(tile_id.worker, &CWorker::get,
@@ -66,6 +67,7 @@ public:
 
     rpc::Future* py_get(TileId* tile_id, CSliceIdx* subslice, GetResp* resp) {
         GetReq req(*tile_id, *subslice);
+        Log_debug("Send GetReq %u", req.rpc_id);
         /* Transfer data ownership to ctile */
         resp->own_data = false;
         return _py_send<GetReq, GetResp>(tile_id->worker, &CWorker::get,

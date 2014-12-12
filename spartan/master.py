@@ -18,6 +18,10 @@ def _dump_profile():
   import yappi
   yappi.get_func_stats().save('master_prof.out', type='pstat')
 
+def _shutdown():
+  if MASTER is not None:
+    MASTER.shutdown()
+
 def get():
   return MASTER
 
@@ -42,6 +46,7 @@ class Master(MasterService):
       import yappi
       yappi.start()
       atexit.register(_dump_profile)
+    atexit.register(_shutdown)
 
     global MASTER
     MASTER = self
@@ -186,7 +191,7 @@ class Master(MasterService):
 
     Returns: `EmptyMessage`
     '''
-    #util.log_info('Receive worker %d heartbeat:%s', req.worker_id, req.worker_status)
+    #util.log_warn('Receive worker %d heartbeat:%s', req.worker_id, req.worker_status)
     if req.worker_id >= 0 and self._initialized:
       self.update_worker_score(req.worker_id, req.worker_status)
       self.mark_failed_workers()

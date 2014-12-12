@@ -233,6 +233,7 @@ public:
 void init_flags(void);
 
 std::vector<const char*> get_flags_info(void);
+void parse_done(void);
 void config_parse(int argc, char** argv);
 
 extern CFlags FLAGS;

@@ -49,7 +49,6 @@ static PyObject *
 get_resp_to_tile(PyObject* o, PyObject *args)
 {
     unsigned long u; 
-    std::cout << __func__ << std::endl;
     if (!PyArg_ParseTuple(args, "k", &u)) 
         return NULL;
     

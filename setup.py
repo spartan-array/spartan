@@ -62,6 +62,7 @@ subprocess.call("cp spartan/src/worker spartan", shell=True)
 subprocess.call("cp spartan/src/libspartan_array.so spartan", shell=True)
 subprocess.call("cp spartan/src/libcore.so spartan", shell=True)
 subprocess.call("mkdir -p spartan/rpc/simplerpc", shell=True)
+subprocess.call("cp spartan/src/rpc/base-utils/build/libbase.so spartan/", shell=True)
 subprocess.call("cp spartan/src/rpc/simple-rpc/build/_pyrpc.so spartan/rpc/simplerpc", shell=True)
 subprocess.call("cp spartan/src/rpc/simple-rpc/build/libsimplerpc.so spartan/rpc/simplerpc", shell=True)
 subprocess.call("cp spartan/src/rpc/simple-rpc/pylib/simplerpc/*.py spartan/rpc/simplerpc", shell=True)
@@ -175,20 +176,22 @@ setup(
 
     # Spartan extensions, cython part.
     Extension('spartan.rpc.serialization_buffer',
-              ['spartan/rpc/serialization_buffer.pyx']),
+              ['spartan/rpc/serialization_buffer.pyx'],
+              extra_compile_args=["-pipe"]),
     Extension('spartan.rpc.cloudpickle',
-              ['spartan/rpc/cloudpickle.pyx']),
+              ['spartan/rpc/cloudpickle.pyx'],
+              extra_compile_args=["-pipe"]),
     Extension('spartan.array.sparse',
               ['spartan/array/sparse.pyx'],
               language='c++',
-              extra_compile_args=["-std=c++0x"],
+              extra_compile_args=["-std=c++0x", "-pipe"],
               extra_link_args=["-std=c++11"]),
     Extension('spartan.config',
               ['spartan/config.pyx'],
               language='c++',
               include_dirs=ext_include_dirs,
               library_dirs=ext_link_dirs,
-              extra_compile_args=["-std=c++0x", "-lcore"],
+              extra_compile_args=["-std=c++0x", "-lcore", "-pipe"],
               extra_link_args=["-std=c++11", "-lcore"]),
 
     # Example extensions

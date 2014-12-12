@@ -3,6 +3,7 @@
 #include <Python.h>
 #include <numpy/arrayobject.h>
 #include <numpy/numpyconfig.h>
+#include "base/logging.h"
 #include "rpc/marshal.h"
 
 class CSlice {

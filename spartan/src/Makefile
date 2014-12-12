@@ -13,8 +13,8 @@ ifndef $(NUMPY_FLAGS)
     NUMPY = $(shell python -c "import numpy; print '-I' + numpy.__path__[0] + '/core/include/numpy'")
 endif
 
-CFLAGS = -I$(CUR_DIR) -I$(CORE_DIR) -I$(ARRAY_DIR) -I$(RPC) -I$(RPCBASE) $(PY_CFLAGS) $(NUMPY) -pthread -std=c++0x -O2 -ggdb
-LDFLAGS = -L$(RPCBASE)/build -L$(RPC)/build -L$(CURDIR) $(PY_LDFLAGS) -lbase -lpython2.7 -std=c++11 -ggdb
+CFLAGS = -I$(CUR_DIR) -I$(CORE_DIR) -I$(ARRAY_DIR) -I$(RPC) -I$(RPCBASE) $(PY_CFLAGS) $(NUMPY) -pthread -std=c++0x -O2 #-ggdb
+LDFLAGS = -L$(RPCBASE)/build -L$(RPC)/build -L$(CURDIR) $(PY_LDFLAGS) -lbase -lpython2.7 -std=c++11 #-ggdb
 
 OBJS_WORKER = $(CUR_DIR)/core/worker.o
 OBJS_ARRAY = $(ARRAY_DIR)/cslice.o $(ARRAY_DIR)/cextent.o $(ARRAY_DIR)/ctile.o $(ARRAY_DIR)/carray.o $(ARRAY_DIR)/carray_reducer.o
@@ -33,6 +33,7 @@ all: $(APPS)
 base-utils:
 	@if [ ! -d "$(RPCBASE)" ] ; then \
 	    git clone https://github.com/santazhang/base-utils $(RPCBASE); \
+	    cp $(RPCDIR)/base-utils-wscript $(RPC)/wscript; \
 	    cd $(RPCBASE) && patch -Np1 < ../base-utils-patch 2> /dev/null && cd - ;\
 	fi
 

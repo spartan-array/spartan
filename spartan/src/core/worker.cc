@@ -1,7 +1,9 @@
 #include <string>
 #include <stdio.h>
 #include <signal.h>
+#include <unistd.h>
 #include <sys/wait.h>
+#include <sys/param.h> 
 
 #include "cconfig.h"
 #include "cblob_ctx.h"
@@ -74,7 +76,7 @@ void CWorker::wait_for_shutdown() {
     while (_running) {
         double now = (double)time(0);
         if (now - last_heartbeat < HEARTBEAT_INTERVAL || !_initialized) {
-            sleep(0.5);
+            sleep(1);
             continue;
         }
 
@@ -90,8 +92,10 @@ void CWorker::wait_for_shutdown() {
         };
         rpc::Future* fu = _master->async_heartbeat(req, fu_attr);
         if (fu == NULL) {
-            Log_error("Exit due to connection to master failed.");
-            this->_running = false;
+            if (this->_running) {
+                Log_error("Exit due to connection to master failed.");
+                this->_running = false;
+            }
             break;
         }
         fu->timed_wait(1);
@@ -123,7 +127,8 @@ void CWorker::initialize(const InitializeReq& req, EmptyMessage* resp) {
 }
 
 void CWorker::get_tile_info(const TileIdMessage& req, TileInfoResp* resp) {
-    Log_debug("RPC %s", __func__);
+    static unsigned count = 0;
+    Log_debug("RPC %s %d", __func__, count);
     lock(_blob_lock);
     std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.tile_id);
     unlock(_blob_lock);
@@ -133,9 +138,10 @@ void CWorker::get_tile_info(const TileIdMessage& req, TileInfoResp* resp) {
 }
 
 void CWorker::create(const CreateTileReq& req, TileIdMessage* resp) {
+    static unsigned count = 0;
     resp->tile_id.worker = id;
     resp->tile_id.id = _id_counter++;
-    Log_debug("RPC %s %s, CTile type = %d", __func__, 
+    Log_debug("RPC %s %u, %s, CTile type = %d", __func__, count,
               resp->tile_id.to_string().c_str(),
               req.data->get_type());
     lock(_blob_lock);
@@ -143,10 +149,12 @@ void CWorker::create(const CreateTileReq& req, TileIdMessage* resp) {
     // Tell Python's Tile that there is someone else using this CTile.
     req.data->increase_py_c_refcount();
     unlock(_blob_lock);
+    Log_debug("RPC %s %u done", __func__, count++);
 }
 
 void CWorker::destroy(const DestroyReq& req, EmptyMessage* resp) {
-    Log_debug("RPC %s", __func__);
+    static unsigned count = 0;
+    Log_debug("RPC %s %u", __func__, count);
     lock(_blob_lock);
     for (auto& tid : req.ids) {
         //Log_debug("destroy tile:%s", tid.to_string().c_str());
@@ -162,19 +170,23 @@ void CWorker::destroy(const DestroyReq& req, EmptyMessage* resp) {
         }
     }
     unlock(_blob_lock);
+    Log_debug("RPC %s %u done", __func__, count++);
 }
 
 void CWorker::update(const UpdateReq& req, EmptyMessage* resp) {
-    Log_debug("RPC %s %u %p", __func__, req.reducer, req.data);
+    static unsigned count = 0;
+    Log_debug("RPC %s %u, %u %p", __func__, count, req.reducer, req.data);
     lock(_blob_lock);
     std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.id);
     unlock(_blob_lock);
     assert(it != _blobs.end());
     it->second->update(req.region, *(req.data), req.reducer);
+    Log_debug("RPC %s %u done", __func__, count++);
 }
 
 void CWorker::get(const GetReq& req, GetResp* resp) {
-    Log_debug("RPC %s", __func__);
+    static unsigned count = 0;
+    Log_debug("RPC %s %u %u", __func__, req.rpc_id, count);
     Log_debug("receive get %s[%d:%d:%d]", req.id.to_string().c_str(),
               req.subslice.get_slice(0).start, req.subslice.get_slice(0).stop,
               req.subslice.get_slice(0).step);
@@ -183,12 +195,14 @@ void CWorker::get(const GetReq& req, GetResp* resp) {
     std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.id);
     unlock(_blob_lock);
     assert(it != _blobs.end());
+    resp->rpc_id = req.rpc_id;
     resp->data = it->second->get(req.subslice);
-
+    Log_debug("RPC %s %u %u done", __func__, req.rpc_id, count++);
 }
 
 void CWorker::get_flatten(const GetReq& req, GetResp* resp) {
-    Log_debug("RPC %s", __func__);
+    static unsigned count = 0;
+    Log_debug("RPC %s %u", __func__, count);
     Log_debug("receive get_flatten %s[%d:%d:%d]", req.id.to_string().c_str(),
               req.subslice.get_slice(0).start, req.subslice.get_slice(0).stop,
               req.subslice.get_slice(0).step);
@@ -197,11 +211,14 @@ void CWorker::get_flatten(const GetReq& req, GetResp* resp) {
     std::unordered_map<TileId, CTile*>::iterator it = _blobs.find(req.id);
     unlock(_blob_lock);
     assert(it != _blobs.end());
+    resp->rpc_id = req.rpc_id;
     resp->data = it->second->get(req.subslice);
+    Log_debug("RPC %s %u done", __func__, count++);
 }
 
 void CWorker::cancel_tile(const TileIdMessage& req, rpc::i8* resp) {
-    Log_debug("RPC %s", __func__);
+    static unsigned count = 0;
+    Log_debug("RPC %s %u", __func__, count);
     Log_info("receive cancel_tile %s", req.tile_id.to_string().c_str());
     *resp = 0;
     lock(_kernel_lock);
@@ -210,10 +227,12 @@ void CWorker::cancel_tile(const TileIdMessage& req, rpc::i8* resp) {
         *resp = 1;
     }
     unlock(_kernel_lock);
+    Log_debug("RPC %s %u done", __func__, count++);
 }
 
 void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
-    Log_debug("RPC %s", __func__);
+    static unsigned count = 0;
+    Log_debug("RPC %s %u", __func__, count);
     lock(_blob_lock);
     for (auto& tid : req.blobs) {
         if (tid.worker == id)
@@ -226,12 +245,13 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
 
     char init_cmd[] = "blob_ctx.set(blob_ctx.BlobCtx(worker_id, None, None, worker_ctx))\n"
                       "mapper_fn, kw = read(fn)\n"
-                      "print mapper_fn, kw\n"
+                      //"print mapper_fn, kw\n"
                       "results={}\n"
                       "futures=FutureGroup()\n";
 
     char mapper_cmd[] = 
                         "tile_id = core.TileId(*tid)\n"
+                        //"util.log_debug(mapper_fn)\n"
                         "map_result = mapper_fn(tile_id, blob, **kw)\n"
                         "results[tile_id]=map_result.result\n"
                         "if map_result.futures is not None:\n"
@@ -277,6 +297,7 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
             }
             PyDict_SetItemString(pLocal, "blob", py_blob);
             PyDict_SetItemString(pLocal, "tid", Py_BuildValue("(ii)", tid.worker, tid.id));
+            Log_debug("Ready to run mapper_cmd");
             if (PyRun_String(mapper_cmd, Py_file_input, pLocal, pLocal) == NULL) {
                 PyErr_PrintEx(0);
             } else {
@@ -315,11 +336,15 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
         PyObject* re = PyDict_GetItemString(pLocal, "returnstr");
         resp->result = std::string(PyString_AsString(re), PyString_Size(re));
     }
+    Log_debug("RPC %s %u done", __func__, count++);
 }
 
 #include <time.h>
 void start_worker(int32_t port, int argc, char** argv) {
-    std::string w_addr = "0.0.0.0:" + std::to_string(port);
+    char hostname[MAXHOSTNAMELEN];
+    gethostname(hostname, MAXHOSTNAMELEN);
+    std::string w_addr = (hostname);
+    w_addr += ":" + std::to_string(port);
     Log_info("start worker pid %d at %s", getpid(), w_addr.c_str());
 
     CWorker* w = new CWorker(FLAGS.get_val<std::string>("master"), w_addr,

@@ -61,6 +61,7 @@ def start_remote_worker(worker, st, ed):
   #print >>sys.stderr, args
   util.log_debug('Running worker %s', ' '.join(args))
   time.sleep(0.1)
+  # TODO: improve this to make log break at newline
   if worker != 'localhost':
     p = subprocess.Popen(ssh_args + args, executable='ssh')
   else:

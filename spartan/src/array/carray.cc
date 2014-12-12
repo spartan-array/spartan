@@ -40,6 +40,7 @@ char npy_type_token[] = {NPY_BOOLLTR,
                          (char)-1};
 
 std::map<char*, int> NpyMemManager::refcount;
+pthread_mutex_t NpyMemManager::mutex = PTHREAD_MUTEX_INITIALIZER;
 
 CArray::CArray(npy_intp dimensions[], int nd, char type)
 {
@@ -185,7 +186,7 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
         char *buf = new char[all_size];
         assert(buf != NULL);
         *dest = new NpyMemManager(buf, buf, false, all_size); 
-        Log_debug("Not full copy. *dest = %p, buf = %p, all_size = %d, copy_size = %d",
+        Log_debug("Partial copy. *dest = %p, buf = %p, all_size = %d, copy_size = %d",
                   *dest, buf, all_size, copy_size);
         do {
             curr_pos = ravelled_pos(curr_idx, ex->array_shape, nd);
@@ -210,6 +211,7 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
             Log_error("Something is wrong when doing copy. all_size = %d, copy_size = %d",
                       all_size, copy_size);
         }
+        Log_debug("Partial copy done.");
         return ret;
     }
 }

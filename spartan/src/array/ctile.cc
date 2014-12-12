@@ -1,3 +1,5 @@
+#undef NDEBUG
+#include <assert.h>
 #include <Python.h>
 /* For Numpy C-API */
 #define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
@@ -179,10 +181,10 @@ CTile::reduce(const CSliceIdx &idx, CTile &update, REDUCER reducer)
     } else if (type == CTILE_SPARSE) {
         Log_debug("CTILE::reduce, sparse");
         if (update.type == CTILE_DENSE || update.type == CTILE_MASKED) {
-            Log_debug("CTILE::reduce, sparse <- dense");
+            Log_error("CTILE::reduce, sparse <- dense %X", reducer);
             assert(0);
         } else { 
-            Log_debug("CTILE::reduce, sparse <- sparse");
+            Log_error("CTILE::reduce, sparse <- sparse %X", reducer);
             assert(0);
         }
     }
@@ -412,7 +414,6 @@ CTile::to_npy(void)
 
         assert(object != NULL);
         ret = PyObject_Call(object, sargs, kargs);
-        assert(dense != NULL);
 
         return ret;
     }

@@ -76,13 +76,23 @@ LOG_STR = {logging.DEBUG: 'DEBUG',
            logging.ERROR: 'ERROR',
            logging.FATAL: 'FATAL'}
 
+LOG_VAL_MAPPING = {0: logging.DEBUG,
+                   1: logging.INFO,
+                   2: logging.WARN,
+                   3: logging.ERROR,
+                   4: logging.FATAL}
+
 
 class LogLevelFlag(Flag):
   def parse(self, str):
     self.val = getattr(logging, str)
+    for k, v in LOG_VAL_MAPPING.iteritems():
+      if v == self.val:
+        self.val = k
+        break
 
   def _str(self):
-    return LOG_STR[self.val]
+    return LOG_STR[LOG_VAL_MAPPING[self.val]]
 
 class HostListFlag(Flag):
   def parse(self, str):
@@ -112,6 +122,7 @@ from libc.string cimport const_char
 from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 cdef extern from "src/core/cconfig.h":
   cdef vector[const_char *] get_flags_info()
+  cdef void parse_done()
 
 class Flags(object):
   def __init__(self):
@@ -257,7 +268,7 @@ def parse(argv):
   logging.root = logging.RootLogger(logging.WARNING)
   logging.basicConfig(
           format='%(levelname)s %(asctime)s %(filename)s:%(lineno)s | %(hostname)s[%(pid)s] %(funcName)s: %(message)s',
-    level=FLAGS.log_level,
+    level=LOG_VAL_MAPPING[FLAGS.log_level],
     stream=sys.stderr)
 
   for f in rest:
@@ -269,5 +280,6 @@ def parse(argv):
     for name, flag in sorted(FLAGS):
       print '  >> ', name, '\t', flag.val
 
+  parse_done()
   return rest
 
