@@ -18,17 +18,7 @@ sending out RPC messages to many workers at once.  This context, is for historic
 reasons located in `spartan.blob_ctx`.
 """
 
-try:
-  #import pyximport
-  #pyximport.install()
-  pass
-except:
-  print 'Pyximport failed (this is likely not a problem unless you are changing Cython files)'
-
-
 import sys
-import os
-
 from . import config
 from .config import FLAGS
 from .cluster import start_cluster

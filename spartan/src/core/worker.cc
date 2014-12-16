@@ -1,9 +1,10 @@
-#include <string>
-#include <stdio.h>
-#include <signal.h>
+#include <cstdio>
+#include <csignal>
+#include <ctime>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/param.h> 
+#include <string>
 
 #include "cconfig.h"
 #include "cblob_ctx.h"
@@ -39,7 +40,6 @@ CWorker::CWorker(const std::string& master_addr, const std::string& worker_addr,
     HEARTBEAT_INTERVAL = heartbeat_interval;
 }
 
-#include <time.h>
 CWorker::~CWorker() {
     for (auto& it : _peers) {
         delete it.second;
@@ -338,12 +338,12 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
     Log_debug("RPC %s %u done", __func__, count++);
 }
 
-#include <time.h>
 void start_worker(int32_t port, int argc, char** argv) {
     char hostname[MAXHOSTNAMELEN];
     gethostname(hostname, MAXHOSTNAMELEN);
     std::string w_addr = (hostname);
     w_addr += ":" + std::to_string(port);
+
     Log_info("start worker pid %d at %s", getpid(), w_addr.c_str());
 
     CWorker* w = new CWorker(FLAGS.get_val<std::string>("master"), w_addr,
@@ -357,25 +357,30 @@ void start_worker(int32_t port, int argc, char** argv) {
 
     if (server->start(w_addr.c_str()) == 0) {
         // init python environment
-        Py_Initialize();
-        PyEval_InitThreads();
-        PyEval_ReleaseThread(PyThreadState_Get());
+        //Py_Initialize();
+        //PyEval_InitThreads();
+        //PyEval_ReleaseThread(PyThreadState_Get());
 
-        {
-            GILHelper gil_helper;
-            PySys_SetArgv(argc, argv);
-            PyRun_SimpleString("import sys");
-            PyRun_SimpleString("import spartan");
-            PyRun_SimpleString("spartan.config.parse(sys.argv)");
-            PyRun_SimpleString("sys.path.append('./tests')");
-        }
-
+        //{
+            //GILHelper gil_helper;
+            //PySys_SetArgv(argc, argv);
+            //Log_warn("import sys");
+            //PyRun_SimpleString("import sys");
+            //Log_warn("import spartan");
+            //[> Sleep a while (0~1 second) to avoid conflict of reading files <]
+            ////usleep(50000 * num);
+            //PyRun_SimpleString("import spartan");
+            //Log_warn("parse");
+            //PyRun_SimpleString("spartan.config.parse(sys.argv)");
+            //Log_warn("sys.path.append");
+            //PyRun_SimpleString("sys.path.append('./tests')");
+        //}
         w->register_to_master();
         w->wait_for_shutdown();
 
         // finalize python interpreter
-        PyGILState_Ensure();
-        Py_Finalize();
+        //PyGILState_Ensure();
+        //Py_Finalize();
     }
 
     Log_info("Before clear");
@@ -395,13 +400,32 @@ int main(int argc, char* argv[]) {
     int num_workers = FLAGS.get_val<int>("count");
     int port_base = FLAGS.get_val<int>("port_base") + 1;
 
+
+    // init python environment
+    Py_Initialize();
+    PyEval_InitThreads();
+    PyEval_ReleaseThread(PyThreadState_Get());
+    {
+        GILHelper gil_helper;
+        PySys_SetArgv(argc, argv);
+        PyRun_SimpleString("import sys");
+        PyRun_SimpleString("import spartan");
+        PyRun_SimpleString("spartan.config.parse(sys.argv)");
+        PyRun_SimpleString("sys.path.append('./tests')");
+    }
     // start #num_workers workers in this host
     for (int i = 0; i < num_workers; i++) {
         if (fork() == 0) {
             start_worker(port_base + i, argc, argv);
+            // finalize python interpreter
+            PyGILState_Ensure();
+            Py_Finalize();
             return 0;
         }
     }
+    // finalize python interpreter
+    PyGILState_Ensure();
+    Py_Finalize();
 
     pid_t pid;
     while ((pid = wait(NULL)) >= 0) {

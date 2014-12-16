@@ -62,6 +62,9 @@ void init_flags(void)
     FLAGS.add(new BoolFlag("dump_timers", "false"));
 
     FLAGS.add(new BoolFlag("use_cuda", "false"));
+
+    FLAGS.add(new StrFlag("worker_list", "4,8,16,32,64,80"));
+    FLAGS.add(new BoolFlag("test_optimizations", "False"));
 }
 
 std::map<std::string, std::string> parse_argv(int argc, char **argv)
