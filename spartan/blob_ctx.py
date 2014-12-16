@@ -229,7 +229,8 @@ class BlobCtx(object):
       dict: mapping from (source_tile, result of ``mapper_fn``)
     '''
     assert self.worker_id == MASTER_ID
-    req = core.RunKernelReq(blobs=tile_ids, fn=serialize((mapper_fn, kw)))
+    req = core.RunKernelReq(blobs=tile_ids, fn=serialize((mapper_fn, kw),
+                                                         use_cloudpickle=True))
     futures = self._send_all(WorkerProxy.async_run_kernel, req)
     result = {}
     for f in futures:

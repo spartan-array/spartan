@@ -1,5 +1,3 @@
-from rpc.simplerpc.marshal import Marshal
-
 '''
 Python definitions for RPC messages.
 
@@ -7,9 +5,36 @@ These are used for sending and receiving array data (`UpdateReq`, `GetReq` and `
 running a function on array data (`KernelReq`, `ResultResp`), registering and initializing
 workers (`RegisterReq`, `InitializeReq`).
 '''
+from rpc.simplerpc.marshal import Marshal
+#import copy_reg
 
-TileId = Marshal.reg_type('TileId', [('worker', 'rpc::i32'),
-                                     ('id', 'rpc::i32')])
+#TileId = Marshal.reg_type('TileId', [('worker', 'rpc::i32'),
+                                      #('id', 'rpc::i32')])
+
+class TileId(object):
+  def __init__(self, worker, id):
+    self.worker = worker
+    self.id = id
+
+  def __hash__(self):
+    return self.worker ^ self.id
+
+  def __reduce__(self):
+    return (TileId, (self.worker, self.id))
+
+  def __eq__(self, other):
+    return self.worker == other.worker and self.id == other.id
+
+  def __repr__(self):
+    return 'B(%d.%d)' % (self.worker, self.id)
+
+Marshal.reg_type('TileId', [('worker', 'rpc::i32'), ('id', 'rpc::i32')], TileId)
+
+
+#def TileID__reduce__(self):
+  #return (TileId, (self.worker, self.id))
+
+#copy_reg.pickle(_TileId, TileID__reduce__)
 
 WorkerStatus = Marshal.reg_type('WorkerStatus', [('total_physical_memory', 'rpc::i64'),
                                                  ('num_processors', 'rpc::i32'),

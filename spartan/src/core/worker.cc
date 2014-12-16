@@ -251,7 +251,6 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
 
     char mapper_cmd[] = 
                         "tile_id = core.TileId(*tid)\n"
-                        //"util.log_debug(mapper_fn)\n"
                         "map_result = mapper_fn(tile_id, blob, **kw)\n"
                         "results[tile_id]=map_result.result\n"
                         "if map_result.futures is not None:\n"

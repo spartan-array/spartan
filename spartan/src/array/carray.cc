@@ -82,7 +82,7 @@ CArray::CArray(npy_intp dimensions[], int nd, char type, char *data, NpyMemManag
 
 CArray::CArray(CArray_RPC *rpc)
 {
-    Log_debug("CArray::CArray(CArray_RPC)\n");
+    Log_debug("CArray::CArray(CArray_RPC)");
     init(rpc->dimensions, (int)rpc->nd, (char)rpc->item_type);
     if (rpc->is_npy_memmanager) { 
         data_source = (NpyMemManager*)(rpc->data);
@@ -153,6 +153,7 @@ CArray::copy_slice(CExtent *ex, NpyMemManager **dest)
         npy_intp copy_size, all_size;
         int i, last_sliced_dim;
 
+        Log_debug("Partial copy. *dest = %p", *dest);
         for (i = nd - 1; i >= 0; i--) {
             npy_intp dim; 
             
