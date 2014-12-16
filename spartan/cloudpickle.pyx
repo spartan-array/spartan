@@ -2,7 +2,7 @@
 
 """
 This module was extracted from the `cloud` package, developed by `PiCloud, Inc.
-<http://www.picloud.com>`_.  
+<http://www.picloud.com>`_.
 
 (This version comes from PySpark).
 
@@ -20,7 +20,7 @@ It does not include an unpickler, as standard python unpickling suffices.
 # Copyright (c) 2012, Regents of the University of California.
 # Copyright (c) 2009 `PiCloud, Inc. <http://www.picloud.com>`_.
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
@@ -33,7 +33,7 @@ It does not include an unpickler, as standard python unpickling suffices.
 #       names of its contributors may be used to endorse or promote
 #       products derived from this software without specific prior written
 #       permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 # "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 # LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -157,7 +157,7 @@ try:
     UnicodeType
 except NameError:
     UnicodeType = None
-    
+
 cdef list PyObject_HEAD
 try:
     import ctypes
@@ -196,7 +196,7 @@ cdef tuple xrange_params(xrangeobj):
     cdef int xrange_len = len(xrangeobj)
     if not xrange_len: #empty
         return (0,1,0)
-    
+
     cdef int start = xrangeobj[0]
     if xrange_len == 1: #one element
         return (start, 1, 1)
@@ -206,7 +206,7 @@ cdef tuple xrange_params(xrangeobj):
 cpdef save_string(CloudPickler self, str obj, pack=struct.pack):
     cdef bool unicode = obj.isunicode()
     cdef int l
-    
+
     if self.bin:
         if unicode:
             obj = obj.encode("utf-8")
@@ -228,7 +228,7 @@ cpdef save_string(CloudPickler self, str obj, pack=struct.pack):
         else:
             self.write(STRING + repr(obj) + '\n')
     self.memoize(obj)
-        
+
 #debug variables intended for developer use:
 cdef bool printSerialization = False
 cdef bool printMemoization = False
@@ -256,18 +256,18 @@ cdef dict dispatch = {buffer              : CloudPickler.save_buffer,
                       ListType            : CloudPickler.save_list,
                       DictionaryType      : CloudPickler.save_dict,
                       InstanceType        : CloudPickler.save_inst,
-                      file                : CloudPickler.save_file,                 
+                      file                : CloudPickler.save_file,
                       }
 
 if StringType is UnicodeType:
     dispatch[StringType] = save_string
-    
+
 if PyObject_HEAD:
-    dispatch[operator.itemgetter] = CloudPickler.save_itemgetter  
+    dispatch[operator.itemgetter] = CloudPickler.save_itemgetter
 
 if PyStringMap:
-    dispatch[PyStringMap] = CloudPicker.save_dict 
-    
+    dispatch[PyStringMap] = CloudPicker.save_dict
+
 #python2.6+ supports slice pickling. some py2.5 extensions might as well.  We just test it
 try:
     slice(0,1).__reduce__()
@@ -282,12 +282,12 @@ except TypeError: #can't pickle -- use PiCloud pickler
 
 if sys.version_info < (2,7): #2.7 supports partial pickling
     dispatch[partial] = CloudPickler.save_partial
-    
+
 #itertools objects do not pickle!
 for v in itertools.__dict__.values():
     if type(v) is type:
         dispatch[v] = CloudPickler.save_unsupported
-             
+
 cdef class CloudPickler:
     cdef dict memo, globals_ref   # map ids to dictionary. used to ensure that functions can share global env
     cdef bool bin, savedForceImports, savedDjangoEnv  #hack tro transport django environment
@@ -295,18 +295,18 @@ cdef class CloudPickler:
     cdef int proto, fast, _BATCHSIZE
     cdef list numpy_tst_mods
     cdef object write
-    
+
     def __init__(self, file, protocol=0, min_size_to_save=0):
         self.proto = <int>protocol
         if self.proto < 0:
             self.proto = HIGHEST_PROTOCOL
         elif self.proto > HIGHEST_PROTOCOL:
             raise ValueError("pickle protocol must be <= %d" % HIGHEST_PROTOCOL)
-          
+
         self.bin = self.proto >= 1
         self.write = file.write
         self.memo = {}
-        
+
         self.fast = 0
 
         self.savedForceImports = False
@@ -314,12 +314,12 @@ cdef class CloudPickler:
         self.modules = set()
         self.globals_ref = {}
         self._BATCHSIZE = 1000
-        
+
         self.numpy_tst_mods = ['numpy', 'scipy.special']
-    
+
     cdef void clear_memo(self):
         self.memo.clear()
-          
+
     cdef void dump(self, obj):
         # note: not thread safe
         # minimal side-effects, so not fixing
@@ -328,6 +328,7 @@ cdef class CloudPickler:
         cdef int new_recurse
         if base_recurse < recurse_limit:
             sys.setrecursionlimit(recurse_limit)
+
         self.inject_addons()
         try:
             if self.proto >= 2:
@@ -362,7 +363,7 @@ cdef class CloudPickler:
                 return LONG_BINGET + pack("<i", i)
 
         return GET + repr(i) + '\n'
-    
+
     def save(self, obj):
         # Check the memo
         x = self.memo.get(id(obj))
@@ -723,7 +724,7 @@ cdef class CloudPickler:
 
         self.write(GLOBAL + modname + '\n' + name + '\n')
         self.memoize(obj)
-      
+
     def save_instancemethod(self, obj):
         #Memoization rarely is ever useful due to python bounding
         self.save_reduce(MethodType, (obj.im_func, obj.im_self,obj.im_class), obj=obj)
@@ -920,7 +921,7 @@ cdef class CloudPickler:
     # to remove it.
     def save_empty_tuple(self, obj):
         self.write(EMPTY_TUPLE)
- 
+
     def save_list(self, obj):
         if self.bin:
             self.write(EMPTY_LIST)
@@ -929,7 +930,7 @@ cdef class CloudPickler:
 
         self.memoize(obj)
         self._batch_appends(iter(obj))
-    
+
     def _batch_appends(self, items):
         # Helper to batch up APPENDS sequences
         if not self.bin:
@@ -963,7 +964,7 @@ cdef class CloudPickler:
        #print 'saving', obj
         if obj is __builtins__:
             self.save_reduce(_get_module_builtins, (), obj=obj)
-            return 
+            return
 
         if self.bin:
             self.write(EMPTY_DICT)
@@ -1004,7 +1005,7 @@ cdef class CloudPickler:
                 self.save(v)
                 self.write(SETITEM)
             # else tmp is empty, and we're done
-                       
+
     def save_reduce(self, func, args, state=None,
                     listitems=None, dictitems=None, obj=None):
         """Modified to support __transient__ on new objects
@@ -1265,8 +1266,12 @@ def whichmodule(func, funcname):
     for name, module in sys.modules.items():
         if module is None:
             continue # skip dummy package entries
-        if name != '__main__' and getattr(module, funcname, None) is func:
-            break
+        try:
+          if name != '__main__' and getattr(module, funcname, None) is func:
+              break
+        except Exception as e:
+          #util.log_info(e)
+          pass
     else:
         name = '__main__'
     classmap[func] = name
@@ -1300,7 +1305,7 @@ cpdef encode_long(long x):
 
     if x == 0:
         return ''
-    
+
     cdef str ashex
     cdef int njunkchars, nibbles, nbits, newnibbles
     if x > 0:
@@ -1350,7 +1355,7 @@ cpdef encode_long(long x):
 cpdef dump(obj, file, int protocol=2):
     CloudPickler(file, protocol).dump(obj)
 
-cpdef dumps(obj, int protocol=2):   
+cpdef dumps(obj, int protocol=2):
     file = Writer()
     cp = CloudPickler(file,protocol)
     cp.dump(obj)
