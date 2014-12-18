@@ -10,7 +10,7 @@ from . import util, core, _cblob_ctx_py_if
 import threading
 import random
 import numpy as np
-from rpc import serialize, RemoteException, WorkerProxy
+from rpc import serialize, serialize_to, serialization_buffer, RemoteException, WorkerProxy
 from rpc import FutureGroup, Future
 import rpc.rpc_array
 from .array.tile import builtin_reducers
@@ -74,8 +74,14 @@ class BlobCtx(object):
       return None
 
     fu_group = FutureGroup()
-    for w in self.workers.values():
-      fu = method(w, req)
+    for wid, w in self.workers.iteritems():
+      if not isinstance(req, dict):
+        fu = method(w, req)
+      else:
+        _req = req.get(wid, None)
+        if _req is None:
+          continue
+        fu = method(w, _req)
       # Transform simplerpc.future to our future.
       fu = Future(fu=fu)
       fu_group.append(fu)
@@ -188,10 +194,27 @@ class BlobCtx(object):
       tile_ids (list): Tiles to destroy.
     '''
     assert self.worker_id == MASTER_ID
-    req = core.DestroyReq(ids=tile_ids)
+    #for tid in tile_ids:
+      #req = core.DestroyReq(id=tid)
+      # # Don't need to wait for the result.
+      #self._send(tid.worker, WorkerProxy.async_destroy, req, wait=False)
 
     # Don't need to wait for the result.
+    tids = {}
+    for tid in tile_ids:
+      l = tids.get(tid.worker, None)
+      if l is None:
+        l = []
+        tids[tid.worker] = l
+      l.append(tid)
+    req = {}
+    for w, l in tids.iteritems():
+      req[w] = core.DestroyReq(ids=l)
     self._send_all(WorkerProxy.async_destroy, req, wait=False)
+
+    # Don't need to wait for the result.
+    #req = core.DestroyReq(ids=tile_ids)
+    #self._send_all(WorkerProxy.async_destroy, req, wait=False)
 
   def destroy(self, tile_id):
     '''
@@ -229,9 +252,31 @@ class BlobCtx(object):
       dict: mapping from (source_tile, result of ``mapper_fn``)
     '''
     assert self.worker_id == MASTER_ID
-    req = core.RunKernelReq(blobs=tile_ids, fn=serialize((mapper_fn, kw),
-                                                         use_cloudpickle=True))
-    futures = self._send_all(WorkerProxy.async_run_kernel, req)
+    #begin = time.time()
+    tids = {}
+    for tid in tile_ids:
+      l = tids.get(tid.worker, None)
+      if l is None:
+        l = []
+        tids[tid.worker] = l
+      l.append(tid)
+    req = {}
+    w = serialization_buffer.Writer()
+    serialize_to((mapper_fn, kw), w, use_cloudpickle=True)
+    fn = w.getvalue()
+    #fn = serialize((mapper_fn, kw), use_cloudpickle=True)
+    for w, l in tids.iteritems():
+      req[w] = core.RunKernelReq(blobs=l, fn=fn)
+    futures = self._send_all(WorkerProxy.async_run_kernel, req, wait=False)
+    result = []
+    for fu in futures:
+      err_code = fu.wait()
+      if err_code == 0:
+        result.append(fu.result)
+    #print "All", time.time() - begin, kw
+
+    futures = result
+
     result = {}
     for f in futures:
       for source_tile, map_result in f.result.iteritems():
@@ -253,6 +298,7 @@ _ctx.val = None
 
 def get():
   'Thread-local: return the context for this process.'
+  _cblob_ctx_py_if.c_import()
   return _ctx.val
 
 

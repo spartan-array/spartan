@@ -64,6 +64,7 @@ GetResp = Marshal.reg_type('GetResp', [('id', 'TileId'),
                                        ('data', 'std::string')])
 
 DestroyReq = Marshal.reg_type('DestroyReq', [('ids', 'std::vector<TileId>')])
+#DestroyReq = Marshal.reg_type('DestroyReq', [('id', 'TileId')])
 
 UpdateReq = Marshal.reg_type('UpdateReq', [('id', 'TileId'),
                                            ('region', 'SubSlice'),

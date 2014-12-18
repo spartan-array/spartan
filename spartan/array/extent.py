@@ -1,4 +1,5 @@
 import numpy as np
+import copy_reg
 from _cextent_py_if import *
 
 #def offset_slice(base, other):
@@ -13,6 +14,11 @@ from _cextent_py_if import *
   #print base.ul, other.ul, other.lr
   #print 'offset_slice', a
   #return a;
+
+#def extent_reduce(self):
+  #return create, (self.ul, self.lr, self.array_shape)
+
+#copy_reg.pickle(TileExtent, extent_reduce)
 
 def to_global(ex, idx, axis):
   '''Convert ``idx`` from a local offset in this tile to a global offset.'''

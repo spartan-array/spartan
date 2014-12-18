@@ -44,8 +44,12 @@ class RemoteException(Exception):
   def __str__(self):
     return repr(self)
 
-def serialize_to(obj, writer):
+def serialize_to(obj, writer, use_cloudpickle=False):
   pos = writer.tell()
+  if use_cloudpickle:
+    cloudpickle.dump(obj, writer, -1)
+    return
+
   try:
     cPickle.dump(obj, writer, -1)
   except (ImportError, pickle.PicklingError, PickleError, TypeError):
@@ -62,6 +66,7 @@ def serialize(obj, use_cloudpickle=False):
     return cloudpickle.dumps(obj, -1)
 
 def read(f):
-  return cPickle.loads(f)
-
-
+  if isinstance(f, str):
+    return cPickle.loads(f)
+  else:
+    return cPickle.load(f)

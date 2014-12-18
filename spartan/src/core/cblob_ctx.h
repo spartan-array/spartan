@@ -43,17 +43,17 @@ public:
         return local_worker == NULL;
     }
 
-    void destroy_all(std::vector<TileId>& tile_ids) const {
-        DestroyReq req(tile_ids);
-        _send_all<DestroyReq, EmptyMessage>(&spartan::WorkerProxy::async_destroy, req,
-                                            NULL, NULL, false);
-    }
+    //void destroy_all(std::vector<TileId>& tile_ids) const {
+        //DestroyReq req(tile_ids);
+        //_send_all<DestroyReq, EmptyMessage>(&spartan::WorkerProxy::async_destroy, req,
+                                            //NULL, NULL, false);
+    //}
 
-    void destroy(const TileId& tile_id) const {
-        std::vector<TileId> tids;
-        tids.push_back(tile_id);
-        destroy_all(tids);
-    }
+    //void destroy(const TileId& tile_id) const {
+        //std::vector<TileId> tids;
+        //tids.push_back(tile_id);
+        //destroy_all(tids);
+    //}
 
     rpc::Future* get(const TileId& tile_id, const CSliceIdx& subslice, GetResp* resp,
                      bool wait=true, int32_t timeout=CBlobCtx::RPC_TIMEOUT) {
@@ -148,13 +148,13 @@ public:
         return resp;
     }
 
-    std::vector<RunKernelResp*>* map(std::vector<TileId>& tile_ids, std::string& mapper_fn) {
-        std::vector<RunKernelResp*>* resp = new std::vector<RunKernelResp*>();
-        RunKernelReq req(tile_ids, mapper_fn);
-        _send_all<RunKernelReq, RunKernelResp>(&spartan::WorkerProxy::async_run_kernel,
-                                               req, resp);
-        return resp;
-    }
+    //std::vector<RunKernelResp*>* map(std::vector<TileId>& tile_ids, std::string& mapper_fn) {
+        //std::vector<RunKernelResp*>* resp = new std::vector<RunKernelResp*>();
+        //RunKernelReq req(tile_ids, mapper_fn);
+        //_send_all<RunKernelReq, RunKernelResp>(&spartan::WorkerProxy::async_run_kernel,
+                                               //req, resp);
+        //return resp;
+    //}
 
 };
 

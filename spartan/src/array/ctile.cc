@@ -419,22 +419,6 @@ CTile::to_npy(void)
     }
 }
 
-static long long 
-get_longlong(PyObject *o) {
-    if (PyNumber_Check(o)) {
-        PyObject *_long;
-        long long ret;
-
-        _long = PyNumber_Long(o);
-        ret = PyLong_AsLongLong(_long);
-        Py_DECREF(_long);
-        return ret;
-    } else {
-        assert(0);
-    }
-    return 0;
-}
-
 CTile*
 ctile_creator(PyObject *args)
 {
@@ -449,7 +433,7 @@ ctile_creator(PyObject *args)
     int nd = PyTuple_Size(shape);
     npy_intp dimensions[NPY_MAXDIMS];
     for (int i = 0; i < nd; i++) {
-        dimensions[i] = (npy_intp)get_longlong(PyTuple_GetItem(shape, i));
+        dimensions[i] = (npy_intp)PyInt_AsLong(PyTuple_GetItem(shape, i));
     }
 
     CTile *tile = new CTile(dimensions, nd, dtype[0], (CTILE_TYPE)tile_type, 

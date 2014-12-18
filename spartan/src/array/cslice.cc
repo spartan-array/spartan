@@ -1,21 +1,21 @@
 #define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
 #define NO_IMPORT_ARRAY
 #include "cslice.h"
-static long long 
-get_longlong(PyObject *o) {
-    if (PyNumber_Check(o)) {
-        PyObject *_long;
-        long long ret;
+//static long long
+//get_longlong(PyObject *o) {
+    //if (PyNumber_Check(o)) {
+        //PyObject *_long;
+        //long long ret;
 
-        _long = PyNumber_Long(o);
-        ret = PyLong_AsLongLong(_long);
-        Py_DECREF(_long);
-        return ret;
-    } else {
-        assert(0);
-    }
-    return 0;
-}
+        //_long = PyNumber_Long(o);
+        //ret = PyLong_AsLongLong(_long);
+        //Py_DECREF(_long);
+        //return ret;
+    //} else {
+        //assert(0);
+    //}
+    //return 0;
+//}
 
 
 #include <iostream>
@@ -60,7 +60,7 @@ CSliceIdx::CSliceIdx(PyObject *idx, int nd, npy_intp *dimensions)
         } else if (idx == Py_None) {
             ;
         } else {
-            slices[0].start = (npy_intp)get_longlong(idx);
+            slices[0].start = (npy_intp)PyInt_AsLong(idx);
             slices[0].stop = slices[0].start + 1;
             slices[0].step = 1;
         }
@@ -81,7 +81,7 @@ CSliceIdx::CSliceIdx(PyObject *idx, int nd, npy_intp *dimensions)
             } else if (idx == Py_None) {
                 ;
             } else {
-                slices[i].start = (npy_intp)get_longlong(slc);
+                slices[i].start = (npy_intp)PyInt_AsLong(slc);
                 slices[i].stop = slices[i].start + 1;
                 slices[i].step = 1;
             }

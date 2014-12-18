@@ -25,10 +25,12 @@ PID = os.getpid()
 LOGGING_CONFIGURED = False
 
 def _setup_logger():
-  global LOGGING_CONFIGURED
+  global LOGGING_CONFIGURED, PID, HOSTNAME
   if logging.root is None:
     raise Exception, 'Log attempt before logging was configured.'
 
+  HOSTNAME = socket.gethostname()
+  PID = os.getpid()
   logging.RootLogger.findCaller = findCaller
   LOGGING_CONFIGURED = True
 

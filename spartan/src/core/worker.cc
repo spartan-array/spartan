@@ -139,12 +139,12 @@ void CWorker::get_tile_info(const TileIdMessage& req, TileInfoResp* resp) {
 
 void CWorker::create(const CreateTileReq& req, TileIdMessage* resp) {
     static unsigned count = 0;
-    resp->tile_id.worker = id;
-    resp->tile_id.id = _id_counter++;
     Log_debug("RPC %s %u, %s, CTile type = %d", __func__, count,
               resp->tile_id.to_string().c_str(),
               req.data->get_type());
     lock(_blob_lock);
+    resp->tile_id.worker = id;
+    resp->tile_id.id = _id_counter++;
     _blobs[resp->tile_id] = req.data;
     // Tell Python's Tile that there is someone else using this CTile.
     req.data->increase_py_c_refcount();
@@ -156,18 +156,29 @@ void CWorker::destroy(const DestroyReq& req, EmptyMessage* resp) {
     static unsigned count = 0;
     Log_debug("RPC %s %u", __func__, count);
     lock(_blob_lock);
+
+    //CTile* tile = _blobs[req.id];
+    //tile->decrease_py_c_refcount();
+    //if (!tile->can_release()) {
+        //Log_error("Why is Python code still using this CTile?");
+        //assert(false);
+    //}
+    //_blobs.erase(req.id);
+    //delete tile;
+    //unlock(_blob_lock);
+    //return;
     for (auto& tid : req.ids) {
-        //Log_debug("destroy tile:%s", tid.to_string().c_str());
-        if (tid.worker == id) {
+        Log_debug("destroy tile:%s", tid.to_string().c_str());
+        //if (tid.worker == id) {
             CTile* tile = _blobs[tid];
-            _blobs.erase(tid);
             tile->decrease_py_c_refcount();
             if (!tile->can_release()) {
                 Log_error("Why is Python still using this CTile?");
                 assert(false);
             }
+            _blobs.erase(tid);
             delete tile;
-        }
+        //}
     }
     unlock(_blob_lock);
     Log_debug("RPC %s %u done", __func__, count++);
@@ -232,6 +243,11 @@ void CWorker::cancel_tile(const TileIdMessage& req, rpc::i8* resp) {
 
 void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
     static unsigned count = 0;
+    static PyObject *local_module = NULL;
+    static PyObject *init_fn = NULL, *map_fn = NULL, *wait_fn = NULL, *finalize_fn = NULL;
+
+
+    static unsigned long _time = 0, _count = 1;
     Log_debug("RPC %s %u", __func__, count);
     lock(_blob_lock);
     for (auto& tid : req.blobs) {
@@ -242,38 +258,22 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
 
     // TODO:sort _kernel_remain_tiles according to tile size
     // self._kernel_remain_tiles.sort()
-
-    char init_cmd[] = "blob_ctx.set(blob_ctx.BlobCtx(worker_id, None, None, worker_ctx))\n"
-                      "mapper_fn, kw = read(fn)\n"
-                      //"print mapper_fn, kw\n"
-                      "results={}\n"
-                      "futures=FutureGroup()\n";
-
-    char mapper_cmd[] = 
-                        "tile_id = core.TileId(*tid)\n"
-                        "map_result = mapper_fn(tile_id, blob, **kw)\n"
-                        "results[tile_id]=map_result.result\n"
-                        "if map_result.futures is not None:\n"
-                        "  assert isinstance(map_result.futures, list)\n"
-                        "  futures.extend(map_result.futures)\n";
-
-    PyObject *pMain, *pLocal;
-    {
+    do {
         GILHelper gil_helper;
 
-        pMain = PyImport_AddModule("__main__");
-        pLocal = PyModule_GetDict(pMain);
-
-        PyRun_SimpleString("from spartan import blob_ctx, core, util");
-        PyRun_SimpleString("from spartan.rpc import read, serialize, FutureGroup");
-        PyDict_SetItemString(pLocal, "worker_ctx", Py_BuildValue("k", _ctx));
-        PyDict_SetItemString(pLocal, "worker_id", Py_BuildValue("k", id));
-        PyDict_SetItemString(pLocal, "fn", Py_BuildValue("s#", req.fn.c_str(), req.fn.size()));
-
-        PyRun_String(init_cmd, Py_file_input, pLocal, pLocal);
-
-        TileId tid;
+        if (local_module == NULL) {
+            local_module = PyImport_ImportModule("spartan.worker");
+            init_fn = PyObject_GetAttrString(local_module, "init");
+            map_fn = PyObject_GetAttrString(local_module, "map");
+            wait_fn = PyObject_GetAttrString(local_module, "wait");
+            finalize_fn = PyObject_GetAttrString(local_module, "finalize");
+        }
+        PyObject_CallObject(init_fn, Py_BuildValue("kks#", id, _ctx,
+                                                   req.fn.c_str(),
+                                                   req.fn.size()
+                                                   ));
         while (true) {
+            TileId tid;
             lock(_kernel_lock);
             if (_kernel_remain_tiles.size() > 0) {
                 tid = _kernel_remain_tiles.back();
@@ -284,31 +284,31 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
                 break;
             }
 
-
-            PyObject *py_blob;
-            auto it = _py_blobs.find(tid);
-            if (it == _py_blobs.end()) {
-                py_blob = _blobs[tid]->to_npy();
-                /* TODO:Increase the reference count?*/
-                _py_blobs[tid] = py_blob;
-            } else {
-                py_blob = it->second;
-            }
-            PyDict_SetItemString(pLocal, "blob", py_blob);
-            PyDict_SetItemString(pLocal, "tid", Py_BuildValue("(ii)", tid.worker, tid.id));
+            //PyObject *py_blob;
+            //auto it = _py_blobs.find(tid);
+            //if (it == _py_blobs.end()) {
+                //[> FIXME: Memory leakage ? <]
+                //py_blob = _blobs[tid]->to_npy();
+                //[> TODO:Increase the reference count? <]
+                //_py_blobs[tid] = py_blob;
+            //} else {
+                //py_blob = it->second;
+            //}
+            //PyDict_SetItemString(pLocal, "blob", py_blob);
             Log_debug("Ready to run mapper_cmd");
-            if (PyRun_String(mapper_cmd, Py_file_input, pLocal, pLocal) == NULL) {
+            if (PyObject_CallObject(map_fn, Py_BuildValue("((ii))", tid.worker, tid.id)) == NULL) {
                 PyErr_PrintEx(0);
             } else {
-                Log_debug("PyRun_String success : %s", mapper_cmd);
+                //Log_debug("PyRun_String success : %s", mapper_cmd);
             }
         }
-    }
 
-    {
+    } while(0);
+
+    do {
         GILHelper gil_helper;
-        PyRun_SimpleString("futures.wait()\n");
-    }
+        PyObject_CallObject(wait_fn, NULL);
+    } while(0);
 
     // TODO check load balance
     /*
@@ -329,12 +329,13 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
 
           tile_id = self._ctx.maybe_steal_tile(tile_id, id).tile_id
     */
-    {
+
+    do {
         GILHelper gil_helper;
-        PyRun_SimpleString("returnstr = serialize(results)\n");
-        PyObject* re = PyDict_GetItemString(pLocal, "returnstr");
+        PyObject_CallObject(finalize_fn, NULL);
+        PyObject* re = PyObject_GetAttrString(local_module, "returnstr");
         resp->result = std::string(PyString_AsString(re), PyString_Size(re));
-    }
+    } while(0);
     Log_debug("RPC %s %u done", __func__, count++);
 }
 
@@ -408,14 +409,19 @@ int main(int argc, char* argv[]) {
     {
         GILHelper gil_helper;
         PySys_SetArgv(argc, argv);
-        PyRun_SimpleString("import sys");
+        PyRun_SimpleString("import sys, logging");
         PyRun_SimpleString("import spartan");
         PyRun_SimpleString("spartan.config.parse(sys.argv)");
         PyRun_SimpleString("sys.path.append('./tests')");
+
     }
     // start #num_workers workers in this host
     for (int i = 0; i < num_workers; i++) {
         if (fork() == 0) {
+            do {
+                GILHelper gil_helper;
+                PyRun_SimpleString("spartan.config.LOGGING_CONFIGURED = False");
+            } while(0);
             start_worker(port_base + i, argc, argv);
             // finalize python interpreter
             PyGILState_Ensure();

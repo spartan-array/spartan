@@ -4,6 +4,7 @@
 #define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
 #include <numpy/arrayobject.h>
 #include "carray.h"
+#include <sys/time.h>
 
 int npy_type_size[] = {sizeof(npy_bool),
                        sizeof(npy_intp),
@@ -270,7 +271,7 @@ CArray::to_carray_rpc(CExtent *ex)
     } else {
         rpc->size = ex->size * type_size;
         for (int i = 0; i < nd; ++i) {
-            rpc->dimensions[i] = ex->lr[i] - ex->ul[i]; //dimensions[i];
+            rpc->dimensions[i] = ex->lr[i] - ex->ul[i];
             rpc->dimensions[i] = (rpc->dimensions[i] == 0) ? 1 : rpc->dimensions[i];
         }
         npy_intp ret_size;
@@ -280,6 +281,7 @@ CArray::to_carray_rpc(CExtent *ex)
         }
         dest.push_back(rpc->data);
     }
+
 
     return dest;
 }
