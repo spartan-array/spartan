@@ -24,7 +24,8 @@ public:
 };
 
 CWorker::CWorker(const std::string& master_addr, const std::string& worker_addr,
-               int32_t heartbeat_interval) {
+               int32_t heartbeat_interval)
+{
     id = -1;
     _id_counter = 0;
     _addr = worker_addr;
@@ -40,7 +41,8 @@ CWorker::CWorker(const std::string& master_addr, const std::string& worker_addr,
     HEARTBEAT_INTERVAL = heartbeat_interval;
 }
 
-CWorker::~CWorker() {
+CWorker::~CWorker()
+{
     for (auto& it : _peers) {
         delete it.second;
     }
@@ -54,7 +56,8 @@ CWorker::~CWorker() {
     _clt_poll->release();
 }
 
-void CWorker::register_to_master() {
+void CWorker::register_to_master()
+{
     RegisterReq req(_addr, *_worker_status);
     rpc::FutureAttr fu_attr;
     fu_attr.callback = [this] (rpc::Future* fu) {
@@ -71,7 +74,8 @@ void CWorker::register_to_master() {
     }
 }
 
-void CWorker::wait_for_shutdown() {
+void CWorker::wait_for_shutdown()
+{
     double last_heartbeat = (double)time(0);
     while (_running) {
         double now = (double)time(0);
@@ -115,7 +119,8 @@ void CWorker::wait_for_shutdown() {
  *     resp (EmptyMessage): bar
  */
 
-void CWorker::initialize(const InitializeReq& req, EmptyMessage* resp) {
+void CWorker::initialize(const InitializeReq& req, EmptyMessage* resp)
+{
     id = req.id;
     for (auto& it : req.peers) {
         Log_info("CWorker::initialize %d %s", it.first, it.second.c_str());
@@ -126,7 +131,8 @@ void CWorker::initialize(const InitializeReq& req, EmptyMessage* resp) {
     Log_info("Worker %d initialization done!", id);
 }
 
-void CWorker::get_tile_info(const TileIdMessage& req, TileInfoResp* resp) {
+void CWorker::get_tile_info(const TileIdMessage& req, TileInfoResp* resp)
+{
     static unsigned count = 0;
     Log_debug("RPC %s %d", __func__, count);
     lock(_blob_lock);
@@ -137,7 +143,8 @@ void CWorker::get_tile_info(const TileIdMessage& req, TileInfoResp* resp) {
     resp->sparse = ((it->second)->get_type() == CTILE_SPARSE);
 }
 
-void CWorker::create(const CreateTileReq& req, TileIdMessage* resp) {
+void CWorker::create(const CreateTileReq& req, TileIdMessage* resp)
+{
     static unsigned count = 0;
     Log_debug("RPC %s %u, %s, CTile type = %d", __func__, count,
               resp->tile_id.to_string().c_str(),
@@ -152,21 +159,12 @@ void CWorker::create(const CreateTileReq& req, TileIdMessage* resp) {
     Log_debug("RPC %s %u done", __func__, count++);
 }
 
-void CWorker::destroy(const DestroyReq& req, EmptyMessage* resp) {
+void CWorker::destroy(const DestroyReq& req, EmptyMessage* resp)
+{
     static unsigned count = 0;
     Log_debug("RPC %s %u", __func__, count);
     lock(_blob_lock);
 
-    //CTile* tile = _blobs[req.id];
-    //tile->decrease_py_c_refcount();
-    //if (!tile->can_release()) {
-        //Log_error("Why is Python code still using this CTile?");
-        //assert(false);
-    //}
-    //_blobs.erase(req.id);
-    //delete tile;
-    //unlock(_blob_lock);
-    //return;
     for (auto& tid : req.ids) {
         Log_debug("destroy tile:%s", tid.to_string().c_str());
         //if (tid.worker == id) {
@@ -184,7 +182,8 @@ void CWorker::destroy(const DestroyReq& req, EmptyMessage* resp) {
     Log_debug("RPC %s %u done", __func__, count++);
 }
 
-void CWorker::update(const UpdateReq& req, EmptyMessage* resp) {
+void CWorker::update(const UpdateReq& req, EmptyMessage* resp)
+{
     static unsigned count = 0;
     Log_debug("RPC %s %u, %u %p", __func__, count, req.reducer, req.data);
     lock(_blob_lock);
@@ -195,7 +194,8 @@ void CWorker::update(const UpdateReq& req, EmptyMessage* resp) {
     Log_debug("RPC %s %u done", __func__, count++);
 }
 
-void CWorker::get(const GetReq& req, GetResp* resp) {
+void CWorker::get(const GetReq& req, GetResp* resp)
+{
     static unsigned count = 0;
     Log_debug("RPC %s %u %u", __func__, req.rpc_id, count);
     Log_debug("receive get %s[%d:%d:%d]", req.id.to_string().c_str(),
@@ -211,7 +211,8 @@ void CWorker::get(const GetReq& req, GetResp* resp) {
     Log_debug("RPC %s %u %u done", __func__, req.rpc_id, count++);
 }
 
-void CWorker::get_flatten(const GetReq& req, GetResp* resp) {
+void CWorker::get_flatten(const GetReq& req, GetResp* resp)
+{
     static unsigned count = 0;
     Log_debug("RPC %s %u", __func__, count);
     Log_debug("receive get_flatten %s[%d:%d:%d]", req.id.to_string().c_str(),
@@ -227,7 +228,8 @@ void CWorker::get_flatten(const GetReq& req, GetResp* resp) {
     Log_debug("RPC %s %u done", __func__, count++);
 }
 
-void CWorker::cancel_tile(const TileIdMessage& req, rpc::i8* resp) {
+void CWorker::cancel_tile(const TileIdMessage& req, rpc::i8* resp)
+{
     static unsigned count = 0;
     Log_debug("RPC %s %u", __func__, count);
     Log_info("receive cancel_tile %s", req.tile_id.to_string().c_str());
@@ -241,13 +243,9 @@ void CWorker::cancel_tile(const TileIdMessage& req, rpc::i8* resp) {
     Log_debug("RPC %s %u done", __func__, count++);
 }
 
-void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
+void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp)
+{
     static unsigned count = 0;
-    static PyObject *local_module = NULL;
-    static PyObject *init_fn = NULL, *map_fn = NULL, *wait_fn = NULL, *finalize_fn = NULL;
-
-
-    static unsigned long _time = 0, _count = 1;
     Log_debug("RPC %s %u", __func__, count);
     lock(_blob_lock);
     for (auto& tid : req.blobs) {
@@ -261,17 +259,9 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
     do {
         GILHelper gil_helper;
 
-        if (local_module == NULL) {
-            local_module = PyImport_ImportModule("spartan.worker");
-            init_fn = PyObject_GetAttrString(local_module, "init");
-            map_fn = PyObject_GetAttrString(local_module, "map");
-            wait_fn = PyObject_GetAttrString(local_module, "wait");
-            finalize_fn = PyObject_GetAttrString(local_module, "finalize");
-        }
         PyObject_CallObject(init_fn, Py_BuildValue("kks#", id, _ctx,
                                                    req.fn.c_str(),
-                                                   req.fn.size()
-                                                   ));
+                                                   req.fn.size()));
         while (true) {
             TileId tid;
             lock(_kernel_lock);
@@ -339,7 +329,18 @@ void CWorker::run_kernel(const RunKernelReq& req, RunKernelResp* resp) {
     Log_debug("RPC %s %u done", __func__, count++);
 }
 
-void start_worker(int32_t port, int argc, char** argv) {
+void CWorker::init_kernel_env(void)
+{
+    GILHelper gil_helper;
+    local_module = PyImport_ImportModule("spartan.worker");
+    init_fn = PyObject_GetAttrString(local_module, "init_run_kernel");
+    map_fn = PyObject_GetAttrString(local_module, "map");
+    wait_fn = PyObject_GetAttrString(local_module, "wait");
+    finalize_fn = PyObject_GetAttrString(local_module, "finalize");
+}
+
+void start_worker(int32_t port, int argc, char** argv)
+{
     char hostname[MAXHOSTNAMELEN];
     gethostname(hostname, MAXHOSTNAMELEN);
     std::string w_addr = (hostname);
@@ -357,31 +358,9 @@ void start_worker(int32_t port, int argc, char** argv) {
     server->reg(w);
 
     if (server->start(w_addr.c_str()) == 0) {
-        // init python environment
-        //Py_Initialize();
-        //PyEval_InitThreads();
-        //PyEval_ReleaseThread(PyThreadState_Get());
-
-        //{
-            //GILHelper gil_helper;
-            //PySys_SetArgv(argc, argv);
-            //Log_warn("import sys");
-            //PyRun_SimpleString("import sys");
-            //Log_warn("import spartan");
-            //[> Sleep a while (0~1 second) to avoid conflict of reading files <]
-            ////usleep(50000 * num);
-            //PyRun_SimpleString("import spartan");
-            //Log_warn("parse");
-            //PyRun_SimpleString("spartan.config.parse(sys.argv)");
-            //Log_warn("sys.path.append");
-            //PyRun_SimpleString("sys.path.append('./tests')");
-        //}
+        w->init_kernel_env();
         w->register_to_master();
         w->wait_for_shutdown();
-
-        // finalize python interpreter
-        //PyGILState_Ensure();
-        //Py_Finalize();
     }
 
     Log_info("Before clear");
@@ -392,7 +371,8 @@ void start_worker(int32_t port, int argc, char** argv) {
     Log_info("Everything is cleared");
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[])
+{
     FLAGS.add(new StrFlag("master", "0.0.0.0:10000"));
     FLAGS.add(new IntFlag("count", "1"));
     config_parse(argc, argv);
@@ -402,26 +382,24 @@ int main(int argc, char* argv[]) {
     int port_base = FLAGS.get_val<int>("port_base") + 1;
 
 
-    // init python environment
+    // init python environment here to avoid too many import
+    // which require file reading
     Py_Initialize();
     PyEval_InitThreads();
     PyEval_ReleaseThread(PyThreadState_Get());
-    {
+    do {
         GILHelper gil_helper;
         PySys_SetArgv(argc, argv);
-        PyRun_SimpleString("import sys, logging");
+        PyRun_SimpleString("import os, sys, logging");
         PyRun_SimpleString("import spartan");
+        PyRun_SimpleString("from spartan import blob_ctx, core, util, config");
         PyRun_SimpleString("spartan.config.parse(sys.argv)");
         PyRun_SimpleString("sys.path.append('./tests')");
+    } while(0);
 
-    }
     // start #num_workers workers in this host
     for (int i = 0; i < num_workers; i++) {
         if (fork() == 0) {
-            do {
-                GILHelper gil_helper;
-                PyRun_SimpleString("spartan.config.LOGGING_CONFIGURED = False");
-            } while(0);
             start_worker(port_base + i, argc, argv);
             // finalize python interpreter
             PyGILState_Ensure();
@@ -429,6 +407,7 @@ int main(int argc, char* argv[]) {
             return 0;
         }
     }
+
     // finalize python interpreter
     PyGILState_Ensure();
     Py_Finalize();

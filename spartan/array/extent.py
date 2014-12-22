@@ -18,7 +18,12 @@ from _cextent_py_if import *
 #def extent_reduce(self):
   #return create, (self.ul, self.lr, self.array_shape)
 
-#copy_reg.pickle(TileExtent, extent_reduce)
+
+def extent_reduce(self):
+  return create, self.to_tuple()
+
+copy_reg.pickle(TileExtent, extent_reduce)
+
 
 def to_global(ex, idx, axis):
   '''Convert ``idx`` from a local offset in this tile to a global offset.'''
@@ -28,6 +33,7 @@ def to_global(ex, idx, axis):
   rpos = ex.to_global(idx)
   return np.int64(rpos)
 
+
 def shapes_match(offset, data):
   '''
   Return true if the shape of ``data`` matches the extent ``offset``.
@@ -36,6 +42,7 @@ def shapes_match(offset, data):
   '''
   return np.all(offset.shape == data.shape)
 
+
 def shape_for_reduction(input_shape, axis):
   '''
   Return the shape for the result of applying a reduction along ``axis`` to
@@ -43,10 +50,11 @@ def shape_for_reduction(input_shape, axis):
   :param input_shape:
   :param axis:
   '''
-  if axis == None: return ()
+  if axis is None: return ()
   input_shape = list(input_shape)
   del input_shape[axis]
   return input_shape
+
 
 def find_overlapping(extents, region):
   '''
@@ -60,6 +68,7 @@ def find_overlapping(extents, region):
     if overlap is not None:
       yield (ex, overlap)
 
+
 def all_nonzero_shape(shape):
   '''
   Check if the shape is valid (all elements are biger than zero). This is equal to
@@ -69,6 +78,7 @@ def all_nonzero_shape(shape):
     if i == 0:
       return False
   return True
+
 
 def find_rect(ravelled_ul, ravelled_lr, shape):
   '''
@@ -89,6 +99,7 @@ def find_rect(ravelled_ul, ravelled_lr, shape):
     rect_ravelled_lr = ravelled_lr + (div - ravelled_lr % div) % div - 1
   return (rect_ravelled_ul, rect_ravelled_lr)
 
+
 def is_complete(shape, slices):
   '''
   Returns true if ``slices`` is a complete covering of shape; that is:
@@ -104,7 +115,7 @@ def is_complete(shape, slices):
   if len(shape) != len(slices):
     return False
 
-  for dim,slice in zip(shape, slices):
+  for dim, slice in zip(shape, slices):
     if slice.start > 0: return False
     if slice.stop < dim: return False
   return True

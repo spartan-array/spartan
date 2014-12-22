@@ -38,6 +38,13 @@ private:
 
     int32_t HEARTBEAT_INTERVAL = 3;
 
+
+    PyObject *local_module;
+    PyObject *init_fn;
+    PyObject *map_fn;
+    PyObject *wait_fn;
+    PyObject *finalize_fn;
+
     inline void lock(base::SpinLock& l) {
         l.lock();
     }
@@ -56,6 +63,7 @@ public:
     ~CWorker();
     void register_to_master();
     void wait_for_shutdown();
+    void init_kernel_env();
 
     // all the rpc services
     void initialize(const InitializeReq& req, EmptyMessage* resp);

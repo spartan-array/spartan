@@ -10,15 +10,6 @@ do {\
     } \
 } while (0)
 
-#define RETURN_CHECK(val) \
-do {\
-    if (val == NULL) { \
-        return NULL; \
-    } else { \
-        return val; \
-    } \
-} while (0)
-
 typedef struct {
     PyObject_HEAD
     int ndim;
@@ -28,24 +19,18 @@ typedef struct {
 
 /* Can't be defined here because it need &TileExtentType. */
 static PyObject* _TileExtent_create_helper(CExtent *c_ex, bool return_none_if_null);
-static PyObject *mod;
-static PyObject *create_obj;
+static PyObject *mod = NULL;
+static PyObject *create_obj = NULL;
 
 static PyObject*
-_TileExtent_gettuple(TileExtent *self, npy_intp *array, int ndim)
+_TileExtent_gettuple(npy_intp *array, int ndim)
 {
-    //if (ndim == 2) {
-        //return Py_BuildValue("ll", array[0], array[1]);
-    //} else if (ndim == 3) {
-        //return Py_BuildValue("lll", array[0], array[1], array[2]);
-    //} else {
-        PyObject *tuple = PyTuple_New(ndim);
-        RETURN_IF_NULL(tuple);
-        for (int i = 0; i < ndim; i++) {
-            PyTuple_SetItem(tuple, i, Py_BuildValue("l", array[i]));
-        }
-        return tuple;
-    //}
+    PyObject *tuple = PyTuple_New(ndim);
+    RETURN_IF_NULL(tuple);
+    for (int i = 0; i < ndim; i++) {
+        PyTuple_SET_ITEM(tuple, i, PyInt_FromLong(array[i]));
+    }
+    return tuple;
 }
 
 static int
@@ -78,7 +63,7 @@ _TileExtent_settuple(TileExtent *self,
 static PyObject*
 TileExtent_getul(TileExtent *self, void *closure)
 {
-    return _TileExtent_gettuple(self, self->c_ex->ul, self->c_ex->ndim);
+    return _TileExtent_gettuple(self->c_ex->ul, self->c_ex->ndim);
 }
 
 static int
@@ -90,7 +75,7 @@ TileExtent_setul(TileExtent *self, PyObject *value, void *closure)
 static PyObject*
 TileExtent_getlr(TileExtent *self, void *closure)
 {
-    return _TileExtent_gettuple(self, self->c_ex->lr, self->c_ex->ndim);
+    return _TileExtent_gettuple(self->c_ex->lr, self->c_ex->ndim);
 }
 
 static int
@@ -102,7 +87,7 @@ TileExtent_setlr(TileExtent *self, PyObject *value, void *closure)
 static PyObject*
 TileExtent_getshape(TileExtent *self, void *closure)
 {
-    return _TileExtent_gettuple(self, self->c_ex->shape, self->c_ex->ndim);
+    return _TileExtent_gettuple(self->c_ex->shape, self->c_ex->ndim);
 }
 
 static int
@@ -115,7 +100,7 @@ static PyObject*
 TileExtent_getarray_shape(TileExtent *self, void *closure)
 {
     if (self->c_ex->has_array_shape) {
-        return _TileExtent_gettuple(self, self->c_ex->array_shape, self->c_ex->ndim);
+        return _TileExtent_gettuple(self->c_ex->array_shape, self->c_ex->ndim);
     } else {
         Py_RETURN_NONE;
     }
@@ -234,7 +219,6 @@ static PyObject*
 TileExtent_reduce(PyObject* o)
 {
     TileExtent *self = (TileExtent*) o;
-    PyObject *obj = NULL;
     PyObject *ul, *lr, *array_shape;
 
     ul = TileExtent_getul(self, NULL);
@@ -248,7 +232,6 @@ TileExtent_reduce(PyObject* o)
         return NULL;
     }
 
-    //obj = PyObject_GetAttrString(mod, "create");
     return Py_BuildValue("O(OOO)", create_obj, ul, lr, array_shape);
 }
 
@@ -267,7 +250,7 @@ TileExtent_to_slice(PyObject* o)
                           PyLong_FromLongLong(self->c_ex->lr[i]),
                           NULL);
         RETURN_IF_NULL(slc);
-        PyTuple_SetItem(result, i, slc);
+        PyTuple_SET_ITEM(result, i, slc);
     }
 
     return result;
@@ -278,24 +261,21 @@ TileExtent_ravelled_pos(PyObject* o)
 {
     TileExtent *self = (TileExtent*) o;
     npy_intp rpos;
-    PyObject *result;
 
     rpos = ravelled_pos(self->c_ex->ul, self->c_ex->array_shape, self->c_ex->ndim);
-    result = PyLong_FromLongLong(rpos);
-    RETURN_CHECK(result);
+    return PyInt_FromLong(rpos);
 }
 
 static PyObject *
 TileExtent_to_global(PyObject *o, PyObject *args)
 {
     TileExtent *self = (TileExtent*) o;
-    PyObject *idx, *result;
+    PyObject *idx;
 
     if (!PyArg_ParseTuple(args, "O", &idx))
         return NULL;
 
-    result = PyInt_FromLong(self->c_ex->to_global(PyInt_AsLong(idx)));
-    RETURN_CHECK(result);
+    return PyInt_FromLong(self->c_ex->to_global(PyInt_AsLong(idx)));
 }
 
 static long
@@ -329,22 +309,24 @@ TileExtent_to_tuple(PyObject *o)
     PyObject *tuple, *ul, *lr, *array;
 
     tuple = PyTuple_New(3);
-    RETURN_IF_NULL(tuple);
     ul = PyTuple_New(self->ndim);
-    RETURN_IF_NULL(ul);
     lr = PyTuple_New(self->ndim);
-    RETURN_IF_NULL(lr);
-    array= PyTuple_New(self->ndim);
-    RETURN_IF_NULL(array);
+    array = PyTuple_New(self->ndim);
+    if (tuple == NULL or ul == NULL or lr == NULL or array == NULL) {
+        if (tuple != NULL) Py_DECREF(tuple);
+        if (ul != NULL) Py_DECREF(ul);
+        if (lr != NULL) Py_DECREF(lr);
+        if (array != NULL) Py_DECREF(array);
+    }
 
     for (int i = 0; i < self->ndim; i++) {
-        PyTuple_SetItem(ul, i, PyLong_FromLongLong(self->c_ex->ul[i]));
-        PyTuple_SetItem(lr, i, PyLong_FromLongLong(self->c_ex->lr[i]));
-        PyTuple_SetItem(array, i, PyLong_FromLongLong(self->c_ex->array_shape[i]));
+        PyTuple_SET_ITEM(ul, i, PyInt_FromLong(self->c_ex->ul[i]));
+        PyTuple_SET_ITEM(lr, i, PyInt_FromLong(self->c_ex->lr[i]));
+        PyTuple_SET_ITEM(array, i, PyInt_FromLong(self->c_ex->array_shape[i]));
     }
-    PyTuple_SetItem(tuple, 0, ul);
-    PyTuple_SetItem(tuple, 1, lr);
-    PyTuple_SetItem(tuple, 2, array);
+    PyTuple_SET_ITEM(tuple, 0, ul);
+    PyTuple_SET_ITEM(tuple, 1, lr);
+    PyTuple_SET_ITEM(tuple, 2, array);
 
     return tuple;
 }
@@ -446,7 +428,7 @@ _TileExtent_create_helper(CExtent *c_ex, bool return_none_if_null)
 
         ex->size = c_ex->size;
         ex->ndim = c_ex->ndim;
-        ex-> c_ex = c_ex;
+        ex->c_ex = c_ex;
         return (PyObject*)ex;
     }
 }
@@ -464,15 +446,18 @@ create(PyObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "OOO", &ul, &lr, &array_shape))
         return NULL;
 
-    ndim = PySequence_Size(ul);
+    if (!(PySequence_Check(ul) && PySequence_Check(lr) && PySequence_Check(array_shape)))
+        return NULL;
+
+    ndim = PySequence_Fast_GET_SIZE(ul);
     for (i = 0; i < ndim; i++) {
-        c_ul[i] = PyInt_AsLong(PySequence_GetItem(ul, i));
-        c_lr[i] = PyInt_AsLong(PySequence_GetItem(lr, i));
+        c_ul[i] = PyInt_AsLong(PySequence_Fast_GET_ITEM(ul, i));
+        c_lr[i] = PyInt_AsLong(PySequence_Fast_GET_ITEM(lr, i));
     }
 
     if (array_shape != Py_None) {
         for (i = 0; i < ndim; i++) {
-            c_array_shape[i] = PyInt_AsLong(PySequence_GetItem(array_shape, i));
+            c_array_shape[i] = PyInt_AsLong(PySequence_Fast_GET_ITEM(array_shape, i));
         }
         c_ex = extent_create(c_ul, c_lr, c_array_shape, ndim);
     } else {
@@ -551,7 +536,7 @@ offset_slice(PyObject *self, PyObject *args)
                           PyLong_FromLongLong(slice[i].stop),
                           NULL);
         RETURN_IF_NULL(slc);
-        PyTuple_SetItem(tuple, i, slc);
+        PyTuple_SET_ITEM(tuple, i, slc);
     }
     return tuple;
 }
@@ -639,7 +624,7 @@ find_shape(PyObject *self, PyObject *args)
     list = PyTuple_New(ex->ndim);
     RETURN_IF_NULL(list);
     for (i = 0; i < ex->ndim; i++) {
-        PyTuple_SetItem(list, i, PyLong_FromLongLong(shape[i]));
+        PyTuple_SET_ITEM(list, i, PyLong_FromLongLong(shape[i]));
     }
     return list;
 }
@@ -676,7 +661,7 @@ unravelled_pos(PyObject *self, PyObject *args)
     RETURN_IF_NULL(result);
     for (int i = ndim - 1; i >= 0; i--) {
         npy_intp item = PyInt_AsLong(PySequence_GetItem(array_shape, i));
-        PyTuple_SetItem(result, i, PyLong_FromLongLong(idx % item));
+        PyTuple_SET_ITEM(result, i, PyLong_FromLongLong(idx % item));
         idx /= item;
     }
 
@@ -686,7 +671,7 @@ unravelled_pos(PyObject *self, PyObject *args)
 static PyObject*
 ravelled_pos(PyObject *self, PyObject *args)
 {
-    PyObject *idx, *array_shape, *result;
+    PyObject *idx, *array_shape;
 
     if (!PyArg_ParseTuple(args, "OO", &idx, &array_shape))
         return NULL;
@@ -699,8 +684,7 @@ ravelled_pos(PyObject *self, PyObject *args)
         mul *= PyInt_AsLong(PySequence_GetItem(array_shape, i));
     }
 
-    result = PyLong_FromLongLong(rpos);
-    RETURN_CHECK(result);
+    return PyInt_FromLong(rpos);
 }
 
 static PyMethodDef extent_methods[] = {

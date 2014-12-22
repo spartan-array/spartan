@@ -79,10 +79,10 @@ _CBlobCtx_Py_get(PyObject* o, PyObject *args, bool is_flatten)
     Py_END_ALLOW_THREADS
     if (fu == NULL) {
         if (!is_flatten)
-            return PyObject_CallFunction(future_get_obj, (char*)"(kkO)", 0,
+            return PyObject_CallFunction(future_get_obj, (char*)"(OkO)", Py_None,
                                          (unsigned long)resp, Py_False, NULL);
         else
-            return PyObject_CallFunction(future_get_obj, (char*)"(kkO)", 0,
+            return PyObject_CallFunction(future_get_obj, (char*)"(OkO)", Py_None,
                                          (unsigned long)resp, Py_True, NULL);
     } else {
         delete resp;
@@ -138,7 +138,7 @@ CBlobCtx_Py_update(PyObject* o, PyObject *args)
     Py_END_ALLOW_THREADS
 
     if (fu == NULL) {
-        PyObject *resp = PyObject_CallFunction(emptym_obj, NULL);
+        PyObject *resp = PyObject_CallFunctionObjArgs(emptym_obj, NULL);
         PyObject *kargs = PyDict_New();
         PyDict_SetItemString(kargs, "id", PyInt_FromLong(-1));
         PyDict_SetItemString(kargs, "rep", resp);
@@ -176,20 +176,26 @@ CBlobCtx_Py_create(PyObject* o, PyObject *args)
     Py_END_ALLOW_THREADS
 
     if (fu == NULL) {
-        PyObject *tileid = PyObject_CallFunction(tileid_obj, (char*)"kk",
+        PyObject *tileid = PyObject_CallFunction(tileid_obj, (char*)"ll",
                                                  resp.tile_id.worker,
-                                                 resp.tile_id.id);
+                                                 resp.tile_id.id,
+                                                 NULL);
         PyObject *message = PyObject_CallFunctionObjArgs(tilem_obj, tileid, NULL);
-        PyObject *kargs = PyDict_New();
-        PyDict_SetItemString(kargs, "id", PyInt_FromLong(-1));
-        PyDict_SetItemString(kargs, "rep", message);
-        return PyObject_Call(future_obj, PyTuple_New(0), kargs);
+        return PyObject_CallFunctionObjArgs(future_obj,
+                                            Py_None, Py_None, message, Py_None, NULL);
+        //PyObject *kargs = PyDict_New();
+        //PyDict_SetItemString(kargs, "id", PyInt_FromLong(-1));
+        //PyDict_SetItemString(kargs, "rep", message);
+        //return PyObject_Call(future_obj, PyTuple_New(0), kargs);
     } else {
         PyObject *rep_types = Py_BuildValue("(s)", "TileIdMessage");
-        PyObject *kargs = PyDict_New();
-        PyDict_SetItemString(kargs, "id", Py_BuildValue("k", (unsigned long)fu));
-        PyDict_SetItemString(kargs, "rep_types", rep_types);
-        return PyObject_Call(future_obj, PyTuple_New(0), kargs);
+        return PyObject_CallFunction(future_obj, (char*)"kOOO",
+                                     (unsigned long)fu, rep_types, Py_None, Py_None,
+                                     NULL);
+        //PyObject *kargs = PyDict_New();
+        //PyDict_SetItemString(kargs, "id", PyLong_FromUnsignedLong((unsigned long)fu));
+        //PyDict_SetItemString(kargs, "rep_types", rep_types);
+        //return PyObject_Call(future_obj, PyTuple_New(0), kargs);
     }
 }
 

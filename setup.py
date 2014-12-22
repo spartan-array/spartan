@@ -66,7 +66,7 @@ subprocess.call("cp spartan/src/rpc/base-utils/build/libbase.so spartan/", shell
 subprocess.call("cp spartan/src/rpc/simple-rpc/build/_pyrpc.so spartan/rpc/simplerpc", shell=True)
 subprocess.call("cp spartan/src/rpc/simple-rpc/build/libsimplerpc.so spartan/rpc/simplerpc", shell=True)
 subprocess.call("cp spartan/src/rpc/simple-rpc/pylib/simplerpc/*.py spartan/rpc/simplerpc", shell=True)
-
+subprocess.call("mv spartan/rpc/simplerpc/marshal.py spartan/rpc/simplerpc/marshal.pyx", shell=True)
 subprocess.call("cp spartan/src/rpc/service.py spartan/rpc", shell=True)
 
 path = os.path.realpath('spartan/src/rpc/simple-rpc/pylib/simplerpc/')
@@ -88,8 +88,6 @@ with open(path) as rfp:
       line = line.replace('simplerpc.', '.')
       line = line.replace('simplerpc ', '. ')
       wfp.write(line)
-
-
 
 
 base = '.' #os.path.dirname(os.path.realpath(__file__))
@@ -180,6 +178,9 @@ setup(
               extra_compile_args=["-pipe"]),
     Extension('spartan.rpc.cloudpickle',
               ['spartan/rpc/cloudpickle.pyx'],
+              extra_compile_args=["-pipe"]),
+    Extension('spartan.rpc.simplerpc.marshal',
+              ['spartan/rpc/simplerpc/marshal.pyx'],
               extra_compile_args=["-pipe"]),
     Extension('spartan.array.sparse',
               ['spartan/array/sparse.pyx'],
