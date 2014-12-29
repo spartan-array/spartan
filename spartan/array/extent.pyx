@@ -463,21 +463,29 @@ def change_partition_axis(ex, axis):
   if axis < 0:
     axis += len(ex.array_shape)
 
+  # Vector is a special case
+  if len(ex.shape) == 1:
+    if axis == 1:
+      # We define that if axis is 1, users need the whole vector.
+      return create((0, ), ex.array_shape, ex.array_shape)
+    else:
+      return ex
+
   old_axis = []
   for i in range(len(ex.shape)):
     if ex.shape[i] != ex.array_shape[i]:
       old_axis.append(i)
 
   if len(old_axis) > 1:
-    # The meaning of this API for block partition is unclear.
-    util.log_warn(str((old_axis, ex.shape, ex.array_shape)))
+    # TODO:The meaning of this API for block partition is unclear.
+    util.log_warn("change_partition_axis doesn't know how to deal with block partition %s",
+                  str((old_axis, ex.shape, ex.array_shape)))
     return None
 
   if len(old_axis) == 0 or old_axis[0] == axis:
     return ex
 
   old_axis = old_axis[0]
-
   new_ul = list(ex.ul[:])
   new_lr = list(ex.lr[:])
   new_ul[axis] = util.divup(new_ul[old_axis] * ex.array_shape[axis],

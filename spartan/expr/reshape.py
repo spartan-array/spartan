@@ -219,14 +219,3 @@ def reshape(array, new_shape, tile_hint=None):
   return ReshapeExpr(array=array,
                      new_shape=new_shape,
                      tile_hint=tile_hint)
-
-
-def retile(array, tile_hint):
-  '''
-  Change the tiling of ``array``, while retaining the same shape.
-
-  Args:
-    array(Expr): Array to reshape
-    tile_hint(tuple): New tile shape
-  '''
-  return reshape(array, array.shape, tile_hint)
