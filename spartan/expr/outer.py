@@ -9,7 +9,7 @@ from spartan.node import Node
 
 def outer_mapper(ex, arrays, axes, local_user_fn, local_user_fn_kw, target):
   # Fetch the tile for the first array
-  first_ex = extent.change_partition_axis(ex, axes[0])
+  first_extent = extent.change_partition_axis(ex, axes[0])
   first_tile = arrays[0].fetch(ex)
 
   futures = rpc.FutureGroup()
@@ -18,6 +18,8 @@ def outer_mapper(ex, arrays, axes, local_user_fn, local_user_fn_kw, target):
 
   done_extent = {}
   for key in arrays[1].tiles.iterkeys():
+    if hasattr(arrays[1], 'view_extent'):
+      key = arrays[1].view_extent(key)
     outer_extent = extent.change_partition_axis(key, axes[1])
     if done_extent.get(outer_extent, None) is not None:
       # Usually, change_partition_axis won't return the same extents
@@ -34,7 +36,7 @@ def outer_mapper(ex, arrays, axes, local_user_fn, local_user_fn_kw, target):
       continue
 
     outer_tile = arrays[1].fetch(outer_extent)
-    result = local_user_fn(first_ex, first_tile,
+    result = local_user_fn(first_extent, first_tile,
                            outer_extent, outer_tile,
                            **local_user_fn_kw)
     if result is not None:
@@ -72,7 +74,7 @@ class OuterProductExpr(Expr):
     target = distarray.create(shape, arrays[0].dtype,
                               sharder=None, reducer=reducer,
                               tile_hint=tile_hint,
-                              sparse=arrays[0].sparse)
+                              sparse=(arrays[0].sparse and arrays[1].sparse))
 
     arrays[0].foreach_tile(mapper_fn=outer_mapper,
                            kw=dict(arrays=arrays, axes=axes, local_user_fn=fn,

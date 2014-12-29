@@ -118,6 +118,13 @@ class Reshape(distarray.DistArray):
   def tile_shape(self):
     return self._tile_shape
 
+  def view_extent(self, ex):
+    ravelled_ul, ravelled_lr = _ravelled_ex(ex.ul, ex.lr, ex.array_shape)
+    unravelled_ul, unravelled_lr = _unravelled_ex(ravelled_ul,
+                                                  ravelled_lr,
+                                                  self.shape)
+    return extent.create(unravelled_ul, np.array(unravelled_lr) + 1, self.shape)
+
   def foreach_tile(self, mapper_fn, kw=None):
     if kw is None: kw = {}
     kw['array'] = self

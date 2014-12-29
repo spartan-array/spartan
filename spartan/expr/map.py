@@ -247,7 +247,7 @@ class Map2Expr(Expr):
     target = distarray.create(shape, arrays[0].dtype,
                               sharder=None, reducer=reducer,
                               tile_hint=tile_hint,
-                              sparse=arrays[0].sparse)
+                              sparse=(arrays[0].sparse and arrays[1].sparse))
 
     arrays[0].foreach_tile(mapper_fn=tile_reshape_mapper,
                            kw=dict(arrays=arrays, local_user_fn=fn,
@@ -348,7 +348,7 @@ class Map3Expr(Expr):
     target = distarray.create(shape, arrays[0].dtype,
                               sharder=None, reducer=reducer,
                               tile_hint=tile_hint,
-                              sparse=arrays[0].sparse)
+                              sparse=(arrays[0].sparse and arrays[1].sparse))
 
     arrays[0].foreach_tile(mapper_fn=join_mapper,
                            kw=dict(arrays=arrays, axes=axes, local_user_fn=fn,

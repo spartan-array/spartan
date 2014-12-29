@@ -180,7 +180,12 @@ def dot_outer_mapper(ex_a, tile_a, ex_b, tile_b):
     lr = (ex_a.lr[0], ex_b.lr[1])
     shape = (ex_a.array_shape[0], ex_b.array_shape[1])
   target_ex = extent.create(ul, lr, shape)
-  yield target_ex, np.dot(tile_a, tile_b)
+  # FIXME: Temporary workaround for sparse arrays
+  if sp.issparse(tile_a):
+    tile_a = tile_a.tocsr()
+  if sp.issparse(tile_b):
+    tile_b = tile_b.tocsr()
+  yield target_ex, tile_a.dot(tile_b)
 
   #TODO: Sparse array
 
@@ -196,30 +201,36 @@ def dot_map3_mapper(extents, tiles):
     lr = (extents[0].lr[0], extents[1].lr[1])
     shape = (extents[0].shape[0], extents[1].shape[1])
   target_ex = extent.create(ul, lr, shape)
-  yield target_ex, np.dot(tiles[0], tiles[1])
+
+  # FIXME: Temporary workaround for sparse arrays
+  if sp.issparse(tiles[0]):
+    tiles[0] = tiles[0].tocsr()
+  if sp.issparse(tiles[1]):
+    tiles[1] = tiles[1].tocsr()
+  yield target_ex, tiles[0].dot(tiles[1])
 
   #TODO: Sparse array
 
 
 def dot_map2_mapper(ex, tiles):
   target_ex = extent.create((0,), (1,), (1,))
-  yield target_ex, np.dot(tiles[0], tiles[1]).reshape(1,)
+  yield target_ex, tiles[0].dot(tiles[1]).reshape(1,)
 
 
 def dot_map2_np_mapper(ex, tiles, array2):
   if len(ex.ul) == 1:
     # vec * vec
     target_ex = extent.create((0, ), (1, ), (1, ))
-    target_tile = np.dot(tiles[0], array2[ex.ul[0]:ex.lr[0]]).reshape(1, )
+    target_tile = tiles[0].dot(array2[ex.ul[0]:ex.lr[0]]).reshape(1, )
   elif len(array2.shape) == 1:
     # matrix * vec
     target_ex = extent.create((ex.ul[0], ), (ex.lr[0], ), (ex.array_shape[0], ))
-    target_tile = np.dot(tiles[0], array2[ex.ul[1]:ex.lr[1]])
+    target_tile = tiles[0].dot(array2[ex.ul[1]:ex.lr[1]])
   else:
     # matrix * matrix
     target_ex = extent.create((ex.ul[0], 0), (ex.lr[0], array2.shape[1]),
                               (ex.array_shape[0], array2.shape[1]))
-    target_tile = np.dot(tiles[0], array2[ex.ul[1]:ex.lr[1], ])
+    target_tile = tiles[0].dot(array2[ex.ul[1]:ex.lr[1], ])
   yield target_ex, target_tile
 
 
