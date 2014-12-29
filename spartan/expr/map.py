@@ -285,6 +285,17 @@ def map2(arrays, fn, fn_kw=None, shape=None, tile_hint=None, reducer=None):
 def join_mapper(ex, arrays, axes, local_user_fn, local_user_fn_kw, target):
   # First find out extents for all arrays
   first_extent = extent.change_partition_axis(ex, axes[0])
+
+  # FIXME: I'm not sure if the following comment is really true for map3.
+  # Add an assert here for now to verify the statement.
+  # Will remove it after we confirm the claim.
+  assert first_extent is not None
+  if first_extent is None:
+    # It is possible that the return value of change_partition_axis
+    # is None if the dimension of new partition axis is smaller than
+    # the dimension of the original axis.
+    return LocalKernelResult(result=[])
+
   keys = (first_extent.ul[axes[0]], first_extent.lr[axes[0]])
   join_extents = [first_extent]
   for i in range(1, len(arrays)):

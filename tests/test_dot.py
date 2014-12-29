@@ -19,9 +19,9 @@ class Test_Dot_with_Vec(test_common.ClusterTest):
                   np.dot(na, nb))
 
     # Test with row < col
-    av = expr.arange((66, 100))
+    av = expr.arange((67, 100))
     bv = expr.arange((100, 77))
-    na = np.arange(6600).reshape(66, 100)
+    na = np.arange(6700).reshape(67, 100)
     nb = np.arange(7700).reshape(100, 77)
 
     Assert.all_eq(expr.dot(av, bv).glom(),

@@ -27,6 +27,12 @@ def outer_mapper(ex, arrays, axes, local_user_fn, local_user_fn_kw, target):
       # We need to avoid redo the extent.
       continue
 
+    if outer_extent is None:
+      # It is possible that the return value of change_partition_axis
+      # is None if the dimension of new partition axis is smaller than
+      # the dimension of the original axis.
+      continue
+
     outer_tile = arrays[1].fetch(outer_extent)
     result = local_user_fn(first_ex, first_tile,
                            outer_extent, outer_tile,
