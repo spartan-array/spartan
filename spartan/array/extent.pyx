@@ -459,6 +459,19 @@ def is_complete(shape, slices):
     if slice.stop < dim: return False
   return True
 
+
+def largest_dim_axis(shape, exclude_axis=None):
+  '''
+  Args:
+    shape:
+    exclude_axis: tuple or list
+  '''
+  idx = np.argsort(shape)
+  for i in xrange(len(idx)-1, -1, -1):
+    if exclude_axis is None or idx[i] not in exclude_axis:
+      return idx[i]
+  return idx[0]
+
 def change_partition_axis(ex, axis):
   if axis < 0:
     axis += len(ex.array_shape)
@@ -471,27 +484,39 @@ def change_partition_axis(ex, axis):
     else:
       return ex
 
-  old_axis = []
-  for i in range(len(ex.shape)):
+  old_axes = []
+  for i in xrange(len(ex.shape)):
     if ex.shape[i] != ex.array_shape[i]:
-      old_axis.append(i)
+      old_axes.append(i)
 
-  if len(old_axis) > 1:
+  if len(old_axes) > 1:
     # TODO:The meaning of this API for block partition is unclear.
     util.log_warn("change_partition_axis doesn't know how to deal with block partition %s",
-                  str((old_axis, ex.shape, ex.array_shape)))
-    return None
+                  str((old_axes, ex.shape, ex.array_shape)))
+    raise NotImplementedError
 
-  if len(old_axis) == 0 or old_axis[0] == axis:
+  if len(old_axes) == 0 or old_axes[0] == axis:
     return ex
+  ##Mapping "sorting axis" to "tiling axis" presentation
+  #if len(old_axes) == 0 or old_axes[0] != axis:
+    #return ex
+  #else:
+    ##New tiling strategy with biggest dimension
+    #idx = np.argsort(ex.array_shape)
+    #for i in xrange(len(idx)-1, -1, -1):
+      #if idx[i] != old_axes[0]:
+        #axis = idx[i]
+        #break
 
-  old_axis = old_axis[0]
+  old_axis = old_axes[0]
+
   new_ul = list(ex.ul[:])
   new_lr = list(ex.lr[:])
   new_ul[axis] = util.divup(new_ul[old_axis] * ex.array_shape[axis],
-                            ex.array_shape[old_axis])
+                    ex.array_shape[old_axis])
   new_ul[old_axis] = 0
   new_lr[axis] = util.divup(new_lr[old_axis] * ex.array_shape[axis],
                             ex.array_shape[old_axis])
   new_lr[old_axis] = ex.array_shape[old_axis]
+
   return create(new_ul, new_lr, ex.array_shape)
