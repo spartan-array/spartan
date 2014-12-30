@@ -43,45 +43,45 @@ class TestOptimization(test_common.ClusterTest):
     Assert.all_eq(nq, q.optimized().glom(), tolerance = 1e-10)
 
 
-  def test_optimization_shape(self):
-    shape = (200, 800)
-    na = np.arange(np.prod(shape), dtype=np.int).reshape(shape)
-    nb = np.random.randint(1, 1000, (1000, 1000))
-    nc = np.random.randint(1, 1000, (1000, 1000))
-    a = expr.arange(shape, dtype=np.int)
-    b = expr.from_numpy(nb)
-    c = expr.from_numpy(nc)
+  #def test_optimization_shape(self):
+    #shape = (200, 800)
+    #na = np.arange(np.prod(shape), dtype=np.int).reshape(shape)
+    #nb = np.random.randint(1, 1000, (1000, 1000))
+    #nc = np.random.randint(1, 1000, (1000, 1000))
+    #a = expr.arange(shape, dtype=np.int)
+    #b = expr.from_numpy(nb)
+    #c = expr.from_numpy(nc)
 
-    d = b + c
-    e = b + d
-    f = d[200:900, 200:900]
-    g = e[200:900, 200:900]
-    h = f + g
-    i = f + h
-    j = h[100:500, 100:500]
-    k = i[100:300, 100:300]
-    l = expr.reshape(expr.ravel(j), (800, 200))
-    m = expr.dot(a, l)
-    n = m + k
-    o = n + m 
-    q = o[100:200, 100:200]
+    #d = b + c
+    #e = b + d
+    #f = d[200:900, 200:900]
+    #g = e[200:900, 200:900]
+    #h = f + g
+    #i = f + h
+    #j = h[100:500, 100:500]
+    #k = i[100:300, 100:300]
+    #l = expr.reshape(expr.ravel(j), (800, 200))
+    #m = expr.dot(a, l)
+    #n = m + k
+    #o = n + m
+    #q = o[100:200, 100:200]
 
-    nd = nb + nc
-    ne = nb + nd
-    nf = nd[200:900, 200:900]
-    ng = ne[200:900, 200:900]
-    nh = nf + ng
-    ni = nf + nh
-    nj = nh[100:500, 100:500]
-    nk = ni[100:300, 100:300]
-    nl = np.reshape(np.ravel(nj), (800, 200))
-    nm = np.dot(na, nl)
-    nn = nm + nk
-    no = nn + nm 
-    nq = no[100:200, 100:200]
+    #nd = nb + nc
+    #ne = nb + nd
+    #nf = nd[200:900, 200:900]
+    #ng = ne[200:900, 200:900]
+    #nh = nf + ng
+    #ni = nf + nh
+    #nj = nh[100:500, 100:500]
+    #nk = ni[100:300, 100:300]
+    #nl = np.reshape(np.ravel(nj), (800, 200))
+    #nm = np.dot(na, nl)
+    #nn = nm + nk
+    #no = nn + nm
+    #nq = no[100:200, 100:200]
 
 
-    Assert.all_eq(nq, q.optimized().glom(), tolerance = 1e-10)
+    #Assert.all_eq(nq, q.optimized().glom(), tolerance = 1e-10)
 
 
   def _test_optimization_ordered(self):
