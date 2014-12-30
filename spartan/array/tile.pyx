@@ -284,8 +284,8 @@ def merge(old_tile, subslice, update, reducer):
       old_tile.mask[subslice] = True
   else:
     if old_tile.data is not None: #and old_tile.data.format == 'coo':
-      #old_tile.data = old_tile.data.tolil()
-      old_tile.data = old_tile.data.tocsr()
+      #old_tile.data = old_tile.data.tocsr()
+      old_tile.data = old_tile.data.tolil()
     #util.log_info('Update dense to sparse')
     # TODO (SPARSE UPDATE)!!!
     # sparse update, no mask, just iterate over data items
