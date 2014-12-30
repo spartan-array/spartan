@@ -71,8 +71,9 @@ def _fetch_sort_mapper(array, ex, partition_counts):
 
 
 def _sort_mapper(array, ex, axis=None):
-  new_axis = extent.largest_dim_axis(ex.array_shape, exclude_axis=(axis,))
-  axis_ex = extent.change_partition_axis(ex, new_axis)
+  partition_axis = extent.largest_intact_dim_axis(ex.shape, ex.array_shape,
+                                                  exclude_axis=[axis])
+  axis_ex = extent.change_partition_axis(ex, partition_axis)
   if axis_ex is not None:
     tile = array.fetch(axis_ex)
     yield axis_ex, np.sort(tile, axis=axis)
@@ -109,8 +110,9 @@ def sort(array, axis=-1, sample_rate=0.1):
 
 
 def _partition_mapper(array, ex, kth=None, axis=None):
-  new_axis = extent.largest_dim_axis(ex.array_shape, exclude_axis=(axis,))
-  axis_ex = extent.change_partition_axis(ex, new_axis)
+  partition_axis = extent.largest_intact_dim_axis(ex.shape, ex.array_shape,
+                                                  exclude_axis=[axis])
+  axis_ex = extent.change_partition_axis(ex, partition_axis)
   if axis_ex is not None:
     tile = array.fetch(axis_ex)
     yield axis_ex, np.partition(tile, kth, axis=axis)
@@ -135,8 +137,9 @@ def partition(array, kth, axis=-1):
 
 
 def _argsort_mapper(array, ex, axis=None):
-  new_axis = extent.largest_dim_axis(ex.array_shape, exclude_axis=(axis,))
-  axis_ex = extent.change_partition_axis(ex, new_axis)
+  partition_axis = extent.largest_intact_dim_axis(ex.shape, ex.array_shape,
+                                                  exclude_axis=[axis])
+  axis_ex = extent.change_partition_axis(ex, partition_axis)
   if axis_ex is not None:
     tile = array.fetch(axis_ex)
     yield axis_ex, np.argsort(tile, axis=axis)
@@ -156,8 +159,9 @@ def argsort(array, axis=-1):
 
 
 def _argpartition_mapper(array, ex, kth=None, axis=None):
-  new_axis = extent.largest_dim_axis(ex.array_shape, exclude_axis=(axis,))
-  axis_ex = extent.change_partition_axis(ex, new_axis)
+  partition_axis = extent.largest_intact_dim_axis(ex.shape, ex.array_shape,
+                                                  exclude_axis=[axis])
+  axis_ex = extent.change_partition_axis(ex, partition_axis)
   if axis_ex is not None:
     tile = array.fetch(axis_ex)
     yield axis_ex, np.argpartition(tile, kth, axis=axis)

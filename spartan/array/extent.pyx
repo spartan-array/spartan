@@ -460,17 +460,21 @@ def is_complete(shape, slices):
   return True
 
 
-def largest_dim_axis(shape, exclude_axis=None):
+def largest_intact_dim_axis(shape, array_shape, exclude_axis=None):
+#def largest_intact_dim_axis(shape, exclude_axis=None):
   '''
   Args:
     shape:
     exclude_axis: tuple or list
   '''
-  idx = np.argsort(shape)
+  idx = np.argsort(array_shape)
+  for i in xrange(len(idx)-1, -1, -1):
+    if shape[idx[i]] == array_shape[idx[i]] and \
+        (exclude_axis is None or idx[i] not in exclude_axis):
+      return idx[i]
   for i in xrange(len(idx)-1, -1, -1):
     if exclude_axis is None or idx[i] not in exclude_axis:
       return idx[i]
-  return idx[0]
 
 def change_partition_axis(ex, axis):
   if axis < 0:
@@ -493,6 +497,7 @@ def change_partition_axis(ex, axis):
     # TODO:The meaning of this API for block partition is unclear.
     util.log_warn("change_partition_axis doesn't know how to deal with block partition %s",
                   str((old_axes, ex.shape, ex.array_shape)))
+    print ex, ex.array_shape
     raise NotImplementedError
 
   if len(old_axes) == 0 or old_axes[0] == axis:
