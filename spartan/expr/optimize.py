@@ -582,12 +582,6 @@ class AutomaticTiling(OptimizePass):
     for child_id in child_ids: self.nodes[child_id].expr.append(expr)
     return child_ids
 
-  def visit_Map3Expr(self, expr):
-    #TODO: Apply the algorithm to Map3
-    child_ids = self.visit_children(expr.arrays)
-    for child_id in child_ids: self.nodes[child_id].expr.append(expr)
-    return child_ids
-
   def visit_OuterProductExpr(self, expr):
     #TODO: Apply the algorithm to Outer
     child_ids = self.visit_children(expr.arrays)

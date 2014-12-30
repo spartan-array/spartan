@@ -169,28 +169,30 @@ def old_dot(a, b, tile_hint=None):
   return DotExpr(matrix_a=a, matrix_b=b, tile_hint=tile_hint)
 
 
-def dot_outer_mapper(ex_a, tile_a, ex_b, tile_b):
-  # Dense * Dense
-  if len(tile_b.shape) == 1:
-    ul = (ex_a.ul[0], )
-    lr = (ex_a.lr[0], )
-    shape = (ex_a.array_shape[0], )
+def dot_map2_np_mapper(ex, tiles, array2):
+  ex = ex[0]
+  if len(ex.ul) == 1:
+    # vec * vec
+    target_ex = extent.create((0, ), (1, ), (1, ))
+    target_tile = tiles[0].dot(array2[ex.ul[0]:ex.lr[0]]).reshape(1, )
+  elif len(array2.shape) == 1:
+    # matrix * vec
+    target_ex = extent.create((ex.ul[0], ), (ex.lr[0], ), (ex.array_shape[0], ))
+    target_tile = tiles[0].dot(array2[ex.ul[1]:ex.lr[1]])
   else:
-    ul = (ex_a.ul[0], ex_b.ul[1])
-    lr = (ex_a.lr[0], ex_b.lr[1])
-    shape = (ex_a.array_shape[0], ex_b.array_shape[1])
-  target_ex = extent.create(ul, lr, shape)
-  # FIXME: Temporary workaround for sparse arrays
-  if sp.issparse(tile_a):
-    tile_a = tile_a.tocsr()
-  if sp.issparse(tile_b):
-    tile_b = tile_b.tocsr()
-  yield target_ex, tile_a.dot(tile_b)
-
-  #TODO: Sparse array
+    # matrix * matrix
+    target_ex = extent.create((ex.ul[0], 0), (ex.lr[0], array2.shape[1]),
+                              (ex.array_shape[0], array2.shape[1]))
+    target_tile = tiles[0].dot(array2[ex.ul[1]:ex.lr[1], ])
+  yield target_ex, target_tile
 
 
-def dot_map3_mapper(extents, tiles):
+def dot_map2_vec_mapper(ex, tiles):
+  target_ex = extent.create((0,), (1,), (1,))
+  yield target_ex, tiles[0].dot(tiles[1]).reshape(1,)
+
+
+def dot_map2_mapper(extents, tiles):
   # Dense * Dense
   if len(tiles[1].shape) == 1:
     ul = (0, )
@@ -212,26 +214,25 @@ def dot_map3_mapper(extents, tiles):
   #TODO: Sparse array
 
 
-def dot_map2_mapper(ex, tiles):
-  target_ex = extent.create((0,), (1,), (1,))
-  yield target_ex, tiles[0].dot(tiles[1]).reshape(1,)
-
-
-def dot_map2_np_mapper(ex, tiles, array2):
-  if len(ex.ul) == 1:
-    # vec * vec
-    target_ex = extent.create((0, ), (1, ), (1, ))
-    target_tile = tiles[0].dot(array2[ex.ul[0]:ex.lr[0]]).reshape(1, )
-  elif len(array2.shape) == 1:
-    # matrix * vec
-    target_ex = extent.create((ex.ul[0], ), (ex.lr[0], ), (ex.array_shape[0], ))
-    target_tile = tiles[0].dot(array2[ex.ul[1]:ex.lr[1]])
+def dot_outer_mapper(ex_a, tile_a, ex_b, tile_b):
+  # Dense * Dense
+  if len(tile_b.shape) == 1:
+    ul = (ex_a.ul[0], )
+    lr = (ex_a.lr[0], )
+    shape = (ex_a.array_shape[0], )
   else:
-    # matrix * matrix
-    target_ex = extent.create((ex.ul[0], 0), (ex.lr[0], array2.shape[1]),
-                              (ex.array_shape[0], array2.shape[1]))
-    target_tile = tiles[0].dot(array2[ex.ul[1]:ex.lr[1], ])
-  yield target_ex, target_tile
+    ul = (ex_a.ul[0], ex_b.ul[1])
+    lr = (ex_a.lr[0], ex_b.lr[1])
+    shape = (ex_a.array_shape[0], ex_b.array_shape[1])
+  target_ex = extent.create(ul, lr, shape)
+  # FIXME: Temporary workaround for sparse arrays
+  if sp.issparse(tile_a):
+    tile_a = tile_a.tocsr()
+  if sp.issparse(tile_b):
+    tile_b = tile_b.tocsr()
+  yield target_ex, tile_a.dot(tile_b)
+
+  #TODO: Sparse array
 
 
 def dot(a, b, tile_hint=None):
@@ -252,13 +253,13 @@ def dot(a, b, tile_hint=None):
       shape = (a.shape[0], )
     else:
       shape = (a.shape[0], b.shape[1])
-    return map.map2(a, fn=dot_map2_np_mapper, fn_kw={'array2': b}, shape=shape,
-                    reducer=np.add)
+    return map.map2(a, axes=[0], fn=dot_map2_np_mapper, fn_kw={'array2': b},
+                    shape=shape, reducer=np.add)
   else:
     if len(a.shape) == 1 and len(b.shape) == 1:
       if a.shape[0] != b.shape[0]:
         raise ValueError("objects are not aligned")
-      return map.map2((a, b), fn=dot_map2_mapper, shape=(1, ), reducer=np.add)
+      return map.map2((a, b), fn=dot_map2_vec_mapper, shape=(1, ), reducer=np.add)
     elif len(a.shape) > 1 and len(b.shape) == 1:
       if a.shape[1] != b.shape[0]:
         raise ValueError("objects are not aligned")
@@ -276,7 +277,7 @@ def dot(a, b, tile_hint=None):
       return outer.outer((a, b), (0, 1), dot_outer_mapper, shape=shape,
                          tile_hint=tile_hint, reducer=np.add)
     else:
-      # Use map3(join) to implement dot
-      util.log_debug('Using map3 to do dot')
-      return map.map3((a, b), (1, 0), dot_map3_mapper, shape=shape,
+      # Use map2(join) to implement dot
+      util.log_debug('Using map2 to do dot')
+      return map.map2((a, b), (1, 0), dot_map2_mapper, shape=shape,
                       tile_hint=tile_hint, reducer=np.add)

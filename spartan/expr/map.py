@@ -205,110 +205,119 @@ def map(inputs, fn, numpy_expr=None, fn_kw=None):
   return MapExpr(children=children, child_to_var=child_to_var, op=op)
 
 
-def tile_reshape_mapper(ex, arrays, local_user_fn, local_user_fn_kw, target):
-  tiles = []
-  # Fetch the extents
-  for i in range(0, len(arrays)):
-    tiles.append(arrays[i].fetch(ex))
+#def tile_reshape_mapper(ex, arrays, local_user_fn, local_user_fn_kw, target):
+  #tiles = []
+  ## Fetch the extents
+  #for i in range(0, len(arrays)):
+    #tiles.append(arrays[i].fetch(ex))
 
-  if local_user_fn_kw is None:
-    local_user_fn_kw = {}
-  result = local_user_fn(ex, tiles, **local_user_fn_kw)
-  futures = rpc.FutureGroup()
-  if result is not None:
-    for ex, v in result:
-      futures.append(target.update(ex, v, wait=False))
+  #if local_user_fn_kw is None:
+    #local_user_fn_kw = {}
+  #result = local_user_fn(ex, tiles, **local_user_fn_kw)
+  #futures = rpc.FutureGroup()
+  #if result is not None:
+    #for ex, v in result:
+      #futures.append(target.update(ex, v, wait=False))
 
-  return LocalKernelResult(result=[], futures=futures)
-
-
-class Map2Expr(Expr):
-  arrays = Instance(TupleExpr)
-  fn = PythonValue
-  fn_kw = PythonValue
-  shape = Instance(tuple)
-  tile_hint = Instance(tuple)
-  reducer = PythonValue
-
-  def pretty_str(self):
-    return 'Map2[%d]' % (self.expr_id)
-
-  def compute_shape(self):
-    return self.shape
-
-  def _evaluate(self, ctx, deps):
-    arrays = deps['arrays']
-    fn = deps['fn']
-    fn_kw = deps['fn_kw']
-    shape = deps['shape']
-    tile_hint = deps['tile_hint']
-    reducer = deps['reducer']
-
-    target = distarray.create(shape, arrays[0].dtype,
-                              sharder=None, reducer=reducer,
-                              tile_hint=tile_hint,
-                              sparse=(arrays[0].sparse and arrays[1].sparse))
-
-    arrays[0].foreach_tile(mapper_fn=tile_reshape_mapper,
-                           kw=dict(arrays=arrays, local_user_fn=fn,
-                                   local_user_fn_kw=fn_kw,
-                                   target=target))
-    return target
+  #return LocalKernelResult(result=[], futures=futures)
 
 
-def map2(arrays, fn, fn_kw=None, shape=None, tile_hint=None, reducer=None):
-  '''
-  Arguments:
-    arrays:
-    fn:
-    fn_kw:
-    shape:
-    tile_hint:
-    reducer:
+#class Map2Expr(Expr):
+  #arrays = Instance(TupleExpr)
+  #fn = PythonValue
+  #fn_kw = PythonValue
+  #shape = Instance(tuple)
+  #tile_hint = Instance(tuple)
+  #reducer = PythonValue
 
-  Returns:
-    Map2Expr
-  '''
-  if not util.is_iterable(arrays):
-    arrays = [arrays]
+  #def pretty_str(self):
+    #return 'Map2[%d]' % (self.expr_id)
 
-  assert fn is not None
-  assert shape is not None
+  #def compute_shape(self):
+    #return self.shape
 
-  arrays = tuple(arrays)
-  arrays = TupleExpr(vals=arrays)
-  return Map2Expr(arrays=arrays, fn=fn, fn_kw=fn_kw,
-                  shape=tuple(shape), tile_hint=tile_hint,
-                  reducer=reducer)
+  #def _evaluate(self, ctx, deps):
+    #arrays = deps['arrays']
+    #fn = deps['fn']
+    #fn_kw = deps['fn_kw']
+    #shape = deps['shape']
+    #tile_hint = deps['tile_hint']
+    #reducer = deps['reducer']
+
+    #target = distarray.create(shape, arrays[0].dtype,
+                              #sharder=None, reducer=reducer,
+                              #tile_hint=tile_hint,
+                              #sparse=(arrays[0].sparse and arrays[1].sparse))
+
+    #arrays[0].foreach_tile(mapper_fn=tile_reshape_mapper,
+                           #kw=dict(arrays=arrays, local_user_fn=fn,
+                                   #local_user_fn_kw=fn_kw,
+                                   #target=target))
+    #return target
+
+
+#def map2(arrays, fn, fn_kw=None, shape=None, tile_hint=None, reducer=None):
+  #'''
+  #Arguments:
+    #arrays:
+    #fn:
+    #fn_kw:
+    #shape:
+    #tile_hint:
+    #reducer:
+
+  #Returns:
+    #Map2Expr
+  #'''
+  #if not util.is_iterable(arrays):
+    #arrays = [arrays]
+
+  #assert fn is not None
+  #assert shape is not None
+
+  #arrays = tuple(arrays)
+  #arrays = TupleExpr(vals=arrays)
+  #return Map2Expr(arrays=arrays, fn=fn, fn_kw=fn_kw,
+                  #shape=tuple(shape), tile_hint=tile_hint,
+                  #reducer=reducer)
 
 
 def join_mapper(ex, arrays, axes, local_user_fn, local_user_fn_kw, target):
-  # First find out extents for all arrays
-  first_extent = extent.change_partition_axis(ex, axes[0])
+  if len(axes) == 0:
+    tiles = []
+    # Fetch the extents
+    for i in range(0, len(arrays)):
+      tiles.append(arrays[i].fetch(ex))
 
-  # FIXME: I'm not sure if the following comment is really true for map3.
-  # Add an assert here for now to verify the statement.
-  # Will remove it after we confirm the claim.
-  assert first_extent is not None
-  if first_extent is None:
-    # It is possible that the return value of change_partition_axis
-    # is None if the dimension of new partition axis is smaller than
-    # the dimension of the original axis.
-    return LocalKernelResult(result=[])
+    join_extents = ex
+  else:
+    # First find out extents for all arrays
+    first_extent = extent.change_partition_axis(ex, axes[0])
 
-  keys = (first_extent.ul[axes[0]], first_extent.lr[axes[0]])
-  join_extents = [first_extent]
-  for i in range(1, len(arrays)):
-    ul = [0 for j in range(len(arrays[i].shape))]
-    lr = list(arrays[i].shape)
-    ul[axes[i]] = keys[0]
-    lr[axes[i]] = keys[1]
-    join_extents.append(extent.create(ul, lr, arrays[i].shape))
+    # FIXME: I'm not sure if the following comment is really true for map2.
+    # Add an assert here for now to verify the statement.
+    # Will remove it after we confirm the claim.
+    assert first_extent is not None
+    if first_extent is None:
+      # It is possible that the return value of change_partition_axis
+      # is None if the dimension of new partition axis is smaller than
+      # the dimension of the original axis.
+      return LocalKernelResult(result=[])
 
-  tiles = []
-  # Fetch the extents
-  for i in range(0, len(arrays)):
-    tiles.append(arrays[i].fetch(join_extents[i]))
+    keys = (first_extent.ul[axes[0]], first_extent.lr[axes[0]])
+    join_extents = [first_extent]
+
+    for i in range(1, len(arrays)):
+      ul = [0 for j in range(len(arrays[i].shape))]
+      lr = list(arrays[i].shape)
+      ul[axes[i]] = keys[0]
+      lr[axes[i]] = keys[1]
+      join_extents.append(extent.create(ul, lr, arrays[i].shape))
+
+    tiles = []
+    # Fetch the extents
+    for i in range(0, len(arrays)):
+      tiles.append(arrays[i].fetch(join_extents[i]))
 
   if local_user_fn_kw is None:
     local_user_fn_kw = {}
@@ -321,7 +330,7 @@ def join_mapper(ex, arrays, axes, local_user_fn, local_user_fn_kw, target):
   return LocalKernelResult(result=[], futures=futures)
 
 
-class Map3Expr(Expr):
+class Map2Expr(Expr):
   arrays = Instance(TupleExpr)
   axes = Instance(tuple)
   fn = PythonValue
@@ -331,7 +340,7 @@ class Map3Expr(Expr):
   reducer = PythonValue
 
   def pretty_str(self):
-    return 'Map3[%d]' % (self.expr_id)
+    return 'Map2[%d]' % (self.expr_id)
 
   def compute_shape(self):
     return self.shape
@@ -356,7 +365,7 @@ class Map3Expr(Expr):
     return target
 
 
-def map3(arrays, axes, fn, fn_kw=None, shape=None, tile_hint=None, reducer=None):
+def map2(arrays, axes=[], fn=None, fn_kw=None, shape=None, tile_hint=None, reducer=None):
   '''
   Arguments:
     arrays:
@@ -368,7 +377,7 @@ def map3(arrays, axes, fn, fn_kw=None, shape=None, tile_hint=None, reducer=None)
     reducer:
 
   Returns:
-    Map3Expr
+    Map2Expr
   '''
   if not util.is_iterable(arrays):
     arrays = [arrays]
@@ -377,12 +386,12 @@ def map3(arrays, axes, fn, fn_kw=None, shape=None, tile_hint=None, reducer=None)
     axes = [axes]
 
   assert fn is not None
-  assert len(arrays) == len(axes)
+  assert axes == [] or len(arrays) == len(axes)
   assert shape is not None
 
   arrays = tuple(arrays)
   arrays = TupleExpr(vals=arrays)
   axes = tuple(axes)
-  return Map3Expr(arrays=arrays, axes=axes, fn=fn, fn_kw=fn_kw,
+  return Map2Expr(arrays=arrays, axes=axes, fn=fn, fn_kw=fn_kw,
                   shape=tuple(shape), tile_hint=tile_hint,
                   reducer=reducer)
