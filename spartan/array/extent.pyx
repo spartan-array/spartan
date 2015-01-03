@@ -460,10 +460,33 @@ def is_complete(shape, slices):
   return True
 
 
+def largest_intact_dim_axis(shape, array_shape, exclude_axis=None):
+#def largest_intact_dim_axis(shape, exclude_axis=None):
+  '''
+  Args:
+    shape:
+    exclude_axis: tuple or list
+  '''
+  idx = np.argsort(array_shape)
+  for i in xrange(len(idx)-1, -1, -1):
+    if shape[idx[i]] == array_shape[idx[i]] and \
+        (exclude_axis is None or idx[i] not in exclude_axis):
+      return idx[i]
+  for i in xrange(len(idx)-1, -1, -1):
+    if exclude_axis is None or idx[i] not in exclude_axis:
+      return idx[i]
 
 def change_partition_axis(ex, axis):
   if axis < 0:
     axis += len(ex.array_shape)
+
+  # Vector is a special case
+  if len(ex.shape) == 1:
+    if axis == 1:
+      # We define that if axis is 1, users need the whole vector.
+      return create((0, ), ex.array_shape, ex.array_shape)
+    else:
+      return ex
 
   old_axes = []
   for i in xrange(len(ex.shape)):
@@ -471,20 +494,24 @@ def change_partition_axis(ex, axis):
       old_axes.append(i)
 
   if len(old_axes) > 1:
-    # The meaning of this API for block partition is unclear.
-    util.log_warn(str((old_axes, ex.shape, ex.array_shape)))
+    # TODO:The meaning of this API for block partition is unclear.
+    util.log_warn("change_partition_axis doesn't know how to deal with block partition %s",
+                  str((old_axes, ex.shape, ex.array_shape)))
+    print ex, ex.array_shape
     raise NotImplementedError
 
-  #Mapping "sorting axis" to "tiling axis" presentation
-  if len(old_axes) == 0 or old_axes[0] != axis:
+  if len(old_axes) == 0 or old_axes[0] == axis:
     return ex
-  else:
-    #New tiling strategy with biggest dimension
-    idx = np.argsort(ex.array_shape)
-    for i in xrange(len(idx)-1, -1, -1):
-      if idx[i] != old_axes[0]:
-        axis = idx[i]
-        break
+  ##Mapping "sorting axis" to "tiling axis" presentation
+  #if len(old_axes) == 0 or old_axes[0] != axis:
+    #return ex
+  #else:
+    ##New tiling strategy with biggest dimension
+    #idx = np.argsort(ex.array_shape)
+    #for i in xrange(len(idx)-1, -1, -1):
+      #if idx[i] != old_axes[0]:
+        #axis = idx[i]
+        #break
 
   old_axis = old_axes[0]
 

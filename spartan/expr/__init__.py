@@ -26,7 +26,7 @@ Optimizations on DAGs live in `spartan.expr.optimize`.
 from base import Expr, evaluate, optimized_dag, glom, eager, lazify, as_array, force, NotShapeable, newaxis
 from .builtins import *
 from .assign import assign
-from .map import map
+from .map import map, map2
 from .map_with_location import map_with_location
 from .region_map import region_map
 from .tile_operation import tile_operation

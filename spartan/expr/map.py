@@ -9,23 +9,25 @@ element-wise operations.  For instance ``a + b`` is translated to:
 ::
 
    map((a, b), lambda x, y: x + y)
-   
+
 Inputs to a map are *broadcast* up to have the same shape (this is
-the same behavior as Numpy broadcasting).  
+the same behavior as Numpy broadcasting).
 '''
 
 import collections
 from traits.api import Instance
 
+from spartan import rpc
 from .. import util, blob_ctx
-from ..array import distarray, tile
+from ..array import distarray, tile, extent
 from ..core import LocalKernelResult
 from ..node import indent
 from ..util import Assert
-from .base import ListExpr, Expr, as_array
+from .base import ListExpr, TupleExpr, PythonValue, Expr, as_array, NotShapeable
 from .broadcast import Broadcast, broadcast
 from .local import (FnCallExpr, LocalInput, LocalCtx, LocalExpr, LocalMapExpr,
-    LocalMapLocationExpr, make_var)
+                    LocalMapLocationExpr, make_var)
+import time
 
 
 def get_local_values(ex, children, child_to_var):
@@ -46,9 +48,9 @@ def get_local_values(ex, children, child_to_var):
 def tile_mapper(ex, children, child_to_var, op):
   '''
   Run for each tile of a `Map` operation.
-  
+
   Evaluate the map function on the local tile and return a result.
-  
+
   :param ex: `Extent`
   :param children: Input arrays for this operation.
   :param child_to_var: Map from a child to the varname.
@@ -96,11 +98,9 @@ class MapExpr(Expr):
   child_to_var = Instance(list)
   op = Instance(LocalExpr)
 
-
   def pretty_str(self):
     return 'Map[%d](%s, %s)' % (self.expr_id, self.op.pretty_str(),
-                            indent(self.children.pretty_str()))
-
+                                indent(self.children.pretty_str()))
 
   def compute_shape(self):
     '''MapTiles retains the shape of inputs.
@@ -130,7 +130,7 @@ class MapExpr(Expr):
   def _evaluate_kw(self, op):
     '''
     Evaluate all the exprs in the map kws. It is used mostly by region_map which will contain exprs in its kws.
-    It can avoid expr tree optimization being interrupted by the region_map. This evaluation will not affect the 
+    It can avoid expr tree optimization being interrupted by the region_map. This evaluation will not affect the
     map fusion optimization. It just turns the exprs in the kws into DistArray.
 
     Args:
@@ -154,7 +154,7 @@ class MapExpr(Expr):
 
     children = broadcast(children)
     largest = distarray.largest_value(children)
-    
+
     i = children.index(largest)
     children[0], children[i] = children[i], children[0]
     child_to_var[0], child_to_var[i] = child_to_var[i], child_to_var[0]
@@ -164,9 +164,9 @@ class MapExpr(Expr):
 
     #util.log_info('Mapping %s over %d inputs; largest = %s', op, len(children), largest.shape)
 
-    return largest.map_to_array(
-              tile_mapper, 
-              kw = {'children':children, 'child_to_var':child_to_var, 'op':self.op})
+    return largest.map_to_array(tile_mapper, kw={'children': children,
+                                                 'child_to_var': child_to_var,
+                                                 'op': self.op})
 
 
 def map(inputs, fn, numpy_expr=None, fn_kw=None):
@@ -203,3 +203,195 @@ def map(inputs, fn, numpy_expr=None, fn_kw=None):
   op = LocalMapExpr(fn=fn, kw=fn_kw, pretty_fn=numpy_expr, deps=op_deps)
 
   return MapExpr(children=children, child_to_var=child_to_var, op=op)
+
+
+#def tile_reshape_mapper(ex, arrays, local_user_fn, local_user_fn_kw, target):
+  #tiles = []
+  ## Fetch the extents
+  #for i in range(0, len(arrays)):
+    #tiles.append(arrays[i].fetch(ex))
+
+  #if local_user_fn_kw is None:
+    #local_user_fn_kw = {}
+  #result = local_user_fn(ex, tiles, **local_user_fn_kw)
+  #futures = rpc.FutureGroup()
+  #if result is not None:
+    #for ex, v in result:
+      #futures.append(target.update(ex, v, wait=False))
+
+  #return LocalKernelResult(result=[], futures=futures)
+
+
+#class Map2Expr(Expr):
+  #arrays = Instance(TupleExpr)
+  #fn = PythonValue
+  #fn_kw = PythonValue
+  #shape = Instance(tuple)
+  #tile_hint = Instance(tuple)
+  #reducer = PythonValue
+
+  #def pretty_str(self):
+    #return 'Map2[%d]' % (self.expr_id)
+
+  #def compute_shape(self):
+    #return self.shape
+
+  #def _evaluate(self, ctx, deps):
+    #arrays = deps['arrays']
+    #fn = deps['fn']
+    #fn_kw = deps['fn_kw']
+    #shape = deps['shape']
+    #tile_hint = deps['tile_hint']
+    #reducer = deps['reducer']
+
+    #target = distarray.create(shape, arrays[0].dtype,
+                              #sharder=None, reducer=reducer,
+                              #tile_hint=tile_hint,
+                              #sparse=(arrays[0].sparse and arrays[1].sparse))
+
+    #arrays[0].foreach_tile(mapper_fn=tile_reshape_mapper,
+                           #kw=dict(arrays=arrays, local_user_fn=fn,
+                                   #local_user_fn_kw=fn_kw,
+                                   #target=target))
+    #return target
+
+
+#def map2(arrays, fn, fn_kw=None, shape=None, tile_hint=None, reducer=None):
+  #'''
+  #Arguments:
+    #arrays:
+    #fn:
+    #fn_kw:
+    #shape:
+    #tile_hint:
+    #reducer:
+
+  #Returns:
+    #Map2Expr
+  #'''
+  #if not util.is_iterable(arrays):
+    #arrays = [arrays]
+
+  #assert fn is not None
+  #assert shape is not None
+
+  #arrays = tuple(arrays)
+  #arrays = TupleExpr(vals=arrays)
+  #return Map2Expr(arrays=arrays, fn=fn, fn_kw=fn_kw,
+                  #shape=tuple(shape), tile_hint=tile_hint,
+                  #reducer=reducer)
+
+
+def join_mapper(ex, arrays, axes, local_user_fn, local_user_fn_kw, target):
+  if len(axes) == 0:
+    tiles = []
+    # Fetch the extents
+    for i in range(0, len(arrays)):
+      tiles.append(arrays[i].fetch(ex))
+
+    join_extents = ex
+  else:
+    # First find out extents for all arrays
+    first_extent = extent.change_partition_axis(ex, axes[0])
+
+    # FIXME: I'm not sure if the following comment is really true for map2.
+    # Add an assert here for now to verify the statement.
+    # Will remove it after we confirm the claim.
+    assert first_extent is not None
+    if first_extent is None:
+      # It is possible that the return value of change_partition_axis
+      # is None if the dimension of new partition axis is smaller than
+      # the dimension of the original axis.
+      return LocalKernelResult(result=[])
+
+    keys = (first_extent.ul[axes[0]], first_extent.lr[axes[0]])
+    join_extents = [first_extent]
+
+    for i in range(1, len(arrays)):
+      ul = [0 for j in range(len(arrays[i].shape))]
+      lr = list(arrays[i].shape)
+      ul[axes[i]] = keys[0]
+      lr[axes[i]] = keys[1]
+      join_extents.append(extent.create(ul, lr, arrays[i].shape))
+
+    tiles = []
+    # Fetch the extents
+    for i in range(0, len(arrays)):
+      tiles.append(arrays[i].fetch(join_extents[i]))
+
+  if local_user_fn_kw is None:
+    local_user_fn_kw = {}
+  result = local_user_fn(join_extents, tiles, **local_user_fn_kw)
+  futures = rpc.FutureGroup()
+  if result is not None:
+    for ex, v in result:
+      futures.append(target.update(ex, v, wait=False))
+
+  return LocalKernelResult(result=[], futures=futures)
+
+
+class Map2Expr(Expr):
+  arrays = Instance(TupleExpr)
+  axes = Instance(tuple)
+  fn = PythonValue
+  fn_kw = PythonValue
+  shape = Instance(tuple)
+  tile_hint = Instance(tuple)
+  reducer = PythonValue
+
+  def pretty_str(self):
+    return 'Map2[%d]' % (self.expr_id)
+
+  def compute_shape(self):
+    return self.shape
+
+  def _evaluate(self, ctx, deps):
+    arrays = deps['arrays']
+    axes = deps['axes']
+    fn = deps['fn']
+    fn_kw = deps['fn_kw']
+    shape = deps['shape']
+    tile_hint = deps['tile_hint']
+    reducer = deps['reducer']
+
+    target = distarray.create(shape, arrays[0].dtype,
+                              sharder=None, reducer=reducer,
+                              tile_hint=tile_hint,
+                              sparse=(arrays[0].sparse and arrays[1].sparse))
+
+    arrays[0].foreach_tile(mapper_fn=join_mapper,
+                           kw=dict(arrays=arrays, axes=axes, local_user_fn=fn,
+                                   local_user_fn_kw=fn_kw, target=target))
+    return target
+
+
+def map2(arrays, axes=[], fn=None, fn_kw=None, shape=None, tile_hint=None, reducer=None):
+  '''
+  Arguments:
+    arrays:
+    axes:
+    fn:
+    fn_kw:
+    shape:
+    tile_hint:
+    reducer:
+
+  Returns:
+    Map2Expr
+  '''
+  if not util.is_iterable(arrays):
+    arrays = [arrays]
+
+  if not util.is_iterable(axes):
+    axes = [axes]
+
+  assert fn is not None
+  assert axes == [] or len(arrays) == len(axes)
+  assert shape is not None
+
+  arrays = tuple(arrays)
+  arrays = TupleExpr(vals=arrays)
+  axes = tuple(axes)
+  return Map2Expr(arrays=arrays, axes=axes, fn=fn, fn_kw=fn_kw,
+                  shape=tuple(shape), tile_hint=tile_hint,
+                  reducer=reducer)
