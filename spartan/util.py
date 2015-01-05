@@ -16,10 +16,8 @@ import time
 import traceback
 import numpy as np
 
-from spartan.config import FLAGS, BoolFlag
+from spartan.config import FLAGS
 
-
-FLAGS.add(BoolFlag('dump_timers', default=False))
 
 HOSTNAME = socket.gethostname()
 PID = os.getpid()
@@ -27,37 +25,39 @@ PID = os.getpid()
 LOGGING_CONFIGURED = False
 
 def _setup_logger():
-  global LOGGING_CONFIGURED
+  global LOGGING_CONFIGURED, PID, HOSTNAME
   if logging.root is None:
     raise Exception, 'Log attempt before logging was configured.'
-  
+
+  HOSTNAME = socket.gethostname()
+  PID = os.getpid()
   logging.RootLogger.findCaller = findCaller
-  LOGGING_CONFIGURED = True   
+  LOGGING_CONFIGURED = True
 
 def log_debug(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
   kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
-  logging.debug(*args, **kw) 
+  logging.debug(*args, **kw)
 
 def log_info(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
   kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
-  logging.info(*args, **kw) 
+  logging.info(*args, **kw)
 
 def log_warn(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
   kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
-  logging.warn(*args, **kw) 
+  logging.warn(*args, **kw)
 
 def log_error(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
   kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
-  logging.error(*args, **kw) 
-  
+  logging.error(*args, **kw)
+
 def log_fatal(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
   kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
-  logging.fatal(*args, **kw) 
+  logging.fatal(*args, **kw)
 
 def findCaller(obj):
   f = sys._getframe(5)
@@ -112,7 +112,7 @@ class FileWatchdog(threading.Thread):
 
   def __init__(self, file_handle=sys.stdin, on_closed=lambda: os._exit(1)):
     '''
-    
+
     :param file_handle:
     :param on_closed:
     '''
@@ -152,7 +152,7 @@ def flatten(lst, depth=1, unique=False):
 def timeit(f, name=None):
   '''
   Run ``f`` and return (time_taken, result).
-   
+
   :param f:
   :param name:
   '''
@@ -207,7 +207,7 @@ class Timer(object):
   def __enter__(self):
     #self.start()
     pass
-  
+
   def __exit__(self, exc_type, exc_val, exc_tb):
     #self.stop()
     pass
@@ -242,15 +242,15 @@ def stack_signal():
 
 class Assert(object):
   '''Assertion helper functions.
-  
+
   ::
-  
+
     a = 'foo'
     b = 'bar'
-    
-    Assert.eq(a, b) 
+
+    Assert.eq(a, b)
     # equivalent to:
-    # assert a == b, 'a == b failed (%s vs %s)' % (a, b) 
+    # assert a == b, 'a == b failed (%s vs %s)' % (a, b)
   '''
 
   @staticmethod
@@ -328,7 +328,7 @@ class Assert(object):
 
     bad = [(k, v) for k, v in d.iteritems() if v > 1]
     assert len(bad) == 0, 'Duplicates found: %s' % bad
-    
+
   @staticmethod
   def not_null(expr):
     assert expr is not None, expr
@@ -348,9 +348,9 @@ def trace_fn(fn):
 
 def rtype_check(typeclass):
   '''Function decorator to check return type.
-  
+
   Usage::
-  
+
     @rtype_check(int)
     def fn(x, y, z):
       return x + y
@@ -436,9 +436,9 @@ def as_list(x):
 def get_core_mapping():
   '''
   Read /proc/cpuinfo and return a dictionary mapping from:
-  
+
   ``processor_id -> (package, core)``
-  
+
   '''
   lines = open('/proc/cpuinfo').read().strip().split('\n')
   package_id = core_id = None
@@ -459,7 +459,7 @@ def get_core_mapping():
 
 def memoize(f):
   '''Decorator.
-  
+
   Cache outputs of ``f``; repeated calls with the same arguments will be
   served from the cache.
   '''
@@ -476,7 +476,7 @@ def memoize(f):
 def copy_docstring(source_function):
   '''
   Decorator.
-  
+
   Copy the docstring from ``source_function`` to this function.
   '''
   def _decorator(func):

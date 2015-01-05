@@ -1,0 +1,173 @@
+diff -u base-utils-original/base/logging.cc base-utils/base/logging.cc
+--- base-utils-original/base/logging.cc	2014-08-19 15:23:45.000000000 -0400
++++ base-utils/base/logging.cc	2014-08-15 16:56:33.000000000 -0400
+@@ -56,22 +56,24 @@
+ }
+ 
+ void Log::vlog(const char* fmt, va_list va) {
+-    char severity = rep_->lm->severity();
++    if (rep_->verbosity < LOG_LEVEL) return;
++
++    const char* severity = rep_->lm->severity();
+     const char* filebase = file_basename(rep_->file);
+     char now_str[TIME_NOW_STR_SIZE];
+     time_now_str(now_str);
+ 
+     pthread_mutex_lock(&log_mutex);
+     if (filebase != nullptr) {
+-        printf("%c %s %s:%d | ", severity, now_str, filebase, rep_->line);
++        printf("%s %s %s:%d | %s[%d] ", severity, now_str, filebase, rep_->line, rep_->lm->hostname(), rep_->lm->pid());
+     } else {
+-        printf("%c %s | ", severity, now_str);
++        printf("%s %s | %s[%d] ", severity, now_str, rep_->lm->hostname(), rep_->lm->pid());
+     }
+     vprintf(fmt, va);
+     printf("\n");
+     pthread_mutex_unlock(&log_mutex);
+ 
+-    if (severity == 'F') {
++    if (strcmp(severity, "FATAL") == 0) {
+         // print stack trace for fatal errors, and abort
+         print_stack_trace();
+         ::abort();
+@@ -81,7 +83,7 @@
+ void Log::debug(const char* fmt, ...) {
+     va_list va;
+     va_start(va, fmt);
+-    LOG_VERBOSE(1).vlog(fmt, va);
++    LOG_DEBUG.vlog(fmt, va);
+     va_end(va);
+ }
+ 
+@@ -113,10 +115,15 @@
+     va_end(va);
+ }
+ 
+-LogManager LogManager_INFO('I', do_not_create_your_own());
+-LogManager LogManager_WARN('W', do_not_create_your_own());
+-LogManager LogManager_ERROR('E', do_not_create_your_own());
+-LogManager LogManager_FATAL('F', do_not_create_your_own());
++char* LogManager::s_hostname_ = NULL;
++
++LogManager LogManager_DEBUG("DEBUG", do_not_create_your_own());
++LogManager LogManager_INFO("INFO", do_not_create_your_own());
++LogManager LogManager_WARN("WARN", do_not_create_your_own());
++LogManager LogManager_ERROR("ERROR", do_not_create_your_own());
++LogManager LogManager_FATAL("FATAL", do_not_create_your_own());
++
++int LOG_LEVEL = 0;
+ 
+ } // namespace base
+ 
+diff -u base-utils-original/base/logging.h base-utils/base/logging.h
+--- base-utils-original/base/logging.h	2014-08-19 15:23:45.000000000 -0400
++++ base-utils/base/logging.h	2014-08-15 16:56:33.000000000 -0400
+@@ -3,15 +3,16 @@
+ 
+ #include <stdarg.h>
+ #include <sstream>
++#include <unistd.h>
+ 
+ #include "base/misc.h"
+ #include "base/debugging.h"
+ 
+-#define LOG_VERBOSE(verbosity) base::LogManager_INFO.new_log(__FILE__, __LINE__, verbosity)
+-#define LOG_INFO base::LogManager_INFO.new_log(__FILE__, __LINE__, 0)
+-#define LOG_WARN base::LogManager_WARN.new_log(__FILE__, __LINE__, 0)
+-#define LOG_ERROR base::LogManager_ERROR.new_log(__FILE__, __LINE__, 0)
+-#define LOG_FATAL base::LogManager_FATAL.new_log(__FILE__, __LINE__, 0)
++#define LOG_DEBUG base::LogManager_DEBUG.new_log(__FILE__, __LINE__, 0)
++#define LOG_INFO base::LogManager_INFO.new_log(__FILE__, __LINE__, 1)
++#define LOG_WARN base::LogManager_WARN.new_log(__FILE__, __LINE__, 2)
++#define LOG_ERROR base::LogManager_ERROR.new_log(__FILE__, __LINE__, 3)
++#define LOG_FATAL base::LogManager_FATAL.new_log(__FILE__, __LINE__, 4)
+ #define LOG_NULL \
+     true ? void(0) : base::hack_for_conditional_logging() & LOG_INFO
+ 
+@@ -32,7 +33,7 @@
+         << "verify(" << (#invariant) << ") failed at " << __FILE__ << ':' << __LINE__ << " in function " << __FUNCTION__
+ 
+ // for compatibility
+-#define Log_debug LOG_VERBOSE(1)
++#define Log_debug LOG_DEBUG
+ #define Log_info LOG_INFO
+ #define Log_warn LOG_WARN
+ #define Log_error LOG_ERROR
+@@ -112,21 +113,44 @@
+ class LogManager {
+     MAKE_NOCOPY(LogManager);
+ public:
+-    LogManager(char _severity, struct do_not_create_your_own): severity_(_severity) {
++    LogManager(const char* _severity, struct do_not_create_your_own): severity_(_severity) {
++        if (s_hostname_ == NULL)
++            sethost();
++    }
++
++    ~LogManager() {
++        if (s_hostname_ != NULL) {
++            delete s_hostname_;
++            s_hostname_ = NULL;
++        }
+     }
+ 
+     Log new_log(const char* file, int line, int verbosity) {
+         return Log(this, file, line, verbosity);
+     }
+ 
+-    char severity() const {
++    const char* severity() const {
+         return severity_;
+     }
+ 
++    static char* hostname() {
++        return s_hostname_;
++    }
++
++    static pid_t pid() {
++        return getpid();
++    }
++
++    static void sethost() {
++        s_hostname_ = new char [100];
++        gethostname(s_hostname_, 100);
++    }
++
+ private:
+-    char severity_;
+-};
++    const char* severity_;
+ 
++    static char* s_hostname_;
++};
+ 
+ struct hack_for_conditional_logging {
+     // from google-glog library
+@@ -134,7 +158,9 @@
+     }
+ };
+ 
+-extern LogManager LogManager_INFO, LogManager_WARN, LogManager_ERROR, LogManager_FATAL;
++extern LogManager LogManager_DEBUG, LogManager_INFO, LogManager_WARN, LogManager_ERROR, LogManager_FATAL;
++
++extern int LOG_LEVEL;
+ 
+ } // namespace base
+ 
+diff -u base-utils-original/base/misc.cc base-utils/base/misc.cc
+--- base-utils-original/base/misc.cc	2014-08-19 15:23:45.000000000 -0400
++++ base-utils/base/misc.cc	2014-08-15 16:56:33.000000000 -0400
+@@ -38,11 +38,11 @@
+     make_int(now + 14, local_calendar.tm_min, 2);
+     now[16] = ':';
+     make_int(now + 17, local_calendar.tm_sec, 2);
+-    now[19] = '.';
++    now[19] = ',';
+     timeval tv;
+     gettimeofday(&tv, nullptr);
+-    make_int(now + 20, tv.tv_usec, 6);
+-    now[26] = '\0';
++    make_int(now + 20, tv.tv_usec/1000, 3);
++    now[23] = '\0';
+ }
+ 
+ int get_ncpu() {

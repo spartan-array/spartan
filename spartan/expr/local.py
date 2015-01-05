@@ -13,9 +13,11 @@ import imp
 import time
 import numpy as np
 
+import scipy.sparse as sp
 from spartan import util
 from spartan.util import Assert
 from spartan.node import Node, indent
+from spartan.config import FLAGS
 from traits.api import Str, List, Function, PythonValue, Int
 
 var_id = iter(xrange(1000000))
@@ -44,7 +46,7 @@ class LocalExpr(Node):
 
   def add_dep(self, v):
     self.deps.append(v)
-    assert len(self.deps) <= 2, v
+    #assert len(self.deps) <= 2, v
 
   def input_names(self):
     return util.flatten([v.input_names() for v in self.deps], unique=True)
@@ -70,10 +72,10 @@ class LocalInput(LocalExpr):
 
 class FnCallExpr(LocalExpr):
   '''Evaluate a function call.
-  
+
   Dependencies that are variable should be specified via the ``deps`` attribute,
   and will be evaluated and supplied to the function when called.
-  
+
   Constants (axis of a reduction, datatype, etc), can be supplied via the ``kw``
   argument.
   '''
@@ -89,8 +91,8 @@ class FnCallExpr(LocalExpr):
   def pretty_str(self):
     # drop modules from the prettified string
     pretty_fn = self.fn_name().split('.')[-1]
-    return '%s(%s)' % (
-      pretty_fn, indent(','.join([v.pretty_str() for v in self.deps if not isinstance(v, LocalInput)]))
+    return '%s(%s,kw=%s)' % (
+      pretty_fn, indent(','.join([v.pretty_str() for v in self.deps if not isinstance(v, LocalInput)])), indent(','.join(['(k=%s v=%s)'%(k,v) for k,v in self.kw.iteritems()]))
     )
 
   def fn_name(self):
@@ -110,14 +112,35 @@ class FnCallExpr(LocalExpr):
     deps = [d.evaluate(ctx) for d in self.deps]
 
     #util.log_info('Evaluating %s.%d [%s]', self.fn_name(), self.id, deps)
-    return self.fn(*deps, **self.kw)
 
+    # Not all Numpy operations are compatible with mixed sparse and dense arrays.
+    # To address this, if only one of the inputs is sparse, we convert it to
+    # dense before computing our result.
+    if isinstance(self.fn, np.ufunc) and len(deps) == 2 and sp.issparse(deps[0]) ^ sp.issparse(deps[1]):
+      for i in range(2):
+        if sp.issparse(deps[i]):
+          deps[i] = deps[i].todense()
+    return self.fn(*deps, **self.kw)
 
 # The local operation of map and reduce expressions is practically
 # identical.  Reductions take an axis and extent argument in
 # addition to the normal function call arguments.
 class LocalMapExpr(FnCallExpr):
   _op_type = 'map'
+
+class LocalMapLocationExpr(LocalMapExpr):
+  _op_type = 'map_location'
+
+  def evaluate(self, ctx):
+    deps = []
+    for d in self.deps:
+      if isinstance(d, LocalInput) and d.idx == 'extent':
+        deps.append(d.evaluate(ctx).to_tuple())
+      else:
+        deps.append(d.evaluate(ctx))
+
+    #util.log_info('Evaluating %s.%d [%s]', self.fn_name(), self.id, deps)
+    return self.fn(*deps, **self.kw)
 
 class LocalReduceExpr(FnCallExpr):
   _op_type = 'reduce'
@@ -136,7 +159,7 @@ def compile_parakeet_source(src):
   tmpfile = tempfile.NamedTemporaryFile(delete=True, prefix='spartan-local-', suffix='.py')
   tmpfile.write(src)
   tmpfile.flush()
-  
+
   #util.log_info('File: %s, Source: \n %s \n', tmpfile.name, src)
 
   #os.rename(tmpfile.name, srcfile)
@@ -148,7 +171,7 @@ def compile_parakeet_source(src):
     util.log_info('Failed to build parakeet wrapper')
     util.log_debug('Source was: %s', src)
     raise CodegenException(ex.message, ex.args)
-  
+
   source_files.append(tmpfile)
   return module._jit_fn
 
@@ -166,17 +189,14 @@ class ParakeetExpr(LocalExpr):
   def evaluate(self, ctx):
     names = self.input_names()
     fn = compile_parakeet_source(self.source)
-    
+
     kw_args = {}
     for var in names:
       value = ctx.inputs[var]
       kw_args[var] = value
-    
+
     if FLAGS.use_cuda:
       return fn(_backend='cuda', **kw_args)
     else:
       return fn(**kw_args)
-
-from spartan.config import FLAGS, BoolFlag
-FLAGS.add(BoolFlag('use_cuda', default=False))
 
