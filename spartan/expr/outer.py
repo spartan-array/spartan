@@ -94,6 +94,7 @@ def outer(arrays, axes, fn, fn_kw=None,
   :param axes:
   '''
   assert fn is not None
+  assert shape is not None
 
   arrays = TupleExpr(vals=arrays)
 

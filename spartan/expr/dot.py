@@ -169,8 +169,8 @@ def old_dot(a, b, tile_hint=None):
   return DotExpr(matrix_a=a, matrix_b=b, tile_hint=tile_hint)
 
 
-def dot_map2_np_mapper(ex, tiles, array2):
-  ex = ex[0]
+def dot_map2_np_mapper(extents, tiles, array2):
+  ex = extents[0]
   if len(ex.ul) == 1:
     # vec * vec
     target_ex = extent.create((0, ), (1, ), (1, ))
@@ -187,7 +187,7 @@ def dot_map2_np_mapper(ex, tiles, array2):
   yield target_ex, target_tile
 
 
-def dot_map2_vec_mapper(ex, tiles):
+def dot_map2_vec_mapper(extents, tiles):
   target_ex = extent.create((0,), (1,), (1,))
   yield target_ex, tiles[0].dot(tiles[1]).reshape(1,)
 
