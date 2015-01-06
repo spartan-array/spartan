@@ -71,8 +71,7 @@ def _fetch_sort_mapper(array, ex, partition_counts):
 
 
 def _sort_mapper(array, ex, axis=None):
-  partition_axis = extent.largest_intact_dim_axis(ex.shape, ex.array_shape,
-                                                  exclude_axis=[axis])
+  partition_axis = extent.largest_intact_dim_axis(ex, exclude_axes=[axis])
   axis_ex = extent.change_partition_axis(ex, partition_axis)
   if axis_ex is not None:
     tile = array.fetch(axis_ex)
@@ -88,6 +87,8 @@ def sort(array, axis=-1, sample_rate=0.1):
     sample_rate(float): the sample rate.
   '''
   if axis is not None:
+    if axis < 0:
+      axis = len(array.shape) + axis
     return shuffle(array, _sort_mapper, kw={'axis': axis},
                    shape_hint=array.shape)
 
@@ -110,8 +111,7 @@ def sort(array, axis=-1, sample_rate=0.1):
 
 
 def _partition_mapper(array, ex, kth=None, axis=None):
-  partition_axis = extent.largest_intact_dim_axis(ex.shape, ex.array_shape,
-                                                  exclude_axis=[axis])
+  partition_axis = extent.largest_intact_dim_axis(ex, exclude_axes=[axis])
   axis_ex = extent.change_partition_axis(ex, partition_axis)
   if axis_ex is not None:
     tile = array.fetch(axis_ex)
@@ -132,13 +132,15 @@ def partition(array, kth, axis=-1):
   RETURN: ndarray expr
   """
   assert axis is not None, "Spartan doesn't support partition when axis == None now"
+  if axis is not None:
+    if axis < 0:
+      axis = len(array.shape) + axis
   return shuffle(array, _partition_mapper, kw={'axis': axis},
                  shape_hint=array.shape)
 
 
 def _argsort_mapper(array, ex, axis=None):
-  partition_axis = extent.largest_intact_dim_axis(ex.shape, ex.array_shape,
-                                                  exclude_axis=[axis])
+  partition_axis = extent.largest_intact_dim_axis(ex, exclude_axes=[axis])
   axis_ex = extent.change_partition_axis(ex, partition_axis)
   if axis_ex is not None:
     tile = array.fetch(axis_ex)
@@ -154,13 +156,15 @@ def argsort(array, axis=-1):
     axis(int): axis
   '''
   assert axis is not None, "Spartan doesn't support argsort when axis == None now"
+  if axis is not None:
+    if axis < 0:
+      axis = len(array.shape) + axis
   return shuffle(array, _argsort_mapper, kw={'axis': axis},
                  shape_hint=array.shape)
 
 
 def _argpartition_mapper(array, ex, kth=None, axis=None):
-  partition_axis = extent.largest_intact_dim_axis(ex.shape, ex.array_shape,
-                                                  exclude_axis=[axis])
+  partition_axis = extent.largest_intact_dim_axis(ex, exclude_axes=[axis])
   axis_ex = extent.change_partition_axis(ex, partition_axis)
   if axis_ex is not None:
     tile = array.fetch(axis_ex)
@@ -177,5 +181,8 @@ def argpartition(array, kth, axis=-1):
     axis(int): axis
   '''
   assert axis is not None, "Spartan doesn't support argpartition when axis == None now"
+  if axis is not None:
+    if axis < 0:
+      axis = len(array.shape) + axis
   return shuffle(array, _argpartition_mapper, kw={'axis': axis},
                  shape_hint=array.shape)
