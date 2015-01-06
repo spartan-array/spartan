@@ -534,4 +534,6 @@ def change_partition_axis(ex, axis):
                             ex.array_shape[old_axis])
   new_lr[old_axis] = ex.array_shape[old_axis]
 
-  return create(new_ul, new_lr, ex.array_shape)
+  target_ex = create(new_ul, new_lr, ex.array_shape)
+  #assert target_ex is not None, (new_ul, new_lr, axis, ex.array_shape, ex)
+  return target_ex
