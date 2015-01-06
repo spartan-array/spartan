@@ -459,21 +459,31 @@ def is_complete(shape, slices):
     if slice.stop < dim: return False
   return True
 
+def largest_dim_axis(shape, exclude_axes=None):
+  largest_dim = 0
+  largest_axis = 0
+  for i in range(len(shape)):
+    if exclude_axes is not None and i in exclude_axes:
+      continue
+    if largest_dim < shape[i]:
+      largest_dim = shape[i]
+      largest_axis = i
 
-def largest_intact_dim_axis(shape, array_shape, exclude_axis=None):
-#def largest_intact_dim_axis(shape, exclude_axis=None):
+  return largest_axis
+
+def largest_intact_dim_axis(ex, exclude_axes=None):
   '''
   Args:
     shape:
-    exclude_axis: tuple or list
+    exclude_axes: tuple or list
   '''
-  idx = np.argsort(array_shape)
+  idx = np.argsort(ex.array_shape)
   for i in xrange(len(idx)-1, -1, -1):
-    if shape[idx[i]] == array_shape[idx[i]] and \
-        (exclude_axis is None or idx[i] not in exclude_axis):
+    if ex.shape[idx[i]] == ex.array_shape[idx[i]] and \
+        (exclude_axes is None or idx[i] not in exclude_axes):
       return idx[i]
   for i in xrange(len(idx)-1, -1, -1):
-    if exclude_axis is None or idx[i] not in exclude_axis:
+    if exclude_axes is None or idx[i] not in exclude_axes:
       return idx[i]
 
 def change_partition_axis(ex, axis):
