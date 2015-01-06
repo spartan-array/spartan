@@ -103,6 +103,10 @@ class EvalCache(object):
 
       del self.refs[expr_id]
 
+  def clear(self):
+    self.refs.clear()
+    self.cache.clear()
+
 class ExprTrace(object):
   '''
   Captures the stack trace for an expression.
@@ -472,6 +476,8 @@ class Expr(Node):
 
     '''
     # If the expr has been optimized, return the cached optimized expr.
+    return optimized_dag(self)
+
     if self.optimized_expr is None:
       self.optimized_expr = optimized_dag(self)
       self.optimized_expr.optimized_expr = self.optimized_expr

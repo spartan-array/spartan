@@ -11,7 +11,7 @@ lower code to Parakeet.
 '''
 from collections import namedtuple
 import operator, math
-from tiling import mincost_tiling
+from . import tiling
 import weakref
 
 from ..config import FLAGS, BoolFlag
@@ -71,7 +71,8 @@ visited_expr = {'map_fusion': weakref.WeakValueDictionary(),
 
 class OptimizePass(object):
   def __init__(self):
-    self.visited = visited_expr[self.name]
+    #self.visited = visited_expr[self.name]
+    self.visited = {}
 
   def visit(self, op):
     if not isinstance(op, Expr):
@@ -479,6 +480,7 @@ class AutomaticTiling(OptimizePass):
   inited = False
   
   def init(self, expr):
+    global _tiled_exprlist
     self.cur_node_id = 1
     self.edges = {}
     self.nodes = {0: self.node_type([], -1, [], [])}
@@ -486,7 +488,9 @@ class AutomaticTiling(OptimizePass):
     self.split_nodes = {}
     self.init_expr = id(expr)
     self.inited = True
-      
+
+    _tiled_exprlist = {}
+
   def add_edge(self, edge_from, edge_to, edge_cost=0):
     #util.log_warn('add_edge:%d %d cost:%d', edge_from, edge_to, edge_cost)
     if (edge_from, edge_to) not in self.edges:
@@ -780,8 +784,9 @@ class AutomaticTiling(OptimizePass):
   def tile_expr(self, expr, tiling):
     if isinstance(expr, (NdArrayExpr, ReduceExpr, DotExpr)) and len(expr.shape) > 0:
       expr.tile_hint = list(expr.shape)
-      expr.tile_hint[tiling] = int(math.ceil(float(expr.tile_hint[tiling]) / FLAGS.num_workers))
- 
+      if len(expr.shape) > tiling:
+        expr.tile_hint[tiling] = int(math.ceil(float(expr.tile_hint[tiling]) / FLAGS.num_workers))
+
   def calc_tiling(self, expr):
     # add T node for graph
     self.nodes[self.cur_node_id] = self.node_type([expr], -1, [], [])
@@ -792,8 +797,22 @@ class AutomaticTiling(OptimizePass):
     
     # compute best tiling for all exprs
     self.visited_nodes = set()
-    nodes = mincost_tiling(self.cur_node_id - 1, self.generate_edges(), self.split_nodes.items())
-
+    edges = self.generate_edges()
+    
+    nodes = []
+    if FLAGS.tiling_alg == 'maxedge':
+      nodes = tiling.maxedge_tiling(self.cur_node_id - 1, edges, self.split_nodes.items())
+      print 'maxedge', nodes
+    elif FLAGS.tiling_alg == 'mincost':
+      nodes = tiling.mincost_tiling(self.cur_node_id - 1, edges, self.split_nodes.items())
+      print 'mincost', nodes
+    elif FLAGS.tiling_alg == 'best':
+      nodes = tiling.best_tiling(self.cur_node_id - 1, edges, self.split_nodes.items())
+      print 'best', nodes
+    elif FLAGS.tiling_alg == 'worse':
+      nodes = tiling.worse_tiling(self.cur_node_id - 1, edges, self.split_nodes.items())
+      print 'worse', nodes
+ 
     # give expr the best tiling hint
     for node_id in nodes:
       node = self.nodes[node_id]
