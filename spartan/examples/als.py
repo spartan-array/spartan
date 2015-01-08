@@ -107,13 +107,11 @@ def als(A, la=0.065, alpha=40, implicit_feedback=False, num_features=20, num_ite
     U = expr.outer((A, M), (0, None), fn=_solve_U_or_M_mapper,
                    fn_kw={'la': la, 'alpha': alpha,
                           'implicit_feedback': implicit_feedback, 'shape': shape},
-                   shape=shape, tile_hint=(num_users / 32, num_features),
-                   dtype=np.float)
+                   shape=shape, dtype=np.float)
     # Recomputing M
     shape = (num_items, num_features)
     M = expr.outer((AT, U), (0, None), fn=_solve_U_or_M_mapper,
                    fn_kw={'la': la, 'alpha': alpha,
                           'implicit_feedback': implicit_feedback, 'shape': shape},
-                   shape=shape, tile_hint=(num_items / 32, num_features),
-                   dtype=np.float)
+                   shape=shape, dtype=np.float)
   return U, M
