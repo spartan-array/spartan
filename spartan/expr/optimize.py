@@ -480,7 +480,6 @@ class AutomaticTiling(OptimizePass):
   inited = False
   
   def init(self, expr):
-    global _tiled_exprlist
     self.cur_node_id = 1
     self.edges = {}
     self.nodes = {0: self.node_type([], -1, [], [])}
@@ -489,7 +488,8 @@ class AutomaticTiling(OptimizePass):
     self.init_expr = id(expr)
     self.inited = True
 
-    _tiled_exprlist = {}
+    #self.tiled_exprlist = _tiled_exprlist
+    self.tiled_exprlist = {}
 
   def add_edge(self, edge_from, edge_to, edge_cost=0):
     #util.log_warn('add_edge:%d %d cost:%d', edge_from, edge_to, edge_cost)
@@ -817,7 +817,7 @@ class AutomaticTiling(OptimizePass):
     for node_id in nodes:
       node = self.nodes[node_id]
       for cur_expr in node.expr:
-        _tiled_exprlist[hash(cur_expr)] = node.tiling
+        self.tiled_exprlist[hash(cur_expr)] = node.tiling
         self.tile_expr(cur_expr, node.tiling)
       
     self.inited = False
@@ -826,7 +826,7 @@ class AutomaticTiling(OptimizePass):
   def tile_cached_expr(self, expr):
     if not isinstance(expr, Expr) or isinstance(expr, (Val, AsArray)): return
     
-    self.tile_expr(expr, _tiled_exprlist[hash(expr)])
+    self.tile_expr(expr, self.tiled_exprlist[hash(expr)])
     
     if hasattr(expr, 'array'): self.tile_cached_expr(expr.array)
     if hasattr(expr, 'src'): self.tile_cached_expr(expr.src)
@@ -848,9 +848,9 @@ class AutomaticTiling(OptimizePass):
   def visit_default(self, expr):
     if not self.inited: self.init(expr)
     
-    if hash(expr) in _tiled_exprlist:
+    if hash(expr) in self.tiled_exprlist:
       self.tile_cached_expr(expr)
-      tiling = _tiled_exprlist[hash(expr)]
+      tiling = self.tiled_exprlist[hash(expr)]
       self.nodes[self.cur_node_id] = self.node_type([expr], tiling, [], [])
       expr_node_ids = [self.cur_node_id]
       self.add_edge(0, self.cur_node_id, 0)
