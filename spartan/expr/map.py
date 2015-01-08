@@ -337,6 +337,7 @@ class Map2Expr(Expr):
   fn_kw = PythonValue
   shape = Instance(tuple)
   tile_hint = Instance(tuple)
+  dtype = PythonValue
   reducer = PythonValue
 
   def pretty_str(self):
@@ -352,9 +353,13 @@ class Map2Expr(Expr):
     fn_kw = deps['fn_kw']
     shape = deps['shape']
     tile_hint = deps['tile_hint']
+    dtype = deps['dtype']
     reducer = deps['reducer']
 
-    target = distarray.create(shape, arrays[0].dtype,
+    if dtype is None:
+      dtype = arrays[0].dtype
+
+    target = distarray.create(shape, dtype,
                               sharder=None, reducer=reducer,
                               tile_hint=tile_hint,
                               sparse=(arrays[0].sparse and arrays[1].sparse))
@@ -365,7 +370,7 @@ class Map2Expr(Expr):
     return target
 
 
-def map2(arrays, axes=[], fn=None, fn_kw=None, shape=None, tile_hint=None, reducer=None):
+def map2(arrays, axes=[], fn=None, fn_kw=None, shape=None, tile_hint=None, dtype=None, reducer=None):
   '''
   Arguments:
     arrays:
@@ -394,4 +399,4 @@ def map2(arrays, axes=[], fn=None, fn_kw=None, shape=None, tile_hint=None, reduc
   axes = tuple(axes)
   return Map2Expr(arrays=arrays, axes=axes, fn=fn, fn_kw=fn_kw,
                   shape=tuple(shape), tile_hint=tile_hint,
-                  reducer=reducer)
+                  dtype=dtype, reducer=reducer)

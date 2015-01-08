@@ -3,6 +3,7 @@ from scipy.linalg import lstsq
 from spartan import expr, util
 from spartan.array import extent
 
+
 def _als_solver(feature_vectors, rating_vector, la):
   '''
   local alternating least-squares solver
@@ -21,6 +22,7 @@ def _als_solver(feature_vectors, rating_vector, la):
 
   # compute Ai * ui = Vi
   return lstsq(Ai, Vi)[0]
+
 
 def _implicit_feedback_als_solver(rating_vector, la, alpha, Y, YT, YTY):
   '''
@@ -62,10 +64,11 @@ def _solve_U_or_M_mapper(ex_a, rating_matrix, ex_b, U_or_M, la, alpha, implicit_
     YTY = np.dot(YT, Y)
 
   result = np.zeros((rating_matrix.shape[0], U_or_M.shape[1]))
-  for i in range(rating_matrix.shape[0]):
-    if implicit_feedback:
+  if implicit_feedback:
+    for i in range(rating_matrix.shape[0]):
       result[i] = _implicit_feedback_als_solver(rating_matrix[i], la, alpha, Y, YT, YTY)
-    else:
+  else:
+    for i in range(rating_matrix.shape[0]):
       non_zero_idx = rating_matrix[i].nonzero()[0]
       rating_vector = rating_matrix[i, non_zero_idx]
       feature_vectors = U_or_M[non_zero_idx]
