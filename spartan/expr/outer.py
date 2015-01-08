@@ -6,43 +6,57 @@ from ..core import LocalKernelResult
 from spartan import rpc
 from spartan.node import Node
 
+import time
 
+
+test=0
+# TODO: How to do cache for outer
 def outer_mapper(ex, arrays, axes, local_user_fn, local_user_fn_kw, target):
   # Fetch the tile for the first array
   first_extent = extent.change_partition_axis(ex, axes[0])
-  first_tile = arrays[0].fetch(ex)
+  first_tile = arrays[0].fetch(first_extent)
 
   futures = rpc.FutureGroup()
   if local_user_fn_kw is None:
     local_user_fn_kw = {}
 
-  done_extent = {}
-  for key in arrays[1].tiles.iterkeys():
-    if hasattr(arrays[1], 'view_extent'):
-      key = arrays[1].view_extent(key)
-    outer_extent = extent.change_partition_axis(key, axes[1])
-    if done_extent.get(outer_extent, None) is not None:
-      # Usually, change_partition_axis won't return the same extents
-      # (if there is no bugs :) ). However, if the underline array
-      # is a vector and the new partition axis is 1, the API will
-      # return an extent that cover the whole vector.
-      # We need to avoid redo the extent.
-      continue
-
-    if outer_extent is None:
-      # It is possible that the return value of change_partition_axis
-      # is None if the dimension of new partition axis is smaller than
-      # the dimension of the original axis.
-      continue
-
+  if axes[1] is None:
+    outer_extent = extent.from_shape(arrays[1].shape)
     outer_tile = arrays[1].fetch(outer_extent)
     result = local_user_fn(first_extent, first_tile,
                            outer_extent, outer_tile,
                            **local_user_fn_kw)
     if result is not None:
       for ex, v in result:
-        futures.append(target.update(ex, v, wait=False))
-    done_extent[outer_extent] = True
+          futures.append(target.update(ex, v, wait=False))
+  else:
+    done_extent = {}
+    for key in arrays[1].tiles.iterkeys():
+      if hasattr(arrays[1], 'view_extent'):
+        key = arrays[1].view_extent(key)
+      outer_extent = extent.change_partition_axis(key, axes[1])
+      if done_extent.get(outer_extent, None) is not None:
+        # Usually, change_partition_axis won't return the same extents
+        # (if there is no bugs :) ). However, if the underline array
+        # is a vector and the new partition axis is 1, the API will
+        # return an extent that cover the whole vector.
+        # We need to avoid redo the extent.
+        continue
+
+      if outer_extent is None:
+        # It is possible that the return value of change_partition_axis
+        # is None if the dimension of new partition axis is smaller than
+        # the dimension of the original axis.
+        continue
+
+      outer_tile = arrays[1].fetch(outer_extent)
+      result = local_user_fn(first_extent, first_tile,
+                             outer_extent, outer_tile,
+                             **local_user_fn_kw)
+      if result is not None:
+        for ex, v in result:
+          futures.append(target.update(ex, v, wait=False))
+      done_extent[outer_extent] = True
 
   return LocalKernelResult(result=[], futures=futures)
 
@@ -53,6 +67,7 @@ class OuterProductExpr(Expr):
   fn = PythonValue
   fn_kw = PythonValue
   shape = Instance(tuple)
+  dtype = PythonValue
   tile_hint = Instance(tuple)
   reducer = PythonValue
 
@@ -68,10 +83,14 @@ class OuterProductExpr(Expr):
     fn = deps['fn']
     fn_kw = deps['fn_kw']
     shape = deps['shape']
+    dtype = deps['dtype']
     tile_hint = deps['tile_hint']
     reducer = deps['reducer']
 
-    target = distarray.create(shape, arrays[0].dtype,
+    if dtype is None:
+      dtype = arrays[0].dtype
+
+    target = distarray.create(shape, dtype,
                               sharder=None, reducer=reducer,
                               tile_hint=tile_hint,
                               sparse=(arrays[0].sparse and arrays[1].sparse))
@@ -82,8 +101,8 @@ class OuterProductExpr(Expr):
     return target
 
 
-def outer(arrays, axes, fn, fn_kw=None,
-          shape=None, tile_hint=None, reducer=None):
+def outer(arrays, axes, fn, fn_kw=None, shape=None, tile_hint=None,
+          reducer=None, dtype=None):
   '''
   Outer (cartesian) product over the tiles of ``a`` and ``b``.
 
@@ -99,5 +118,5 @@ def outer(arrays, axes, fn, fn_kw=None,
   arrays = TupleExpr(vals=arrays)
 
   return OuterProductExpr(arrays=arrays, axes=axes, fn=fn, fn_kw=fn_kw,
-                          shape=tuple(shape), tile_hint=tile_hint,
-                          reducer=reducer)
+                          shape=tuple(shape), dtype=dtype,
+                          tile_hint=tile_hint, reducer=reducer)
