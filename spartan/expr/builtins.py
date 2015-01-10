@@ -17,28 +17,29 @@ from .. import util
 from ..array import extent
 from ..array.extent import index_for_reduction, shapes_match
 from ..util import Assert
-from .map import map
+from .map import map, map2
 from .map_with_location import map_with_location
+from .outer import outer
 from .ndarray import ndarray
 from .optimize import disable_parakeet, not_idempotent
 from .reduce import reduce
-from .shuffle import shuffle
 import __builtin__
 
-def _make_ones(input): return np.ones(input.shape, input.dtype)
-def _make_zeros(input): return np.zeros(input.shape, input.dtype)
 
 @disable_parakeet
 def _make_rand(input):
   return np.random.rand(*input.shape)
 
+
 @disable_parakeet
 def _make_randn(input):
   return np.random.randn(*input.shape)
 
+
 @disable_parakeet
 def _make_randint(input, low=0, high=10):
   return np.random.randint(low, high, size=input.shape)
+
 
 @disable_parakeet
 def _make_sparse_rand(input,
@@ -86,6 +87,7 @@ def rand(*shape, **kw):
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint),
              fn=_make_rand)
 
+
 @not_idempotent
 def randn(*shape, **kw):
   '''
@@ -100,6 +102,7 @@ def randn(*shape, **kw):
 
   for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randn)
+
 
 @not_idempotent
 def randint(*shape, **kw):
@@ -117,6 +120,7 @@ def randint(*shape, **kw):
 
   for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=np.float, tile_hint=tile_hint), fn=_make_randint, fn_kw=kw)
+
 
 @not_idempotent
 def sparse_rand(shape,
@@ -141,13 +145,12 @@ def sparse_rand(shape,
   for s in shape: assert isinstance(s, (int, long))
   return map(ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True),
              fn=_make_sparse_rand,
-             fn_kw = { 'dtype' : dtype,
-                       'density' : density,
-                       'format' : format })
+             fn_kw={'dtype': dtype,
+                    'density': density,
+                    'format': format})
 
-def sparse_empty(shape,
-                 dtype=np.float32,
-                 tile_hint=None):
+
+def sparse_empty(shape, dtype=np.float32, tile_hint=None):
   '''Return an empty sparse array of the given shape.
 
   :param shape: `tuple`.  Shape of the resulting array.
@@ -162,7 +165,7 @@ def sparse_diagonal(shape, dtype=np.float32, tile_hint=None):
                            _make_sparse_diagonal)
 
 
-def _diagflat_mapper(array, ex):
+def _diagflat_mapper(extents, tiles, shape=None):
   '''Create a diagonal array section for this extent.
 
   If the extent does not lie on the diagonal, a zero array is returned.
@@ -171,47 +174,20 @@ def _diagflat_mapper(array, ex):
   :param ex: Extent
     Region being processed.
   '''
-  '''
-  util.log_info('ex.ul: %s ex.lr: %s ex.shape: %s', ex.ul, ex.lr, ex.shape)
-  util.log_info('array.shape: %s', array.shape)
+  ex = extents[0]
+  tile = tiles[0]
+  head = extent.ravelled_pos(ex.ul, ex.array_shape)
+  tail = extent.ravelled_pos([l - 1 for l in ex.lr], ex.array_shape)
 
-  new_ul = (ex.ul[0] * array.shape[1], 0)
-  new_lr = (ex.lr[0] * array.shape[1], np.prod(array.shape))
-  new_shape = (np.prod(array.shape), np.prod(array.shape))
-  new_ex = extent.create(new_ul, new_lr, new_shape)
+  result = np.diagflat(tile)
+  if head != 0:
+    result = np.hstack((np.zeros(((tail - head + 1), head)), result))
+  if tail + 1 != shape[0]:
+    result = np.hstack((result, np.zeros((tail - head + 1, shape[0] - (tail + 1)))))
 
-  util.log_info('new_ul: %s new_lr: %s new_shape: %s', new_ul, new_lr, new_shape)
-  data = np.ravel(array.fetch(ex))
+  target_ex = extent.create((head, 0), (tail + 1, shape[1]), shape)
+  yield target_ex, result
 
-  util.log_info('data: %s %s', data, data.shape)
-  util.log_info('zeros: %s %s', new_lr[0] - new_ul[0], new_lr[1] - new_ul[1])
-  result = np.zeros((new_lr[0] - new_ul[0], new_lr[1] - new_ul[1]))
-  for i in xrange(data.shape[0]):
-    result[i, new_ul[0] + i] = data[i]
-
-  '''
-  #util.log_info('ex.ul: %s ex.lr: %s ex.shape: %s', ex.ul, ex.lr, ex.shape)
-  #util.log_info('array.shape: %s', array.shape)
-
-  head = extent.ravelled_pos(ex.ul, array.shape)
-  tail = extent.ravelled_pos([l-1 for l in ex.lr], array.shape)
-  numElements = np.prod(array.shape)
-
-  new_ul = (head, 0)
-  new_lr = (tail+1, numElements)
-  new_shape = (numElements, numElements)
-  new_ex = extent.create(new_ul, new_lr, new_shape)
-
-  #util.log_info('new_ul: %s new_lr: %s new_shape: %s', new_ul, new_lr, new_shape)
-  data = np.ravel(array.fetch(ex))
-  
-  #util.log_info('data: %s %s', data, data.shape)
-  #util.log_info('zeros: %s %s', new_lr[0] - new_ul[0], new_lr[1] - new_ul[1])
-  result = np.zeros((new_lr[0] - new_ul[0], new_lr[1] - new_ul[1]))
-  for i in xrange(data.shape[0]):
-    result[i, new_ul[0] + i] = data[i]
-
-  yield new_ex, result
 
 def diagflat(array):
   '''
@@ -221,29 +197,25 @@ def diagflat(array):
   :param array: 2D DistArray
     The data to fill the diagonal.
   '''
-  return shuffle(array, _diagflat_mapper, shape_hint=(np.prod(array.shape), np.prod(array.shape)))
+  shape = (np.prod(array.shape), np.prod(array.shape))
+  return map2(array, 0, fn=_diagflat_mapper, fn_kw={'shape': shape}, shape=shape)
 
 
-def _diagonal_mapper(array, ex):
-  if ex.ul[0] >= ex.ul[1] and ex.ul[0] < ex.lr[1]:  # Below the diagonal.
-    above, below = False, True
-  elif ex.ul[1] >= ex.ul[0] and ex.ul[1] < ex.lr[0]:  # Above the diagonal.
-    above, below = True, False
-  else:  # Not on the diagonal.
-    return
+def _diagonal_mapper(ex, tiles, shape=None):
+  tile = tiles[0]
+  max_dim = __builtin__.max(*ex.ul)
+  first_point = [max_dim for i in range(len(ex.ul))]
+  slices = []
+  for i in range(len(ex.ul)):
+    if first_point[i] >= ex.lr[i]:
+      return
+    slices.append(slice(first_point[i] - ex.ul[i], ex.shape[i]))
 
-  start = ex.ul[above]
-  stop = __builtin__.min(ex.lr[above], ex.lr[below])
-  result = np.ndarray((stop - start, ))
-
-  data = array.fetch(ex)
-  index = 0
-  for i in range(start, stop):
-    result[index] = data[i - ex.ul[0], i - ex.ul[1]]
-    index += 1
-
-  res_ex = extent.create((start, ), (stop, ), (__builtin__.min(array.shape), ))
-  yield (res_ex, result)
+  result = tile[slices].diagonal()
+  target_ex = extent.create((first_point[0], ),
+                            (first_point[0] + result.shape[0], ),
+                            shape)
+  yield target_ex, result
 
 
 def diagonal(a):
@@ -251,7 +223,7 @@ def diagonal(a):
 
   :param a: array_like
     Array from which the diagonals are taken.
-  :rtype ShuffleExpr
+  :rtype Map2Expr
 
   Raises
   ------
@@ -262,7 +234,9 @@ def diagonal(a):
   if len(a.shape) < 2:
     raise ValueError("diag requires an array of at least two dimensions")
 
-  return shuffle(a, _diagonal_mapper, shape_hint=(__builtin__.min(a.shape), ))
+  shape = (__builtin__.min(a.shape), )
+  return map2(a, fn=_diagonal_mapper, fn_kw={'shape': shape}, shape=shape)
+
 
 def diag(array, offset=0):
   '''
@@ -276,7 +250,7 @@ def diag(array, offset=0):
     This argument hasn't been implemented yet.
 
 
-  :rtype ShuffleExpr
+  :rtype Map2Expr
 
   Raises
   ------
@@ -294,6 +268,7 @@ def diag(array, offset=0):
     return diagonal(array)
   else:
     raise ValueError("Input must be 1- or 2-d.")
+
 
 def _normalize_mapper(tile, ex, axis, norm_value):
   '''Normalize a region of an array.
@@ -335,7 +310,7 @@ def normalize(array, axis=None):
   '''
   axis_sum = sum(array, axis=axis).glom()
   return map_with_location(array, _normalize_mapper,
-                    fn_kw={'axis': axis, 'norm_value': axis_sum})
+                           fn_kw={'axis': axis, 'norm_value': axis_sum})
 
 
 def norm(array, ord=2):
@@ -363,22 +338,24 @@ def norm(array, ord=2):
     result = reduce(array,
                     axis=0,
                     dtype_fn=lambda input: input.dtype,
-                    local_reduce_fn=lambda ex, data, axis:np.abs(data).sum(axis),
+                    local_reduce_fn=lambda ex, data, axis: np.abs(data).sum(axis),
                     accumulate_fn=np.add).glom()
     return np.max(result)
   elif len(array.shape) == 1 or len(array.shape) == 2 and array.shape[1] == 1:
     result = reduce(array,
                     axis=0,
                     dtype_fn=lambda input: input.dtype,
-                    local_reduce_fn=lambda ex, data, axis:np.square(data).sum(axis),
+                    local_reduce_fn=lambda ex, data, axis: np.square(data).sum(axis),
                     accumulate_fn=np.add).glom()
     return np.sqrt(result)
 
   assert False, "matrix norm-2 is not support!"
 
+
 @disable_parakeet
 def _tocoo(data):
   return data.tocoo()
+
 
 def tocoo(array):
   '''
@@ -388,6 +365,14 @@ def tocoo(array):
   :rtype: A new array in COO format.
   '''
   return map(array, fn=_tocoo)
+
+
+def _make_ones(input):
+  return np.ones(input.shape, input.dtype)
+
+
+def _make_zeros(input):
+  return np.zeros(input.shape, input.dtype)
 
 
 def zeros(shape, dtype=np.float, tile_hint=None):
@@ -474,8 +459,8 @@ def arange(shape=None, start=0, stop=None, step=1, dtype=np.float, tile_hint=Non
     stop = step*(np.prod(shape) + start)
 
   return map_with_location(ndarray(shape, dtype, tile_hint), _arange_mapper,
-                    fn_kw={'start': start, 'stop': stop,
-                           'step': step, 'dtype': dtype})
+                           fn_kw={'start': start, 'stop': stop,
+                                  'step': step, 'dtype': dtype})
 
 
 def _sum_local(ex, data, axis):
@@ -500,6 +485,7 @@ def sum(x, axis=None, tile_hint=None):
                 accumulate_fn=np.add,
                 tile_hint=tile_hint)
 
+
 def max(x, axis=None, tile_hint=None):
   '''Compute the maximum value over an array (or axis).  See `numpy.max`.
 
@@ -512,11 +498,11 @@ def max(x, axis=None, tile_hint=None):
    Expr:
   '''
   return reduce(x,
-      axis=axis,
-      dtype_fn=lambda input: input.dtype,
-      local_reduce_fn=lambda ex, data, axis: data.max(axis),
-      accumulate_fn=np.maximum,
-      tile_hint = tile_hint)
+                axis=axis,
+                dtype_fn=lambda input: input.dtype,
+                local_reduce_fn=lambda ex, data, axis: data.max(axis),
+                accumulate_fn=np.maximum,
+                tile_hint=tile_hint)
 
 
 def min(x, axis=None, tile_hint=None):
@@ -531,11 +517,11 @@ def min(x, axis=None, tile_hint=None):
    Expr:
   '''
   return reduce(x,
-      axis=axis,
-      dtype_fn=lambda input: input.dtype,
-      local_reduce_fn=lambda ex, data, axis: data.min(axis),
-      accumulate_fn=np.minimum,
-      tile_hint = tile_hint)
+                axis=axis,
+                dtype_fn=lambda input: input.dtype,
+                local_reduce_fn=lambda ex, data, axis: data.min(axis),
+                accumulate_fn=np.minimum,
+                tile_hint=tile_hint)
 
 
 def mean(x, axis=None):
@@ -559,6 +545,7 @@ def _num_tiles(array):
   remaining = (array.shape[1] - array.tile_shape()[1]) * num_tiles
   return num_tiles + util.divup(remaining, array.tile_shape()[1])
 
+
 def std(a, axis=None):
   '''Compute the standard deviation along the specified axis.
 
@@ -575,7 +562,8 @@ def std(a, axis=None):
   :rtype standard_deviation: Expr
   '''
   a_casted = a.astype(np.float64)
-  return sqrt(mean(a_casted ** 2, axis) - mean(a_casted, axis) ** 2) #.optimized()
+  return sqrt(mean(a_casted ** 2, axis) - mean(a_casted, axis) ** 2)  #.optimized()
+
 
 def _to_structured_array(*vals):
   '''Create a structured array from the given input arrays.
@@ -704,11 +692,13 @@ def count_nonzero(array, axis=None, tile_hint=None):
                 accumulate_fn=np.add,
                 tile_hint=tile_hint)
 
+
 def _countzero_local(ex, data, axis):
   if axis is None:
     return np.asarray(np.prod(ex.shape) - np.count_nonzero(data))
 
   return (data == 0).sum(axis)
+
 
 def count_zero(array, axis=None):
   '''
@@ -722,7 +712,7 @@ def count_zero(array, axis=None):
   return reduce(array, axis,
                 dtype_fn=lambda input: np.int64,
                 local_reduce_fn=_countzero_local,
-                accumulate_fn = np.add)
+                accumulate_fn=np.add)
 
 
 def size(x, axis=None):
@@ -737,9 +727,11 @@ def size(x, axis=None):
     return np.prod(x.shape)
   return x.shape[axis]
 
+
 @disable_parakeet
 def _astype_mapper(t, dtype):
   return t.astype(dtype)
+
 
 def astype(x, dtype):
   '''
@@ -752,16 +744,16 @@ def astype(x, dtype):
 
   '''
   assert x is not None
-  return map(x, _astype_mapper, fn_kw={'dtype': np.dtype(dtype).str })
+  return map(x, _astype_mapper, fn_kw={'dtype': np.dtype(dtype).str})
 
 
-def _ravel_mapper(array, ex):
+def _ravel_mapper(ex, tiles):
   ul = extent.ravelled_pos(ex.ul, ex.array_shape)
   lr = 1 + extent.ravelled_pos([lr - 1 for lr in ex.lr], ex.array_shape)
   shape = (np.prod(ex.array_shape),)
 
   ravelled_ex = extent.create((ul,), (lr,), shape)
-  ravelled_data = array.fetch(ex).ravel()
+  ravelled_data = tiles[0].ravel()
   yield ravelled_ex, ravelled_data
 
 
@@ -772,42 +764,64 @@ def ravel(v):
   See `numpy.ndarray.ravel`.
   :param v: `Expr` or `DistArray`
   '''
-  return shuffle(v, _ravel_mapper, shape_hint=(np.prod(v.shape),))
+  return map2(v,  fn=_ravel_mapper, shape=(np.prod(v.shape),))
+
 
 def multiply(a, b):
   assert a.shape == b.shape
   return map((a, b), fn=lambda a, b: a.multiply(b) if sp.issparse(a) else a * b)
 
+
 def power(a, b):
   return map((a, b), fn=np.power)
 
-def add(a, b): return map((a, b), fn=np.add)
 
-def sub(a, b): return map((a, b), fn=np.subtract)
+def add(a, b):
+  return map((a, b), fn=np.add)
 
-def maximum(a, b): return map((a, b), np.maximum)
 
-def ln(v): return map(v, fn=np.log)
+def sub(a, b):
+  return map((a, b), fn=np.subtract)
 
-def log(v): return map(v, fn=np.log)
 
-def exp(v): return map(v, fn=np.exp)
+def maximum(a, b):
+  return map((a, b), np.maximum)
 
-def square(v): return map(v, fn=np.square)
 
-def sqrt(v): return map(v, fn=np.sqrt)
+def ln(v):
+  return map(v, fn=np.log)
 
-def abs(v): return map(v, fn=np.abs)
 
-def _bincount_mapper(array, ex, minlength=None):
-  tile = array.fetch(ex)
-  result = np.bincount(tile, minlength=minlength)
+def log(v):
+  return map(v, fn=np.log)
+
+
+def exp(v):
+  return map(v, fn=np.exp)
+
+
+def square(v):
+  return map(v, fn=np.square)
+
+
+def sqrt(v):
+  return map(v, fn=np.sqrt)
+
+
+def abs(v):
+  return map(v, fn=np.abs)
+
+
+def _bincount_mapper(ex, tiles, minlength=None):
+  if len(tiles) > 1:
+    result = np.bincount(tiles[0], weights=tiles[1], minlength=minlength)
+  else:
+    result = np.bincount(tiles[0], minlength=minlength)
   result_ex = extent.from_shape(result.shape)
-  util.log_info('%s %s %s', tile.max(), result.shape, result)
   yield result_ex, result
 
 
-def bincount(v):
+def bincount(v, weights=None, minlength=None):
   '''
   Count unique values in ``v``.
   See `numpy.bincount` for more information.
@@ -820,11 +834,17 @@ def bincount(v):
   minval = min(v).glom()
   maxval = max(v).glom()
   assert minval > 0
-  target = ndarray((maxval + 1,), dtype=np.int64, reduce_fn=np.add)
-  return shuffle(v,
-      _bincount_mapper,
-      target=target,
-      kw = { 'minlength' : maxval + 1})
+  if minlength is not None:
+    minlength = __builtin__.max(maxval + 1, minlength)
+  else:
+    minlength = maxval + 1
+
+  if weights is not None:
+    return map2((v, weights), fn=_bincount_mapper, fn_kw={'minlength': minlength},
+                shape=(minlength,), reducer=np.add)
+  else:
+    return map2(v, fn=_bincount_mapper, fn_kw={'minlength': minlength},
+                shape=(minlength,), reducer=np.add)
 
 
 def _translate_extent(ex, a, roffset=0, coffset=0):
@@ -847,37 +867,20 @@ def _translate_extent(ex, a, roffset=0, coffset=0):
   return extent.create(ul, lr, a.shape)
 
 
-def _concatenate_mapper(array, ex, a, b, axis):
-  data_a = None
-  data_b = None
-  result = np.ndarray(ex.shape)
-
-  # Fetch only the required data from a and b.
-  ex_a = _translate_extent(ex, a)
-  if ex_a is not None:
-    data_a = a.fetch(ex_a)
-
-  # Translate extent for b.
-  if axis == 0:
-    ex_b = _translate_extent(ex, b, a.shape[0])
+def _concatenate_mapper(extents, tiles, shape=None, axis=0):
+  if len(extents[0].shape) > 1:
+    ul = extents[0].ul
+    lr = list(extents[0].lr)
+    lr[axis] += extents[1].shape[axis]
+    ex = extent.create(ul, lr, shape)
+    yield ex, np.concatenate((tiles[0], tiles[1]), axis=axis)
   else:
-    ex_b = _translate_extent(ex, b, 0, a.shape[1])
-  if ex_b is not None:
-    data_b = b.fetch(ex_b)
-
-  if data_a is not None:
-    s = [slice(0, shape, None) for shape in data_a.shape]
-    result[tuple(s)] = data_a
-    start = data_a.shape
-  else:
-    start = [0] * len(a.shape)
-
-  if data_b is not None:
-    s = [slice(None, None, None)] * len(a.shape)
-    s[axis] = slice(start[axis], None, None)
-    result[tuple(s)] = data_b
-
-  yield ex, result
+    ex = extent.create(extents[0].ul, extents[0].lr, shape)
+    yield ex, tiles[0]
+    ul = (extents[0].array_shape[0] + extents[1].ul[0], )
+    lr = (extents[0].array_shape[0] + extents[1].lr[0], )
+    ex = extent.create(ul, lr, shape)
+    yield ex, tiles[1]
 
 
 def concatenate(a, b, axis=0):
@@ -890,12 +893,16 @@ def concatenate(a, b, axis=0):
       continue
     new_shape[index] = dim1
     if dim1 != dim2:
-      raise ValueError('all the input array dimensions except for the' \
+      raise ValueError('all the input array dimensions except for the'
                        'concatenation axis must match exactly')
 
-  return shuffle(ndarray(new_shape),
-                 _concatenate_mapper,
-                 kw={'a': a, 'b': b, 'axis': axis}, shape_hint=new_shape)
+  if len(a.shape) > 1:
+    partition_axis = extent.largest_dim_axis(a.shape, exclude_axes=[axis])
+  else:
+    partition_axis = 0
+
+  return map2((a, b), (partition_axis, partition_axis), fn=_concatenate_mapper,
+              fn_kw={'axis': axis, 'shape': new_shape}, shape=new_shape)
 
 
 try:

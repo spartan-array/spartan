@@ -459,11 +459,44 @@ def is_complete(shape, slices):
     if slice.stop < dim: return False
   return True
 
+def largest_dim_axis(shape, exclude_axes=None):
+  largest_dim = 0
+  largest_axis = 0
+  for i in range(len(shape)):
+    if exclude_axes is not None and i in exclude_axes:
+      continue
+    if largest_dim < shape[i]:
+      largest_dim = shape[i]
+      largest_axis = i
 
+  return largest_axis
+
+def largest_intact_dim_axis(ex, exclude_axes=None):
+  '''
+  Args:
+    shape:
+    exclude_axes: tuple or list
+  '''
+  idx = np.argsort(ex.array_shape)
+  for i in xrange(len(idx)-1, -1, -1):
+    if ex.shape[idx[i]] == ex.array_shape[idx[i]] and \
+        (exclude_axes is None or idx[i] not in exclude_axes):
+      return idx[i]
+  for i in xrange(len(idx)-1, -1, -1):
+    if exclude_axes is None or idx[i] not in exclude_axes:
+      return idx[i]
 
 def change_partition_axis(ex, axis):
   if axis < 0:
     axis += len(ex.array_shape)
+
+  # Vector is a special case
+  if len(ex.shape) == 1:
+    if axis == 1:
+      # We define that if axis is 1, users need the whole vector.
+      return create((0, ), ex.array_shape, ex.array_shape)
+    else:
+      return ex
 
   old_axes = []
   for i in xrange(len(ex.shape)):
@@ -471,20 +504,24 @@ def change_partition_axis(ex, axis):
       old_axes.append(i)
 
   if len(old_axes) > 1:
-    # The meaning of this API for block partition is unclear.
-    util.log_warn(str((old_axes, ex.shape, ex.array_shape)))
+    # TODO:The meaning of this API for block partition is unclear.
+    util.log_warn("change_partition_axis doesn't know how to deal with block partition %s",
+                  str((old_axes, ex.shape, ex.array_shape)))
+    print ex, ex.array_shape
     raise NotImplementedError
 
-  #Mapping "sorting axis" to "tiling axis" presentation
-  if len(old_axes) == 0 or old_axes[0] != axis:
+  if len(old_axes) == 0 or old_axes[0] == axis:
     return ex
-  else:
-    #New tiling strategy with biggest dimension
-    idx = np.argsort(ex.array_shape)
-    for i in xrange(len(idx)-1, -1, -1):
-      if idx[i] != old_axes[0]:
-        axis = idx[i]
-        break
+  ##Mapping "sorting axis" to "tiling axis" presentation
+  #if len(old_axes) == 0 or old_axes[0] != axis:
+    #return ex
+  #else:
+    ##New tiling strategy with biggest dimension
+    #idx = np.argsort(ex.array_shape)
+    #for i in xrange(len(idx)-1, -1, -1):
+      #if idx[i] != old_axes[0]:
+        #axis = idx[i]
+        #break
 
   old_axis = old_axes[0]
 
@@ -497,4 +534,6 @@ def change_partition_axis(ex, axis):
                             ex.array_shape[old_axis])
   new_lr[old_axis] = ex.array_shape[old_axis]
 
-  return create(new_ul, new_lr, ex.array_shape)
+  target_ex = create(new_ul, new_lr, ex.array_shape)
+  #assert target_ex is not None, (new_ul, new_lr, axis, ex.array_shape, ex)
+  return target_ex

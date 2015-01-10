@@ -8,7 +8,8 @@ import test_common
 import time
 import random
 
-N = 5120
+#N = 5120
+N = 2560
 
 def gen_array(shape):
   return expr.ones(shape)
