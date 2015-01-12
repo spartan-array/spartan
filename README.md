@@ -8,11 +8,11 @@ expressions are then compiled and optimized and run on a distributed
 array backend across multiple machines.
 
 Check out the
-[turorial on the wiki.](https://github.com/spartan-array/spartan/wiki/Tutorial)
+[tutorial on the wiki.](https://github.com/spartan-array/spartan/wiki/Tutorial)
 
 ## Installation
 
-#### From PyPi (not necessarily up-to-date)
+#### From PyPI (not necessarily up-to-date)
     
     pip install [--user] spartan
 
