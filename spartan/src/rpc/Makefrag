@@ -1,5 +1,3 @@
-OBJ_DIRS += rpc
-
 .PHONY:simple-rpc
 simple-rpc:
 	@if [ ! -d "$(RPC)" ] ; then \
@@ -10,6 +8,8 @@ simple-rpc:
 
 rpc: simple-rpc
 	cd $(RPC);python waf configure; python waf;
-	cd $(RPCDIR);python simple-rpc/bin/rpcgen service.rpc --python --cpp;
+	@if [ ! -f "$(RPCDIR)/service.h" ] ; then \
+			cd $(RPCDIR);python simple-rpc/bin/rpcgen service.rpc --python --cpp; \
+	fi
 
 all: rpc

@@ -17,9 +17,9 @@ endif
 CFLAGS := -I$(CUR_DIR) -I$(CORE_DIR) -I$(ARRAY_DIR) -I$(RPC) $(PY_CFLAGS) $(NUMPY) -pthread -std=c++0x -O2
 LDFLAGS := -L$(RPC)/build -L$(CURDIR) -L$(RPC) $(PY_LDFLAGS) -lpython2.7 -std=c++11
 
-OBJ_DIRS :=
-
 all:
+
+.DELETE_ON_ERROR:
 
 .cc.o:
 	$(CC) $(CFLAGS) $< -c -o $@ -fPIC
