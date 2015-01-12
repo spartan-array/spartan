@@ -1,0 +1,15 @@
+OBJ_DIRS += rpc
+
+.PHONY:simple-rpc
+simple-rpc:
+	@if [ ! -d "$(RPC)" ] ; then \
+	    git clone https://github.com/santazhang/simple-rpc $(RPC); \
+	    cp $(RPCDIR)/simple-rpc-wscript $(RPC)/wscript; \
+			cd $(RPCDIR) && patch -Np1 < $(CUR_DIR)/rpc/base-utils-patch 2> /dev/null && cd -; \
+	fi
+
+rpc: simple-rpc
+	cd $(RPC);python waf configure;python waf;
+	cd $(RPCDIR);python simple-rpc/bin/rpcgen service.rpc --python --cpp;
+
+all: rpc

@@ -1,6 +1,6 @@
-diff -u base-utils-original/base/logging.cc base-utils/base/logging.cc
+diff -u base-utils-original/base/logging.cc rpc/simple-rpc/base/logging.cc
 --- base-utils-original/base/logging.cc	2014-08-19 15:23:45.000000000 -0400
-+++ base-utils/base/logging.cc	2014-08-15 16:56:33.000000000 -0400
++++ rpc/simple-rpc/base/logging.cc	2014-08-15 16:56:33.000000000 -0400
 @@ -56,22 +56,24 @@
  }
  
@@ -59,9 +59,9 @@ diff -u base-utils-original/base/logging.cc base-utils/base/logging.cc
  
  } // namespace base
  
-diff -u base-utils-original/base/logging.h base-utils/base/logging.h
+diff -u base-utils-original/base/logging.h rpc/simple-rpc/base/logging.h
 --- base-utils-original/base/logging.h	2014-08-19 15:23:45.000000000 -0400
-+++ base-utils/base/logging.h	2014-08-15 16:56:33.000000000 -0400
++++ rpc/simple-rpc/base/logging.h	2014-08-15 16:56:33.000000000 -0400
 @@ -3,15 +3,16 @@
  
  #include <stdarg.h>
@@ -153,9 +153,9 @@ diff -u base-utils-original/base/logging.h base-utils/base/logging.h
  
  } // namespace base
  
-diff -u base-utils-original/base/misc.cc base-utils/base/misc.cc
+diff -u base-utils-original/base/misc.cc rpc/simple-rpc/base/misc.cc
 --- base-utils-original/base/misc.cc	2014-08-19 15:23:45.000000000 -0400
-+++ base-utils/base/misc.cc	2014-08-15 16:56:33.000000000 -0400
++++ rpc/simple-rpc/base/misc.cc	2014-08-15 16:56:33.000000000 -0400
 @@ -38,11 +38,11 @@
      make_int(now + 14, local_calendar.tm_min, 2);
      now[16] = ':';
