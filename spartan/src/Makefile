@@ -15,13 +15,13 @@ ifndef $(NUMPY_FLAGS)
 endif
 
 CFLAGS := -I$(CUR_DIR) -I$(CORE_DIR) -I$(ARRAY_DIR) -I$(RPC) $(PY_CFLAGS) $(NUMPY) -pthread -std=c++0x -O2
-LDFLAGS := -L$(RPC)/build -L$(CURDIR) -L$(RPC) $(PY_LDFLAGS) -lbase -lpython2.7 -std=c++11
+LDFLAGS := -L$(RPC)/build -L$(OBJ_DIR) -L$(CURDIR) -L$(RPC) $(PY_LDFLAGS) -lbase -lpython2.7 -std=c++11
 
 OBJS_WORKER = $(CUR_DIR)/core/worker.o
 OBJS_ARRAY = $(ARRAY_DIR)/cslice.o $(ARRAY_DIR)/cextent.o $(ARRAY_DIR)/ctile.o $(ARRAY_DIR)/carray.o $(ARRAY_DIR)/carray_reducer.o
 OBJS_CORE = $(CUR_DIR)/core/cconfig.o
 
-all: rpc libcore.so libspartan_array.so worker
+all: rpc $(OBJ_DIR)/libcore.so $(OBJ_DIR)/libspartan_array.so $(OBJ_DIR)/worker
 
 .cc.o:
 	$(CC) $(CFLAGS) $< -c -o $@ -fPIC
@@ -42,21 +42,24 @@ rpc: simple-rpc
 	fi
 
 -include $(OBJS_CORE:.o=.d)
-libcore.so: $(OBJS_CORE)
-	${CC} -o $(CUR_DIR)/$@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach
+$(OBJ_DIR)/libcore.so: $(OBJS_CORE)
+	@mkdir -p $(@D)
+	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach
 
 -include $(OBJS_ARRAY:.o=.d)
-libspartan_array.so: $(OBJS_ARRAY)
-	${CC} -o $(CUR_DIR)/$@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach -lcore
+$(OBJ_DIR)/libspartan_array.so: $(OBJS_ARRAY)
+	@mkdir -p $(@D)
+	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach -lcore
 
 -include $(OBJS_WORKER:.o=.d)
-worker: $(OBJS_WORKER)
-	${CC} -o $(CUR_DIR)/$@ $^ $(LDFLAGS) -lsimplerpc -lspartan_array -lcore
+$(OBJ_DIR)/worker: $(OBJS_WORKER)
+	@mkdir -p $(@D)
+	${CC} -o $@ $^ $(LDFLAGS) -lsimplerpc -lspartan_array -lcore
 
+#TODO: This needs to be updated
 clean:
 	rm -f $(RPCDIR)/*.o $(RPCDIR)/*.d
 	rm -f $(ARRAY_DIR)/*.o $(ARRAY_DIR)/*.d
 	rm -f $(CORE_DIR)/*.o $(CORE_DIR)/*.d
-	rm -rf $(RPCDIR)/simple-rpc
-	rm -f $(CUR_DIR)/*.so $(CUR_DIR)/worker
+	rm -rf $(RPCDIR)/simple-rpc $(OBJ_DIR)
 	rm -f $(RPCDIR)/service.h $(RPCDIR)/service.py
