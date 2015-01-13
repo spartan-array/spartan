@@ -40,20 +40,19 @@ rpc: simple-rpc
 	@if [ ! -f "$(RPCDIR)/service.h" ] ; then \
 			cd $(RPCDIR);python simple-rpc/bin/rpcgen service.rpc --python --cpp; \
 	fi
+	@mkdir -p $(OBJ_DIR)
+	mv $(RPC)/build/*.so $(OBJ_DIR)
 
 -include $(OBJS_CORE:.o=.d)
 $(OBJ_DIR)/libcore.so: $(OBJS_CORE)
-	@mkdir -p $(@D)
 	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach
 
 -include $(OBJS_ARRAY:.o=.d)
 $(OBJ_DIR)/libspartan_array.so: $(OBJS_ARRAY)
-	@mkdir -p $(@D)
 	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach -lcore
 
 -include $(OBJS_WORKER:.o=.d)
 $(OBJ_DIR)/worker: $(OBJS_WORKER)
-	@mkdir -p $(@D)
 	${CC} -o $@ $^ $(LDFLAGS) -lsimplerpc -lspartan_array -lcore
 
 #TODO: This needs to be updated

@@ -45,6 +45,7 @@ class clean(Command):
   def finalize_options(self):
     pass
 
+	#TODO: This one needs update
   def run(self):
     subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp", shell=True)
     subprocess.call("rm -rf spartan/array/*.so spartan/array/*.c spartan/array/*.cpp", shell=True)
@@ -94,11 +95,11 @@ base = '.' #os.path.dirname(os.path.realpath(__file__))
 ext_include_dirs = ['/usr/local/include',
                     base + '/spartan/src',
                     base + '/spartan/src/rpc/simple-rpc',
-                    base + '/spartan/src/rpc/base-utils',
+                    base + '/spartan/src/rpc/base-utils',     #TODO: This one needs update
                     base + '/spartan/src/rpc/simple-rpc/build', ]
 ext_link_dirs = ['/usr/lib',
                  base + '/spartan/src/',
-                 base + '/spartan/src/rpc/base-utils/build',
+                 base + '/spartan/src/rpc/base-utils/build',  #TODO: This one needs update
                  base + '/spartan/src/rpc/simple-rpc/build', ]
 
 setup(
