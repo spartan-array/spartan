@@ -60,5 +60,7 @@ clean:
 	rm -f $(RPCDIR)/*.o $(RPCDIR)/*.d
 	rm -f $(ARRAY_DIR)/*.o $(ARRAY_DIR)/*.d
 	rm -f $(CORE_DIR)/*.o $(CORE_DIR)/*.d
-	rm -rf $(RPCDIR)/simple-rpc $(OBJ_DIR)
-	rm -f $(RPCDIR)/service.h $(RPCDIR)/service.py
+	rm -rf $(OBJ_DIR)
+
+cleanall: clean
+	rm -rf $(RPC) $(RPCDIR)/service.h $(RPCDIR)/service.py
