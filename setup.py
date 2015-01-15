@@ -1,7 +1,9 @@
 import os, sys
 import subprocess
-from setuptools import setup, Extension, Command
+from distutils.core import setup, Extension, Command
 from Cython.Distutils import build_ext
+
+from distutils.command.install import INSTALL_SCHEMES
 
 class clean(Command):
   description = 'Remove build and trash files'
@@ -16,7 +18,7 @@ class clean(Command):
   def run(self):
     subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp", shell=True)
     subprocess.call("rm -rf spartan/array/*.so spartan/array/*.c spartan/array/*.cpp", shell=True)
-    subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp", shell=True)
+    subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp spartan/rpc/simplerpc", shell=True)
     subprocess.call("make -C spartan/src cleanall", shell=True)
     subprocess.call("rm -rf build", shell=True)
 
@@ -26,8 +28,6 @@ def pre_install():
   subprocess.call("make -C spartan/src", shell = True)
   #FIXME: These two shell command needs to call like this?
   subprocess.call("mkdir -p spartan/rpc/simplerpc", shell = True)
-  subprocess.call("mv spartan/src/rpc/simple-rpc/pylib/simplerpc/marshal.py \
-                      spartan/rpc/simplerpc/marshal.pyx", shell = True)
   path = os.path.join(os.getcwd(), 'spartan/src/rpc/simple-rpc/pylib/simplerpc/')
   new_path = os.path.join(os.getcwd(), 'spartan/rpc/simplerpc')
 
@@ -57,6 +57,9 @@ def pre_install():
   rfp.close()
   wfp.close()
 
+  #Make marshal.py into .pyx for Cython use
+  subprocess.call("mv -i spartan/rpc/simplerpc/marshal.py \
+                          spartan/rpc/simplerpc/marshal.pyx", shell = True)
 
 def fetch_from_src(dic):
   '''
@@ -76,14 +79,16 @@ def fetch_from_src(dic):
     src_rpc.append('spartan/src/obj/rpc/' + f)
 
   #Copy all pylib/simplerpc/*.py into spartan/rpc/simplerpc
-  for f in os.listdir(os.path.join(path, 'rpc/simple-rpc/pylib/simplerpc')):
-    if f.endswith('.py'):
-      src_rpc.append('spartan/src/rpc/simple-rpc/pylib/simplerpc/' + f)
+  path = os.getcwd()
+  for f in os.listdir(os.path.join(path, 'spartan/rpc/simplerpc')):
+    if f.endswith('.py') and not 'marshal' in f:
+      src_rpc.append(os.path.join(os.path.join(path, 'spartan/rpc/simplerpc'), f))
 
-  dic['data_files'] = [('spartan', src_bin), ('spartan/rpc/simplerpc', src_rpc)]
-  #service.py
-  # FIXME: Is this really needed to be hard coded?
-  dic['data_files'].append(('spartan/rpc', ['spartan/src/rpc/service.py']))
+  dic['data_files'] = [
+                        ('spartan', src_bin),
+                        ('spartan/rpc/simplerpc', src_rpc), 
+                        ('spartan/rpc', ['spartan/src/rpc/service.py'])
+                      ]
 
 def setup_package():
   src_path = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -103,6 +108,9 @@ def setup_package():
     'spartan.array',
     'spartan.rpc',
   ]
+
+  #Set dynamic runtime linkage
+  runtime_link = ["$ORIGIN"]
 
   pkgs_dir = {p : p.replace('.', '/') for p in pkgs}
 
@@ -154,14 +162,16 @@ def setup_package():
                 include_dirs=ext_include_dirs,
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lspartan_array"],
-                extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"]),
+                extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"],
+                runtime_library_dirs=runtime_link),
       Extension('spartan.array._ctile_py_if',
                 ['spartan/src/array/_ctile_py_if.cc'],
                 language='c++',
                 include_dirs=ext_include_dirs,
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lsparta_array"],
-                extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"]),
+                extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"],
+                runtime_library_dirs=runtime_link),
       Extension('spartan._cblob_ctx_py_if',
                 ['spartan/src/core/_cblob_ctx_py_if.cc'],
                 language='c++',
@@ -169,7 +179,8 @@ def setup_package():
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc", "-lcore"],
                 extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
-                                "-lbase", "-lcore", "-lpython2.7"]),
+                                "-lbase", "-lcore", "-lpython2.7"],
+                runtime_library_dirs=runtime_link),
       Extension('spartan.rpc._rpc_array',
                 ['spartan/src/rpc/_rpc_array.cc'],
                 language='c++',
@@ -177,12 +188,14 @@ def setup_package():
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc"],
                 extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
-                                "-lbase", "-lpython2.7"]),
+                                "-lbase", "-lpython2.7"],
+                runtime_library_dirs=runtime_link),
       Extension('spartan.expr.tiling',
                 sources=['spartan/expr/tiling.cc'],
                 language='c++',
                 extra_compile_args=["-std=c++0x"],
-                extra_link_args=["-std=c++11", "-fPIC"]),
+                extra_link_args=["-std=c++11", "-fPIC"],
+                runtime_library_dirs=runtime_link),
 
       # Spartan extensions, cython part.
       Extension('spartan.rpc.serialization_buffer',
@@ -198,14 +211,16 @@ def setup_package():
                 ['spartan/array/sparse.pyx'],
                 language='c++',
                 extra_compile_args=["-std=c++0x", "-pipe"],
-                extra_link_args=["-std=c++11"]),
+                extra_link_args=["-std=c++11"],
+                runtime_library_dirs=runtime_link),
       Extension('spartan.config',
                 ['spartan/config.pyx'],
                 language='c++',
                 include_dirs=ext_include_dirs,
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lcore", "-pipe"],
-                extra_link_args=["-std=c++11", "-lcore"]),
+                extra_link_args=["-std=c++11", "-lcore"],
+                runtime_library_dirs=runtime_link),
 
       # Example extensions
       Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core.pyx']),
@@ -221,6 +236,11 @@ def setup_package():
   )
 
   fetch_from_src(metadata)
+
+  #See this link for explanation:
+  #https://groups.google.com/forum/#!topic/comp.lang.python/Nex7L-026uw
+  for scheme in INSTALL_SCHEMES.values():
+    scheme['data'] = scheme['purelib']
 
   try:
     print metadata
