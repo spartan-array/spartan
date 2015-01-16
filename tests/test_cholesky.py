@@ -24,12 +24,12 @@ def benchmark_cholesky(ctx, timer):
   #A = np.dot(A, A.T)
   #A = expr.force(from_numpy(A, tile_hint=(ARRAY_SIZE/n, ARRAY_SIZE/n)))
 
-  A = expr.randn(ARRAY_SIZE, ARRAY_SIZE, tile_hint=(ARRAY_SIZE/n, ARRAY_SIZE/n))
-  A = expr.dot(A, expr.transpose(A)).force()
+  A = expr.randn(ARRAY_SIZE, ARRAY_SIZE)
+  A = expr.dot(A, expr.transpose(A))
   
   util.log_warn('begin cholesky!')
   t1 = datetime.now()
-  L = cholesky(A).glom()
+  L = cholesky(A).optimized().glom()
   t2 = datetime.now()
   assert np.all(np.isclose(A.glom(), np.dot(L, L.T.conj())))
   cost_time = millis(t1,t2)

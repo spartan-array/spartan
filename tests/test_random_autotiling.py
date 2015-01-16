@@ -32,7 +32,8 @@ def gen_dot(a, b):
   if not hasattr(a, 'shape') or not hasattr(b, 'shape') or len(a.shape) * len(b.shape) == 0: return [a * b]
   
   if a.shape[0] == b.shape[0]:
-      return [expr.dot(expr.transpose(a), b)]
+    if len(a.shape) > 1: return [expr.dot(expr.transpose(a), b)]
+    elif len(b.shape) == 1: return [expr.dot(a, b)]
   
   if len(a.shape) > 1 and a.shape[1] == b.shape[0]:
       return [expr.dot(a, b)]
@@ -45,6 +46,19 @@ def gen_dot(a, b):
   
   return [a, b]
 
+def gen_map2_one(a):
+  if hasattr(a, 'shape') and len(a.shape) > 0:
+    return [expr.argsort(a, axis=random.randrange(len(a.shape)))]
+  return [a]
+  
+def gen_map2_two(a, b):
+  if len(a.shape) != len(b.shape): return [a, b]
+  
+  axis = random.randrange(len(a.shape))
+  for index, (dima, dimb) in enumerate(zip(a.shape, b.shape)):
+    if index != axis and dima != dimb: return [a, b]
+  return expr.concatenate(a, b, axis)
+   
 def fn1():
   M = random.choice([N/2, N, N*2])
   num_operators = random.randint(3, 6)
@@ -54,7 +68,6 @@ def fn1():
   funcs = [gen_reduce, gen_map, gen_dot]
   while len(operators) > 1:
     fn = random.choice(funcs)
-    
     ops = []
     for i in range(fn.func_code.co_argcount):
       op_idx = random.randrange(len(operators))
@@ -66,11 +79,26 @@ def fn1():
   return operators[0]
 
 def record_time(expr, alg):
+  print expr
   t1 = time.time()
-  expr.optimized().force()
+  expr.optimized()
   t2 = time.time()
 
   print alg, t2 - t1, '\n'
+
+def fn2():
+  a = expr.ones((N, N))
+  b = expr.ones((N, N))
+  x = expr.dot(a, b)
+  g = a + b + x
+  
+  return g
+
+def fn3():
+  a = expr.ones((N, N))
+  b = expr.ones((N, N/2))
+  g = expr.dot(a, b) + expr.dot(expr.sum(a, axis=1).reshape((1, N)), b)
+  return g
 
 #@with_ctx
 #def test_auto_tiling_opt(ctx):

@@ -259,7 +259,7 @@ def dot(a, b, tile_hint=None):
     if len(a.shape) == 1 and len(b.shape) == 1:
       if a.shape[0] != b.shape[0]:
         raise ValueError("objects are not aligned")
-      return map.map2((a, b), fn=dot_map2_vec_mapper, shape=(1, ), reducer=np.add)
+      return map.map2((a, b), (0, 0), fn=dot_map2_vec_mapper, shape=(1, ), reducer=np.add)
     elif len(a.shape) > 1 and len(b.shape) == 1:
       if a.shape[1] != b.shape[0]:
         raise ValueError("objects are not aligned")

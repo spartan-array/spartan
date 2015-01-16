@@ -336,7 +336,7 @@ class Map2Expr(Expr):
   fn = PythonValue
   fn_kw = PythonValue
   shape = Instance(tuple)
-  tile_hint = Instance(tuple)
+  tile_hint = PythonValue(None, desc="Tuple or None")
   dtype = PythonValue
   reducer = PythonValue
 

@@ -68,7 +68,7 @@ class OuterProductExpr(Expr):
   fn_kw = PythonValue
   shape = Instance(tuple)
   dtype = PythonValue
-  tile_hint = Instance(tuple)
+  tile_hint = PythonValue(None, desc="Tuple or None")
   reducer = PythonValue
 
   def pretty_str(self):
