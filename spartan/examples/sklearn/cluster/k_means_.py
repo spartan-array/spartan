@@ -114,7 +114,7 @@ class KMeans(object):
     self.n_clusters = n_clusters
     self.n_iter = n_iter
 
-  def fit(self, X, centers=None, implementation='outer'):
+  def fit(self, X, centers=None, implementation='map2'):
     """Compute k-means clustering.
 
     Parameters
