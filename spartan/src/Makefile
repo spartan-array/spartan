@@ -47,15 +47,15 @@ rpc: simple-rpc
 
 -include $(OBJS_CORE:.o=.d)
 $(OBJ_DIR)/bin/libcore.so: $(OBJS_CORE)
-	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach
+	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach -Wl,-rpath='$$ORIGIN'
 
 -include $(OBJS_ARRAY:.o=.d)
 $(OBJ_DIR)/bin/libspartan_array.so: $(OBJS_ARRAY)
-	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach -lcore
+	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach -lcore -Wl,-rpath='$$ORIGIN'
 
 -include $(OBJS_WORKER:.o=.d)
 $(OBJ_DIR)/bin/worker: $(OBJS_WORKER)
-	${CC} -o $@ $^ $(LDFLAGS) -lsimplerpc -lspartan_array -lcore
+	${CC} -o $@ $^ $(LDFLAGS) -lsimplerpc -lspartan_array -lcore -Wl,-rpath='$$ORIGIN/lib'
 
 #TODO: This needs to be updated
 clean:

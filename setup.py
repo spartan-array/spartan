@@ -3,6 +3,7 @@ import subprocess
 from distutils.core import setup, Extension, Command
 from Cython.Distutils import build_ext
 
+from distutils.sysconfig import get_python_lib
 from distutils.command.install import INSTALL_SCHEMES
 
 class clean(Command):
@@ -58,8 +59,8 @@ def pre_install():
   wfp.close()
 
   #Make marshal.py into .pyx for Cython use
-  subprocess.call("mv -i spartan/rpc/simplerpc/marshal.py \
-                          spartan/rpc/simplerpc/marshal.pyx", shell = True)
+#  subprocess.call("mv -i spartan/rpc/simplerpc/marshal.py \
+#                          spartan/rpc/simplerpc/marshal.pyx", shell = True)
 
 def fetch_from_src(dic):
   '''
@@ -81,7 +82,8 @@ def fetch_from_src(dic):
   #Copy all pylib/simplerpc/*.py into spartan/rpc/simplerpc
   path = os.getcwd()
   for f in os.listdir(os.path.join(path, 'spartan/rpc/simplerpc')):
-    if f.endswith('.py') and not 'marshal' in f:
+#    if f.endswith('.py') and not 'marshal' in f:
+    if f.endswith('.py'):
       src_rpc.append(os.path.join(os.path.join(path, 'spartan/rpc/simplerpc'), f))
 
   dic['data_files'] = [
@@ -109,8 +111,16 @@ def setup_package():
     'spartan.rpc',
   ]
 
+  #See this link for explanation:
+  #https://groups.google.com/forum/#!topic/comp.lang.python/Nex7L-026uw
+  for scheme in INSTALL_SCHEMES.values():
+    scheme['data'] = scheme['purelib']
+
   #Set dynamic runtime linkage
-  runtime_link = ["$ORIGIN"]
+  runtime_link = ["/home/gabrielwen/.local/lib/python2.7/site-packages/spartan/",
+                  "/home/gabrielwen/.local/lib/python2.7/site-packages/spartan/rpc",
+                  "/home/gabrielwen/.local/lib/python2.7/site-packages/spartan/rpc/simplerpc/",
+                  ]
 
   pkgs_dir = {p : p.replace('.', '/') for p in pkgs}
 
@@ -200,13 +210,16 @@ def setup_package():
       # Spartan extensions, cython part.
       Extension('spartan.rpc.serialization_buffer',
                 ['spartan/rpc/serialization_buffer.pyx'],
-                extra_compile_args=["-pipe"]),
+                extra_compile_args=["-pipe"],
+                runtime_library_dirs=runtime_link),
       Extension('spartan.rpc.cloudpickle',
                 ['spartan/rpc/cloudpickle.pyx'],
-                extra_compile_args=["-pipe"]),
-      Extension('spartan.rpc.simplerpc.marshal',
-                ['spartan/rpc/simplerpc/marshal.pyx'],
-                extra_compile_args=["-pipe"]),
+                extra_compile_args=["-pipe"],
+                runtime_library_dirs=runtime_link),
+#      Extension('spartan.rpc.simplerpc.marshal',
+#                ['spartan/rpc/simplerpc/marshal.pyx'],
+#                extra_compile_args=["-pipe"],
+#                runtime_library_dirs=runtime_link),
       Extension('spartan.array.sparse',
                 ['spartan/array/sparse.pyx'],
                 language='c++',
@@ -237,13 +250,9 @@ def setup_package():
 
   fetch_from_src(metadata)
 
-  #See this link for explanation:
-  #https://groups.google.com/forum/#!topic/comp.lang.python/Nex7L-026uw
-  for scheme in INSTALL_SCHEMES.values():
-    scheme['data'] = scheme['purelib']
-
   try:
     print metadata
+    print '\n', runtime_link
     setup(**metadata)
   finally:
     del sys.path[0]
