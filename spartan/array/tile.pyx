@@ -262,10 +262,10 @@ def merge(old_tile, subslice, update, reducer):
     # If the update shape is the same as the tile,
     # then avoid doing a (possibly expensive) slice update.
     if old_tile.data.shape == update.shape:
-      if reducer is not None:
+      if reducer is not None and old_tile.mask[np.unravel_index(0, old_tile.data.shape)]:
         old_tile.data = reducer(old_tile.data, update)
       else:
-        old_tile.data = update
+        old_tile.data = update.astype(old_tile.data.dtype)
       old_tile.mask = np.ones(old_tile.shape, dtype=np.bool)
     else:
       replaced = ~old_tile.mask[subslice]
@@ -284,6 +284,7 @@ def merge(old_tile, subslice, update, reducer):
       old_tile.mask[subslice] = True
   else:
     if old_tile.data is not None: #and old_tile.data.format == 'coo':
+      #old_tile.data = old_tile.data.tocsr()
       old_tile.data = old_tile.data.tolil()
     #util.log_info('Update dense to sparse')
     # TODO (SPARSE UPDATE)!!!

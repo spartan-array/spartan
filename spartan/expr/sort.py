@@ -3,6 +3,7 @@ from .ndarray import ndarray
 from ..array import extent
 from .tile_operation import tile_operation
 from .shuffle import shuffle
+from .map import map2
 from .base import force
 from .. import util
 from .. import rpc
@@ -70,11 +71,8 @@ def _fetch_sort_mapper(array, ex, partition_counts):
   yield extent.create((dst_idx,), (dst_idx+result.size,), (np.prod(array.shape),)), np.sort(result, axis=None)
 
 
-def _sort_mapper(array, ex, axis=None):
-  axis_ex = extent.change_partition_axis(ex, axis)
-  assert axis_ex is not None, "Spartan doesn't support sort for block partition"
-  tile = array.fetch(axis_ex)
-  yield axis_ex, np.sort(tile, axis=axis)
+def _sort_mapper(extents, tiles, axis=None):
+  yield extents[0], np.sort(tiles[0], axis=axis)
 
 
 def sort(array, axis=-1, sample_rate=0.1):
@@ -86,8 +84,11 @@ def sort(array, axis=-1, sample_rate=0.1):
     sample_rate(float): the sample rate.
   '''
   if axis is not None:
-    return shuffle(array, _sort_mapper, kw={'axis': axis},
-                   shape_hint=array.shape)
+    if axis < 0:
+      axis = len(array.shape) + axis
+    partition_axis = extent.largest_dim_axis(array.shape, exclude_axes=[axis])
+    return map2(array, partition_axis, fn=_sort_mapper,
+                fn_kw={'axis': axis}, shape=array.shape)
 
   array = force(array)
 
@@ -107,16 +108,34 @@ def sort(array, axis=-1, sample_rate=0.1):
   return sorted_array
 
 
-# TODO: Support partition with axis
+def _partition_mapper(extents, tiles, axis=None):
+  yield extents[0], np.partition(tiles[0], axis=axis)
+
+
 def partition(array, kth, axis=-1):
-  raise NotImplementedError
+  """
+  Return a partitioned copy of an array.
+
+  Args: array: DistArray or Expr
+    array to be sorted
+  kth:  int or list of ints
+    Index to partition by
+  axis:	int or None, optional
+    Axis along which to sort.
+
+  RETURN: ndarray expr
+  """
+  assert axis is not None, "Spartan doesn't support partition when axis == None now"
+  if axis is not None:
+    if axis < 0:
+      axis = len(array.shape) + axis
+    partition_axis = extent.largest_dim_axis(array.shape, exclude_axes=[axis])
+    return map2(array, partition_axis, fn=_partition_mapper,
+                fn_kw={'axis': axis}, shape=array.shape)
 
 
-def _argsort_mapper(array, ex, axis=None):
-  axis_ex = extent.change_partition_axis(ex, axis)
-  assert axis_ex is not None, "Spartan doesn't support argsort for block partition"
-  tile = array.fetch(axis_ex)
-  yield axis_ex, np.argsort(tile, axis=axis)
+def _argsort_mapper(extents, tiles, axis=None):
+  yield extents[0], np.argsort(tiles[0], axis=axis)
 
 
 def argsort(array, axis=-1):
@@ -127,17 +146,17 @@ def argsort(array, axis=-1):
     array(DistArray or Expr): array to be sorted
     axis(int): axis
   '''
-
   assert axis is not None, "Spartan doesn't support argsort when axis == None now"
-  return shuffle(array, _argsort_mapper, kw={'axis': axis},
-                 shape_hint=array.shape)
+  if axis is not None:
+    if axis < 0:
+      axis = len(array.shape) + axis
+    partition_axis = extent.largest_dim_axis(array.shape, exclude_axes=[axis])
+    return map2(array, partition_axis, fn=_argsort_mapper,
+                fn_kw={'axis': axis}, shape=array.shape)
 
 
-def _argpartition_mapper(array, ex, kth=None, axis=None):
-  axis_ex = extent.change_partition_axis(ex, axis)
-  assert axis_ex is not None, "Spartan doesn't support argpartition for block partition"
-  tile = array.fetch(axis_ex)
-  yield axis_ex, np.argpartition(tile, kth, axis=axis)
+def _argpartition_mapper(extents, tiles, axis=None):
+  yield extents[0], np.argpartition(tiles[0], axis=axis)
 
 
 def argpartition(array, kth, axis=-1):
@@ -150,5 +169,9 @@ def argpartition(array, kth, axis=-1):
     axis(int): axis
   '''
   assert axis is not None, "Spartan doesn't support argpartition when axis == None now"
-  return shuffle(array, _argsort_mapper, kw={'axis': axis},
-                 shape_hint=array.shape)
+  if axis is not None:
+    if axis < 0:
+      axis = len(array.shape) + axis
+    partition_axis = extent.largest_dim_axis(array.shape, exclude_axes=[axis])
+    return map2(array, partition_axis, fn=_argpartition_mapper,
+                fn_kw={'axis': axis}, shape=array.shape)

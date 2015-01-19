@@ -3,7 +3,7 @@ Operations for updating slices of arrays.
 
 To preserve the non-mutation semantics required for optimizations
 to be correct, writing to an array should not actually mutate the
-original array, but should instead create a new array with the 
+original array, but should instead create a new array with the
 appropriate region updated.  This code currently mutates arrays
 in place, and therefore should be used with care.
 '''
@@ -41,14 +41,14 @@ def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
   return LocalKernelResult(result=None, futures=futures)
 
 class WriteArrayExpr(Expr):
-  array = PythonValue(None, desc="DistArray or Expr") 
-  src_slices = PythonValue(None, desc="Slices or a tuple of slices") 
-  data = PythonValue(None, desc="np.ndarray or Expr") 
-  dst_slices = PythonValue(None, desc="Slices or a tuple of slices") 
+  array = PythonValue(None, desc="DistArray or Expr")
+  src_slices = PythonValue(None, desc="Slices or a tuple of slices")
+  data = PythonValue(None, desc="np.ndarray or Expr")
+  dst_slices = PythonValue(None, desc="Slices or a tuple of slices")
 
   def __str__(self):
     return 'WriteArrayExpr[%d] %s %s' % (self.expr_id, self.array, self.data)
-  
+
   def _evaluate(self, ctx, deps):
     array = deps['array']
     src_slices = deps['src_slices']
@@ -84,7 +84,7 @@ def write(array, src_slices, data, dst_slices):
   :param data: data
   :param dst_slices: slices for data
   :rtype: `Expr`
-  
+
   '''
   return WriteArrayExpr(array = array, src_slices = src_slices,
                         data = data, dst_slices = dst_slices)
@@ -420,7 +420,7 @@ def from_numpy(npa, tile_hint = None):
   '''
   if (not isinstance(npa, np.ndarray)) and (not sp.issparse(npa)):
     raise TypeError("Expected ndarray, got: %s" % type(npa))
-  
+
   # if the sparse type can't support slice, we need to convert it to another type.
   if sp.issparse(npa):
     npa = npa.tocsr()
@@ -430,4 +430,4 @@ def from_numpy(npa, tile_hint = None):
   slices = tuple([slice(0, i) for i in npa.shape])
 
   return write(array, slices, npa, slices)
-     
+

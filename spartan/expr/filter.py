@@ -15,12 +15,12 @@ from traits.api import Instance, PythonValue
 
 class FilterExpr(Expr):
   '''Represents an indexing operation.
-  
+
   Attributes:
     src: `Expr` to index into
-    idx: `tuple` (for slicing) or `Expr` (for bool/integer indexing) 
+    idx: `tuple` (for slicing) or `Expr` (for bool/integer indexing)
   '''
-  src = Instance(Expr) 
+  src = Instance(Expr)
   idx = PythonValue(None, desc="Tuple or Expr")
 
   def __init__(self, *args, **kw):
@@ -49,10 +49,10 @@ class FilterExpr(Expr):
 
 def _int_index_mapper(ex, src, idx, dst):
   '''Kernel function for indexing via an integer array.
-  
+
   Iterate over entries in ``idx`` and fetch the values
   from ``src``, writing into ``dst``.
-  
+
   Args:
     ex: `Extent` to process.
     src (DistArray):
@@ -78,9 +78,9 @@ def _int_index_mapper(ex, src, idx, dst):
 
 def _bool_index_mapper(ex, src, idx):
   '''Kernel function for boolean indexing.
-  
+
   Fetches the input file from ``src`` and applies the mask from ``idx``.
-  
+
   Args:
     ex: `Extent` to process.
     src (DistArray):
@@ -100,19 +100,19 @@ def _bool_index_mapper(ex, src, idx):
 def eval_index(ctx, src, idx):
   '''
   Index an array by another array (boolean or integer).
-  
+
   Args:
     ctx: `BlobCtx`
     src: :py:class:`DistArray` to read from
     idx: `DistArray` of bool or integer index.
-    
+
   Returns:
-    DistArray: The result of src[idx] 
+    DistArray: The result of src[idx]
   '''
 
   Assert.isinstance(idx, (np.ndarray, distarray.DistArray))
 
-  if idx.dtype == np.bool:
+  if idx.dtype == np.bool or idx.dtype == np.bool_:
     # return a new array masked by `idx`
     dst = src.map_to_array(_bool_index_mapper, kw={'src': src, 'idx': idx})
     return dst
@@ -127,4 +127,4 @@ def eval_index(ctx, src, idx):
     # map over it, fetching the appropriate values for each tile.
     return dst.map_to_array(_int_index_mapper, kw={'src': src, 'idx': idx, 'dst': dst})
 
-    
+

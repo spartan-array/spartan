@@ -13,12 +13,14 @@ from ..core import LocalKernelResult
 from .shuffle import target_mapper
 from traits.api import Instance, PythonValue
 
+
 def _tile_mapper(ex, **kw):
   user_fn = kw['_fn']
   fn_kw = kw['_fn_kw']
   base = kw['_base']
   base_ex = extent.create(ex.ul[::-1], ex.lr[::-1], base.shape)
   return user_fn(base_ex, **fn_kw)
+
 
 class Transpose(distarray.DistArray):
   '''Transpose the underlying array base.
@@ -44,24 +46,28 @@ class Transpose(distarray.DistArray):
   def tile_shape(self):
     return self.base.tile_shape()[::-1]
 
+  def view_extent(self, ex):
+    return extent.create(ex.ul[::-1], ex.lr[::-1], self.shape)
+
   def foreach_tile(self, mapper_fn, kw=None):
-    return self.base.foreach_tile(mapper_fn = _tile_mapper,
-                                  kw = {'_fn_kw' : kw,
-                                        '_base' : self,
-                                        '_fn' : mapper_fn})
+    return self.base.foreach_tile(mapper_fn=_tile_mapper,
+                                  kw={'_fn_kw': kw,
+                                      '_base': self,
+                                      '_fn': mapper_fn})
 
   def extent_for_blob(self, id):
     base_ex = self.base.blob_to_ex[id]
     return extent.create(base_ex.ul[::-1], base_ex.lr[::-1], self.base.shape)
-  
+
   def fetch(self, ex):
     base_ex = extent.create(ex.ul[::-1], ex.lr[::-1], self.base.shape)
     base_tile = self.base.fetch(base_ex)
     return base_tile.transpose()
 
+
 class TransposeExpr(Expr):
-  array = Instance(Expr) 
-  tile_hint = PythonValue(None, desc="Tuple or None") 
+  array = Instance(Expr)
+  tile_hint = PythonValue(None, desc="Tuple or None")
 
   def __str__(self):
     return 'Transpose[%d] %s' % (self.expr_id, self.array)
@@ -75,18 +81,18 @@ class TransposeExpr(Expr):
     # May raise NotShapeable
     return self.array.shape[::-1]
 
-def transpose(array, tile_hint = None):
+
+def transpose(array, tile_hint=None):
   '''
   Transpose ``array``.
-  
+
   Args:
     array: `Expr` to transpose.
-    
+
   Returns:
     `TransposeExpr`: Transpose array.
   '''
 
   array = lazify(array)
 
-  return TransposeExpr(array = array, tile_hint = tile_hint)
-
+  return TransposeExpr(array=array, tile_hint=tile_hint)
