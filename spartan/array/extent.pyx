@@ -162,9 +162,13 @@ cpdef create(ul, lr, array_shape):
   '''
   Create a new extent with the given coordinates and array shape.
 
-  :param ul: `tuple`:
-  :param lr:
-  :param array_shape:
+  :param ul: tuple
+    Tuple containing the top left coordinates (x, y)
+  :param lr: tuple
+    Tuple containing the bottom right coordinates (x, y)
+  :param array_shape: tuple
+    The shape of the underlying array (m_rows, n_cols)
+
   '''
   cdef TileExtent ex = TileExtent()
   ex._ul_len = len(ul)
