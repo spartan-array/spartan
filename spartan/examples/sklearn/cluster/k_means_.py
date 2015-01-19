@@ -49,13 +49,21 @@ def _find_cluster_mapper(inputs, ex, d_pts, old_centers,
   return []
 
 
-def kmeans_dist_mapper(ex_a, tile_a, ex_b, tile_b):
+def kmeans_outer_dist_mapper(ex_a, tile_a, ex_b, tile_b):
   points = tile_a
   centers = tile_b
-  target_ex = extent.create((ex_a.ul[0], ex_b.ul[0]),
-                            (ex_a.lr[0], ex_b.lr[0]),
-                            (ex_a.array_shape[0], ex_b.array_shape[0]))
-  yield target_ex, cdist(points, centers)
+  target_ex = extent.create((ex_a[0].ul[0], ),
+                            (ex_a[0].lr[0], ),
+                            (ex_a[0].array_shape[0], ))
+  yield target_ex, np.argmin(cdist(points, centers), axis=1)
+
+
+def kmeans_map2_dist_mapper(ex, tile, centers=None):
+  points = tile[0]
+  target_ex = extent.create((ex[0].ul[0], ),
+                            (ex[0].lr[0], ),
+                            (ex[0].array_shape[0], ))
+  yield target_ex, np.argmin(cdist(points, centers), axis=1)
 
 
 def kmeans_count_mapper(extents, tiles, centers_count):
@@ -88,6 +96,7 @@ def kmeans_center_mapper(extents, tiles, centers_count):
 
   yield target_ex, new_centers
 
+
 class KMeans(object):
   def __init__(self, n_clusters=8, n_iter=100):
     """K-Means clustering
@@ -118,14 +127,46 @@ class KMeans(object):
 
     labels = expr.zeros((num_points, 1), dtype=np.int)
 
-    if implementation == 'outer':
+    if implementation == 'map2':
+      if centers is None:
+        centers = np.random.rand(self.n_clusters, num_dim)
+
+      for i in range(self.n_iter):
+        labels = expr.map2(X, 0, fn=kmeans_map2_dist_mapper, fn_kw={"centers": centers},
+                           shape=(X.shape[0], ))
+
+        counts = expr.map2(labels, 0, fn=kmeans_count_mapper,
+                           fn_kw={'centers_count': self.n_clusters},
+                           shape=(centers.shape[0], ))
+        new_centers = expr.map2((X, labels), (0, 0), fn=kmeans_center_mapper,
+                                fn_kw={'centers_count': self.n_clusters},
+                                shape=(centers.shape[0], centers.shape[1]))
+        counts = counts.optimized().glom()
+        centers = new_centers.optimized().glom()
+
+        # If any centroids don't have any points assigined to them.
+        zcount_indices = (counts == 0).reshape(self.n_clusters)
+
+        if np.any(zcount_indices):
+          # One or more centroids may not have any points assigned to them,
+          # which results in their position being the zero-vector.  We reseed these
+          # centroids with new random values.
+          n_points = np.count_nonzero(zcount_indices)
+          # In order to get rid of dividing by zero.
+          counts[zcount_indices] = 1
+          centers[zcount_indices, :] = np.random.randn(n_points, num_dim)
+
+        centers = centers / counts.reshape(centers.shape[0], 1)
+      return centers, labels
+
+    elif implementation == 'outer':
       if centers is None:
         centers = expr.rand(self.n_clusters, num_dim)
 
       for i in range(self.n_iter):
-        distances = expr.outer((X, centers), (0, 0), fn=kmeans_dist_mapper,
-                               shape=(X.shape[0], centers.shape[0]))
-        labels = expr.argmin(distances, axis=1)
+        labels = expr.outer((X, centers), (0, None), fn=kmeans_outer_dist_mapper,
+                            shape=(X.shape[0],))
+        #labels = expr.argmin(distances, axis=1)
         counts = expr.map2(labels, 0, fn=kmeans_count_mapper,
                            fn_kw={'centers_count': self.n_clusters},
                            shape=(centers.shape[0], ))
