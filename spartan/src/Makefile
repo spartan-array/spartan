@@ -33,6 +33,7 @@ simple-rpc:
 	    git clone https://github.com/santazhang/simple-rpc $(RPC); \
 	    cp $(RPCDIR)/simple-rpc-wscript $(RPC)/wscript; \
 			cd $(RPCDIR) && patch -Np1 < $(CUR_DIR)/rpc/base-patch 2> /dev/null && cd -; \
+			patch $(RPC)/pylib/simplerpc/marshal.py < $(RPCDIR)/marshal-patch; \
 	fi
 
 rpc: simple-rpc
