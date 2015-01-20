@@ -27,7 +27,6 @@ class clean(Command):
 #Assume we are already under /home/..../spartan
 def pre_install():
   subprocess.call("make -C spartan/src", shell = True)
-  #FIXME: These two shell command needs to call like this?
   subprocess.call("mkdir -p spartan/rpc/simplerpc", shell = True)
   path = os.path.join(os.getcwd(), 'spartan/src/rpc/simple-rpc/pylib/simplerpc/')
   new_path = os.path.join(os.getcwd(), 'spartan/rpc/simplerpc')
@@ -257,8 +256,6 @@ def setup_package():
   fetch_from_src(metadata)
 
   try:
-    print metadata
-    print '\n', runtime_link
     setup(**metadata)
   finally:
     del sys.path[0]
