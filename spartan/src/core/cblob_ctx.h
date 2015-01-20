@@ -14,7 +14,7 @@ private:
     int32_t num_workers;
     std::unordered_map<int32_t, spartan::WorkerProxy*>* workers; // RPC connections to other workers in the computation.
     static int32_t RPC_TIMEOUT;
-    int32_t id_counter = 0;
+    int32_t id_counter;
 
     template<typename Q, typename R>
     rpc::Future* _send(int32_t worker_id, void (CWorker::*pLocalFunc)(const Q&, R*),
@@ -35,7 +35,7 @@ public:
     CBlobCtx(int32_t wid, std::unordered_map<int32_t, spartan::WorkerProxy*>* peers,
              CWorker* l_worker = NULL, bool o_workers = false)
                 : worker_id(wid), local_worker(l_worker), num_workers(peers->size()),
-                  workers(peers) {}
+                  workers(peers), id_counter(0) {}
 
     ~CBlobCtx() {}
 
