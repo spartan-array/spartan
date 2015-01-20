@@ -273,11 +273,11 @@ def dot(a, b, tile_hint=None):
 
     if a.shape[0] > a.shape[1]:
       # Use outer(join) to implement dot
-      util.log_debug('Using outer to do dot')
+      util.log_warn('Using outer to do dot')
       return outer.outer((a, b), (0, 1), dot_outer_mapper, shape=shape,
                          tile_hint=tile_hint, reducer=np.add)
     else:
       # Use map2(join) to implement dot
-      util.log_debug('Using map2 to do dot')
+      util.log_warn('Using map2 to do dot')
       return map.map2((a, b), (1, 0), dot_map2_mapper, shape=shape,
                       tile_hint=tile_hint, reducer=np.add)

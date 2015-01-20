@@ -32,7 +32,7 @@ import os
 import numpy as np
 
 #timeout for hearbeat messsage
-HEARTBEAT_TIMEOUT=100000000
+HEARTBEAT_TIMEOUT=1000
 _init_lock = rlock.FastRLock()
 
 class Worker(object):

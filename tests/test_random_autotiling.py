@@ -61,11 +61,11 @@ def gen_map2_two(a, b):
    
 def fn1():
   M = random.choice([N/2, N, N*2])
-  num_operators = random.randint(3, 6)
+  num_operators = random.randint(3, 5)
   operators = [gen_array((N, M)) for i in range(num_operators)]
   print 'num of perators', num_operators
   
-  funcs = [gen_reduce, gen_map, gen_dot]
+  funcs = [gen_reduce, gen_map, gen_dot, gen_map2_two]
   while len(operators) > 1:
     fn = random.choice(funcs)
     ops = []
@@ -79,7 +79,6 @@ def fn1():
   return operators[0]
 
 def record_time(expr, alg):
-  print expr
   t1 = time.time()
   expr.optimized()
   t2 = time.time()
@@ -107,6 +106,7 @@ def benchmark_autotiling(ctx, timer):
   for i in range(10):
     for fn in fns:
       expr = fn()
+      print expr
       #FLAGS.opt_collapse_cached = 0
       #FLAGS.opt_auto_tiling = 0
       #record_time(expr, 'orig time')

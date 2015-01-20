@@ -72,7 +72,7 @@ class OuterProductExpr(Expr):
   reducer = PythonValue
 
   def pretty_str(self):
-    return 'OuterProduct[%d]' % (self.expr_id)
+    return 'OuterProduct[%d](arrays=%s, axes=%s, fn=%s, tile_hint=%s)' % (self.expr_id, self.arrays.pretty_str(), self.axes, self.fn, self.tile_hint)
 
   def compute_shape(self):
     return self.shape
