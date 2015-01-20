@@ -68,11 +68,15 @@ def fetch_from_src(dic):
   '''
   path = os.path.join(os.getcwd(), 'spartan/src')
 
+  #From /src/pkg to spartan
+  src_pkg = []
+  for f in os.listdir(os.path.join(path, 'obj/pkg')):
+    src_pkg.append('spartan/src/obj/pkg/' + f)
 
-  #From /src/bin to spartan/
-  src_bin = []
-  for f in os.listdir(os.path.join(path, 'obj/bin')):
-    src_bin.append('spartan/src/obj/bin/' + f)
+  #From /src/lib to spartan/lib
+  src_lib = []
+  for f in os.listdir(os.path.join(path, 'obj/lib')):
+    src_lib.append('spartan/src/obj/lib/' + f)
 
   #From /src/rpc to spartan/rpc/simplerpc
   src_rpc = []
@@ -87,7 +91,8 @@ def fetch_from_src(dic):
       src_rpc.append(os.path.join(os.path.join(path, 'spartan/rpc/simplerpc'), f))
 
   dic['data_files'] = [
-                        ('spartan', src_bin),
+                        ('spartan', src_pkg),
+                        ('spartan/lib', src_lib),
                         ('spartan/rpc/simplerpc', src_rpc), 
                         ('spartan/rpc', ['spartan/src/rpc/service.py'])
                       ]
@@ -116,11 +121,14 @@ def setup_package():
   for scheme in INSTALL_SCHEMES.values():
     scheme['data'] = scheme['purelib']
 
-  #Set dynamic runtime linkage
-  runtime_link = ["/home/gabrielwen/.local/lib/python2.7/site-packages/spartan/",
-                  "/home/gabrielwen/.local/lib/python2.7/site-packages/spartan/rpc",
-                  "/home/gabrielwen/.local/lib/python2.7/site-packages/spartan/rpc/simplerpc/",
-                  ]
+  #Set rpath
+  runtime_link = {
+                    'spartan' : ['$ORIGIN/lib'],
+                    'spartan/lib' : ['$ORIGIN/../lib'],
+                    'spartan/expr' : ['$ORIGIN/../lib'],
+                    'spartan/array' : ['$ORIGIN/../lib'],
+                    'spartan/rpc' : ['$ORIGIN/../lib'],
+                  }
 
   pkgs_dir = {p : p.replace('.', '/') for p in pkgs}
 
@@ -130,7 +138,8 @@ def setup_package():
                       src_path + '/spartan/src/rpc/simple-rpc/build', ]
   ext_link_dirs = ['/usr/lib',
                   src_path + '/spartan/src/',
-                  src_path + '/spartan/src/obj/bin',
+                  src_path + '/spartan/src/obj/pkg',
+                  src_path + '/spartan/src/obj/lib',
                   src_path + '/spartan/src/obj/rpc',
                   src_path + '/spartan/src/rpc/simple-rpc/build/base',
                   src_path + '/spartan/src/rpc/simple-rpc/build', ]
@@ -173,7 +182,7 @@ def setup_package():
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lspartan_array"],
                 extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"],
-                runtime_library_dirs=runtime_link),
+                runtime_library_dirs=runtime_link['spartan/array']),
       Extension('spartan.array._ctile_py_if',
                 ['spartan/src/array/_ctile_py_if.cc'],
                 language='c++',
@@ -181,7 +190,7 @@ def setup_package():
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lsparta_array"],
                 extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"],
-                runtime_library_dirs=runtime_link),
+                runtime_library_dirs=runtime_link['spartan/array']),
       Extension('spartan._cblob_ctx_py_if',
                 ['spartan/src/core/_cblob_ctx_py_if.cc'],
                 language='c++',
@@ -190,7 +199,7 @@ def setup_package():
                 extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc", "-lcore"],
                 extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
                                 "-lbase", "-lcore", "-lpython2.7"],
-                runtime_library_dirs=runtime_link),
+                runtime_library_dirs=runtime_link['spartan']),
       Extension('spartan.rpc._rpc_array',
                 ['spartan/src/rpc/_rpc_array.cc'],
                 language='c++',
@@ -199,23 +208,21 @@ def setup_package():
                 extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc"],
                 extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
                                 "-lbase", "-lpython2.7"],
-                runtime_library_dirs=runtime_link),
+                runtime_library_dirs=runtime_link['spartan/rpc']),
       Extension('spartan.expr.tiling',
                 sources=['spartan/expr/tiling.cc'],
                 language='c++',
                 extra_compile_args=["-std=c++0x"],
                 extra_link_args=["-std=c++11", "-fPIC"],
-                runtime_library_dirs=runtime_link),
+                runtime_library_dirs=runtime_link['spartan/expr']),
 
       # Spartan extensions, cython part.
       Extension('spartan.rpc.serialization_buffer',
                 ['spartan/rpc/serialization_buffer.pyx'],
-                extra_compile_args=["-pipe"],
-                runtime_library_dirs=runtime_link),
+                extra_compile_args=["-pipe"]),
       Extension('spartan.rpc.cloudpickle',
                 ['spartan/rpc/cloudpickle.pyx'],
-                extra_compile_args=["-pipe"],
-                runtime_library_dirs=runtime_link),
+                extra_compile_args=["-pipe"]),
 #      Extension('spartan.rpc.simplerpc.marshal',
 #                ['spartan/rpc/simplerpc/marshal.pyx'],
 #                extra_compile_args=["-pipe"],
@@ -224,8 +231,7 @@ def setup_package():
                 ['spartan/array/sparse.pyx'],
                 language='c++',
                 extra_compile_args=["-std=c++0x", "-pipe"],
-                extra_link_args=["-std=c++11"],
-                runtime_library_dirs=runtime_link),
+                extra_link_args=["-std=c++11"]),
       Extension('spartan.config',
                 ['spartan/config.pyx'],
                 language='c++',
@@ -233,7 +239,7 @@ def setup_package():
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lcore", "-pipe"],
                 extra_link_args=["-std=c++11", "-lcore"],
-                runtime_library_dirs=runtime_link),
+                runtime_library_dirs=runtime_link['spartan']),
 
       # Example extensions
       Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core.pyx']),
