@@ -80,6 +80,8 @@ public:
 struct host {
     std::string name;
     int count;
+
+    host(std::string n, int c):name(n),count(c) {};
 };
 
 class HostListFlag : public CFlag {
@@ -102,7 +104,8 @@ public:
             hostname = host.substr(0, split);
             std::istringstream (host.substr(split + 1)) >> hostcount;
 
-            struct host h = {.name = hostname, .count = hostcount}              ;
+            struct host h(hostname, hostcount);
+            //struct host h = {.name = hostname, .count = hostcount}              ;
             val.push_back(h);
         }
     };
