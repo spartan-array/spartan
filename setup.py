@@ -1,6 +1,7 @@
 import os, sys
 import subprocess
-from distutils.core import setup, Extension, Command
+#from distutils.core import setup, Extension, Command
+from setuptools import setup, Extension, Command
 from Cython.Distutils import build_ext
 
 from distutils.sysconfig import get_python_lib
