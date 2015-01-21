@@ -5,7 +5,7 @@ virtualenv:
   system_site_packages: true
 before_install:
    - sudo apt-get update -qq
-   - sudo apt-get upgrade gcc -qq
+   - sudo apt-get install --only-upgrade gcc
    - sudo apt-get install python-numpy python-scipy libzmq3-dev
 install: 
   - LANG=C pip install pyzmq
