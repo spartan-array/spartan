@@ -21,14 +21,13 @@ class clean(Command):
     subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp", shell=True)
     subprocess.call("rm -rf spartan/array/*.so spartan/array/*.c spartan/array/*.cpp", shell=True)
     subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp spartan/rpc/simplerpc", shell=True)
-    subprocess.call("make -C spartan/src cleanall", shell=True)
+    subprocess.call("make -C spartan cleanall", shell=True)
     subprocess.call("rm -rf build", shell=True)
 
 #We need to build up src/ before setup invokes
 #Assume we are already under /home/..../spartan
 def pre_install():
-  subprocess.call("make -C spartan/src", shell = True)
-  subprocess.call("mkdir -p spartan/rpc/simplerpc", shell = True)
+  subprocess.call("make -C spartan", shell = True)
   path = os.path.join(os.getcwd(), 'spartan/src/rpc/simple-rpc/pylib/simplerpc/')
   new_path = os.path.join(os.getcwd(), 'spartan/rpc/simplerpc')
 
@@ -66,23 +65,17 @@ def fetch_from_src(dic):
   '''
   Append executables from /src/* into metadata
   '''
-  path = os.path.join(os.getcwd(), 'spartan/src')
+  #FIXME: Need to move executables to package location so that develop works
+  path = os.path.join(os.getcwd(), 'spartan')
 
-  #From /src/pkg to spartan
-  src_pkg = []
-  for f in os.listdir(os.path.join(path, 'obj/pkg')):
-    src_pkg.append('spartan/src/obj/pkg/' + f)
+  #Special record to include spartan/lib
+  lib_dir = []
+  for f in os.listdir(os.path.join(path, 'lib')):
+    lib_dir.append(os.path.join(os.path.join(path, 'lib'), f))
 
-  #From /src/lib to spartan/lib
-  src_lib = []
-  for f in os.listdir(os.path.join(path, 'obj/lib')):
-    src_lib.append('spartan/src/obj/lib/' + f)
+  path = os.path.join(path, 'src')
 
-  #From /src/rpc to spartan/rpc/simplerpc
   src_rpc = []
-  for f in os.listdir(os.path.join(path, 'obj/rpc')):
-    src_rpc.append('spartan/src/obj/rpc/' + f)
-
   #Copy all pylib/simplerpc/*.py into spartan/rpc/simplerpc
   path = os.getcwd()
   for f in os.listdir(os.path.join(path, 'spartan/rpc/simplerpc')):
@@ -91,8 +84,7 @@ def fetch_from_src(dic):
       src_rpc.append(os.path.join(os.path.join(path, 'spartan/rpc/simplerpc'), f))
 
   dic['data_files'] = [
-                        ('spartan', src_pkg),
-                        ('spartan/lib', src_lib),
+                        ('spartan/lib', lib_dir),
                         ('spartan/rpc/simplerpc', src_rpc), 
                         ('spartan/rpc', ['spartan/src/rpc/service.py'])
                       ]
@@ -137,10 +129,9 @@ def setup_package():
                       src_path + '/spartan/src/rpc/simple-rpc',
                       src_path + '/spartan/src/rpc/simple-rpc/build', ]
   ext_link_dirs = ['/usr/lib',
-                  src_path + '/spartan/src/',
-                  src_path + '/spartan/src/obj/pkg',
-                  src_path + '/spartan/src/obj/lib',
-                  src_path + '/spartan/src/obj/rpc',
+                  src_path + '/spartan',
+                  src_path + '/spartan/lib',
+                  src_path + '/spartan/rpc/simplerpc',
                   src_path + '/spartan/src/rpc/simple-rpc/build/base',
                   src_path + '/spartan/src/rpc/simple-rpc/build', ]
 
