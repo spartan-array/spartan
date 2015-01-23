@@ -21,7 +21,7 @@ class clean(Command):
     subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp", shell=True)
     subprocess.call("rm -rf spartan/array/*.so spartan/array/*.c spartan/array/*.cpp", shell=True)
     subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp spartan/rpc/service.py spartan/rpc/simplerpc", shell=True)
-    subprocess.call("make -C spartan cleanall", shell=True)
+    subprocess.call("make -C spartan clean", shell=True)
     subprocess.call("rm -rf build", shell=True)
 
 #We need to build up src/ before setup invokes
@@ -129,7 +129,10 @@ def setup_package():
 
   pkgs_dir = {p : p.replace('.', '/') for p in pkgs}
 
-  ext_include_dirs = ['/usr/local/include',
+  import numpy
+  numpy_path =  numpy.__path__[0] + '/core/include/'
+  ext_include_dirs = [numpy_path,
+                     '/usr/local/include',
                       src_path + '/spartan/src',
                       src_path + '/spartan/src/rpc/simple-rpc',
                       src_path + '/spartan/src/rpc/simple-rpc/build', ]
@@ -185,7 +188,7 @@ def setup_package():
                 include_dirs=ext_include_dirs,
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lsparta_array"],
-                extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"],
+                extra_link_args=["-std=c++11", "-lspartan_array", "-lcore", "-lbase", "-lpython2.7"],
                 runtime_library_dirs=runtime_link['spartan/array']),
       Extension('spartan._cblob_ctx_py_if',
                 ['spartan/src/core/_cblob_ctx_py_if.cc'],
