@@ -20,7 +20,7 @@ class clean(Command):
   def run(self):
     subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp", shell=True)
     subprocess.call("rm -rf spartan/array/*.so spartan/array/*.c spartan/array/*.cpp", shell=True)
-    subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp spartan/rpc/simplerpc", shell=True)
+    subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp spartan/rpc/service.py spartan/rpc/simplerpc", shell=True)
     subprocess.call("make -C spartan cleanall", shell=True)
     subprocess.call("rm -rf build", shell=True)
 
@@ -45,17 +45,21 @@ def pre_install():
 
   path = os.path.join(os.getcwd(), 'spartan/src/rpc/service.py')
   new_path = os.path.join(os.getcwd(), 'spartan/rpc/simplerpc/service.py')
+  second_path = os.path.join(os.getcwd(), 'spartan/rpc/service.py')
 
   rfp = open(path)
   wfp = open(new_path, 'w')
+  sfp = open(second_path, 'w')
 
   for line in rfp:
+    sfp.write(line)
     line = line.replace('simplerpc.', '.')
     line = line.replace('simplerpc ', '. ')
     wfp.write(line)
 
   rfp.close()
   wfp.close()
+  sfp.close()
 
   #Make marshal.py into .pyx for Cython use
 #  subprocess.call("mv -i spartan/rpc/simplerpc/marshal.py \
@@ -94,7 +98,8 @@ def setup_package():
   old_path = os.getcwd()
 
   #Calling Makefile in spartan/src
-  pre_install()
+  if not 'clean' in sys.argv:
+    pre_install()
 
   #Set Spartan source path first
   os.chdir(src_path)
@@ -245,7 +250,9 @@ def setup_package():
     },
   )
 
-  fetch_from_src(metadata)
+  #Fetch metadata from spartan/src
+  if not 'clean' in sys.argv:
+    fetch_from_src(metadata)
 
   try:
     setup(**metadata)
