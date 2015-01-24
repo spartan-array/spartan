@@ -14,7 +14,7 @@ from . import tiling
 import weakref
 
 from ..config import FLAGS, BoolFlag
-from ..array.distarray import DistArray
+from ..array.distarray import DistArray, DistArrayImpl
 from . import local
 from .filter import FilterExpr
 from .slice import SliceExpr
@@ -478,7 +478,7 @@ class AutomaticTiling(OptimizePass):
 
   name = 'auto_tiling'
   node_type = namedtuple('node_type', ['expr', 'tiling', 'children', 'parents'])
-  num_node_per_group = 6
+  num_node_per_group = 4
   inited = False
   cost_model = {'map':{(0, 0): 0, (0, 1): 1, (0, 2): 1, 
                        (0, 3): 1, (0, 4): 1, (0, 5): 2,
@@ -491,7 +491,14 @@ class AutomaticTiling(OptimizePass):
                        (4, 0): 0, (4, 1): 1, (4, 2): 0,
                        (4, 3): 1, (4, 4): 0, (4, 5): 1,
                        (5, 0): 1, (5, 1): 0, (5, 2): 0,
-                       (5, 3): 1, (5, 4): 1, (5, 5): 0}}
+                       (5, 3): 1, (5, 4): 1, (5, 5): 0},
+                'map2':{(0, 0): 0, (0, 1): 1, (0, 2): 1, (0, -1): 1,
+                        (1, 0): 1, (1, 1): 0, (1, 2): 1, (1, -1): 1,
+                        (2, 0): 1, (2, 1): 1, (2, 2): 0, (2, -1): 1,
+                        (3, 0): 0, (3, 1): 0, (3, 2): 1, (3, -1): 1,
+                        (4, 0): 0, (4, 1): 1, (4, 2): 0, (4, -1): 1,
+                        (5, 0): 1, (5, 1): 0, (5, 2): 0, (5, -1): 1}
+                }
   
   def init(self, expr):
     self.cur_node_id = 1
@@ -573,10 +580,9 @@ class AutomaticTiling(OptimizePass):
     child_ids = self.visit_children([largest])
     other_child_ids = self.visit_children(expr.children.vals, largest)
     kw_ids = self.visit_children(expr.op.kw['fn_kw'].itervalues()) if 'fn_kw' in expr.op.kw else []
-    isBlockRegion = True if 'region' in expr.op.kw and expr.op.kw['region'][0].shape[0] != expr.shape[0] and expr.op.kw['region'][0].shape[1] != expr.shape[1] else False
     
     # one input map, reuse child expr
-    if len(other_child_ids) == 0 and not isBlockRegion:
+    if len(other_child_ids) == 0:
       for child_id in child_ids: self.nodes[child_id].expr.append(expr)
       return child_ids
 
@@ -590,7 +596,7 @@ class AutomaticTiling(OptimizePass):
 
     for (tiling_type, map_child_id) in zip(tiling_types, child_ids):
       self.nodes[self.cur_node_id] = self.node_type([expr], tiling_type, [], [])
-      self.add_edge(map_child_id, self.cur_node_id, reduce(operator.mul, expr.shape, 1) if isBlockRegion and tiling_type != 2 else 0)
+      self.add_edge(map_child_id, self.cur_node_id, 0)
 
       for child_id in other_child_ids:
         child = self.nodes[child_id]
@@ -621,12 +627,14 @@ class AutomaticTiling(OptimizePass):
     
     copy_nodes = []
     for axis, child_ids in zip(expr.axes, child_id_groups):
+      if isinstance(axis, tuple): axis = 2
+      if axis is None: axis = -1
       self.nodes[self.cur_node_id] = self.node_type([expr], axis, [], [])
       
       cost = reduce(operator.mul, self.nodes[child_ids[0]].expr[0].shape, 1)
       for child_id in child_ids:
         child = self.nodes[child_id]
-        e_cost = 0 if axis is not None and (axis == (child.tiling % 4) or child.tiling == 3) else cost
+        e_cost = self.cost_model['map2'][(child.tiling, axis)] * cost
         self.add_edge(child_id, self.cur_node_id, e_cost)
     
       if len(copy_nodes) > 0: self.add_edge(self.cur_node_id, copy_nodes[0], 0)
@@ -639,7 +647,7 @@ class AutomaticTiling(OptimizePass):
       child_ids = [] 
       for tiling_type in range(self.num_node_per_group):
         self.nodes[self.cur_node_id] = self.node_type([expr], tiling_type, [], [])
-        self.add_edge(inter_node_id, self.cur_node_id, e_cost)
+        self.add_edge(inter_node_id, self.cur_node_id, (tiling_type / 3 + 1) * e_cost)
         child_ids.append(self.cur_node_id)  
         self.cur_node_id += 1
       self.add_split_nodes(child_ids)
@@ -675,7 +683,7 @@ class AutomaticTiling(OptimizePass):
       child_ids = []
       for tiling_type in range(self.num_node_per_group):
         self.nodes[self.cur_node_id] = self.node_type([expr], tiling_type, [], [])
-        self.add_edge(inter_node_id, self.cur_node_id, e_cost)
+        self.add_edge(inter_node_id, self.cur_node_id, (tiling_type / 3 + 1) * e_cost)
         child_ids.append(self.cur_node_id)  
         self.cur_node_id += 1
       self.add_split_nodes(child_ids)
@@ -911,11 +919,11 @@ class AutomaticTiling(OptimizePass):
     if isinstance(expr, (NdArrayExpr, ReduceExpr, Map2Expr, OuterProductExpr)) and len(expr.shape) > 0:
       expr.tile_hint = list(expr.shape)
       if tiling >= 3: # duplicate tiling
-        print 'dup_tiling', tiling, expr
+        print 'dup_tiling', tiling
       elif tiling == 2 and len(expr.shape) > 1: # block tiling
         expr.tile_hint[0] = int(math.ceil(float(expr.tile_hint[0]) / math.sqrt(FLAGS.num_workers)))
         expr.tile_hint[1] = int(math.ceil(float(expr.tile_hint[1]) / math.sqrt(FLAGS.num_workers)))
-        print 'block_tiling', expr.tile_hint, expr
+        print 'block_tiling', expr.tile_hint, expr.expr_id
       elif len(expr.shape) > tiling:
         expr.tile_hint[tiling] = int(math.ceil(float(expr.tile_hint[tiling]) / FLAGS.num_workers))
 
@@ -973,7 +981,7 @@ class AutomaticTiling(OptimizePass):
     if hasattr(expr, 'children'):
       for child in expr.children.vals:
         self.tile_cached_expr(child)
-    if hasattr(expr, 'fn_kw'):
+    if hasattr(expr, 'fn_kw') and expr.fn_kw is not None:
       for child in expr.fn_kw.itervalues():
         self.tile_cached_expr(child)
     if hasattr(expr, 'op') and 'fn_kw' in expr.op.kw:
@@ -997,7 +1005,7 @@ class AutomaticTiling(OptimizePass):
         node = self.nodes[node_id]
         node.expr.append(expr)
 
-    elif isinstance(expr, DistArray) or isinstance(expr, (Val, AsArray)) and isinstance(expr.val, DistArray):
+    elif isinstance(expr, DistArrayImpl) or (isinstance(expr, (Val, AsArray)) and isinstance(expr.val, DistArrayImpl)):
       # already partitioned array
       array = expr if isinstance(expr, DistArray) else expr.val
       tile_shape = array.tile_shape()

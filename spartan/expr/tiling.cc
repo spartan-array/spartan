@@ -5,7 +5,7 @@
 #include <list>
 #include <set>
 
-#define NUM_NODE_PER_GROUP 6
+#define NUM_NODE_PER_GROUP 4
 const int eMax = 1000000;
 const int nMax = 5000;
 const int INF = 1000000000;
@@ -59,7 +59,7 @@ void init_graph(PyObject *args) {
 	group_id = 0;
 	list = PyTuple_GetItem(args, 2);
 	for (pos = 0; pos < PyList_Size(list); pos++) {
-		PyArg_ParseTuple(PyList_GetItem(list, pos), "iiiiii", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5]);
+		PyArg_ParseTuple(PyList_GetItem(list, pos), "iiii", &v[0], &v[1], &v[2], &v[3]);
 		for (int i = 0; i < NUM_NODE_PER_GROUP; i++) {
 			groups[group_id][i] = v[i];
 			split_nodes[v[i]] = group_id;
@@ -197,6 +197,25 @@ long calc_cost(int s, int t) {
 	return cost;
 }
 
+long view_cost(int u, int j) {
+	if (split_nodes.find(edge[j].v) == split_nodes.end()) return edge[j].cost;
+
+	int i, edge_count = 0;
+	for (i = head[u]; i != -1; i = edge[i].next) {
+		if (split_nodes.find(edge[i].v) != split_nodes.end() && split_nodes[edge[i].v] == split_nodes[edge[j].v])
+			edge_count ++;
+	}
+
+	if (edge_count == 1 && edge[j].cost == 0) {
+        //printf("%d %d is view node\n", u, edge[j].v);
+		long cost = 0;
+		for (int l = head[edge[j].v]; l != -1; l = edge[l].next)
+			cost += view_cost(edge[j].v, l);
+        return cost;
+	}
+	return edge[j].cost;
+}
+
 static PyObject* maxedge_tiling(PyObject *self, PyObject *args) {
 	init_graph(args);
 
@@ -214,7 +233,7 @@ static PyObject* maxedge_tiling(PyObject *self, PyObject *args) {
     	cost = 0;
     	for (k = 0; k < NUM_NODE_PER_GROUP; k++) {
     		u = groups[i][k];
-    		for (j = head[u]; j != -1; j = edge[j].next) cost += edge[j].cost;
+    		for (j = head[u]; j != -1; j = edge[j].next) cost += view_cost(u, j);
     		for (j = tail[u]; j != -1; j = edge[j].prev) cost += edge[j].cost;
     	}
     	max_heap.push(std::make_pair(i, cost));
@@ -225,66 +244,40 @@ static PyObject* maxedge_tiling(PyObject *self, PyObject *args) {
 	memset(vis, true, sizeof(vis));
 
 	int min_u;
-	long min_cost, min_edge;
+	long min_cost;
 	std::pair<int, long> u_cost;
-	std::set<int> vis_groups;
 	while ((u_cost = max_heap.top()).second >= 0) {
 		max_heap.pop();
 
+        min_u = 0;
 		min_cost = -1;
 		for (k = 0; k < NUM_NODE_PER_GROUP; k++) {
 			u = groups[u_cost.first][k];
 			vis[u] = false;
 
 			cost = 0;
-			vis_groups.clear();
 			for (j = head[u]; j != -1; j = edge[j].next) {
 				if (!vis[edge[j].v]) {
-					for (i = 0; i < NUM_NODE_PER_GROUP; i++)
-						if (vis[groups[split_nodes[edge[j].v]][i]]) break;
+					for (i = 0; i < NUM_NODE_PER_GROUP && !vis[groups[split_nodes[edge[j].v]][i]]; i++);
 					int choose_v = groups[split_nodes[edge[j].v]][i];
 					for (i = head[u]; i != -1 && edge[i].v != choose_v; i = edge[i].next);
 
 					if (i == -1) break; else continue;
 				}
-				min_edge = edge[j].cost;
-				if (split_nodes.find(edge[j].v) != split_nodes.end()) {
-					if (vis_groups.find(split_nodes[edge[j].v]) != vis_groups.end()) continue;
-
-					for (i = edge[j].next; i != -1; i = edge[i].next)
-						if (split_nodes.find(edge[i].v) != split_nodes.end() &&
-								split_nodes[edge[i].v] == split_nodes[edge[j].v] &&
-								edge[i].cost < min_edge)
-							min_edge = edge[i].cost;
-				    vis_groups.insert(split_nodes[edge[j].v]);
-				}
-				cost += min_edge;
+				cost += view_cost(u, j);
 			}
 
 			if (j != -1) continue;
 
-		    vis_groups.clear();
 			for (j = tail[u]; j != -1; j = edge[j].prev) {
 				if (!vis[edge[j].u]) {
-					for (i = 0; i < NUM_NODE_PER_GROUP; i++)
-						if (vis[groups[split_nodes[edge[j].u]][i]]) break;
-					int choose_v = groups[split_nodes[edge[j].u]][i];
-					for (i = tail[u]; i != -1 && edge[i].u != choose_v; i = edge[i].prev);
+					for (i = 0; i < NUM_NODE_PER_GROUP && !vis[groups[split_nodes[edge[j].u]][i]]; i++);
+					int choose_u = groups[split_nodes[edge[j].u]][i];
+					for (i = tail[u]; i != -1 && edge[i].u != choose_u; i = edge[i].prev);
 
 					if (i == -1) break; else continue;
 				}
-				min_edge = edge[j].cost;
-				if (split_nodes.find(edge[j].u) != split_nodes.end()) {
-					if (vis_groups.find(split_nodes[edge[j].u]) != vis_groups.end()) continue;
-
-					for (i = edge[j].prev; i != -1; i = edge[i].prev)
-						if (split_nodes.find(edge[i].u) != split_nodes.end() &&
-								split_nodes[edge[i].u] == split_nodes[edge[j].u] &&
-								edge[i].cost < min_edge)
-							min_edge = edge[i].cost;
-				    vis_groups.insert(split_nodes[edge[j].u]);
-				}
-				cost += min_edge;
+				cost += edge[j].cost;
 			}
 
 			if (j != -1) continue;

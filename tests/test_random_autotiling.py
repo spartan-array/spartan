@@ -46,26 +46,21 @@ def gen_dot(a, b):
   
   return [a, b]
 
-def gen_map2_one(a):
-  if hasattr(a, 'shape') and len(a.shape) > 0:
-    return [expr.argsort(a, axis=random.randrange(len(a.shape)))]
-  return [a]
-  
-def gen_map2_two(a, b):
-  if len(a.shape) != len(b.shape): return [a, b]
+def gen_map2(a, b):
+  if len(a.shape) * len(b.shape) <= 1 or len(a.shape) != len(b.shape): return [a, b]
   
   axis = random.randrange(len(a.shape))
   for index, (dima, dimb) in enumerate(zip(a.shape, b.shape)):
     if index != axis and dima != dimb: return [a, b]
-  return expr.concatenate(a, b, axis)
-   
+  return [expr.concatenate(a, b, axis)]
+
 def fn1():
   M = random.choice([N/2, N, N*2])
-  num_operators = random.randint(3, 5)
+  num_operators = random.randint(2, 4)
   operators = [gen_array((N, M)) for i in range(num_operators)]
   print 'num of perators', num_operators
   
-  funcs = [gen_reduce, gen_map, gen_dot, gen_map2_two]
+  funcs = [gen_reduce, gen_map, gen_dot, gen_map2]
   while len(operators) > 1:
     fn = random.choice(funcs)
     ops = []
@@ -73,14 +68,16 @@ def fn1():
       op_idx = random.randrange(len(operators))
       ops.append(operators[op_idx])
       del operators[op_idx]
-    
     operators.extend(fn(*ops))
-  
+    if random.random() > 0.8:
+      operators.append(random.choice(ops))
+    #print 'operators.size', len(operators)
+    
   return operators[0]
 
 def record_time(expr, alg):
   t1 = time.time()
-  expr.optimized()
+  expr.optimized().force()
   t2 = time.time()
 
   print alg, t2 - t1, '\n'
@@ -125,9 +122,9 @@ def benchmark_autotiling(ctx, timer):
       FLAGS.tiling_alg = 'best'
       record_time(expr, 'best time')
       
-      eval_cache.clear()
-      FLAGS.tiling_alg = 'worse'
-      record_time(expr, 'worse time')
+      #eval_cache.clear()
+      #FLAGS.tiling_alg = 'worse'
+      #record_time(expr, 'worse time')
  
 if __name__ == '__main__':
   test_common.run(__file__)

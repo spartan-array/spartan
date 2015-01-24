@@ -543,12 +543,13 @@ def change_partition_axis(ex, axis):
 
     old_axes = partition_axes(ex)
     if len(old_axes) > 1:
-      # TODO: Changing from grid tiling to one-dimensional tiling.
-      util.log_warn("change_partition_axis doesn't know how to change "
-                    "from block partition to one-dimension partition %s",
-                    str((axis, old_axes, ex.shape, ex.array_shape)))
-      print ex, ex.array_shape
-      raise NotImplementedError
+      # Changing from grid tiling to one-dimensional tiling.
+      blk_idx = (ex.ul[0]/ex.shape[0]) * util.divup(ex.array_shape[1], ex.shape[1]) + ex.ul[1]/ex.shape[1]
+      ul = [0, 0]
+      lr = list(ex.array_shape)
+      ul[axis] = blk_idx
+      lr[axis] = blk_idx+1
+      return create(ul, lr, ex.array_shape)
 
     if len(old_axes) == 0 or old_axes[0] == axis:
       return ex
