@@ -23,19 +23,12 @@ def benchmark_cholesky(ctx, timer):
   #A = np.dot(A, A.T)
   #A = expr.force(from_numpy(A, tile_hint=(ARRAY_SIZE/n, ARRAY_SIZE/n)))
 
-  #A = expr.randn(ARRAY_SIZE, ARRAY_SIZE, tile_hint=(ARRAY_SIZE/n, ARRAY_SIZE/n))
   A = expr.randn(ARRAY_SIZE, ARRAY_SIZE)
-  # FIXME: Ideally we should be able to get rid of tile_hint.
-  #        However, current extent.change_partition_axis relies on the
-  #        information of one-dimentional size to change tiling to grid tiling.
-  #        It assumes that every extent should be partitioned in the same size.
-  #        Trace extent.pyx to think about how to fix it!
-  A = expr.dot(A, expr.transpose(A), tile_hint=(ARRAY_SIZE,
-                                                ARRAY_SIZE / ctx.num_workers)).force()
-
+  A = expr.dot(A, expr.transpose(A))
+  
   util.log_warn('begin cholesky!')
   t1 = datetime.now()
-  L = cholesky(A).glom()
+  L = cholesky(A).optimized().glom()
   t2 = datetime.now()
   assert np.all(np.isclose(A.glom(), np.dot(L, L.T.conj())))
   cost_time = millis(t1, t2)

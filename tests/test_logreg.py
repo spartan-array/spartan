@@ -6,7 +6,7 @@ import time
 
 N_EXAMPLES = 100
 N_DIM = 3
-ITERATION = 5
+ITERATION = 2
 
 class TestLogisticRegression(test_common.ClusterTest):
   def test_logreg(self):
