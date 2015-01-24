@@ -107,7 +107,6 @@ class SliceExpr(base.Expr):
       src_shape = self.src.compute_shape()
       ex = extent.from_shape(src_shape)
       slice_ex = extent.compute_slice(ex, self.idx)
-      if slice_ex is None: print 'slice_ex is None', ex, self.idx
       return slice_ex.shape
     else:
       raise base.NotShapeable
