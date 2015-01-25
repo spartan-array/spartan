@@ -1,9 +1,11 @@
 #include <Python.h>
 #include <unordered_map>
+#include <map>
 #include <queue>
 #include <algorithm>
 #include <list>
 #include <set>
+#include <iostream>
 
 #define NUM_NODE_PER_GROUP 4
 const int eMax = 1000000;
@@ -18,6 +20,7 @@ struct Edge {
 int e, t, head[nMax], tail[nMax];
 long mincost, dis[nMax];
 bool vis[nMax];
+bool visited_groups[nMax];
 
 int group_id, groups[nMax][NUM_NODE_PER_GROUP];
 std::unordered_map<int, int> split_nodes;
@@ -197,65 +200,171 @@ long calc_cost(int s, int t) {
 	return cost;
 }
 
-long view_cost(int u, int j) {
-	if (split_nodes.find(edge[j].v) == split_nodes.end()) return edge[j].cost;
+std::map<std::vector<int>, bool > view_pairs;
+void init_view_pairs(void)
+{
+    int i, j, u, k;
+    for (i = 0; i < group_id; i++) {
+        for (j = i + 1; j < group_id; j++) {
+            bool has_matched[NUM_NODE_PER_GROUP];
+            bool is_view = true;
+            for (k = 0 ; k < NUM_NODE_PER_GROUP; k++) 
+                has_matched[k] = false;
+            for (k = 0 ; k < NUM_NODE_PER_GROUP && is_view; k++) {
+    		    u = groups[i][k];
+                for (int e = head[u]; e != -1 && is_view; e = edge[e].next) {
+                    if (split_nodes.find(edge[e].v) != split_nodes.end() &&
+                        split_nodes[edge[e].v] == j) {
+                        int l;
+                        for (l = 0 ; l < NUM_NODE_PER_GROUP ; l++) 
+                            if (groups[j][l] == edge[e].v)
+                                break;
+                        if (not has_matched[l]) {
+                            has_matched[l] = true;
+                        } else {
+                            is_view = false;
+                        }
+                        break;
+                    }
+                }
+            }
+            for (k = 0 ; k < NUM_NODE_PER_GROUP; k++) 
+                if (not has_matched[k])
+                    is_view = false;
+            if (is_view) {
+                std::vector<int> pair;
+                pair.push_back(i); 
+                pair.push_back(j);
+                //printf("view node %d %d\n", i, j);
+                view_pairs.insert(std::make_pair(pair, true));
+            }
+        }
+    }
+}
 
-	int i, edge_count = 0;
-	for (i = head[u]; i != -1; i = edge[i].next) {
-		if (split_nodes.find(edge[i].v) != split_nodes.end() && split_nodes[edge[i].v] == split_nodes[edge[j].v])
-			edge_count ++;
-	}
+long view_cost(int u, int j) {
+    /*
+    std::vector<int> pair;
+    pair.push_back(split_nodes[u]);
+    pair.push_back(split_nodes[edge[j].v]);
+    if (pair[0] > pair[1]) {
+        int t = pair[1];
+        pair[1] = pair[0];
+        pair[0] = t;
+    }
+    if (view_pairs.find(pair) == view_pairs.end()) {
+        return 0;
+    }
+    */
+
+    if (split_nodes.find(edge[j].v) == split_nodes.end()) return edge[j].cost;
+
+    int i, edge_count = 0;
+    for (i = head[u]; i != -1; i = edge[i].next) {
+        if (split_nodes.find(edge[i].v) != split_nodes.end() && split_nodes[edge[i].v] == split_nodes[edge[j].v])
+            edge_count ++;
+    }
 
 	if (edge_count == 1 && edge[j].cost == 0) {
-        //printf("%d %d is view node\n", u, edge[j].v);
+        //printf("%d %d is view node\n", split_nodes[u], split_nodes[edge[j].v]);
 		long cost = 0;
 		for (int l = head[edge[j].v]; l != -1; l = edge[l].next)
 			cost += view_cost(edge[j].v, l);
         return cost;
 	}
 	return edge[j].cost;
+	//return 0;
 }
 
 static PyObject* maxedge_tiling(PyObject *self, PyObject *args) {
 	init_graph(args);
+    init_view_pairs();
 
     struct Compare {
-    	bool operator()(const std::pair<int, long>& e1, const std::pair<int, long>& e2) const {
-    		return e1.second <= e2.second;
+    	bool operator()(const std::pair<int, std::vector<long> >& e1, const std::pair<int, std::vector<long> >& e2) const {
+    	    if (e1.second[0] < e2.second[0])
+    	        return true;
+            else if (e1.second[0] > e2.second[0])
+                return false;
+            else 
+                return e1.second[1] <= e2.second[1];
     	}
     };
-    std::priority_queue<std::pair<int, long>, std::vector<std::pair<int, long>>, Compare> max_heap;
+    std::priority_queue<std::pair<int, std::vector<long> >, std::vector<std::pair<int, std::vector<long> > >, Compare> max_heap;
 
     int i, j, k, u;
     long cost;
+
+    std::vector<std::map<int, int> > connectivity_table;
+    std::vector<int> connectivity;
+    for (i = 0; i < group_id; i++) {
+        connectivity.push_back(0);
+        std::map <int, int> m;
+        connectivity_table.push_back(m);
+    }
+        
+    for (i = 0; i < e ; i++) {
+        int u = edge[i].u;
+        int v = edge[i].v;
+        // Ignore source and terminal
+        if (u == 0 or v == 0 or head[u] == -1 or head[v] == -1)
+            continue;
+        while (split_nodes.find(u) == split_nodes.end()) {
+            u = edge[head[u]].v;
+        }
+        while (split_nodes.find(v) == split_nodes.end()) {
+            v = edge[head[v]].v;
+        }
+        u = split_nodes[u];
+        v = split_nodes[v];
+        if (u < v) {
+            connectivity_table[u][v] = 1;
+        } else if (u > v) {
+            connectivity_table[v][u] = 1;
+        }
+    }
+    for (i = 0; i < group_id; i++) {
+        connectivity[i] += connectivity_table[i].size();
+        for (auto it = connectivity_table[i].begin(); it != connectivity_table[i].end(); ++it) 
+            connectivity[it->first] += 1;
+    }
 
     for (i = 0; i < group_id; i++) {
     	cost = 0;
     	for (k = 0; k < NUM_NODE_PER_GROUP; k++) {
     		u = groups[i][k];
-    		for (j = head[u]; j != -1; j = edge[j].next) cost += view_cost(u, j);
+            for (j = head[u]; j != -1; j = edge[j].next) cost += view_cost(u, j);
     		for (j = tail[u]; j != -1; j = edge[j].prev) cost += edge[j].cost;
     	}
-    	max_heap.push(std::make_pair(i, cost));
+        std::vector<long> weight;
+        weight.push_back(connectivity[i]);
+        printf("coonectivity %d\n", connectivity[i]);
+        weight.push_back(cost);
+    	max_heap.push(std::make_pair(i, weight));
 
     }
-    max_heap.push(std::make_pair(group_id, -1));
+    std::vector<long> weight;
+    weight.push_back(0);
+    weight.push_back(-1);
+    max_heap.push(std::make_pair(group_id, weight));
 
 	memset(vis, true, sizeof(vis));
+	memset(visited_groups, false, sizeof(visited_groups));
 
 	int min_u;
 	long min_cost;
-	std::pair<int, long> u_cost;
-	while ((u_cost = max_heap.top()).second >= 0) {
+	std::pair<int, std::vector<long> > u_cost;
+	while ((u_cost = max_heap.top()).second[1] >= 0) {
 		max_heap.pop();
 
-        min_u = 0;
+        min_u = -1;
 		min_cost = -1;
 		for (k = 0; k < NUM_NODE_PER_GROUP; k++) {
 			u = groups[u_cost.first][k];
 			vis[u] = false;
 
 			cost = 0;
+            /*
 			for (j = head[u]; j != -1; j = edge[j].next) {
 				if (!vis[edge[j].v]) {
 					for (i = 0; i < NUM_NODE_PER_GROUP && !vis[groups[split_nodes[edge[j].v]][i]]; i++);
@@ -277,17 +386,90 @@ static PyObject* maxedge_tiling(PyObject *self, PyObject *args) {
 
 					if (i == -1) break; else continue;
 				}
+				if (u_cost.first == 5 and k == 3) {
+				    printf("==> %d %ld\n", j, edge[j].cost);
+                }
 				cost += edge[j].cost;
 			}
+			*/
 
-			if (j != -1) continue;
+            std::unordered_map<int, bool> caculated_groups;
+            int hedge, tedge;
+            for (hedge = head[u]; hedge != -1; hedge = edge[hedge].prev) {
+                int to_group = split_nodes[edge[hedge].v];
+                if (caculated_groups.find(to_group) != caculated_groups.end())
+                    continue;
+                if (visited_groups[to_group]) {
+                    int candidate;
+                    for (candidate = head[u]; candidate != -1 ; candidate = edge[candidate].prev) {
+                        if (split_nodes[edge[candidate].v] == to_group &&
+                                        vis[edge[candidate].v]) {
+                            break;
+                        }
+                    }
+                    if (candidate == -1) {
+                        cost = -1;
+                        break;
+                    }
+                    cost += edge[candidate].cost;
+                    caculated_groups[to_group] = true;
+                } else {
+                    int candidate_cost = INT_MAX;
+                    for (int c = head[u]; c != -1 ; c = edge[c].next) {
+                        if (split_nodes[edge[c].v] == to_group &&
+                            view_cost(u, c) < candidate_cost) {
+                            candidate_cost = edge[c].cost;
+                        }
+                    }
+                    cost += candidate_cost;
+                    caculated_groups[to_group] = true;
+                }
+            }
+			if (caculated_groups.size() == 0 or cost == -1) 
+			    continue;
 
+            caculated_groups.clear();
+            for (tedge = tail[u]; tedge != -1; tedge = edge[tedge].prev) {
+                int from_group = split_nodes[edge[tedge].u];
+                if (caculated_groups.find(from_group) != caculated_groups.end())
+                    continue;
+                if (visited_groups[from_group]) {
+                    int candidate;
+                    for (candidate = tail[u]; candidate != -1 ; candidate = edge[candidate].prev) {
+                        if (split_nodes[edge[candidate].u] == from_group &&
+                            vis[edge[candidate].u]) {
+                            break;
+                        }
+                    }
+                    if (candidate == -1) {
+                        cost = -1;
+                        break;
+                    }
+                    cost += edge[candidate].cost;
+                    caculated_groups[from_group] = true;
+                } else {
+                    int candidate_cost = INT_MAX;
+                    for (int c = tail[u]; c != -1 ; c = edge[c].prev) {
+                        if (split_nodes[edge[c].u] == from_group && 
+                            edge[c].cost < candidate_cost) {
+                            candidate_cost = edge[c].cost;
+                        }
+                    }
+                    cost += candidate_cost;
+                    caculated_groups[from_group] = true;
+                }
+            }
+			if (caculated_groups.size() == 0 or cost == -1) 
+			    continue;
+
+            //printf("max group %d tilng %d cost = %ld\n", u_cost.first, k, cost);
 			if (min_cost < 0 || cost < min_cost) {
 				min_cost = cost;
 				min_u = u;
 			}
 		}
-        //printf("max group:%d %ld choose u:%d %ld\n", u_cost.first, u_cost.second, min_u, min_cost);
+		visited_groups[u_cost.first] = true;
+        printf("max group:%d choose u:%d %ld\n", u_cost.first,  min_u, min_cost);
 		vis[min_u] = true;
 	}
 
