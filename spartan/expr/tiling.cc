@@ -303,11 +303,13 @@ int get_internal_node_group(int u)
 }
 
 
-void invalidate_view_nodes(int u, int from_u)
+std::unordered_map<int, bool> invalidate_map;
+void invalidate_view_nodes(int u)
 {
     int hedge, tedge, to_group, from_group;
 
     int group = split_nodes[u];
+    invalidate_map[u] = true;
     for (hedge = head[u]; hedge != -1; hedge = edge[hedge].next) {
         if (head[edge[hedge].v] == -1) {
             return;
@@ -316,15 +318,15 @@ void invalidate_view_nodes(int u, int from_u)
             continue;
         }
         to_group = split_nodes[edge[hedge].v];
-        if (is_views(group, to_group)) {
-            //std::cout << "invalid to_group " << to_group  << std::endl;
-            for (int i = 0 ; i < NUM_NODE_PER_GROUP ; i++) {
-                if (groups[to_group][i] != edge[hedge].v) {
-                    valid_nodes[groups[to_group][i]] = false;
+        if (invalidate_map.find(edge[hedge].v) == invalidate_map.end()) {
+            if (is_views(group, to_group)) {
+                //std::cout << "invalid to_group " << to_group << " " << edge[hedge].v << std::endl;
+                for (int i = 0 ; i < NUM_NODE_PER_GROUP ; i++) {
+                    if (groups[to_group][i] != edge[hedge].v) {
+                        valid_nodes[groups[to_group][i]] = false;
+                    }
                 }
-            }
-            if (from_u != edge[hedge].v) {
-                invalidate_view_nodes(edge[hedge].v, u);
+                invalidate_view_nodes(edge[hedge].v);
             }
         }
     }
@@ -337,15 +339,15 @@ void invalidate_view_nodes(int u, int from_u)
             continue;
         }
         from_group = split_nodes[edge[tedge].u];
-        if (is_views(group, from_group)) {
+        if (invalidate_map.find(edge[tedge].u) == invalidate_map.end()) {
+            if (is_views(group, from_group)) {
             //std::cout << "invalid from_group " << from_group  << std::endl;
-            for (int i = 0 ; i < NUM_NODE_PER_GROUP ; i++) {
-                if (groups[from_group][i] != edge[tedge].u) {
-                    valid_nodes[groups[from_group][i]] = false;
+                for (int i = 0 ; i < NUM_NODE_PER_GROUP ; i++) {
+                    if (groups[from_group][i] != edge[tedge].u) {
+                        valid_nodes[groups[from_group][i]] = false;
+                    }
                 }
-            }
-            if (from_u != edge[tedge].u) {
-                invalidate_view_nodes(edge[tedge].u, u);
+                invalidate_view_nodes(edge[tedge].u);
             }
         }
     }
@@ -431,14 +433,12 @@ static PyObject* maxedge_tiling(PyObject *self, PyObject *args) {
 		for (k = 0; k < NUM_NODE_PER_GROUP; k++) {
 			u = groups[u_cost.first][k];
 			vis[u] = false;
-			if (!valid_nodes[u]) {
-			    continue;
-            }
-
 			cost = 0;
             std::unordered_map<int, bool> caculated_groups;
             int hedge, tedge;
+
             for (hedge = head[u]; hedge != -1; hedge = edge[hedge].next) {
+
                 if (head[edge[hedge].v] == -1) {
                     caculated_groups[u_cost.first] = true;
                     break;
@@ -455,9 +455,12 @@ static PyObject* maxedge_tiling(PyObject *self, PyObject *args) {
                         }
                     }
                     caculated_groups[to_group] = true;
+
                 } else if (visited_groups[to_group]) {
                     int candidate;
                     for (candidate = head[u]; candidate != -1 ; candidate = edge[candidate].next) {
+                        if (split_nodes.find(edge[candidate].v) == split_nodes.end())
+                            continue; 
                         if (to_group != split_nodes[edge[candidate].v])
                             continue;
                         if (vis[edge[candidate].v]) 
@@ -473,7 +476,8 @@ static PyObject* maxedge_tiling(PyObject *self, PyObject *args) {
                     int candidate_cost = INT_MAX;
                     int _view_cost = 0;
                     for (int c = head[u]; c != -1 ; c = edge[c].next) {
-                        if (split_nodes[edge[c].v] == to_group &&
+                        if (split_nodes.find(edge[c].v) != split_nodes.end() && 
+                            split_nodes[edge[c].v] == to_group &&
                             (_view_cost = view_cost(u, c)) < candidate_cost) {
                             candidate_cost = _view_cost;
                         }
@@ -500,16 +504,15 @@ static PyObject* maxedge_tiling(PyObject *self, PyObject *args) {
                 if (caculated_groups.find(from_group) != caculated_groups.end())
                     continue;
 
-                //if (u_cost.first == 7) {
-                    //std::cout << cost << std::endl;
-                //}
                 if (visited_groups[from_group]) {
                     int candidate;
                     for (candidate = tail[u]; candidate != -1 ; candidate = edge[candidate].prev) {
-                        if (split_nodes[edge[candidate].u] == from_group &&
-                            vis[edge[candidate].u]) {
+                        if (split_nodes.find(edge[candidate].u) == split_nodes.end()) 
+                            continue;
+                        if (split_nodes[edge[candidate].u] != from_group)
+                            continue;
+                        if (vis[edge[candidate].u]) 
                             break;
-                        }
                     }
 
                     if (candidate == -1) {
@@ -521,7 +524,8 @@ static PyObject* maxedge_tiling(PyObject *self, PyObject *args) {
                 } else {
                     int candidate_cost = INT_MAX;
                     for (int c = tail[u]; c != -1 ; c = edge[c].prev) {
-                        if (split_nodes[edge[c].u] == from_group && 
+                        if (split_nodes.find(edge[c].u) != split_nodes.end() && 
+                            split_nodes[edge[c].u] == from_group && 
                             edge[c].cost < candidate_cost) {
                             candidate_cost = edge[c].cost;
                         }
@@ -542,7 +546,8 @@ static PyObject* maxedge_tiling(PyObject *self, PyObject *args) {
 		visited_groups[u_cost.first] = true;
         //printf("max group:%d choose u:%d %ld\n", u_cost.first,  min_u, min_cost);
 		vis[min_u] = true;
-        invalidate_view_nodes(min_u, min_u);
+        invalidate_view_nodes(min_u);
+		invalidate_map.clear();
 	}
 
 	memcpy(choose_nodes, vis, sizeof(choose_nodes));
