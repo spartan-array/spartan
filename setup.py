@@ -130,6 +130,9 @@ def setup_package():
   pkgs_dir = {p : p.replace('.', '/') for p in pkgs}
 
   import numpy
+  from numpy import version
+  print 'numpy:', numpy.__file__
+  print 'version:', version.__file__, version.version
   numpy_path =  numpy.__path__[0] + '/core/include/'
   ext_include_dirs = [numpy_path,
                      '/usr/local/include',
