@@ -1,6 +1,7 @@
 import numpy as np
 from spartan import expr, util
 from spartan.array import extent
+from scipy.spatial.distance import cdist
 
 '''
 def _calc_probability(point, centers, m):
@@ -37,6 +38,30 @@ def _fuzzy_kmeans_mapper(array, ex, old_centers, centers, counts, labels, m):
 '''
 
 
+def kmeans_map2_dist_mapper(ex, tile, centers=None, m=None):
+  points = tile[0]
+  target_ex = extent.create((ex[0].ul[0], 0),
+                            (ex[0].lr[0], centers.shape[0]),
+                            (ex[0].array_shape[0], centers.shape[0]))
+  distances = cdist(points, centers)
+  distances[distances == 0] = 0.0000000001
+  distances **= 1.0 / (m - 1)
+  distances /= np.sum(distances, axis=1)[:, np.newaxis]
+  yield target_ex, distances
+
+
+def kmeans_map2_center_mapper(ex, tile, centers=None, m=None):
+  X = tile[0]
+  weights = tile[1] ** m
+  new_centers = np.dot(X.T, weights).T
+  target_ex = extent.create((ex[0].ul[0], ),
+                            (ex[0].lr[0], ),
+                            (ex[0].array_shape[0], ))
+  target_ex = extent.create((0, 0), (centers.shape[0], centers.shape[1]),
+                            (centers.shape[0], centers.shape[1]))
+  yield target_ex, new_centers
+
+
 def fuzzy_kmeans(points, k=10, num_iter=10, m=2.0, centers=None):
   '''
   clustering data points using fuzzy kmeans clustering method.
@@ -53,46 +78,19 @@ def fuzzy_kmeans(points, k=10, num_iter=10, m=2.0, centers=None):
   if centers is None:
       centers = expr.rand(k, num_dim)
 
-  labels = expr.zeros((points.shape[0],), dtype=np.int)
+  #labels = expr.zeros((points.shape[0],), dtype=np.int)
 
   for iter in range(num_iter):
-    centers = expr.as_array(centers)
-    points_broadcast = expr.reshape(points, (points.shape[0], 1, points.shape[1]))
-    centers_broadcast = expr.reshape(centers, (1, centers.shape[0], centers.shape[1]))
-    distances = expr.sum(expr.square(points_broadcast - centers_broadcast), axis=2)
-    # This is used to avoid dividing zero
-    distances = distances + 0.00000000001
-    util.log_info('distances shape %s' % str(distances.shape))
-    distances_broadcast = expr.reshape(distances, (distances.shape[0], 1,
-                                                   distances.shape[1]))
-    distances_broadcast2 = expr.reshape(distances, (distances.shape[0],
-                                                    distances.shape[1], 1))
-    prob = 1.0 / expr.sum(expr.power(distances_broadcast / distances_broadcast2,
-                                     2.0 / (m - 1)), axis=2)
-    prob.force()
-    counts = expr.sum(prob, axis=0)
-    counts = expr.reshape(counts, (counts.shape[0], 1))
-    labels = expr.argmax(prob, axis=1)
-    centers = expr.sum(expr.reshape(points, (points.shape[0], 1, points.shape[1])) *
-                       expr.reshape(prob, (prob.shape[0], prob.shape[1], 1)),
-                       axis=0)
-
-    # We assume that the size of centers are relative small that can be handled
-    # on the master.
-    counts = counts.glom()
     centers = centers.glom()
-    # If any centroids don't have any points assigned to them.
-    zcount_indices = (counts == 0).reshape(k)
-
-    if np.any(zcount_indices):
-      # One or more centroids may not have any points assigned to them, which results in their
-      # position being the zero-vector.  We reseed these centroids with new random values
-      # and set their counts to 1 in order to get rid of dividing by zero.
-      counts[zcount_indices, :] = 1
-      centers[zcount_indices, :] = np.random.rand(np.count_nonzero(zcount_indices),
-                                                  num_dim)
-
-    centers = centers / counts
+    fuzzy = expr.map2(points, 0, fn=kmeans_map2_dist_mapper,
+                      fn_kw={"centers": centers, "m": m},
+                      shape=(points.shape[0], centers.shape[0]))
+    labels = expr.argmax(fuzzy, axis=1)
+    new_centers = expr.map2((points, fuzzy), (0, 0), fn=kmeans_map2_center_mapper,
+                            fn_kw={"centers": centers, "m": m},
+                            shape=(centers.shape[0], centers.shape[1]), reducer=np.add)
+    new_centers /= expr.sum(fuzzy ** m, axis=0)[:, expr.newaxis]
+    centers = new_centers
   return labels
 '''
 
