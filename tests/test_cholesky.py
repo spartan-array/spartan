@@ -16,7 +16,7 @@ def benchmark_cholesky(ctx, timer):
   #n = int(math.pow(ctx.num_workers, 1.0 / 3.0))
   n = int(math.sqrt(ctx.num_workers))
   #ARRAY_SIZE = 1600 * 4
-  ARRAY_SIZE = 1600 * n
+  ARRAY_SIZE = 900 * n
 
   util.log_warn('prepare data!')
   #A = np.random.randn(ARRAY_SIZE, ARRAY_SIZE)
@@ -30,7 +30,7 @@ def benchmark_cholesky(ctx, timer):
   t1 = datetime.now()
   L = cholesky(A).optimized().glom()
   t2 = datetime.now()
-  assert np.all(np.isclose(A.glom(), np.dot(L, L.T.conj())))
+  #assert np.all(np.isclose(A.glom(), np.dot(L, L.T.conj())))
   cost_time = millis(t1, t2)
   print "total cost time:%s ms, per iter cost time:%s ms" % (cost_time, cost_time/n)
 

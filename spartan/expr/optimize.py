@@ -510,8 +510,8 @@ class AutomaticTiling(OptimizePass):
     self.init_expr = id(expr)
     self.inited = True
 
-    #self.tiled_exprlist = _tiled_exprlist
-    self.tiled_exprlist = {}
+    self.tiled_exprlist = _tiled_exprlist
+    #self.tiled_exprlist = {}
 
   def add_edge(self, edge_from, edge_to, edge_cost=0):
     #util.log_warn('add_edge:%d %d cost:%d', edge_from, edge_to, edge_cost)

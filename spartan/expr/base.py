@@ -476,7 +476,7 @@ class Expr(Node):
 
     '''
     # If the expr has been optimized, return the cached optimized expr.
-    return optimized_dag(self)
+    #return optimized_dag(self)
 
     if self.optimized_expr is None:
       self.optimized_expr = optimized_dag(self)
