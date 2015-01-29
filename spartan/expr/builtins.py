@@ -31,7 +31,8 @@ def _set_random_seed_mapper(input):
   import time
   import random
   import os
-  np.random.seed(int(time.time() * 100000) + random.randint(0, 10000000) + os.getpid())
+  np.random.seed((int(time.time() * 100000) + random.randint(0, 10000000) +
+                  os.getpid()) % 4294967295)
   return np.zeros((1, ))
 
 
