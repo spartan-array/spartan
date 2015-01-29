@@ -1,5 +1,5 @@
 import test_common
-from spartan.examples.pca import PCA 
+from spartan.examples.pca import PCA
 from spartan import expr, util, blob_ctx
 import numpy as np
 from numpy import absolute
@@ -13,10 +13,11 @@ N_COMPONENTS = 10
 
 class TestPCA(test_common.ClusterTest):
   def test_pca(self):
+    expr.set_random_seed()
     FLAGS.opt_parakeet_gen = 0
     data = np.random.randn(*DIM)
     A = expr.from_numpy(data, tile_hint=util.calc_tile_hint(DIM, axis=0))
-    
+
     m = PCA(N_COMPONENTS)
     m2 = SK_PCA(N_COMPONENTS)
 
@@ -26,6 +27,7 @@ class TestPCA(test_common.ClusterTest):
     assert np.allclose(absolute(m.components_), absolute(m2.components_))
 
 def benchmark_pca(ctx, timer):
+  expr.set_random_seed()
   DIM = (1280, 512)
   data = np.random.randn(*DIM)
   A = expr.from_numpy(data)
@@ -35,7 +37,7 @@ def benchmark_pca(ctx, timer):
   m.fit(A)
   t2 = datetime.now()
   cost_time = millis(t1, t2)
-    
+
   print "total cost time:%s ms" % (cost_time)
 
 if __name__ == '__main__':
