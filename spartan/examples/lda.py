@@ -156,5 +156,4 @@ def learn_topics(terms_docs_matrix, k_topics, alpha=0.1, eta=0.1, max_iter=10, m
                          local_reduce_fn=lambda ex, data, axis: np.abs(data).sum(axis),
                          accumulate_fn=np.add)
   topic_term_counts = topic_term_counts / norm_val.reshape((k_topics, 1))
-  topic_term_counts = topic_term_counts.optimized()
   return doc_topics, topic_term_counts

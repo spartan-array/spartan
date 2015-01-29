@@ -68,11 +68,11 @@ class OuterProductExpr(Expr):
   fn_kw = PythonValue
   shape = Instance(tuple)
   dtype = PythonValue
-  tile_hint = Instance(tuple)
+  tile_hint = PythonValue(None, desc="Tuple or None")
   reducer = PythonValue
 
   def pretty_str(self):
-    return 'OuterProduct[%d]' % (self.expr_id)
+    return 'OuterProduct[%d](arrays=%s, axes=%s, fn=%s, tile_hint=%s)' % (self.expr_id, self.arrays.pretty_str(), self.axes, self.fn, self.tile_hint)
 
   def compute_shape(self):
     return self.shape

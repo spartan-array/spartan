@@ -212,7 +212,7 @@ def region_join_mapper(ex, arrays, axes, local_user_fn, local_user_fn_kw,
     # This is extremely ugly now. Please FIXME after paper submission.
     old_ex = ex
     ex = extent.change_partition_axis(ex, axes[0])
-    util.log_warn("old = %s, new = %s" % (str(old_ex), str(ex)))
+    util.log_debug("old = %s, new = %s" % (str(old_ex), str(ex)))
     tile = arrays[0].fetch(ex)
     futures = rpc.FutureGroup()
     for area in region:
@@ -225,8 +225,9 @@ def region_join_mapper(ex, arrays, axes, local_user_fn, local_user_fn_kw,
         for i in range(1, len(arrays)):
           ul = [0 for j in range(len(arrays[i].shape))]
           lr = list(arrays[i].shape)
-          ul[axes[i]] = ex.ul[axes[0][i - 1]]
-          lr[axes[i]] = ex.lr[axes[0][i - 1]]
+          if axes[i] is not None:
+            ul[axes[i]] = ex.ul[axes[0][i - 1]]
+            lr[axes[i]] = ex.lr[axes[0][i - 1]]
           join_extents.append(extent.create(ul, lr, arrays[i].shape))
           tiles.append(arrays[i].fetch(join_extents[i]))
         if local_user_fn_kw is None:
@@ -292,13 +293,13 @@ class Map2Expr(Expr):
   fn_kw = PythonValue
   shape = Instance(tuple)
   update_region = PythonValue
-  tile_hint = Instance(tuple)
+  tile_hint = PythonValue(None, desc="Tuple or None")
   dtype = PythonValue
   reducer = PythonValue
 
   def pretty_str(self):
-    return 'Map2[%d]' % (self.expr_id)
-
+    return 'Map2[%d](arrays=%s, axes=%s, tile_hint=%s)' % (self.expr_id, self.arrays, self.axes, self.tile_hint)
+  
   def compute_shape(self):
     return self.shape
 
@@ -367,6 +368,7 @@ def map2(arrays, axes=[], fn=None, fn_kw=None, shape=None, update_region=None,
   arrays = tuple(arrays)
   arrays = TupleExpr(vals=arrays)
   axes = tuple(axes)
+
   return Map2Expr(arrays=arrays, axes=axes, fn=fn, fn_kw=fn_kw,
                   shape=tuple(shape), update_region=update_region,
                   tile_hint=tile_hint,

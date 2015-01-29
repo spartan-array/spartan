@@ -12,8 +12,8 @@ def benchmark_lda(ctx, timer):
   
   print "#worker:", ctx.num_workers
   NUM_TERMS = 160
-  #NUM_DOCS = 200 * ctx.num_workers
-  NUM_DOCS = 10 * 64
+  NUM_DOCS = 200 * ctx.num_workers
+  #NUM_DOCS = 10 * 64
 
   # create data
   # NUM_TERMS = 41807
@@ -27,8 +27,8 @@ def benchmark_lda(ctx, timer):
   
   t1 = datetime.now()
   doc_topics, topic_term_count = learn_topics(terms_docs_matrix, k_topics, max_iter=max_iter)
-  doc_topics.force()
-  topic_term_count.force()
+  doc_topics.optimized().force()
+  topic_term_count.optimized().force()
   t2 = datetime.now()
   time_cost = millis(t1,t2)
   util.log_warn('total_time:%s ms, train time per iteration:%s ms', time_cost, time_cost/max_iter)

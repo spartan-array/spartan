@@ -44,7 +44,7 @@ def benchmark_cg(ctx, timer):
   #n = 2000 * 16
   n = 500 * ctx.num_workers
   la = 20
-  niter = 5
+  niter = 1
   
   #nonzer = 7
   #nz = n * (nonzer + 1) * (nonzer + 1) + n * (nonzer + 2)

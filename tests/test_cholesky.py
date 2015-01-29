@@ -16,28 +16,21 @@ def benchmark_cholesky(ctx, timer):
   #n = int(math.pow(ctx.num_workers, 1.0 / 3.0))
   n = int(math.sqrt(ctx.num_workers))
   #ARRAY_SIZE = 1600 * 4
-  ARRAY_SIZE = 1600 * n
+  ARRAY_SIZE = 900 * n
 
   util.log_warn('prepare data!')
   #A = np.random.randn(ARRAY_SIZE, ARRAY_SIZE)
   #A = np.dot(A, A.T)
   #A = expr.force(from_numpy(A, tile_hint=(ARRAY_SIZE/n, ARRAY_SIZE/n)))
 
-  #A = expr.randn(ARRAY_SIZE, ARRAY_SIZE, tile_hint=(ARRAY_SIZE/n, ARRAY_SIZE/n))
   A = expr.randn(ARRAY_SIZE, ARRAY_SIZE)
-  # FIXME: Ideally we should be able to get rid of tile_hint.
-  #        However, current extent.change_partition_axis relies on the
-  #        information of one-dimentional size to change tiling to grid tiling.
-  #        It assumes that every extent should be partitioned in the same size.
-  #        Trace extent.pyx to think about how to fix it!
-  A = expr.dot(A, expr.transpose(A), tile_hint=(ARRAY_SIZE,
-                                                ARRAY_SIZE / ctx.num_workers)).force()
-
+  A = expr.dot(A, expr.transpose(A))
+  
   util.log_warn('begin cholesky!')
   t1 = datetime.now()
-  L = cholesky(A).glom()
+  L = cholesky(A).optimized().glom()
   t2 = datetime.now()
-  assert np.all(np.isclose(A.glom(), np.dot(L, L.T.conj())))
+  #assert np.all(np.isclose(A.glom(), np.dot(L, L.T.conj())))
   cost_time = millis(t1, t2)
   print "total cost time:%s ms, per iter cost time:%s ms" % (cost_time, cost_time/n)
 

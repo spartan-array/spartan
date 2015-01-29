@@ -138,6 +138,7 @@ FLAGS.add(BoolFlag('opt_keep_stack', default=False))
 FLAGS.add(BoolFlag('capture_expr_stack', default=False))
 FLAGS.add(BoolFlag('dump_timers', default=False))
 FLAGS.add(BoolFlag('load_balance', default=False))
+FLAGS.add(StrFlag('tiling_alg', default='mincost', help='algorithm to tile the graph'))
 
 # print flags in sorted order
 # from http://stackoverflow.com/questions/12268602/sort-argparse-help-alphabetically

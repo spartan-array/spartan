@@ -1,6 +1,7 @@
 import test_common
 from spartan.examples.cf import ItemBasedRecommender 
 from spartan import expr, util, blob_ctx
+from spartan.config import FLAGS
 import numpy as np
 from test_common import millis
 from datetime import datetime
@@ -12,6 +13,7 @@ class TestIBRecommender(test_common.ClusterTest):
   def test_ib_recommender(self):
     ctx = blob_ctx.get()
 
+    FLAGS.opt_auto_tiling = 0
     rating_table = expr.sparse_rand((N_USERS, N_ITEMS), 
                                     dtype=np.float64, 
                                     density=0.1, 
