@@ -14,7 +14,7 @@ from . import tiling
 import weakref
 
 from ..config import FLAGS, BoolFlag
-from ..array.distarray import DistArray, DistArrayImpl
+from ..array.distarray import DistArray, LocalWrapper
 from . import local
 from .filter import FilterExpr
 from .slice import SliceExpr
@@ -74,8 +74,8 @@ visited_expr = {'map_fusion': weakref.WeakValueDictionary(),
 
 class OptimizePass(object):
   def __init__(self):
-    #self.visited = visited_expr[self.name]
-    self.visited = {}
+    self.visited = visited_expr[self.name]
+    #self.visited = {}
 
   def visit(self, op):
     if not isinstance(op, Expr):
@@ -237,7 +237,7 @@ class CollapsedCachedExpressions(OptimizePass):
     #util.log_info('Visit: %s, %s', expr.expr_id, expr.cache)
     cache = expr.cache()
     if cache is not None:
-      util.log_info('Collapsing %s', expr.typename())
+      util.log_info('Collapsing %s %s', expr.expr_id, expr.typename())
       return lazify(cache)
     else:
       return expr.visit(self)
@@ -510,8 +510,8 @@ class AutomaticTiling(OptimizePass):
     self.init_expr = id(expr)
     self.inited = True
 
-    #self.tiled_exprlist = _tiled_exprlist
-    self.tiled_exprlist = {}
+    self.tiled_exprlist = _tiled_exprlist
+    #self.tiled_exprlist = {}
 
   def add_edge(self, edge_from, edge_to, edge_cost=0):
     #util.log_warn('add_edge:%d %d cost:%d', edge_from, edge_to, edge_cost)
@@ -1005,20 +1005,24 @@ class AutomaticTiling(OptimizePass):
         node = self.nodes[node_id]
         node.expr.append(expr)
 
-    elif isinstance(expr, DistArrayImpl) or (isinstance(expr, (Val, AsArray)) and isinstance(expr.val, DistArrayImpl)):
+    elif isinstance(expr, DistArray) or (isinstance(expr, (Val, AsArray)) and isinstance(expr.val, DistArray)):
       # already partitioned array
       array = expr if isinstance(expr, DistArray) else expr.val
-      tile_shape = array.tile_shape()
-      tiling = 2
-      for i in range(len(tile_shape)):
-        if tile_shape[i] == array.shape[i]: 
-          tiling = 1 - i
-          break
 
-      self.nodes[self.cur_node_id] = self.node_type([expr], tiling, [], [])
-      expr_node_ids = [self.cur_node_id]
-      self.add_edge(0, self.cur_node_id, 0)
-      self.cur_node_id += 1
+      if isinstance(array, LocalWrapper):
+        expr_node_ids = []
+      else:
+        tile_shape = array.tile_shape()
+        tiling = 2
+        for i in range(len(tile_shape)):
+          if tile_shape[i] == array.shape[i]: 
+            tiling = 1 - i
+            break
+
+        self.nodes[self.cur_node_id] = self.node_type([expr], tiling, [], [])
+        expr_node_ids = [self.cur_node_id]
+        self.add_edge(0, self.cur_node_id, 0)
+        self.cur_node_id += 1
 
     elif isinstance(expr, CollectionExpr):
       # DictExpr, ListExpr, TupleExpr
