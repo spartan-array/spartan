@@ -42,6 +42,11 @@ def set_random_seed():
 
 
 @disable_parakeet
+def _make_rand(input):
+  return np.random.rand(*input.shape)
+
+
+@disable_parakeet
 def _make_randn(input):
   return np.random.randn(*input.shape)
 
