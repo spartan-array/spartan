@@ -14,7 +14,7 @@ from . import tiling
 import weakref
 
 from ..config import FLAGS, BoolFlag
-from ..array.distarray import DistArray, DistArrayImpl
+from ..array.distarray import DistArray, LocalWrapper
 from . import local
 from .filter import FilterExpr
 from .slice import SliceExpr
@@ -74,8 +74,8 @@ visited_expr = {'map_fusion': weakref.WeakValueDictionary(),
 
 class OptimizePass(object):
   def __init__(self):
-    #self.visited = visited_expr[self.name]
-    self.visited = {}
+    self.visited = visited_expr[self.name]
+    #self.visited = {}
 
   def visit(self, op):
     if not isinstance(op, Expr):
@@ -237,7 +237,7 @@ class CollapsedCachedExpressions(OptimizePass):
     #util.log_info('Visit: %s, %s', expr.expr_id, expr.cache)
     cache = expr.cache()
     if cache is not None:
-      util.log_info('Collapsing %s', expr.typename())
+      util.log_info('Collapsing %s %s', expr.expr_id, expr.typename())
       return lazify(cache)
     else:
       return expr.visit(self)
@@ -1005,7 +1005,7 @@ class AutomaticTiling(OptimizePass):
         node = self.nodes[node_id]
         node.expr.append(expr)
 
-    elif isinstance(expr, DistArrayImpl) or (isinstance(expr, (Val, AsArray)) and isinstance(expr.val, DistArrayImpl)):
+    elif isinstance(expr, DistArray) or (isinstance(expr, (Val, AsArray)) and not isinstance(expr.val, LocalWrapper)):
       # already partitioned array
       array = expr if isinstance(expr, DistArray) else expr.val
       tile_shape = array.tile_shape()
