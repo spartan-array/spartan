@@ -1005,20 +1005,24 @@ class AutomaticTiling(OptimizePass):
         node = self.nodes[node_id]
         node.expr.append(expr)
 
-    elif isinstance(expr, DistArray) or (isinstance(expr, (Val, AsArray)) and not isinstance(expr.val, LocalWrapper)):
+    elif isinstance(expr, DistArray) or (isinstance(expr, (Val, AsArray)) and isinstance(expr.val, DistArray)):
       # already partitioned array
       array = expr if isinstance(expr, DistArray) else expr.val
-      tile_shape = array.tile_shape()
-      tiling = 2
-      for i in range(len(tile_shape)):
-        if tile_shape[i] == array.shape[i]: 
-          tiling = 1 - i
-          break
 
-      self.nodes[self.cur_node_id] = self.node_type([expr], tiling, [], [])
-      expr_node_ids = [self.cur_node_id]
-      self.add_edge(0, self.cur_node_id, 0)
-      self.cur_node_id += 1
+      if isinstance(array, LocalWrapper):
+        expr_node_ids = []
+      else:
+        tile_shape = array.tile_shape()
+        tiling = 2
+        for i in range(len(tile_shape)):
+          if tile_shape[i] == array.shape[i]: 
+            tiling = 1 - i
+            break
+
+        self.nodes[self.cur_node_id] = self.node_type([expr], tiling, [], [])
+        expr_node_ids = [self.cur_node_id]
+        self.add_edge(0, self.cur_node_id, 0)
+        self.cur_node_id += 1
 
     elif isinstance(expr, CollectionExpr):
       # DictExpr, ListExpr, TupleExpr
