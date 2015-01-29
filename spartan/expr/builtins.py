@@ -41,14 +41,6 @@ def set_random_seed():
               tile_hint=(1, )), fn=_set_random_seed_mapper).force()
 
 
-def _make_ones(input): return np.ones(input.shape, input.dtype)
-def _make_zeros(input): return np.zeros(input.shape, input.dtype)
-
-@disable_parakeet
-def _make_rand(input):
-  return np.random.rand(*input.shape)
-
-
 @disable_parakeet
 def _make_randn(input):
   return np.random.randn(*input.shape)
