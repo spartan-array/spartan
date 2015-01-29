@@ -13,7 +13,7 @@ import sys
 import numpy as np
 import scipy.sparse as sp
 
-from .. import util
+from .. import util, blob_ctx
 from ..array import extent
 from ..array.extent import index_for_reduction, shapes_match
 from ..util import Assert
@@ -24,6 +24,21 @@ from .optimize import disable_parakeet, not_idempotent
 from .reduce import reduce
 from .shuffle import shuffle
 import __builtin__
+
+
+@disable_parakeet
+def _set_random_seed_mapper(input):
+  import time
+  import random
+  import os
+  np.random.seed(int(time.time() * 100000) + random.randint(0, 10000000) + os.getpid())
+  return np.zeros((1, ))
+
+
+def set_random_seed():
+  ctx = blob_ctx.get()
+  map(ndarray((ctx.num_workers, ), dtype=np.int32,
+              tile_hint=(1, )), fn=_set_random_seed_mapper).force()
 
 def _make_ones(input): return np.ones(input.shape, input.dtype)
 def _make_zeros(input): return np.zeros(input.shape, input.dtype)
