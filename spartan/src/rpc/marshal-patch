@@ -1,0 +1,21 @@
+--- simple-rpc/pylib/simplerpc/marshal.py	2015-01-20 16:39:18.000000000 +0000
++++ /home/gabrielwen/.local/lib/python2.7/site-packages/spartan/rpc/simplerpc/marshal.py	2015-01-20 17:37:46.000000000 +0000
+@@ -7,10 +7,14 @@
+     structs = {} # typename -> (ctor, [(field_name, field_type)])
+ 
+     @staticmethod
+-    def reg_type(type, fields):
+-        ctor = collections.namedtuple(type, [field[0] for field in fields])
+-        Marshal.structs[type] = ctor, fields
+-        return ctor
++    def reg_type(type, fields, default=None):
++        if default is not None:
++            Marshal.structs[type] = default, fields
++            return default
++        else:
++            ctor = collections.namedtuple(type, [field[0] for field in fields])
++            Marshal.structs[type] = ctor, fields
++            return ctor
+ 
+     def __init__(self, id=None, should_release=True):
+         if not id:

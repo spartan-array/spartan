@@ -40,7 +40,7 @@ def build(bld):
     _depend("test/floodtest_service.h test/floodtest_service.py", "test/floodtest_service.rpc", "bin/rpcgen --cpp --python test/floodtest_service.rpc")
 
     bld.shlib(source=bld.path.ant_glob("base/*.cc"), target="base", includes=". base", use="PTHREAD")
-    bld.shlib(source=bld.path.ant_glob("rpc/*.cc"), target="simplerpc", includes=". rpc", use=bld.env.USES)
+    bld.shlib(source=bld.path.ant_glob("rpc/*.cc"), target="simplerpc", includes=". rpc", use=bld.env.USES, rpath = '$ORIGIN')
 
     bld.stlib(
         source="rlog/rlog.cc",
@@ -54,7 +54,8 @@ def build(bld):
             source=bld.path.ant_glob("pylib/simplerpc/*.cc"),
             target="_pyrpc",
             includes=". rpc",
-            use="simplerpc base %s" % bld.env.USES)
+            use="simplerpc base %s" % bld.env.USES,
+            rpath = '$ORIGIN/../../lib')
     else:
         Logs.pprint("RED", "Python extension will not be built")
 

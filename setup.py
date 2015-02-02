@@ -1,43 +1,15 @@
-#!/usr/bin/python
-
-from setuptools import setup, Extension, Command
-#from Cython.Build import cythonize
-import os
+import os, sys
 import subprocess
-
-cmdclass = {}
+#from distutils.core import setup, Extension, Command
+from setuptools import setup, Extension, Command
 from Cython.Distutils import build_ext
-cmdclass['build_ext'] = build_ext
 
-# TODO: support sdist
-#try:
-  #from Cython.Distutils import build_ext
-  #cmdclass['build_ext'] = build_ext
-  #suffix = '.pyx'
-#except:
-  #suffix = '.cpp'
-
-## Ensure Cython .c files are up to date before uploading
-#def build_cython():
-  #print '#' * 10, 'Cythonizing extensions.'
-  #for f in os.popen('find spartan -name "*.pyx"').read().split('\n'):
-    #if not f.strip(): continue
-    #print'#' * 10, 'Cythonizing %s' % f
-    #assert os.system('cython --cplus "%s"' % f) == 0
-
-#from distutils.command.sdist import sdist
-#class cython_sdist(sdist):
-  #'''Build Cython .c files for source distribution.'''
-  #def run(self):
-    #build_cython()
-    #sdist.run(self)
-
-#cmdclass['sdist'] = cython_sdist
-
+from distutils.sysconfig import get_python_lib
+from distutils.command.install import INSTALL_SCHEMES
 
 class clean(Command):
   description = 'Remove build and trash files'
-  user_options = [("all", "a", "the same")]
+  user_options = [("all", "a", "the smae")]
 
   def initialize_options(self):
     self.all = None
@@ -45,166 +17,255 @@ class clean(Command):
   def finalize_options(self):
     pass
 
-	#TODO: This one needs update
   def run(self):
     subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp", shell=True)
     subprocess.call("rm -rf spartan/array/*.so spartan/array/*.c spartan/array/*.cpp", shell=True)
-    subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp", shell=True)
-    subprocess.call("make -C spartan/src clean", shell=True)
+    subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp spartan/rpc/service.py spartan/rpc/simplerpc", shell=True)
+    subprocess.call("make -C spartan clean", shell=True)
     subprocess.call("rm -rf build", shell=True)
 
-# FIXME: Should integrate with develop or intall command
-import site
-site.addsitedir(os.path.join(os.path.realpath('.'), 'spartan/rpc/'))
+#We need to build up src/ before setup invokes
+#Assume we are already under /home/..../spartan
+def pre_install():
+  subprocess.call("make -C spartan", shell = True)
+  path = os.path.join(os.getcwd(), 'spartan/src/rpc/simple-rpc/pylib/simplerpc/')
+  new_path = os.path.join(os.getcwd(), 'spartan/rpc/simplerpc')
 
-# FIXME: Should integrate with setuptool
-subprocess.call("make -C spartan/src", shell=True)
-subprocess.call("cp spartan/src/worker spartan", shell=True)
-subprocess.call("cp spartan/src/libspartan_array.so spartan", shell=True)
-subprocess.call("cp spartan/src/libcore.so spartan", shell=True)
-subprocess.call("mkdir -p spartan/rpc/simplerpc", shell=True)
-subprocess.call("cp spartan/src/rpc/base-utils/build/libbase.so spartan/", shell=True)
-subprocess.call("cp spartan/src/rpc/simple-rpc/build/_pyrpc.so spartan/rpc/simplerpc", shell=True)
-subprocess.call("cp spartan/src/rpc/simple-rpc/build/libsimplerpc.so spartan/rpc/simplerpc", shell=True)
-subprocess.call("cp spartan/src/rpc/simple-rpc/pylib/simplerpc/*.py spartan/rpc/simplerpc", shell=True)
-subprocess.call("mv spartan/rpc/simplerpc/marshal.py spartan/rpc/simplerpc/marshal.pyx", shell=True)
-subprocess.call("cp spartan/src/rpc/service.py spartan/rpc", shell=True)
+  for f in os.listdir(path):
+    if f.endswith(".py"):
+      rfp = open(os.path.join(path, f))
+      wfp = open(os.path.join(new_path, f), 'w')
+      for line in rfp:
+        line = line.replace('simplerpc.', '.')
+        line = line.replace('simplerpc ', '. ')
+        wfp.write(line)
 
-path = os.path.realpath('spartan/src/rpc/simple-rpc/pylib/simplerpc/')
-new_path = os.path.realpath('spartan/rpc/simplerpc/')
-for f in os.listdir(path):
-  if f.endswith(".py"):
-    with open(os.path.join(path, f)) as rfp:
-      with open(os.path.join(new_path, f), 'w') as wfp:
-        for line in rfp:
-          line = line.replace('simplerpc.', '.')
-          line = line.replace('simplerpc ', '. ')
-          wfp.write(line)
+      rfp.close()
+      wfp.close()
 
-path = os.path.relpath('spartan/src/rpc/service.py')
-new_path = os.path.relpath('spartan/rpc/simplerpc/service.py')
-with open(path) as rfp:
-  with open(new_path, 'w') as wfp:
-    for line in rfp:
-      line = line.replace('simplerpc.', '.')
-      line = line.replace('simplerpc ', '. ')
-      wfp.write(line)
+  path = os.path.join(os.getcwd(), 'spartan/src/rpc/service.py')
+  new_path = os.path.join(os.getcwd(), 'spartan/rpc/simplerpc/service.py')
+  second_path = os.path.join(os.getcwd(), 'spartan/rpc/service.py')
 
+  rfp = open(path)
+  wfp = open(new_path, 'w')
+  sfp = open(second_path, 'w')
 
-base = '.' #os.path.dirname(os.path.realpath(__file__))
-ext_include_dirs = ['/usr/local/include',
-                    base + '/spartan/src',
-                    base + '/spartan/src/rpc/simple-rpc',
-                    base + '/spartan/src/rpc/base-utils',     #TODO: This one needs update
-                    base + '/spartan/src/rpc/simple-rpc/build', ]
-ext_link_dirs = ['/usr/lib',
-                 base + '/spartan/src/',
-                 base + '/spartan/src/rpc/base-utils/build',  #TODO: This one needs update
-                 base + '/spartan/src/rpc/simple-rpc/build', ]
+  for line in rfp:
+    sfp.write(line)
+    line = line.replace('simplerpc.', '.')
+    line = line.replace('simplerpc ', '. ')
+    wfp.write(line)
 
-setup(
-  name='spartan',
-  version='0.10',
-  maintainer='Russell Power',
-  maintainer_email='russell.power@gmail.com',
-  url='https://github.com/spartan-array/spartan',
-  classifiers=[
-    'Development Status :: 4 - Beta',
-    'Environment :: Other Environment',
-    'Intended Audience :: Developers',
-    'License :: OSI Approved :: BSD License',
-    'Operating System :: POSIX',
-    'Programming Language :: Python',
-    'Programming Language :: Python :: 2.6',
-    'Programming Language :: Python :: 2.7',
-  ],
-  description='Distributed Numpy-like arrays.',
-  install_requires=[
-    'appdirs',
-    'scipy',
-    'numpy',
-    'cython',
-    'psutil',
-    'traits',
-    #'parakeet',
-  ],
-  package_dir={'': '.'},
-  packages=['spartan',
-            'spartan.expr',
-            'spartan.rpc',
-            'spartan.array'],
+  rfp.close()
+  wfp.close()
+  sfp.close()
 
-  # Our extensions are written by Cython and Python C APIs
-  ext_modules=[
-    # Spartan extensions, Python APIs part.
-    Extension('spartan.array._cextent_py_if',
-              ['spartan/src/array/_cextent_py_if.cc'],
-              language='c++',
-              include_dirs=ext_include_dirs,
-              library_dirs=ext_link_dirs,
-              extra_compile_args=["-std=c++0x", "-lspartan_array"],
-              extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"]),
-    Extension('spartan.array._ctile_py_if',
-              ['spartan/src/array/_ctile_py_if.cc'],
-              language='c++',
-              include_dirs=ext_include_dirs,
-              library_dirs=ext_link_dirs,
-              extra_compile_args=["-std=c++0x", "-lsparta_array"],
-              extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"]),
-    Extension('spartan._cblob_ctx_py_if',
-              ['spartan/src/core/_cblob_ctx_py_if.cc'],
-              language='c++',
-              include_dirs=ext_include_dirs,
-              library_dirs=ext_link_dirs,
-              extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc", "-lcore"],
-              extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
-                               "-lbase", "-lcore", "-lpython2.7"]),
-    Extension('spartan.rpc._rpc_array',
-              ['spartan/src/rpc/_rpc_array.cc'],
-              language='c++',
-              include_dirs=ext_include_dirs,
-              library_dirs=ext_link_dirs,
-              extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc"],
-              extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
-                               "-lbase", "-lpython2.7"]),
-    Extension('spartan.expr.tiling',
-              sources=['spartan/expr/tiling.cc'],
-              language='c++',
-              extra_compile_args=["-std=c++0x"],
-              extra_link_args=["-std=c++11", "-fPIC"]),
+  #Make marshal.py into .pyx for Cython use
+#  subprocess.call("mv -i spartan/rpc/simplerpc/marshal.py \
+#                          spartan/rpc/simplerpc/marshal.pyx", shell = True)
 
-    # Spartan extensions, cython part.
-    Extension('spartan.rpc.serialization_buffer',
-              ['spartan/rpc/serialization_buffer.pyx'],
-              extra_compile_args=["-pipe"]),
-    Extension('spartan.rpc.cloudpickle',
-              ['spartan/rpc/cloudpickle.pyx'],
-              extra_compile_args=["-pipe"]),
-    Extension('spartan.rpc.simplerpc.marshal',
-              ['spartan/rpc/simplerpc/marshal.pyx'],
-              extra_compile_args=["-pipe"]),
-    Extension('spartan.array.sparse',
-              ['spartan/array/sparse.pyx'],
-              language='c++',
-              extra_compile_args=["-std=c++0x", "-pipe"],
-              extra_link_args=["-std=c++11"]),
-    Extension('spartan.config',
-              ['spartan/config.pyx'],
-              language='c++',
-              include_dirs=ext_include_dirs,
-              library_dirs=ext_link_dirs,
-              extra_compile_args=["-std=c++0x", "-lcore", "-pipe"],
-              extra_link_args=["-std=c++11", "-lcore"]),
+def fetch_from_src(dic):
+  '''
+  Append executables from /src/* into metadata
+  '''
+  #FIXME: Need to move executables to package location so that develop works
+  path = os.path.join(os.getcwd(), 'spartan')
 
-    # Example extensions
-    Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core.pyx']),
-    Extension('spartan.examples.cf.helper', ['spartan/examples/cf/helper.pyx']),
-    Extension('spartan.examples.sklearn.util.graph_shortest_path',
-              ['spartan/examples/sklearn/util/graph_shortest_path.pyx']),
-  ],
+  #Special record to include spartan/lib
+  lib_dir = []
+  for f in os.listdir(os.path.join(path, 'lib')):
+    lib_dir.append(os.path.join(os.path.join(path, 'lib'), f))
 
-  cmdclass={
-    'build_ext': build_ext,
-    'clean': clean
-  },
-)
+  path = os.path.join(path, 'src')
+
+  src_rpc = []
+  #Copy all pylib/simplerpc/*.py into spartan/rpc/simplerpc
+  path = os.getcwd()
+  for f in os.listdir(os.path.join(path, 'spartan/rpc/simplerpc')):
+#    if f.endswith('.py') and not 'marshal' in f:
+    if f.endswith('.py'):
+      src_rpc.append(os.path.join(os.path.join(path, 'spartan/rpc/simplerpc'), f))
+
+  dic['data_files'] = [
+                        ('spartan/lib', lib_dir),
+                        ('spartan/rpc/simplerpc', src_rpc), 
+                        ('spartan/rpc', ['spartan/src/rpc/service.py'])
+                      ]
+
+def setup_package():
+  src_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+  old_path = os.getcwd()
+
+  #Calling Makefile in spartan/src
+  if not 'clean' in sys.argv:
+    pre_install()
+
+  #Set Spartan source path first
+  os.chdir(src_path)
+  sys.path.insert(0, src_path)
+
+  #Set packages
+  pkgs = [
+    'spartan',
+    'spartan.expr',
+    'spartan.array',
+    'spartan.rpc',
+  ]
+
+  #See this link for explanation:
+  #https://groups.google.com/forum/#!topic/comp.lang.python/Nex7L-026uw
+  for scheme in INSTALL_SCHEMES.values():
+    scheme['data'] = scheme['purelib']
+
+  #Set rpath
+  runtime_link = {
+                    'spartan' : ['$ORIGIN/lib'],
+                    'spartan/lib' : ['$ORIGIN/../lib'],
+                    'spartan/expr' : ['$ORIGIN/../lib'],
+                    'spartan/array' : ['$ORIGIN/../lib'],
+                    'spartan/rpc' : ['$ORIGIN/../lib'],
+                  }
+
+  pkgs_dir = {p : p.replace('.', '/') for p in pkgs}
+
+  import numpy
+  from numpy import version
+  print 'numpy:', numpy.__file__
+  print 'version:', version.__file__, version.version
+  numpy_path =  numpy.__path__[0] + '/core/include/'
+  ext_include_dirs = [numpy_path,
+                     '/usr/local/include',
+                      src_path + '/spartan/src',
+                      src_path + '/spartan/src/rpc/simple-rpc',
+                      src_path + '/spartan/src/rpc/simple-rpc/build', ]
+  ext_link_dirs = ['/usr/lib',
+                  src_path + '/spartan',
+                  src_path + '/spartan/lib',
+                  src_path + '/spartan/rpc/simplerpc',
+                  src_path + '/spartan/src/rpc/simple-rpc/build/base',
+                  src_path + '/spartan/src/rpc/simple-rpc/build', ]
+
+  metadata = dict(
+    name = 'spartan',
+    version = '0.10',
+    maintainer = 'Russell Power',
+    maintainer_email = 'russell.power@gmail.com',
+    url = 'https://github.com/spartan-array/spartan',
+    classifiers = [
+      'Development Status :: 4 - Beta',
+      'Environment :: Other Environment',
+      'Intended Audience :: Developers',
+      'License :: OSI Approved :: BSD License',
+      'Operating System :: POSIX',
+      'Programming Language :: Python',
+      'Programming Language :: Python :: 2.6',
+      'Programming Language :: Python :: 2.7',
+    ],
+    description = 'Distributed Numpy-like arrays.',
+    install_requires = [
+      'appdirs',
+      'scipy',
+      'numpy',
+      'cython',
+      'psutil',
+      'traits',
+    ],
+    packages = pkgs,
+    package_dir = pkgs_dir,
+
+    # Our extensions are written by Cython and Python C APIs
+    ext_modules=[
+      # Spartan extensions, Python APIs part.
+      Extension('spartan.array._cextent_py_if',
+                ['spartan/src/array/_cextent_py_if.cc'],
+                language='c++',
+                include_dirs=ext_include_dirs,
+                library_dirs=ext_link_dirs,
+                extra_compile_args=["-std=c++0x", "-lspartan_array"],
+                extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"],
+                runtime_library_dirs=runtime_link['spartan/array']),
+      Extension('spartan.array._ctile_py_if',
+                ['spartan/src/array/_ctile_py_if.cc'],
+                language='c++',
+                include_dirs=ext_include_dirs,
+                library_dirs=ext_link_dirs,
+                extra_compile_args=["-std=c++0x", "-lsparta_array"],
+                extra_link_args=["-std=c++11", "-lspartan_array", "-lcore", "-lbase", "-lpython2.7"],
+                runtime_library_dirs=runtime_link['spartan/array']),
+      Extension('spartan._cblob_ctx_py_if',
+                ['spartan/src/core/_cblob_ctx_py_if.cc'],
+                language='c++',
+                include_dirs=ext_include_dirs,
+                library_dirs=ext_link_dirs,
+                extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc", "-lcore"],
+                extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
+                                "-lbase", "-lcore", "-lpython2.7"],
+                runtime_library_dirs=runtime_link['spartan']),
+      Extension('spartan.rpc._rpc_array',
+                ['spartan/src/rpc/_rpc_array.cc'],
+                language='c++',
+                include_dirs=ext_include_dirs,
+                library_dirs=ext_link_dirs,
+                extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc"],
+                extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
+                                "-lbase", "-lpython2.7"],
+                runtime_library_dirs=runtime_link['spartan/rpc']),
+      Extension('spartan.expr.tiling',
+                sources=['spartan/expr/tiling.cc'],
+                language='c++',
+                extra_compile_args=["-std=c++0x"],
+                extra_link_args=["-std=c++11", "-fPIC"],
+                runtime_library_dirs=runtime_link['spartan/expr']),
+
+      # Spartan extensions, cython part.
+      Extension('spartan.rpc.serialization_buffer',
+                ['spartan/rpc/serialization_buffer.pyx'],
+                extra_compile_args=["-pipe"]),
+      Extension('spartan.rpc.cloudpickle',
+                ['spartan/rpc/cloudpickle.pyx'],
+                extra_compile_args=["-pipe"]),
+#      Extension('spartan.rpc.simplerpc.marshal',
+#                ['spartan/rpc/simplerpc/marshal.pyx'],
+#                extra_compile_args=["-pipe"],
+#                runtime_library_dirs=runtime_link),
+      Extension('spartan.array.sparse',
+                ['spartan/array/sparse.pyx'],
+                language='c++',
+                extra_compile_args=["-std=c++0x", "-pipe"],
+                extra_link_args=["-std=c++11"]),
+      Extension('spartan.config',
+                ['spartan/config.pyx'],
+                language='c++',
+                include_dirs=ext_include_dirs,
+                library_dirs=ext_link_dirs,
+                extra_compile_args=["-std=c++0x", "-lcore", "-pipe"],
+                extra_link_args=["-std=c++11", "-lcore"],
+                runtime_library_dirs=runtime_link['spartan']),
+
+      # Example extensions
+      Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core.pyx']),
+      Extension('spartan.examples.cf.helper', ['spartan/examples/cf/helper.pyx']),
+      Extension('spartan.examples.sklearn.util.graph_shortest_path',
+                ['spartan/examples/sklearn/util/graph_shortest_path.pyx']),
+    ],
+
+    cmdclass = {
+      'build_ext' : build_ext,
+      'clean' : clean
+    },
+  )
+
+  #Fetch metadata from spartan/src
+  if not 'clean' in sys.argv:
+    fetch_from_src(metadata)
+
+  try:
+    setup(**metadata)
+  finally:
+    del sys.path[0]
+    os.chdir(old_path)
+  return
+
+if __name__ == '__main__':
+  setup_package()
