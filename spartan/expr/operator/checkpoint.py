@@ -1,12 +1,13 @@
-from .base import Expr, lazify
-from ..config import FLAGS
-from .. import master, util
-from .fio import save
-from ..array.distarray import from_replica
-from fio import partial_load, load
-from .. import blob_ctx
 from traits.api import Bool, Str, Instance, PythonValue, HasTraits
 
+from .base import Expr, lazify
+from ..fio import save, partial_load, load
+from ... import master, util, blob_ctx
+from ...config import FLAGS
+from ...array.distarray import from_replica
+
+
+# TODO: Can checkpoint not be implemented as an Expr?
 class CheckpointExpr(Expr):
   src = Instance(Expr)
   path = Str
@@ -25,25 +26,27 @@ class CheckpointExpr(Expr):
       if cached_result is not None:
         util.log_info('load partial disk data')
         extents = master.get().get_workers_for_reload(cached_result)
-        new_blobs = partial_load(extents, "%s" % self.expr_id, path = self.path, iszip = False)
+        new_blobs = partial_load(extents, "%s" % self.expr_id, path=self.path,
+                                 iszip=False)
         for ex, tile_id in new_blobs.iteritems():
           cached_result.tiles[ex] = tile_id
           cached_result.bad_tiles.remove(ex)
         return cached_result
       else:
         util.log_info('load whole data from disk')
-        cached_result = load("%s" % self.expr_id, path = self.path, iszip = False).evaluate()
+        cached_result = load("%s" % self.expr_id, path=self.path, iszip=False).evaluate()
         return cached_result
-    else: # replica
+    else:  # replica
       return None
 
   def _evaluate(self, ctx, deps):
     result = deps['src']
     if self.mode == 'disk':
-      save(result, "%s" % self.expr_id, path = self.path, iszip = False)
+      save(result, "%s" % self.expr_id, path=self.path, iszip=False)
 
     self.ready = True
     return result
+
 
 def checkpoint(x, mode='disk'):
   '''

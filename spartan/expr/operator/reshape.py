@@ -5,14 +5,16 @@ Reshape operation and expr.
 import itertools
 import numpy as np
 import scipy.sparse as sp
+
+from traits.api import PythonValue, Instance, Tuple
+
 from spartan import rpc
 from .base import Expr, lazify
-from .. import master, blob_ctx, util
-from ..util import is_iterable, Assert
-from ..array import extent, distarray
-from ..core import LocalKernelResult
 from .shuffle import target_mapper
-from traits.api import PythonValue, Instance, Tuple
+from ... import master, blob_ctx, util
+from ...util import is_iterable, Assert
+from ...array import extent, distarray
+from ...core import LocalKernelResult
 
 
 def _ravelled_ex(ul, lr, shape):

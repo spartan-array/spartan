@@ -5,8 +5,9 @@ from test_common import millis
 import numpy as np
 from scipy import linalg
 import math
-from spartan.expr.write_array import from_numpy
+from spartan.expr.operator.write_array import from_numpy
 from datetime import datetime
+
 
 #@test_common.with_ctx
 #def test_pr(ctx):
@@ -25,7 +26,7 @@ def benchmark_cholesky(ctx, timer):
 
   A = expr.randn(ARRAY_SIZE, ARRAY_SIZE)
   A = expr.dot(A, expr.transpose(A))
-  
+
   util.log_warn('begin cholesky!')
   t1 = datetime.now()
   L = cholesky(A).optimized().glom()

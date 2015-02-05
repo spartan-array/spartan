@@ -160,8 +160,7 @@ class TestOptimization(test_common.ClusterTest):
     ns = np.sum(nr)
 
     # Our sum seems to reduce precision
-    Assert.all_eq(ns, s.optimized().glom(), tolerance = 1e-6)
-
+    Assert.all_eq(ns, s.optimized().glom(), tolerance=1e-6)
 
   def test_optimization_map_with_location(self):
     FLAGS.opt_parakeet_gen = 1
@@ -169,8 +168,7 @@ class TestOptimization(test_common.ClusterTest):
       return tile + 10
 
     a = expr.map_with_location(expr.ones((5, 5)), mapper) + expr.ones((5, 5))
-    Assert.isinstance(a.optimized().op, expr.local.ParakeetExpr)
-
+    Assert.isinstance(a.optimized().op, expr.operator.local.ParakeetExpr)
 
   def test_optimization_region_map(self):
     def mapper(tile, ex):
@@ -180,4 +178,4 @@ class TestOptimization(test_common.ClusterTest):
     a = expr.region_map(expr.ones((5, 5)), ex, mapper) + expr.ones((5, 5))*10
 
     for child in a.optimized().op.deps:
-      Assert.true(not isinstance(child, expr.local.LocalInput))
+      Assert.true(not isinstance(child, expr.operator.local.LocalInput))

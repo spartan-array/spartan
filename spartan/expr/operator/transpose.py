@@ -4,14 +4,16 @@ Transpose operation and expr.
 
 import numpy as np
 import scipy.sparse as sp
+
+from traits.api import Instance, PythonValue
+
 from spartan import rpc
 from .base import Expr, lazify
-from .. import blob_ctx, util
-from ..util import is_iterable, Assert
-from ..array import extent, tile, distarray
-from ..core import LocalKernelResult
 from .shuffle import target_mapper
-from traits.api import Instance, PythonValue
+from ... import blob_ctx, util
+from ...array import extent, tile, distarray
+from ...core import LocalKernelResult
+from ...util import is_iterable, Assert
 
 
 def _tile_mapper(ex, **kw):

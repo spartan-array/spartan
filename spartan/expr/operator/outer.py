@@ -1,15 +1,13 @@
+import time
 from traits.api import Instance
 
-from .base import ListExpr, TupleExpr, PythonValue, Expr
-from ..array import distarray, tile, extent
-from ..core import LocalKernelResult
-from spartan import rpc
 from spartan.node import Node
+from spartan import rpc
+from .base import ListExpr, TupleExpr, PythonValue, Expr
+from ...array import distarray, tile, extent
+from ...core import LocalKernelResult
 
-import time
 
-
-test=0
 # TODO: How to do cache for outer
 def outer_mapper(ex, arrays, axes, local_user_fn, local_user_fn_kw, target):
   # Fetch the tile for the first array

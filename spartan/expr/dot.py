@@ -4,14 +4,14 @@ Dot expr.
 
 import numpy as np
 import scipy.sparse as sp
-from . import outer, map
+from traits.api import PythonValue, HasTraits
+from .operator import outer, map
+from .operator.base import Expr, lazify
+from .operator.shuffle import target_mapper, notarget_mapper
 from .. import blob_ctx, util, sparse, rpc
-from .base import Expr, lazify
-from .shuffle import target_mapper, notarget_mapper
 from ..util import is_iterable, Assert
 from ..array import extent, tile, distarray
 from ..core import LocalKernelResult
-from traits.api import PythonValue, HasTraits
 
 
 def _dot_mapper(inputs, ex, av, bv):
@@ -273,11 +273,11 @@ def dot(a, b, tile_hint=None):
 
     if a.shape[0] > a.shape[1]:
       # Use outer(join) to implement dot
-      util.log_warn('Using outer to do dot')
-      return outer.outer((a, b), (0, 1), dot_outer_mapper, shape=shape,
+      #util.log_warn('Using outer to do dot')
+      return outer.outer((a, b), (0, None), dot_outer_mapper, shape=shape,
                          tile_hint=tile_hint, reducer=np.add)
     else:
       # Use map2(join) to implement dot
-      util.log_warn('Using map2 to do dot')
+      #util.log_warn('Using map2 to do dot')
       return map.map2((a, b), (1, 0), dot_map2_mapper, shape=shape,
                       tile_hint=tile_hint, reducer=np.add)

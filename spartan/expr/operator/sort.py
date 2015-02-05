@@ -1,13 +1,12 @@
 import numpy as np
-from .ndarray import ndarray
-from ..array import extent
-from .tile_operation import tile_operation
-from .shuffle import shuffle
-from .map import map2
+
 from .base import force
-from .. import util
-from .. import rpc
-from .. import blob_ctx
+from .map import map2
+from .ndarray import ndarray
+from .shuffle import shuffle
+from .tile_operation import tile_operation
+from ... import util, rpc, blob_ctx
+from ...array import extent
 
 
 def _sample_sort_mapper(array, ex, sample_rate, local_sorted_array):

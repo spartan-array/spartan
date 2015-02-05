@@ -23,31 +23,56 @@ live in their own modules:
 Optimizations on DAGs live in `spartan.expr.optimize`.
 """
 
-from base import Expr, evaluate, optimized_dag, glom, eager, lazify, as_array, force, NotShapeable, newaxis
 from .builtins import *
 from .assign import assign
-from .map import map, map2
-from .map_with_location import map_with_location
-from .region_map import region_map
-from .tile_operation import tile_operation
-from .ndarray import ndarray
-from .outer import outer
-from .reduce import reduce
-from .shuffle import shuffle
-from .scan import scan
-from .write_array import write, from_numpy, from_file, from_file_parallel
-from .checkpoint import checkpoint
-from .fio import save, load, pickle, unpickle, partial_load, partial_unpickle
-from .reshape import reshape
 from .retile import retile
-from .transpose import transpose
 from .dot import dot
-from .sort import sort, argsort, argpartition, partition
+from .fio import save, load, pickle, unpickle, partial_load, partial_unpickle
 
-Expr.outer = outer
-Expr.sum = sum
-Expr.mean = mean
-Expr.astype = astype
-Expr.ravel = ravel
-Expr.argmin = argmin
+from .operator.base import Expr, evaluate, optimized_dag
+from .operator.base import eager, lazify, as_array, force, glom
+from .operator.base import NotShapeable, newaxis
+from .operator.broadcast import broadcast
+from .operator.checkpoint import checkpoint
+from .operator.map import map, map2
+from .operator.map_with_location import map_with_location
+from .operator.ndarray import ndarray
+from .operator.outer import outer
+from .operator.optimize import optimize
+from .operator.region_map import region_map
+from .operator.reshape import reshape
+from .operator.reduce import reduce
+from .operator.sort import sort, argsort, argpartition, partition
+from .operator.shuffle import shuffle
+from .operator.scan import scan
+from .operator.stencil import stencil, maxpool, _convolve
+from .operator.tile_operation import tile_operation
+from .operator.transpose import transpose
+from .operator.write_array import write, from_numpy, from_file, from_file_parallel
+
+Expr.all = None
+Expr.any = None
 Expr.argmax = argmax
+Expr.argmin = argmin
+Expr.argpartition = argpartition
+Expr.argsort = argsort
+Expr.astype = astype
+Expr.diagonal = diagonal
+Expr.dot = dot
+Expr.fill = None
+Expr.flat = None
+Expr.flatten = None
+Expr.outer = outer
+Expr.max = None
+Expr.mean = mean
+Expr.min = None
+Expr.ndim = None
+Expr.nonzero = None
+Expr.partition = None
+Expr.prod = None
+Expr.ravel = ravel
+Expr.reshape = reshape
+Expr.std = None
+Expr.sum = sum
+Expr.transpose = transpose
+Expr.T = None

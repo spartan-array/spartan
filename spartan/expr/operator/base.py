@@ -4,26 +4,28 @@ well as common subclasses for collections.
 '''
 
 import collections
-import weakref
-
 import sys
 import traceback
+import weakref
 import numpy as np
 
-from ..node import Node, indent
-from .. import blob_ctx, node, util
-from ..util import Assert, copy_docstring
-from ..array import distarray
-from ..config import FLAGS, BoolFlag
-from ..rpc import TimeoutException
 from traits.api import Any, Instance, Int, PythonValue
 
+from ... import blob_ctx, node, util
+from ...node import Node, indent
+from ...util import Assert, copy_docstring
+from ...array import distarray
+from ...config import FLAGS, BoolFlag
+from ...rpc import TimeoutException
+
 FLAGS.add(BoolFlag('opt_expression_cache', True, 'Enable expression caching.'))
+
 
 class newaxis(object):
   '''
   The newaxis object indicates that users wish to add a new dimension
   '''
+
 
 class NotShapeable(Exception):
   '''

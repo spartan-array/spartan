@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from setuptools import setup, Extension
+from distutils.command.sdist import sdist
 import os
 
 cmdclass = {}
@@ -12,6 +13,7 @@ try:
 except:
   suffix = '.cpp'
 
+
 # Ensure Cython .c files are up to date before uploading
 def build_cython():
   print '#' * 10, 'Cythonizing extensions.'
@@ -20,13 +22,13 @@ def build_cython():
     print'#' * 10, 'Cythonizing %s' % f
     assert os.system('cython --cplus "%s"' % f) == 0
 
-from distutils.command.sdist import sdist
+
 class cython_sdist(sdist):
   '''Build Cython .c files for source distribution.'''
   def run(self):
     build_cython()
     sdist.run(self)
-  
+
 cmdclass['sdist'] = cython_sdist
 
 setup(
@@ -57,7 +59,7 @@ setup(
   ],
   description='Distributed Numpy-like arrays.',
   package_dir={'': '.'},
-  packages=['spartan', 
+  packages=['spartan',
             'spartan.expr',
             'spartan.rpc',
             'spartan.array' ],
@@ -65,27 +67,27 @@ setup(
     Extension('spartan.core', ['spartan/core' + suffix]),
     Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core' + suffix]),
     Extension('spartan.examples.cf.helper', ['spartan/examples/cf/helper' + suffix]),
-    Extension('spartan.rpc.serialization_buffer', 
+    Extension('spartan.rpc.serialization_buffer',
               ['spartan/rpc/serialization_buffer' + suffix]),
     Extension('spartan.cloudpickle', ['spartan/cloudpickle' + suffix]),
-    Extension('spartan.rpc.serialization', 
+    Extension('spartan.rpc.serialization',
               ['spartan/rpc/serialization' + suffix],
-              language='c++', 
-              extra_compile_args=["-std=c++0x"], 
+              language='c++',
+              extra_compile_args=["-std=c++0x"],
               extra_link_args=["-std=c++11"]),
     Extension('spartan.rpc.rlock',
               ['spartan/rpc/rlock' + suffix], language="c++"),
-    Extension('spartan.examples.sklearn.util.graph_shortest_path', 
-      ['spartan/examples/sklearn/util/graph_shortest_path' + suffix]),
-    Extension('spartan.sparse', 
-              ['spartan/sparse' + suffix], 
-              language='c++', 
-              extra_compile_args=["-std=c++0x"], 
+    Extension('spartan.examples.sklearn.util.graph_shortest_path',
+              ['spartan/examples/sklearn/util/graph_shortest_path' + suffix]),
+    Extension('spartan.sparse',
+              ['spartan/sparse' + suffix],
+              language='c++',
+              extra_compile_args=["-std=c++0x"],
               extra_link_args=["-std=c++11"]),
     Extension('spartan.array.extent', ['spartan/array/extent' + suffix]),
     Extension('spartan.array.tile', ['spartan/array/tile' + suffix]),
-    Extension('spartan.expr.tiling', 
-              sources = ['spartan/expr/tiling.cc'],
+    Extension('spartan.expr.operator.tiling',
+              sources=['spartan/expr/operator/tiling.cc'],
               language='c++',
               extra_compile_args=["-std=c++0x"],
               extra_link_args=["-std=c++11", "-fPIC"]),

@@ -9,21 +9,19 @@ These include --
 * Other: (`dot`).
 '''
 import sys
-
+import __builtin__
 import numpy as np
 import scipy.sparse as sp
 
+from .operator.map import map, map2
+from .operator.map_with_location import map_with_location
+from .operator.reduce import reduce
+from .operator.ndarray import ndarray
+from .operator.optimize import disable_parakeet, not_idempotent
 from .. import util, blob_ctx
 from ..array import extent
 from ..array.extent import index_for_reduction, shapes_match
 from ..util import Assert
-from .map import map, map2
-from .map_with_location import map_with_location
-from .outer import outer
-from .ndarray import ndarray
-from .optimize import disable_parakeet, not_idempotent
-from .reduce import reduce
-import __builtin__
 
 
 @disable_parakeet
@@ -578,7 +576,7 @@ def std(a, axis=None):
   :rtype standard_deviation: Expr
   '''
   a_casted = a.astype(np.float64)
-  return sqrt(mean(a_casted ** 2, axis) - mean(a_casted, axis) ** 2)  #.optimized()
+  return sqrt(mean(a_casted ** 2, axis) - mean(a_casted, axis) ** 2)
 
 
 def _to_structured_array(*vals):

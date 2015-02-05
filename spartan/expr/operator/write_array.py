@@ -10,28 +10,31 @@ in place, and therefore should be used with care.
 
 import numpy as np
 import scipy.sparse as sp
+import scipy
 import os
 import math
 import ast
 import struct
 
+from traits.api import PythonValue
+
 from spartan import rpc
 from spartan import master
 from spartan.array import distarray, extent
 from spartan import sparse
-from .slice import Slice
-from ..core import LocalKernelResult
-from ..util import Assert, FileHelper
 from .base import Expr
 from .ndarray import ndarray
 from .shuffle import shuffle
-from traits.api import PythonValue
+from .slice import Slice
+from ...core import LocalKernelResult
+from ...util import Assert, FileHelper
 
-def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
+
+def _write_mapper(ex, source=None, sregion=None, dst_slice=None):
   intersection = extent.intersection(ex, sregion)
 
   futures = rpc.FutureGroup()
-  if intersection != None:
+  if intersection is not None:
     dst_lr = np.asarray(intersection.lr) - np.asarray(sregion.ul)
     dst_ul = np.asarray(intersection.ul) - np.asarray(sregion.ul)
     dst_ex = extent.create(tuple(dst_ul), tuple(dst_lr), dst_slice.shape)
@@ -39,6 +42,7 @@ def _write_mapper(ex, source = None, sregion = None, dst_slice = None):
     futures.append(source.update(intersection, v, wait=False))
 
   return LocalKernelResult(result=None, futures=futures)
+
 
 class WriteArrayExpr(Expr):
   array = PythonValue(None, desc="DistArray or Expr")
@@ -64,9 +68,9 @@ class WriteArrayExpr(Expr):
     elif isinstance(data, distarray.DistArray):
       dst_slice = Slice(data, dst_slices)
       Assert.eq(sregion.shape, dst_slice.shape)
-      array.foreach_tile(mapper_fn = _write_mapper,
-                         kw = {'source':array, 'sregion':sregion,
-                               'dst_slice':dst_slice})
+      array.foreach_tile(mapper_fn=_write_mapper,
+                         kw={'source': array, 'sregion': sregion,
+                             'dst_slice': dst_slice})
     else:
       raise TypeError
 
@@ -74,6 +78,7 @@ class WriteArrayExpr(Expr):
 
   def compute_shape(self):
     return self.array.shape
+
 
 def write(array, src_slices, data, dst_slices):
   '''
@@ -86,13 +91,15 @@ def write(array, src_slices, data, dst_slices):
   :rtype: `Expr`
 
   '''
-  return WriteArrayExpr(array = array, src_slices = src_slices,
-                        data = data, dst_slices = dst_slices)
+  return WriteArrayExpr(array=array, src_slices=src_slices,
+                        data=data, dst_slices=dst_slices)
+
 
 def _local_load_reducer(old, new):
   return new + old
 
 #def _local_read_dense_mm(ex, fn, data_begin, data_size):
+
 
 def _local_read_sparse_mm(array, ex, fn, data_begin):
   '''
@@ -127,7 +134,7 @@ def _local_read_sparse_mm(array, ex, fn, data_begin):
 
     pos = fp.tell()
     for line in fp:
-      if pos > end + 1: # +1 in case end locates on \n
+      if pos > end + 1:  # +1 in case end locates on \n
         break
       pos += len(line)
       (_row, _col), val = _extract_mm_coordinate(line)
@@ -150,7 +157,8 @@ def _local_read_sparse_mm(array, ex, fn, data_begin):
   new_array = sp.coo_matrix((data, (rows, cols)), new_ex.shape)
   return new_ex, sparse.convert_sparse_array(new_array)
 
-def _readmm_mapper(array, ex, fn = None, data_begin = None):
+
+def _readmm_mapper(array, ex, fn=None, data_begin=None):
   if array.sparse:
     new_ex, new_array = _local_read_sparse_mm(array, ex, fn, data_begin)
   else:
@@ -158,13 +166,15 @@ def _readmm_mapper(array, ex, fn = None, data_begin = None):
 
   yield new_ex, new_array
 
+
 def _extract_mm_coordinate(shape_info):
   shape_info = shape_info.split()
   shape = [int(i) for i in shape_info[:-1]]
   edges = shape_info[-1]
   return (shape, edges)
 
-def _parse_mm_header(fn, sparse_threshold = 0.01):
+
+def _parse_mm_header(fn, sparse_threshold=0.01):
   with open(fn) as fp:
     line = fp.readline().strip()
     header = line
@@ -187,7 +197,8 @@ def _parse_mm_header(fn, sparse_threshold = 0.01):
 
   return (shape, dtype, sparse, data_begin)
 
-def _bulk_read(fp, size, bulk_size = 2**27):
+
+def _bulk_read(fp, size, bulk_size=2**27):
   '''
   size must be 4, 8, 16 or 32. build_size must be 2^n
   '''
@@ -201,6 +212,7 @@ def _bulk_read(fp, size, bulk_size = 2**27):
     while tell + size <= data_len:
       tell += size
       yield data[(tell - size):tell]
+
 
 def _local_read_sparse_npy(array, ex, fn):
   '''
@@ -218,16 +230,16 @@ def _local_read_sparse_npy(array, ex, fn):
   #shape = {}
   #fp = {}
   #read_next = {}
-  attr = {'data_begin':{}, 'dtype':{}, 'shape':None,
-          'read_next':{}, 'fn':{}}
+  attr = {'data_begin': {}, 'dtype': {}, 'shape': None,
+          'read_next': {}, 'fn': {}}
   types = ['row', 'col', 'data']
-  dtype_name = {'float64':'d', 'float32':'f', 'int64':'q', 'int32':'i'}
+  dtype_name = {'float64': 'd', 'float32': 'f', 'int64': 'q', 'int32': 'i'}
 
   for i in types:
     _fn = '%s_%s.npy' % (fn, i)
     attr['fn'][i] = _fn
     _shape, attr['dtype'][i], attr['data_begin'][i] = _parse_npy_header(_fn)
-    if attr['shape'] != None:
+    if attr['shape'] is not None:
       assert attr['shape'] == _shape
     else:
       attr['shape'] = _shape
@@ -280,7 +292,8 @@ def _local_read_sparse_npy(array, ex, fn):
   new_array = sp.coo_matrix((data, (rows, cols)), new_ex.shape)
   return new_ex, sparse.convert_sparse_array(new_array)
 
-def _readnpy_mapper(array, ex, fn = None):
+
+def _readnpy_mapper(array, ex, fn=None):
   if array.sparse:
     new_ex, new_array = _local_read_sparse_npy(array, ex, fn)
   else:
@@ -288,9 +301,10 @@ def _readnpy_mapper(array, ex, fn = None):
 
   yield (new_ex, new_array)
 
+
 def _parse_npy_header(fn):
   with open(fn) as fp:
-    fp.seek(8) # Skip magic
+    fp.seek(8)  # Skip magic
     dict_len = ord(fp.read(1)) + ord(fp.read(1)) * 256
     dict_str = fp.read(dict_len)
     dict_cnt = ast.literal_eval(dict_str)
@@ -298,7 +312,8 @@ def _parse_npy_header(fn):
 
   return (dict_cnt['shape'], np.dtype(dict_cnt['descr']), data_begin)
 
-def from_file_parallel(fn, file_format = 'mm', sparse = True, tile_hint = None):
+
+def from_file_parallel(fn, file_format='mm', sparse=True, tile_hint=None):
   '''
   Make a distarray from a file or files. The file(s) will be read by workers.
   Therefore, the file(s) should be located in a shared file system such as HDFS.
@@ -351,21 +366,19 @@ def from_file_parallel(fn, file_format = 'mm', sparse = True, tile_hint = None):
       raise NotImplementedError("Only support two-dimension sparse mm now.")
     mapper = _readmm_mapper
     reducer = _local_load_reducer
-    kw = {'fn' : fn, 'data_begin' : data_begin}
+    kw = {'fn': fn, 'data_begin': data_begin}
   else:
-    raise NotImplementedError("Only support mm now. Got %s" % file_type)
+    raise NotImplementedError("Only support mm now. Got %s" % file_format)
+
+  array_tile_hint = distarray.good_tile_shape(shape, num_shards=master.get().num_workers)
+
+  array = ndarray(shape=shape, dtype=dtype, sparse=sparse, tile_hint=array_tile_hint)
+  target = ndarray(shape=shape, dtype=dtype, sparse=sparse,
+                   tile_hint=tile_hint, reduce_fn=reducer)
+  return shuffle(array, fn=mapper, kw=kw, target=target)
 
 
-  array_tile_hint = distarray.good_tile_shape(shape, num_shards =
-                                                     master.get().num_workers)
-
-  array = ndarray(shape = shape, dtype = dtype, sparse = sparse,
-                  tile_hint = array_tile_hint)
-  target = ndarray(shape = shape, dtype = dtype, sparse = sparse,
-                   tile_hint = tile_hint, reduce_fn = reducer)
-  return shuffle(array, fn = mapper, kw = kw, target = target)
-
-def from_file(fn, file_type = 'numpy', sparse = True, tile_hint = None):
+def from_file(fn, file_type='numpy', sparse=True, tile_hint=None):
   '''
   Make a distarray from a file.
 
@@ -390,7 +403,7 @@ def from_file(fn, file_type = 'numpy', sparse = True, tile_hint = None):
       row = np.load(fn + '_row.npy')
       col = np.load(fn + '_col.npy')
       data = np.load(fn + '_data.npy')
-      npa = sp.coo_matrix((data, (row, col)), shape = shape)
+      npa = sp.coo_matrix((data, (row, col)), shape=shape)
     else:
       npa = np.load(fn)
       if fn.endswith("npz"):
@@ -400,7 +413,7 @@ def from_file(fn, file_type = 'numpy', sparse = True, tile_hint = None):
         npa.close()
         npa = fn
   elif file_type == 'mm':
-    npa = scipy.io.mmread(path)
+    npa = scipy.io.mmread(fn)
     if sp.issparse(npa) and npa.dtype == np.float64:
       npa = npa.astype(np.float32)
   else:
@@ -408,7 +421,8 @@ def from_file(fn, file_type = 'numpy', sparse = True, tile_hint = None):
 
   return from_numpy(npa, tile_hint)
 
-def from_numpy(npa, tile_hint = None):
+
+def from_numpy(npa, tile_hint=None):
   '''
   Make a distarray from a numpy array
 
@@ -425,9 +439,8 @@ def from_numpy(npa, tile_hint = None):
   if sp.issparse(npa):
     npa = npa.tocsr()
 
-  array = ndarray(shape = npa.shape, dtype = npa.dtype,
-                  sparse = sp.issparse(npa), tile_hint = tile_hint)
+  array = ndarray(shape=npa.shape, dtype=npa.dtype,
+                  sparse=sp.issparse(npa), tile_hint=tile_hint)
   slices = tuple([slice(0, i) for i in npa.shape])
 
   return write(array, slices, npa, slices)
-

@@ -1,9 +1,9 @@
-from .. import util, node, core, master
-from . import broadcast
-from ..util import Assert
-from ..array import distarray, extent
-from . import base
 from traits.api import Instance, Tuple, PythonValue
+
+from . import base, broadcast
+from ... import util, node, core, master
+from ...util import Assert
+from ...array import distarray, extent
 
 
 def _slice_mapper(ex, **kw):
@@ -38,6 +38,7 @@ def _slice_mapper(ex, **kw):
   #util.log_info('Slice mapper[%s] %s %s -> %s', mapper_fn, offset, subslice, result)
   return result
 
+
 class Slice(distarray.DistArray):
   '''
   Represents a Numpy multi-dimensional slice on a base `DistArray`.
@@ -70,10 +71,10 @@ class Slice(distarray.DistArray):
     return self._tile_shape
 
   def foreach_tile(self, mapper_fn, kw):
-    return self.base.foreach_tile(mapper_fn = _slice_mapper,
-                                    kw={'fn_kw' : kw,
-                                        '_slice_extent' : self.slice,
-                                        '_slice_fn' : mapper_fn })
+    return self.base.foreach_tile(mapper_fn=_slice_mapper,
+                                  kw={'fn_kw': kw,
+                                      '_slice_extent': self.slice,
+                                      '_slice_fn': mapper_fn})
 
   def extent_for_blob(self, id):
     base_ex = self.base.blob_to_ex[id]

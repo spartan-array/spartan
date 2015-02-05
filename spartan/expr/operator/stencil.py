@@ -1,9 +1,9 @@
 import math
-
 import numpy as np
-from .. import util
-from ..array import extent
-from ..util import divup, Assert
+
+from ... import util
+from ...array import extent
+from ...util import divup, Assert
 
 
 try:
@@ -14,6 +14,7 @@ except:
   def jit(fn):
     return fn
 
+
 def tiles_like(array, target_shape):
   orig_shape = array.shape
   orig_tile = array.tile_shape()
@@ -22,6 +23,7 @@ def tiles_like(array, target_shape):
     scale = float(target_shape[i]) / orig_shape[i]
     new_tile.append(int(math.ceil(orig_tile[i] * scale)))
   return new_tile
+
 
 @util.synchronized
 def _convolve(local_image, local_filters):
@@ -42,8 +44,10 @@ def _convolve(local_image, local_filters):
 
   return parakeet.imap(_inner, (num_images, num_filts, w, h))
 
+
 def _divup(a, b):
   return int(math.ceil(float(a) / float(b)))
+
 
 @util.synchronized
 @jit
@@ -67,6 +71,7 @@ def _maxpool(array, pool_size, stride):
                 #      target[img, color, x + i, y + j])
 
   return target
+
 
 def stencil_mapper(array, ex, filters=None, images=None, target_shape=None):
   local_filters = filters.glom()
@@ -124,7 +129,7 @@ def stencil(images, filters, stride=1):
                  kw=dict(images=images,
                          filters=filters,
                          target_shape=target.shape),
-                 cost_hint={hash(target):{'00': 0, '01': cost, '10': cost, '11': cost}})
+                 cost_hint={hash(target): {'00': 0, '01': cost, '10': cost, '11': cost}})
 
 
 def _maxpool_mapper(array, ex, pool_size, stride, target_shape):
@@ -144,6 +149,7 @@ def _maxpool_mapper(array, ex, pool_size, stride, target_shape):
 
   yield (target_ex, pooled)
 
+
 def maxpool(images, pool_size=2, stride=2):
   from .shuffle import shuffle
   from .ndarray import ndarray
@@ -160,13 +166,7 @@ def maxpool(images, pool_size=2, stride=2):
                    tile_hint=tile_hint,
                    reduce_fn=np.maximum)
 
-  return shuffle(images,
-                    _maxpool_mapper,
-                    target=target,
-                    kw=dict(target_shape=target.shape,
-                            stride=stride,
-                            pool_size=pool_size))
-
-
-
-
+  return shuffle(images, _maxpool_mapper, target=target,
+                 kw=dict(target_shape=target.shape,
+                         stride=stride,
+                         pool_size=pool_size))
