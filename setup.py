@@ -7,6 +7,8 @@ from Cython.Distutils import build_ext
 from distutils.sysconfig import get_python_lib
 from distutils.command.install import INSTALL_SCHEMES
 
+import shutil
+
 class clean(Command):
   description = 'Remove build and trash files'
   user_options = [("all", "a", "the smae")]
@@ -18,7 +20,7 @@ class clean(Command):
     pass
 
   def run(self):
-    subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp", shell=True)
+    subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp spartan/worker spartan/lib", shell=True)
     subprocess.call("rm -rf spartan/array/*.so spartan/array/*.c spartan/array/*.cpp", shell=True)
     subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp spartan/rpc/simplerpc", shell=True)
     subprocess.call("make -C spartan/src cleanall", shell=True)
@@ -31,6 +33,11 @@ def pre_install():
   subprocess.call("mkdir -p spartan/rpc/simplerpc", shell = True)
   path = os.path.join(os.getcwd(), 'spartan/src/rpc/simple-rpc/pylib/simplerpc/')
   new_path = os.path.join(os.getcwd(), 'spartan/rpc/simplerpc')
+
+  try:
+    os.mkdir('spartan/rpc/simplerpc')
+  except OSError:
+    pass
 
   for f in os.listdir(path):
     if f.endswith(".py"):
@@ -68,20 +75,32 @@ def fetch_from_src(dic):
   '''
   path = os.path.join(os.getcwd(), 'spartan/src')
 
+  #Make directories
+  try:
+    os.mkdir('spartan/lib')
+  except OSError:
+    pass
+
   #From /src/pkg to spartan
   src_pkg = []
   for f in os.listdir(os.path.join(path, 'obj/pkg')):
     src_pkg.append('spartan/src/obj/pkg/' + f)
+    shutil.copyfile(os.path.join(path, 'obj/pkg/')+f, 'spartan/'+f)
+    shutil.copymode(os.path.join(path, 'obj/pkg/')+f, 'spartan/'+f)
 
   #From /src/lib to spartan/lib
   src_lib = []
   for f in os.listdir(os.path.join(path, 'obj/lib')):
     src_lib.append('spartan/src/obj/lib/' + f)
+    shutil.copyfile(os.path.join(path, 'obj/lib/')+f, 'spartan/lib/'+f)
+    shutil.copymode(os.path.join(path, 'obj/lib/')+f, 'spartan/lib/'+f)
 
   #From /src/rpc to spartan/rpc/simplerpc
   src_rpc = []
   for f in os.listdir(os.path.join(path, 'obj/rpc')):
     src_rpc.append('spartan/src/obj/rpc/' + f)
+    shutil.copyfile(os.path.join(path, 'obj/rpc/')+f, 'spartan/rpc/simplerpc/'+f)
+    shutil.copymode(os.path.join(path, 'obj/rpc/')+f, 'spartan/rpc/simplerpc/'+f)
 
   #Copy all pylib/simplerpc/*.py into spartan/rpc/simplerpc
   path = os.getcwd()
@@ -102,7 +121,8 @@ def setup_package():
   old_path = os.getcwd()
 
   #Calling Makefile in spartan/src
-  pre_install()
+  if not 'clean' in sys.argv:
+    pre_install()
 
   #Set Spartan source path first
   os.chdir(src_path)
@@ -254,7 +274,8 @@ def setup_package():
     },
   )
 
-  fetch_from_src(metadata)
+  if not 'clean' in sys.argv:
+    fetch_from_src(metadata)
 
   try:
     setup(**metadata)
