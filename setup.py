@@ -23,7 +23,7 @@ class clean(Command):
     subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp spartan/worker spartan/lib", shell=True)
     subprocess.call("rm -rf spartan/array/*.so spartan/array/*.c spartan/array/*.cpp", shell=True)
     subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp spartan/rpc/simplerpc", shell=True)
-    subprocess.call("make -C spartan/src cleanall", shell=True)
+    subprocess.call("make -C spartan/src clean", shell=True)
     subprocess.call("rm -rf build", shell=True)
 
 #We need to build up src/ before setup invokes
