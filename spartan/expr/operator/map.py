@@ -15,19 +15,19 @@ the same behavior as Numpy broadcasting).
 '''
 
 import collections
+import time
 from traits.api import Instance
 
 from spartan import rpc
-from .. import util, blob_ctx
-from ..array import distarray, tile, extent
-from ..core import LocalKernelResult
-from ..node import indent
-from ..util import Assert
 from .base import ListExpr, TupleExpr, PythonValue, Expr, as_array, NotShapeable
 from .broadcast import Broadcast, broadcast
-from .local import (FnCallExpr, LocalInput, LocalCtx, LocalExpr, LocalMapExpr,
-                    LocalMapLocationExpr, make_var)
-import time
+from .local import FnCallExpr, LocalInput, LocalCtx, LocalExpr, LocalMapExpr
+from .local import LocalMapLocationExpr, make_var
+from ... import util, blob_ctx
+from ...array import distarray, tile, extent
+from ...core import LocalKernelResult
+from ...node import indent
+from ...util import Assert
 
 
 def get_local_values(ex, children, child_to_var):
@@ -299,7 +299,7 @@ class Map2Expr(Expr):
 
   def pretty_str(self):
     return 'Map2[%d](arrays=%s, axes=%s, tile_hint=%s)' % (self.expr_id, self.arrays, self.axes, self.tile_hint)
-  
+
   def compute_shape(self):
     return self.shape
 

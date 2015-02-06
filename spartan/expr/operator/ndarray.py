@@ -2,8 +2,8 @@ import numpy as np
 
 from traits.api import Tuple, Bool, PythonValue
 
-from .base import Expr, expr_like
 from spartan.array import distarray
+from .base import Expr, expr_like
 
 
 class NdArrayExpr(Expr):

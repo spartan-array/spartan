@@ -13,10 +13,10 @@ will prevent Parakeet optimizations (does not allow custom objects).
 
 '''
 
-from .. import util
 from .base import ListExpr, as_array
 from .local import LocalInput, LocalMapLocationExpr, make_var
 from .map import MapExpr
+from ... import util
 
 
 def map_with_location(inputs, fn, numpy_expr=None, fn_kw=None):

@@ -8,12 +8,13 @@ Briefly: global expressions are over arrays, and local expressions are over tile
 chained together; this allows us to construct local DAG's when optimizing,
 which can then be executed or converted to parakeet code.
 '''
-import tempfile
 import imp
+import tempfile
 import time
-import numpy as np
 
+import numpy as np
 import scipy.sparse as sp
+
 from spartan import util
 from spartan.util import Assert
 from spartan.node import Node, indent
@@ -22,11 +23,14 @@ from traits.api import Str, List, Function, PythonValue, Int
 var_id = iter(xrange(1000000))
 expr_id = iter(xrange(1000000))
 
+
 class CodegenException(Exception): pass
+
 
 def make_var():
   '''Return a new unique key for use as a variable name'''
   return 'key_%d' % var_id.next()
+
 
 class LocalCtx(Node):
   inputs = PythonValue
@@ -91,7 +95,7 @@ class FnCallExpr(LocalExpr):
     # drop modules from the prettified string
     pretty_fn = self.fn_name().split('.')[-1]
     return '%s(%s,kw=%s)' % (
-      pretty_fn, indent(','.join([v.pretty_str() for v in self.deps if not isinstance(v, LocalInput)])), indent(','.join(['(k=%s v=%s)'%(k,v) for k,v in self.kw.iteritems()]))
+      pretty_fn, indent(','.join([v.pretty_str() for v in self.deps if not isinstance(v, LocalInput)])), indent(','.join(['(k=%s v=%s)' % (k, v) for k, v in self.kw.iteritems()]))
     )
 
   def fn_name(self):
@@ -121,11 +125,13 @@ class FnCallExpr(LocalExpr):
           deps[i] = deps[i].todense()
     return self.fn(*deps, **self.kw)
 
+
 # The local operation of map and reduce expressions is practically
 # identical.  Reductions take an axis and extent argument in
 # addition to the normal function call arguments.
 class LocalMapExpr(FnCallExpr):
   _op_type = 'map'
+
 
 class LocalMapLocationExpr(LocalMapExpr):
   _op_type = 'map_location'
@@ -141,6 +147,7 @@ class LocalMapLocationExpr(LocalMapExpr):
     #util.log_info('Evaluating %s.%d [%s]', self.fn_name(), self.id, deps)
     return self.fn(*deps, **self.kw)
 
+
 class LocalReduceExpr(FnCallExpr):
   _op_type = 'reduce'
 
@@ -148,6 +155,7 @@ class LocalReduceExpr(FnCallExpr):
 # parakeet requires the source file remain available in
 # order to compile.
 source_files = []
+
 
 # memoize generated modules to avoid recompiling parakeet
 # functions for the same source.
@@ -201,4 +209,3 @@ class ParakeetExpr(LocalExpr):
 
 from spartan.config import FLAGS, BoolFlag
 FLAGS.add(BoolFlag('use_cuda', default=False))
-

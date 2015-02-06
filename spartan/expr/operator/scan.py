@@ -9,11 +9,11 @@ will not compile with Parakeet.
 import numpy as np
 import scipy.sparse as sp
 
-from ..array import extent
-from ..util import divup
 from .map_with_location import map_with_location
-from .shuffle import shuffle
 from .optimize import disable_parakeet
+from .shuffle import shuffle
+from ...array import extent
+from ...util import divup
 
 
 def ex_to_slice(tup):

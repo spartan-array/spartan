@@ -1,13 +1,13 @@
-from spartan import rpc
-
-from .. import blob_ctx, util
-from ..array import distarray, tile
-from ..core import LocalKernelResult
-from ..node import Node
-from ..util import is_iterable, Assert
-from .base import Expr, lazify
 from traits.api import Instance, Function, PythonValue, HasTraits
-from .base import DictExpr, NotShapeable
+
+from spartan import rpc
+from .base import Expr, lazify, DictExpr, NotShapeable
+from ... import blob_ctx, util
+from ...array import distarray, tile
+from ...core import LocalKernelResult
+from ...node import Node
+from ...util import is_iterable, Assert
+
 
 def shuffle(v, fn, cost_hint=None, shape_hint=None, target=None, kw=None):
   '''
@@ -37,6 +37,7 @@ def shuffle(v, fn, cost_hint=None, shape_hint=None, target=None, kw=None):
                      target=target,
                      fn_kw=kw)
 
+
 def target_mapper(ex, map_fn=None, source=None, target=None, fn_kw=None):
   '''
   Kernel function invoked during shuffle.
@@ -63,7 +64,6 @@ def target_mapper(ex, map_fn=None, source=None, target=None, fn_kw=None):
 
 #   util.log_warn('%s futures', len(futures))
   return LocalKernelResult(result=[], futures=futures)
-
 
 
 def notarget_mapper(ex, array=None, map_fn=None, source=None, fn_kw=None):
@@ -118,20 +118,18 @@ class ShuffleExpr(Expr):
 
     map_fn = self.map_fn
     if target is not None:
-      v.foreach_tile(mapper_fn = target_mapper,
-                     kw = dict(map_fn=map_fn, source=v, target=target, fn_kw=fn_kw))
+      v.foreach_tile(mapper_fn=target_mapper,
+                     kw=dict(map_fn=map_fn, source=v, target=target, fn_kw=fn_kw))
       return target
     else:
-      return v.map_to_array(mapper_fn = notarget_mapper,
-                              kw = dict(source=v, map_fn=map_fn, fn_kw=fn_kw))
+      return v.map_to_array(mapper_fn=notarget_mapper,
+                            kw=dict(source=v, map_fn=map_fn, fn_kw=fn_kw))
 
   def compute_shape(self):
-    if self.target != None:
+    if self.target is not None:
       return self.target.shape
-    elif self.shape_hint != None:
+    elif self.shape_hint is not None:
       return self.shape_hint
     else:
       # We don't know the shape after shuffle.
       raise NotShapeable
-
-

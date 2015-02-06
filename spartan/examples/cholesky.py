@@ -3,7 +3,7 @@ import numpy as np
 from scipy import linalg
 from spartan import expr, util
 from spartan.array import extent
-from spartan.expr.base import force
+from spartan.expr.operator.base import force
 from spartan.config import FLAGS
 
 

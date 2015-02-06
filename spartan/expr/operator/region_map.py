@@ -1,7 +1,7 @@
-from ..array import extent
 from .base import Expr
 from .map_with_location import map_with_location
 from .optimize import disable_parakeet
+from ...array import extent
 
 
 @disable_parakeet

@@ -4,17 +4,19 @@ This supports generic reduce operations such as
 ``sum``, ``argmin``, ``argmax``, ``min`` and ``max``.
 
 '''
-import numpy as np
 import collections
+import numpy as np
 
-from ..array import extent, distarray
-from ..expr.local import make_var, LocalExpr, LocalReduceExpr, LocalInput, LocalCtx
+from traits.api import Instance, Function, PythonValue
+
 from spartan.node import indent
-from ..util import Assert
 from . import broadcast
 from .base import Expr, ListExpr
-from ..core import LocalKernelResult
-from traits.api import Instance, Function, PythonValue
+from .local import make_var, LocalExpr, LocalReduceExpr, LocalInput, LocalCtx
+from ...array import extent, distarray
+from ...util import Assert
+from ...core import LocalKernelResult
+
 
 def _reduce_mapper(ex, children, child_to_var, op, axis, output):
   '''Run a local reducer for a tile, and update the appropiate
@@ -67,6 +69,7 @@ def _reduce_mapper(ex, children, child_to_var, op, axis, output):
   output.update(dst_extent, local_reduction)
   return LocalKernelResult(result=[])
 
+
 class ReduceExpr(Expr):
   children = Instance(ListExpr)
   child_to_var = Instance(list)
@@ -92,7 +95,7 @@ class ReduceExpr(Expr):
 
   def pretty_str(self):
     return 'Reduce(%s, axis=%s, %s, hint=%s)' % (self.op.fn.__name__, self.axis,
-                                        indent(self.children.pretty_str()), self.tile_hint)
+                                                 indent(self.children.pretty_str()), self.tile_hint)
 
   def _evaluate(self, ctx, deps):
     children = deps['children']
@@ -115,11 +118,11 @@ class ReduceExpr(Expr):
                                     reducer=tile_accum, tile_hint=self.tile_hint)
 
   # util.log_info('Reducing into array %s', output_array)
-    largest.foreach_tile(_reduce_mapper, kw={'children' : children,
-                                             'child_to_var' : child_to_var,
-                                             'op' : op,
-                                             'axis' : axis,
-                                             'output' : output_array})
+    largest.foreach_tile(_reduce_mapper, kw={'children': children,
+                                             'child_to_var': child_to_var,
+                                             'op': op,
+                                             'axis': axis,
+                                             'output': output_array})
 
     return output_array
 
@@ -147,14 +150,12 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, accumulate_fn, fn_kw=None, tile_h
   if fn_kw is None: fn_kw = {}
   varname = make_var()
 
-  assert not 'axis' in fn_kw, '"axis" argument is reserved.'
+  assert 'axis' not in fn_kw, '"axis" argument is reserved.'
   fn_kw['axis'] = axis
 
   reduce_op = LocalReduceExpr(fn=local_reduce_fn,
-                              deps=[
-                                    LocalInput(idx='extent'),
-                                    LocalInput(idx=varname),
-                              ],
+                              deps=[LocalInput(idx='extent'),
+                                    LocalInput(idx=varname), ],
                               kw=fn_kw)
 
   return ReduceExpr(children=ListExpr(vals=[v]),
@@ -164,4 +165,3 @@ def reduce(v, axis, dtype_fn, local_reduce_fn, accumulate_fn, fn_kw=None, tile_h
                     op=reduce_op,
                     accumulate_fn=accumulate_fn,
                     tile_hint=tile_hint)
-

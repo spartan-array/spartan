@@ -1,8 +1,8 @@
 import numpy as np
 
-from ..array import distarray, extent
-from .. import util, blob_ctx
-from ..util import Assert
+from ... import util, blob_ctx
+from ...array import distarray, extent
+from ...util import Assert
 
 
 def broadcast_mapper(ex, tile, mapper_fn=None, bcast_obj=None):
