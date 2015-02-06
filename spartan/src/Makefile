@@ -11,14 +11,14 @@ OBJ_DIR := $(CUR_DIR)/obj
 PY_CFLAGS = $(shell python-config --cflags)
 PY_LDFLAGS = $(shell python-config --ldflags)
 ifndef $(NUMPY_FLAGS)
-    NUMPY = $(shell python -c "import numpy; print '-I' + numpy.__path__[0] + '/core/include/'")
+    NUMPY = $(shell python -c "import numpy; print '-I' + numpy.__path__[0] + '/core/include/numpy'")
 endif
 
-CFLAGS := -I$(CUR_DIR) -I$(CORE_DIR) -I$(ARRAY_DIR) -I$(RPC) $(NUMPY) $(PY_CFLAGS) -pthread -std=c++0x -O2 -shared -fPIC
-LDFLAGS := -L$(RPC)/build -L$(OBJ_DIR)/lib -L$(OBJ_DIR)/rpc -L$(CURDIR) -L$(RPC) $(PY_LDFLAGS) -lbase -lpython2.7 -std=c++0x -shared
+CFLAGS := -I$(CUR_DIR) -I$(CORE_DIR) -I$(ARRAY_DIR) -I$(RPC) $(PY_CFLAGS) $(NUMPY) -pthread -std=c++0x -O2
+LDFLAGS := -L$(RPC)/build -L$(OBJ_DIR)/lib -L$(OBJ_DIR)/rpc -L$(CURDIR) -L$(RPC) $(PY_LDFLAGS) -lbase -lpython2.7 -std=c++11
 
 OBJS_WORKER = $(CUR_DIR)/core/worker.o
-OBJS_ARRAY = $(ARRAY_DIR)/cslice.o $(ARRAY_DIR)/cextent.o $(ARRAY_DIR)/carray.o $(ARRAY_DIR)/ctile.o $(ARRAY_DIR)/carray_reducer.o
+OBJS_ARRAY = $(ARRAY_DIR)/cslice.o $(ARRAY_DIR)/cextent.o $(ARRAY_DIR)/ctile.o $(ARRAY_DIR)/carray.o $(ARRAY_DIR)/carray_reducer.o
 OBJS_CORE = $(CUR_DIR)/core/cconfig.o
 
 all: rpc $(OBJ_DIR)/lib/libcore.so $(OBJ_DIR)/lib/libspartan_array.so $(OBJ_DIR)/pkg/worker
@@ -49,15 +49,15 @@ rpc: simple-rpc
 
 -include $(OBJS_CORE:.o=.d)
 $(OBJ_DIR)/lib/libcore.so: $(OBJS_CORE)
-	${CC} -o $@ $^ $(LDFLAGS) -Wl,-rpath='$$ORIGIN'
+	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach -Wl,-rpath='$$ORIGIN'
 
 -include $(OBJS_ARRAY:.o=.d)
 $(OBJ_DIR)/lib/libspartan_array.so: $(OBJS_ARRAY)
-	${CC} $(LDFLAGS) -lcore -Wl,-rpath='$$ORIGIN' -Wl,-init,_attach -o $@ $^
+	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach -lcore -Wl,-rpath='$$ORIGIN'
 
 -include $(OBJS_WORKER:.o=.d)
-$(OBJ_DIR)/pkg/worker: $(OBJS_WORKER) $(OBJ_DIR)/lib/libspartan_array.so $(OBJ_DIR)/lib/libcore.so
-	${CC} -o $@ $^ $(LDFLAGS) -Wl,-rpath='$$ORIGIN/lib'
+$(OBJ_DIR)/pkg/worker: $(OBJS_WORKER)
+	${CC} -o $@ $^ $(LDFLAGS) -lsimplerpc -lspartan_array -lcore -Wl,-rpath='$$ORIGIN/lib'
 
 #TODO: This needs to be updated
 clean:

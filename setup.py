@@ -7,6 +7,8 @@ from Cython.Distutils import build_ext
 from distutils.sysconfig import get_python_lib
 from distutils.command.install import INSTALL_SCHEMES
 
+import shutil
+
 class clean(Command):
   description = 'Remove build and trash files'
   user_options = [("all", "a", "the smae")]
@@ -18,18 +20,24 @@ class clean(Command):
     pass
 
   def run(self):
-    subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp", shell=True)
+    subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp spartan/worker spartan/lib", shell=True)
     subprocess.call("rm -rf spartan/array/*.so spartan/array/*.c spartan/array/*.cpp", shell=True)
-    subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp spartan/rpc/service.py spartan/rpc/simplerpc", shell=True)
-    subprocess.call("make -C spartan clean", shell=True)
+    subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp spartan/rpc/simplerpc", shell=True)
+    subprocess.call("make -C spartan/src clean", shell=True)
     subprocess.call("rm -rf build", shell=True)
 
 #We need to build up src/ before setup invokes
 #Assume we are already under /home/..../spartan
 def pre_install():
-  subprocess.call("make -C spartan", shell = True)
+  subprocess.call("make -C spartan/src", shell = True)
+  subprocess.call("mkdir -p spartan/rpc/simplerpc", shell = True)
   path = os.path.join(os.getcwd(), 'spartan/src/rpc/simple-rpc/pylib/simplerpc/')
   new_path = os.path.join(os.getcwd(), 'spartan/rpc/simplerpc')
+
+  try:
+    os.mkdir('spartan/rpc/simplerpc')
+  except OSError:
+    pass
 
   for f in os.listdir(path):
     if f.endswith(".py"):
@@ -45,21 +53,17 @@ def pre_install():
 
   path = os.path.join(os.getcwd(), 'spartan/src/rpc/service.py')
   new_path = os.path.join(os.getcwd(), 'spartan/rpc/simplerpc/service.py')
-  second_path = os.path.join(os.getcwd(), 'spartan/rpc/service.py')
 
   rfp = open(path)
   wfp = open(new_path, 'w')
-  sfp = open(second_path, 'w')
 
   for line in rfp:
-    sfp.write(line)
     line = line.replace('simplerpc.', '.')
     line = line.replace('simplerpc ', '. ')
     wfp.write(line)
 
   rfp.close()
   wfp.close()
-  sfp.close()
 
   #Make marshal.py into .pyx for Cython use
 #  subprocess.call("mv -i spartan/rpc/simplerpc/marshal.py \
@@ -69,17 +73,35 @@ def fetch_from_src(dic):
   '''
   Append executables from /src/* into metadata
   '''
-  #FIXME: Need to move executables to package location so that develop works
-  path = os.path.join(os.getcwd(), 'spartan')
+  path = os.path.join(os.getcwd(), 'spartan/src')
 
-  #Special record to include spartan/lib
-  lib_dir = []
-  for f in os.listdir(os.path.join(path, 'lib')):
-    lib_dir.append(os.path.join(os.path.join(path, 'lib'), f))
+  #Make directories
+  try:
+    os.mkdir('spartan/lib')
+  except OSError:
+    pass
 
-  path = os.path.join(path, 'src')
+  #From /src/pkg to spartan
+  src_pkg = []
+  for f in os.listdir(os.path.join(path, 'obj/pkg')):
+    src_pkg.append('spartan/src/obj/pkg/' + f)
+    shutil.copyfile(os.path.join(path, 'obj/pkg/')+f, 'spartan/'+f)
+    shutil.copymode(os.path.join(path, 'obj/pkg/')+f, 'spartan/'+f)
 
+  #From /src/lib to spartan/lib
+  src_lib = []
+  for f in os.listdir(os.path.join(path, 'obj/lib')):
+    src_lib.append('spartan/src/obj/lib/' + f)
+    shutil.copyfile(os.path.join(path, 'obj/lib/')+f, 'spartan/lib/'+f)
+    shutil.copymode(os.path.join(path, 'obj/lib/')+f, 'spartan/lib/'+f)
+
+  #From /src/rpc to spartan/rpc/simplerpc
   src_rpc = []
+  for f in os.listdir(os.path.join(path, 'obj/rpc')):
+    src_rpc.append('spartan/src/obj/rpc/' + f)
+    shutil.copyfile(os.path.join(path, 'obj/rpc/')+f, 'spartan/rpc/simplerpc/'+f)
+    shutil.copymode(os.path.join(path, 'obj/rpc/')+f, 'spartan/rpc/simplerpc/'+f)
+
   #Copy all pylib/simplerpc/*.py into spartan/rpc/simplerpc
   path = os.getcwd()
   for f in os.listdir(os.path.join(path, 'spartan/rpc/simplerpc')):
@@ -88,7 +110,8 @@ def fetch_from_src(dic):
       src_rpc.append(os.path.join(os.path.join(path, 'spartan/rpc/simplerpc'), f))
 
   dic['data_files'] = [
-                        ('spartan/lib', lib_dir),
+                        ('spartan', src_pkg),
+                        ('spartan/lib', src_lib),
                         ('spartan/rpc/simplerpc', src_rpc), 
                         ('spartan/rpc', ['spartan/src/rpc/service.py'])
                       ]
@@ -129,20 +152,15 @@ def setup_package():
 
   pkgs_dir = {p : p.replace('.', '/') for p in pkgs}
 
-  import numpy
-  from numpy import version
-  print 'numpy:', numpy.__file__
-  print 'version:', version.__file__, version.version
-  numpy_path =  numpy.__path__[0] + '/core/include/'
-  ext_include_dirs = [numpy_path,
-                     '/usr/local/include',
+  ext_include_dirs = ['/usr/local/include',
                       src_path + '/spartan/src',
                       src_path + '/spartan/src/rpc/simple-rpc',
                       src_path + '/spartan/src/rpc/simple-rpc/build', ]
   ext_link_dirs = ['/usr/lib',
-                  src_path + '/spartan',
-                  src_path + '/spartan/lib',
-                  src_path + '/spartan/rpc/simplerpc',
+                  src_path + '/spartan/src/',
+                  src_path + '/spartan/src/obj/pkg',
+                  src_path + '/spartan/src/obj/lib',
+                  src_path + '/spartan/src/obj/rpc',
                   src_path + '/spartan/src/rpc/simple-rpc/build/base',
                   src_path + '/spartan/src/rpc/simple-rpc/build', ]
 
@@ -191,7 +209,7 @@ def setup_package():
                 include_dirs=ext_include_dirs,
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lsparta_array"],
-                extra_link_args=["-std=c++11", "-lspartan_array", "-lcore", "-lbase", "-lpython2.7"],
+                extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"],
                 runtime_library_dirs=runtime_link['spartan/array']),
       Extension('spartan._cblob_ctx_py_if',
                 ['spartan/src/core/_cblob_ctx_py_if.cc'],
@@ -256,7 +274,6 @@ def setup_package():
     },
   )
 
-  #Fetch metadata from spartan/src
   if not 'clean' in sys.argv:
     fetch_from_src(metadata)
 

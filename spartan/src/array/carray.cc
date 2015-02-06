@@ -2,6 +2,7 @@
 #include <Python.h>
 /* For Numpy C-API */
 #define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
+#include <arrayobject.h>
 #include "carray.h"
 #include <sys/time.h>
 
