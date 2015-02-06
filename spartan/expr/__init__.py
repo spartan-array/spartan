@@ -23,7 +23,17 @@ live in their own modules:
 Optimizations on DAGs live in `spartan.expr.optimize`.
 """
 
-from .builtins import *
+from .arrays import astype, tocoo, size
+from .creation import ones, zeros, arange, sparse_empty
+from .creation import diagonal, diag, diagflat, sparse_diagonal
+from .manipulation import ravel, concatenate
+from .mathematics import add, sub, multiply
+from .mathematics import power, ln, log, square, sqrt, exp
+from .mathematics import abs, maximum, sum
+from .srandom import set_random_seed, rand, randn, randint, sparse_rand
+from .statistics import max, min, mean, std, bincount, normalize, norm, norm_cdf
+from .sorting import argmin, argmax, count_nonzero, count_zero
+
 from .assign import assign
 from .retile import retile
 from .dot import dot
