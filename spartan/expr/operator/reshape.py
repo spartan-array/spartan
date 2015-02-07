@@ -210,7 +210,7 @@ class ReshapeExpr(Expr):
     return self.new_shape
 
 
-def reshape(array, new_shape, tile_hint=None):
+def reshape(array, *args, **kargs):
   '''
   Reshape/retile ``array``.
 
@@ -222,6 +222,15 @@ def reshape(array, new_shape, tile_hint=None):
   Returns:
     `ReshapeExpr`: Reshaped array.
   '''
+  if len(args) == 1 and isinstance(args, (tuple, list)):
+    new_shape = args[0]
+  else:
+    new_shape = args
+
+  tile_hint = None
+  if 'tile_hint' in kargs:
+    tile_hint = kargs['tile_hint']
+
   Assert.isinstance(new_shape, tuple)
   array = lazify(array)
 

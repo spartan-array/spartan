@@ -24,12 +24,14 @@ Optimizations on DAGs live in `spartan.expr.optimize`.
 """
 
 from .arrays import astype, tocoo, size
-from .creation import ones, zeros, arange, sparse_empty
+from .creation import empty, sparse_empty, empty_like
+from .creation import zeros, zeros_like, ones, ones_like, eye, identity, full, full_like
 from .creation import diagonal, diag, diagflat, sparse_diagonal
+from .logic import all, any
 from .manipulation import ravel, concatenate
 from .mathematics import add, sub, multiply
 from .mathematics import power, ln, log, square, sqrt, exp
-from .mathematics import abs, maximum, sum
+from .mathematics import abs, maximum, sum, prod
 from .srandom import set_random_seed, rand, randn, randint, sparse_rand
 from .statistics import max, min, mean, std, bincount, normalize, norm, norm_cdf
 from .sorting import argmin, argmax, count_nonzero, count_zero
@@ -60,8 +62,8 @@ from .operator.tile_operation import tile_operation
 from .operator.transpose import transpose
 from .operator.write_array import write, from_numpy, from_file, from_file_parallel
 
-Expr.all = None
-Expr.any = None
+Expr.all = all
+Expr.any = any
 Expr.argmax = argmax
 Expr.argmin = argmin
 Expr.argpartition = argpartition
@@ -69,20 +71,20 @@ Expr.argsort = argsort
 Expr.astype = astype
 Expr.diagonal = diagonal
 Expr.dot = dot
-Expr.fill = None
+Expr.fill = full_like
 Expr.flat = None
-Expr.flatten = None
-Expr.outer = outer
-Expr.max = None
+Expr.flatten = ravel
+Expr.outer = None
+Expr.max = max
 Expr.mean = mean
-Expr.min = None
+Expr.min = min
 Expr.ndim = None
 Expr.nonzero = None
-Expr.partition = None
-Expr.prod = None
+Expr.partition = partition
+Expr.prod = prod
 Expr.ravel = ravel
 Expr.reshape = reshape
-Expr.std = None
+Expr.std = std
 Expr.sum = sum
 Expr.transpose = transpose
-Expr.T = None
+Expr.T = property(transpose)

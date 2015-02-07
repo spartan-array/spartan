@@ -84,3 +84,23 @@ def sum(x, axis=None, tile_hint=None):
                 local_reduce_fn=_sum_local,
                 accumulate_fn=np.add,
                 tile_hint=tile_hint)
+
+
+def _prod_local(ex, data, axis):
+  return data.prod(axis)
+
+
+def prod(x, axis=None, tile_hint=None):
+  '''
+  Prod ``x`` over ``axis``.
+
+
+  :param x: The array to product.
+  :param axis: Either an integer or ``None``.
+  '''
+  return reduce(x,
+                axis=axis,
+                dtype_fn=lambda input: input.dtype,
+                local_reduce_fn=_prod_local,
+                accumulate_fn=np.multiply,
+                tile_hint=tile_hint)
