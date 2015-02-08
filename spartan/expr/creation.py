@@ -42,7 +42,7 @@ def empty(shape, dtype=np.float32, tile_hint=None):
   return ndarray(shape, dtype=dtype, tile_hint=tile_hint, sparse=True)
 
 
-def empyt_like(array, dtype=None, tile_hint=None):
+def empty_like(array, dtype=None, tile_hint=None):
   if dtype is None:
     dtype = array.dtype
   return ndarray(array.shape, dtype=dtype, tile_hint=tile_hint, sparse=array.sparse)
@@ -59,7 +59,7 @@ def eye(N, M=None, k=0, dtype=np.float32, tile_hint=None):
                            _eye_mapper, fn_kw={'k': k, 'dtype': dtype})
 
 
-def identify(n, dtype=np.float32, tile_hint=None):
+def identity(n, dtype=np.float32, tile_hint=None):
   return eye(n, dtype=dtype, tile_hint=tile_hint)
 
 

@@ -26,7 +26,7 @@ Optimizations on DAGs live in `spartan.expr.optimize`.
 from .arrays import astype, tocoo, size
 from .creation import empty, sparse_empty, empty_like
 from .creation import zeros, zeros_like, ones, ones_like, eye, identity, full, full_like
-from .creation import diagonal, diag, diagflat, sparse_diagonal
+from .creation import arange, diagonal, diag, diagflat, sparse_diagonal
 from .logic import all, any
 from .manipulation import ravel, concatenate
 from .mathematics import add, sub, multiply
