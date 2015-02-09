@@ -49,7 +49,8 @@ def empty_like(array, dtype=None, tile_hint=None):
 
 
 def _eye_mapper(tile, ex, k=None, dtype=None):
-  return np.eye(ex.shape[0], M=ex.shape[1], k=(ex.ul[0] + k), dtype=dtype)
+  return np.eye(ex[1][0] - ex[0][0], M=(ex[1][1] - ex[0][1]),
+                k=(ex[0][0] + k), dtype=dtype)
 
 
 def eye(N, M=None, k=0, dtype=np.float32, tile_hint=None):

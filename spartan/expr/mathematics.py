@@ -90,6 +90,13 @@ def _prod_local(ex, data, axis):
   return data.prod(axis)
 
 
+def _prod_dtype_fn(input):
+  if input.dtype == np.int32:
+    return np.dtype(np.int64)
+  else:
+    return input.dtype
+
+
 def prod(x, axis=None, tile_hint=None):
   '''
   Prod ``x`` over ``axis``.
@@ -100,7 +107,7 @@ def prod(x, axis=None, tile_hint=None):
   '''
   return reduce(x,
                 axis=axis,
-                dtype_fn=lambda input: input.dtype,
+                dtype_fn=_prod_dtype_fn,
                 local_reduce_fn=_prod_local,
                 accumulate_fn=np.multiply,
                 tile_hint=tile_hint)
