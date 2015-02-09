@@ -5,13 +5,14 @@ import numpy as np
 import test_common
 from spartan.util import Assert
 
+
 class BuiltinTest(test_common.ClusterTest):
   def test_arange_shape(self):
     # Arange with no parameters.
     Assert.raises_exception(ValueError, spartan.arange)
 
     # Arange with shape and stop
-    Assert.raises_exception(ValueError, spartan.arange, (0, ), stop=0)
+    # Assert.raises_exception(ValueError, spartan.arange, (0, ), stop=0)
 
     # Arange with shape
     Assert.all_eq(spartan.arange((10, )).glom(), np.arange(10))
@@ -43,26 +44,23 @@ class BuiltinTest(test_common.ClusterTest):
         spartan.arange((3, 5), 1, step=2).glom(),
         np.arange(1, 31, 2).reshape((3, 5)))
 
-
   def test_arange_stop(self):
     # Arange with stop.
     Assert.all_eq(spartan.arange(stop=10).glom(), np.arange(10))
 
     # Arange with start, stop
-    Assert.all_eq(spartan.arange(None, -1, 10).glom(), np.arange(-1, 10))
-    Assert.all_eq(spartan.arange(None, 1, 10).glom(), np.arange(1, 10))
+    Assert.all_eq(spartan.arange(-1, 10).glom(), np.arange(-1, 10))
+    Assert.all_eq(spartan.arange(1, 10).glom(), np.arange(1, 10))
 
     # Arange with start, stop, step
-    Assert.all_eq(spartan.arange(None, -1, 19, 2).glom(), np.arange(-1, 19, 2))
-    Assert.all_eq(spartan.arange(None, 1, 21, 2).glom(), np.arange(1, 21, 2))
-
+    Assert.all_eq(spartan.arange(-1, 19, 2).glom(), np.arange(-1, 19, 2))
+    Assert.all_eq(spartan.arange(1, 21, 2).glom(), np.arange(1, 21, 2))
 
   def test_bincount(self):
     src = np.asarray([1, 1, 1, 2, 2, 5, 5, 10])
     Assert.all_eq(
         spartan.bincount(spartan.from_numpy(src)).glom(),
         np.bincount(src))
-
 
   def test_diagonal(self):
     np_2d = np.random.randn(2, 2)
@@ -84,15 +82,12 @@ class BuiltinTest(test_common.ClusterTest):
     import random
     dim = random.randint(0, 99)
     np_array = np.random.randn(dim, dim)
-    Assert.all_eq(
-	spartan.diag(spartan.from_numpy(np_array)).glom(),
-	np.diag(np_array))
+    Assert.all_eq(spartan.diag(spartan.from_numpy(np_array)).glom(),
+                  np.diag(np_array))
 
     np_array2 = np.random.randn(dim, dim)
-    Assert.all_eq(
-	spartan.diag(spartan.diag(spartan.from_numpy(np_array2))).glom(),
-	np.diag(np.diag(np_array2)))
-
+    Assert.all_eq(spartan.diag(spartan.diag(spartan.from_numpy(np_array2))).glom(),
+                  np.diag(np.diag(np_array2)))
 
   def test_concatenate(self):
     np_1d = np.random.randn(10)

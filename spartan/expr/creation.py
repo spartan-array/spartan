@@ -141,7 +141,7 @@ def _arange_mapper(tile, ex, start, stop, step, dtype=None):
   return np.arange(ex_start, ex_stop, step, dtype=dtype).reshape(tile.shape)
 
 
-def arange(start=0, stop=None, step=1, dtype=np.float, tile_hint=None):
+def arange(start=None, stop=None, step=1, dtype=np.float, tile_hint=None):
   '''
   An extended version of `np.arange`.
 
@@ -174,9 +174,18 @@ def arange(start=0, stop=None, step=1, dtype=np.float, tile_hint=None):
   sp.arange((3, 5), -1) == np.arange(-1, 14).reshape((3, 5))
   sp.arange((3, 5), step=2) == np.arange(0, 30, 2).reshape((3, 5))
   '''
+  if start is None and stop is None:
+    raise ValueError('No valid parameters')
+
   shape = None
   if isinstance(start, (tuple, list)):
     shape = start
+    start = 0
+    if stop is not None:
+      start = stop
+      stop = None
+  elif start is None:
+    start = 0
   elif stop is None:
     stop = start
     start = 0
