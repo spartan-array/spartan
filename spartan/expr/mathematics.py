@@ -41,16 +41,30 @@ def _rsub(a, b):
   return map((b, a), fn=np.sub)
 
 
+def _multiply(a, b):
+  if sp.issparse(a):
+    return a.multiply(b)
+  else:
+    return np.multiply(a, b)
+
+
 def multiply(a, b):
-  return map((a, b), fn=np.multiply)
+  return map((a, b), fn=_multiply)
+
+
+def _divide(a, b):
+  if sp.issparse(a):
+    return a.divide(b)
+  else:
+    return np.divide(a, b)
 
 
 def divide(a, b):
-  return map((a, b), fn=np.divide)
+  return map((a, b), fn=_divide)
 
 
 def _rdivide(a, b):
-  return map((b, a), fn=np.divide)
+  return divide(b, a)
 
 
 def true_divide(a, b):

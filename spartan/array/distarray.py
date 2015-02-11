@@ -246,7 +246,6 @@ class DistArrayImpl(DistArray):
         self.ctx.destroy_all(_pending_destructors)
         del _pending_destructors[:]
 
-
   def __reduce__(self):
     return (DistArrayImpl, (self.shape, self.dtype, self.tiles, self.reducer_fn, self.sparse))
 
@@ -261,7 +260,8 @@ class DistArrayImpl(DistArray):
       # Logging during shutdown doesn't work.
       #util.log_debug('Destroying table... %s', self.id)
       tiles = self.tiles.values()
-      _pending_destructors.extend(tiles)
+      if isinstance(_pending_destructors, list):
+        _pending_destructors.extend(tiles)
 
   def id(self):
     return self.table.id()
@@ -284,7 +284,7 @@ class DistArrayImpl(DistArray):
     kw['user_fn'] = mapper_fn
 
     return ctx.map(self.tiles.values(),
-                   mapper_fn = _tile_mapper,
+                   mapper_fn=_tile_mapper,
                    kw=kw)
 
   def fetch(self, region):
@@ -361,7 +361,6 @@ class DistArrayImpl(DistArray):
         else:
           tgt[dst_slice] = result
 
-
     return tgt
 
   def update_slice(self, slc, data):
@@ -419,6 +418,7 @@ class DistArrayImpl(DistArray):
       rpc.wait_for_all(futures)
     else:
       return rpc.FutureGroup(futures)
+
 
 def create(shape,
            dtype=np.float,
@@ -482,6 +482,7 @@ def create(shape,
   master.get().register_array(array)
   return array
 
+
 def from_replica(X):
   '''Make a new, empty DistArray from X'''
   ctx = blob_ctx.get()
@@ -510,6 +511,7 @@ def from_replica(X):
   array = DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
   master.get().register_array(array)
   return array
+
 
 def from_table(extents):
   '''
@@ -544,6 +546,7 @@ def from_table(extents):
   master.get().register_array(array)
   return array
 
+
 class LocalWrapper(DistArray):
   '''
   Provide the `DistArray` interface for local data.
@@ -569,7 +572,7 @@ class LocalWrapper(DistArray):
   def tiles(self):
     # LocalWrapper doesn't actually have tiles, so return a fake tile
     # representing the entire array
-    return {self._ex:core.TileId(-1, 0)}
+    return {self._ex: core.TileId(-1, 0)}
 
   def extent_for_blob(self, tile_id):
     return self._ex
@@ -634,4 +637,3 @@ def largest_value(vals):
   :param vals: List of `DistArray`.
   '''
   return max(vals, key=lambda v: v.real_size())
-
