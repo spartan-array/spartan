@@ -44,3 +44,39 @@ def any(array, axis=None):
                 dtype_fn=lambda input: np.bool,
                 local_reduce_fn=_any_reducer,
                 accumulate_fn=np.logical_or)
+
+
+def equal(a, b):
+  return map((a, b), fn=np.equal)
+
+
+def not_equal(a, b):
+  return map((a, b), fn=np.not_equal)
+
+
+def greater(a, b):
+  return map((a, b), fn=np.greater)
+
+
+def greater_equal(a, b):
+  return map((a, b), fn=np.greater_equal)
+
+
+def less(a, b):
+  return map((a, b), fn=np.less)
+
+
+def less_equal(a, b):
+  return map((a, b), fn=np.less_equal)
+
+
+def logical_and(a, b):
+  return map((a, b), fn=np.logical_and)
+
+
+def logical_or(a, b):
+  return map((a, b), fn=np.logical_or)
+
+
+def logical_xor(a, b):
+  return map((a, b), fn=np.logical_xor)
