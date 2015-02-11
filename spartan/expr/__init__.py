@@ -27,11 +27,13 @@ from .arrays import astype, tocoo, size
 from .creation import empty, sparse_empty, empty_like
 from .creation import zeros, zeros_like, ones, ones_like, eye, identity, full, full_like
 from .creation import arange, diagonal, diag, diagflat, sparse_diagonal
-from .logic import all, any
+from .logic import all, any, equal, not_equal, greater, greater_equal, less, less_equal
+from .logic import logical_and, logical_or, logical_xor
 from .manipulation import ravel, concatenate
-from .mathematics import add, sub, multiply
+from .mathematics import add, sub, multiply, divide, true_divide, floor_divide
+from .mathematics import reciprocal, negative, fmod, mod, remainder
 from .mathematics import power, ln, log, square, sqrt, exp
-from .mathematics import abs, maximum, sum, prod
+from .mathematics import abs, maximum, minimum, sum, prod
 from .srandom import set_random_seed, rand, randn, randint, sparse_rand
 from .statistics import max, min, mean, std, bincount, normalize, norm, norm_cdf
 from .sorting import argmin, argmax, count_nonzero, count_zero
@@ -62,6 +64,7 @@ from .operator.tile_operation import tile_operation
 from .operator.transpose import transpose
 from .operator.write_array import write, from_numpy, from_file, from_file_parallel
 
+
 Expr.all = all
 Expr.any = any
 Expr.argmax = argmax
@@ -88,3 +91,51 @@ Expr.std = std
 Expr.sum = sum
 Expr.transpose = transpose
 Expr.T = property(transpose)
+
+from ..array import distarray
+import mathematics
+
+distarray.DistArray.__add__ = add
+distarray.DistArray.__sub__ = sub
+distarray.DistArray.__mul__ = multiply
+distarray.DistArray.__mod__ = mod
+distarray.DistArray.__div__ = divide
+distarray.DistArray.__eq__ = equal
+distarray.DistArray.__ne__ = not_equal
+distarray.DistArray.__lt__ = less
+distarray.DistArray.__gt__ = greater
+distarray.DistArray.__and__ = logical_and
+distarray.DistArray.__or__ = logical_or
+distarray.DistArray.__xor = logical_xor
+distarray.DistArray.__pow__ = power
+distarray.DistArray.__neg__ = negative
+distarray.DistArray.__rsub__ = mathematics._rsub
+distarray.DistArray.__radd__ = add
+distarray.DistArray.__rmul__ = multiply
+distarray.DistArray.__rdiv__ = mathematics._rdivide
+distarray.DistArray.all = all
+distarray.DistArray.any = any
+distarray.DistArray.argmax = argmax
+distarray.DistArray.argmin = argmin
+distarray.DistArray.argpartition = argpartition
+distarray.DistArray.argsort = argsort
+distarray.DistArray.astype = astype
+distarray.DistArray.diagonal = diagonal
+distarray.DistArray.dot = dot
+distarray.DistArray.fill = full_like
+distarray.DistArray.flat = None
+distarray.DistArray.flatten = ravel
+distarray.DistArray.outer = None
+distarray.DistArray.max = max
+distarray.DistArray.mean = mean
+distarray.DistArray.min = min
+distarray.DistArray.ndim = None
+distarray.DistArray.nonzero = None
+distarray.DistArray.partition = partition
+distarray.DistArray.prod = prod
+distarray.DistArray.ravel = ravel
+distarray.DistArray.reshape = reshape
+distarray.DistArray.std = std
+distarray.DistArray.sum = sum
+distarray.DistArray.transpose = transpose
+distarray.DistArray.T = property(transpose)

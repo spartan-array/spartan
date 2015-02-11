@@ -7,15 +7,28 @@ from spartan.util import Assert
 
 
 class NumpyIfTest(test_common.ClusterTest):
-  def test_arange_shape(self):
-    # Arange with no parameters.
-    A = spartan.arange(40000, dtype=np.int32).reshape(100, 400)
+  #def test_expr(self):
+    ## Arange with no parameters.
+    #A = spartan.arange(40000, dtype=np.int32).reshape(100, 400)
+    #nA = np.arange(40000).reshape(100, 400)
+    #B = A.transpose()
+    #nB = nA.transpose()
+    #C = B.T
+    #nC = nB.T
+    #D = C / 100
+    #nD = nC / 100
+    #E = D.all()
+    #nE = nD.all()
+    #Assert.all_eq(E.glom(), nE)
+
+  def test_distarray(self):
+    A = spartan.arange(40000, dtype=np.int32).reshape(100, 400).force()
     nA = np.arange(40000).reshape(100, 400)
-    B = A.transpose()
+    B = A.transpose().force()
     nB = nA.transpose()
-    C = B.T
+    C = B.T.force()
     nC = nB.T
-    D = C / 100
+    D = (C / 100).force()
     nD = nC / 100
     E = D.all()
     nE = nD.all()

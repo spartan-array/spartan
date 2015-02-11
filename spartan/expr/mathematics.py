@@ -21,25 +21,82 @@ from ..array.extent import index_for_reduction, shapes_match
 from ..util import Assert
 
 
-def multiply(a, b):
-  assert a.shape == b.shape
-  return map((a, b), fn=lambda a, b: a.multiply(b) if sp.issparse(a) else a * b)
-
-
-def power(a, b):
-  return map((a, b), fn=np.power)
-
-
 def add(a, b):
   return map((a, b), fn=np.add)
+
+
+def reciprocal(a):
+  return map(a, fn=np.reciprocal)
+
+
+def negative(a):
+  return map(a, fn=np.negative)
 
 
 def sub(a, b):
   return map((a, b), fn=np.subtract)
 
 
+def _rsub(a, b):
+  return map((b, a), fn=np.sub)
+
+
+def _multiply(a, b):
+  if sp.issparse(a):
+    return a.multiply(b)
+  else:
+    return np.multiply(a, b)
+
+
+def multiply(a, b):
+  return map((a, b), fn=_multiply)
+
+
+def _divide(a, b):
+  if sp.issparse(a):
+    return a.divide(b)
+  else:
+    return np.divide(a, b)
+
+
+def divide(a, b):
+  return map((a, b), fn=_divide)
+
+
+def _rdivide(a, b):
+  return divide(b, a)
+
+
+def true_divide(a, b):
+  return map((a, b), fn=np.true_divide)
+
+
+def floor_divide(a, b):
+  return map((a, b), fn=np.floor_divide)
+
+
+def fmod(a, b):
+  return map((a, b), fn=np.fmod)
+
+
+def mod(a, b):
+  return map((a, b), fn=np.mod)
+
+
+def remainder(a, b):
+  return remainder((a, b), fn=np.remainder)
+
+
+def power(a, b):
+  return map((a, b), fn=np.power)
+
+
 def maximum(a, b):
   return map((a, b), np.maximum)
+
+
+def minimum(a, b):
+  return map((a, b), np.minimum)
 
 
 def ln(v):
