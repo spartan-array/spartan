@@ -89,29 +89,6 @@ class BuiltinTest(test_common.ClusterTest):
     Assert.all_eq(spartan.diag(spartan.diag(spartan.from_numpy(np_array2))).glom(),
                   np.diag(np.diag(np_array2)))
 
-  def test_concatenate(self):
-    np_1d = np.random.randn(10)
-    sp_1d = spartan.from_numpy(np_1d)
-    Assert.all_eq(
-        spartan.concatenate(sp_1d, sp_1d).glom(),
-        np.concatenate((np_1d, np_1d)))
-
-    np_2d = np.arange(1024).reshape(32, 32)
-    sp_2d = spartan.from_numpy(np_2d)
-    Assert.all_eq(
-        spartan.concatenate(sp_2d, sp_2d).glom(),
-        np.concatenate((np_2d, np_2d)))
-    Assert.all_eq(
-        spartan.concatenate(sp_2d, sp_2d, 1).glom(),
-        np.concatenate((np_2d, np_2d), 1))
-
-    np_15x5 = np.random.randn(15, 5)
-    np_15x7 = np.random.randn(15, 7)
-    sp_15x5 = spartan.from_numpy(np_15x5)
-    sp_15x7 = spartan.from_numpy(np_15x7)
-    Assert.all_eq(
-        spartan.concatenate(sp_15x5, sp_15x7, 1).glom(),
-        np.concatenate((np_15x5, np_15x7), 1))
 
   def test_max(self):
     src = np.asarray([1, 1, 1, 2, 2, 5, 5, 10])
