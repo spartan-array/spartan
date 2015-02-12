@@ -26,10 +26,6 @@ def configure(conf):
 
     conf.env.LIB_PTHREAD = 'pthread'
     conf.env.USES += " PTHREAD"
-    conf.env.INCLUDES_BASE = os.path.join(os.getcwd(), "../base-utils")
-    conf.env.LIBPATH_BASE = os.path.join(os.getcwd(), "../base-utils/build")
-    conf.env.LIB_BASE = 'base'
-    conf.env.USES += " BASE"
     conf.find_program('protoc', var='PROTOC', mandatory=False)
     if conf.env.PROTOC != []:
         Logs.pprint("PINK", "Google protocol buffer support enabled")
@@ -43,13 +39,14 @@ def build(bld):
     _depend("test/test_service.h test/test_service.py", "test/test_service.rpc", "bin/rpcgen --cpp --python test/test_service.rpc")
     _depend("test/floodtest_service.h test/floodtest_service.py", "test/floodtest_service.rpc", "bin/rpcgen --cpp --python test/floodtest_service.rpc")
 
-    #bld.stlib(source=bld.path.ant_glob("rpc/*.cc"), target="simplerpc", includes="rpc", use=bld.env.USES)
-    bld.shlib(source=bld.path.ant_glob("rpc/*.cc"), target="simplerpc", includes="rpc", use=bld.env.USES)
+    bld.shlib(source=bld.path.ant_glob("base/*.cc"), target="base", includes=". base", use="PTHREAD")
+    bld.shlib(source=bld.path.ant_glob("rpc/*.cc"), target="simplerpc", includes=". rpc", use=bld.env.USES, rpath = '$ORIGIN')
+
     bld.stlib(
         source="rlog/rlog.cc",
         target="rlog",
         includes=". rlog rpc",
-        use="simplerpc %s" % bld.env.USES)
+        use="simplerpc base %s" % bld.env.USES)
 
     if "PYTHON" in bld.env.USES:
         bld.shlib(
@@ -57,11 +54,12 @@ def build(bld):
             source=bld.path.ant_glob("pylib/simplerpc/*.cc"),
             target="_pyrpc",
             includes=". rpc",
-            use="simplerpc %s" % bld.env.USES)
+            use="simplerpc base %s" % bld.env.USES,
+            rpath = '$ORIGIN/../../lib')
     else:
         Logs.pprint("RED", "Python extension will not be built")
 
-    def _prog(source, target, includes=".", use="simplerpc %s" % bld.env.USES):
+    def _prog(source, target, includes=".", use="simplerpc base %s" % bld.env.USES):
         bld.program(source=source, target=target, includes=includes, use=use)
 
     _prog("test/rpcbench.cc test/benchmark_service.cc", "rpcbench")

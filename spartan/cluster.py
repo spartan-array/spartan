@@ -47,7 +47,8 @@ def start_remote_worker(worker, st, ed):
 
   args += [
           #'gdb', '-ex', 'run', '--args',
-          'spartan/worker',
+          #'spartan/worker',
+          os.path.dirname(spartan.__file__) + '/worker',
           '--master=%s:%d' % (socket.gethostname(), FLAGS.port_base),
           '--count=%d' % (ed - st),
           '--heartbeat_interval=%d' % FLAGS.heartbeat_interval

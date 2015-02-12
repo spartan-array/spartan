@@ -36,8 +36,8 @@ private:
     rpc::PollMgr* _clt_poll;
     rpc::ClientPool* _clt_pool;
 
-    int32_t HEARTBEAT_INTERVAL = 3;
-
+    //int32_t HEARTBEAT_INTERVAL = 3;
+    int32_t HEARTBEAT_INTERVAL;
 
     PyObject *local_module;
     PyObject *init_fn;
