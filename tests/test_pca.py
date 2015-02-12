@@ -1,5 +1,5 @@
 import test_common
-from spartan.examples.pca import PCA 
+from spartan.examples.pca import PCA
 from spartan import expr, util, blob_ctx
 import numpy as np
 from numpy import absolute
@@ -10,9 +10,10 @@ N_COMPONENTS = 10
 
 class TestPCA(test_common.ClusterTest):
   def test_pca(self):
-    ctx = blob_ctx.get() 
+    expr.set_random_seed()
+    ctx = blob_ctx.get()
     A =  expr.randn(*DIM, tile_hint=(int(DIM[0]/ctx.num_workers), DIM[1])).force()
-    
+
     m = PCA(N_COMPONENTS)
     m2 = SK_PCA(N_COMPONENTS)
 
