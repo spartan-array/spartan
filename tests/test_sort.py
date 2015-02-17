@@ -5,10 +5,11 @@ import numpy as np
 from datetime import datetime
 from spartan.util import Assert
 
+
 #@test_common.with_ctx
 #def test_pr(ctx):
 def benchmark_sort(ctx, timer):
-  A = expr.rand(10, 10, 10).force()
+  A = expr.rand(10, 10, 10).evaluate()
   T = expr.sort(A)
   print np.all(np.equal(T.glom(), np.sort(A.glom(), axis=None)))
 

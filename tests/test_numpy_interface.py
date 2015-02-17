@@ -22,13 +22,13 @@ class NumpyIfTest(test_common.ClusterTest):
     #Assert.all_eq(E.glom(), nE)
 
   def test_distarray(self):
-    A = spartan.arange(40000, dtype=np.int32).reshape(100, 400).force()
+    A = spartan.arange(40000, dtype=np.int32).reshape(100, 400).evaluate()
     nA = np.arange(40000).reshape(100, 400)
-    B = A.transpose().force()
+    B = A.transpose().evaluate()
     nB = nA.transpose()
-    C = B.T.force()
+    C = B.T.evaluate()
     nC = nB.T
-    D = (C / 100).force()
+    D = (C / 100).evaluate()
     nD = nC / 100
     E = D.all()
     nE = nD.all()

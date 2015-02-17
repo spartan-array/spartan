@@ -84,7 +84,7 @@ def fn1():
 
 def record_time(expr, alg):
   t1 = time.time()
-  expr.optimized().force()
+  expr.optimized().evaluate()
   t2 = time.time()
 
   print alg, t2 - t1, '\n'

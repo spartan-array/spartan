@@ -9,13 +9,13 @@ class ReshapeTest(test_common.ClusterTest):
   def test_reshape1(self):
     a = expr.arange((10, 10))
     b = expr.reshape(a, (100,))
-    c = expr.arange((100,)) 
+    c = expr.arange((100,))
     Assert.all_eq(b.glom(), c.glom())
-  
+
   def test_reshape2(self):
     a = expr.arange((1000,), tile_hint=[100])
-    b = expr.reshape(a, (10, 100)).force()
-    c = expr.reshape(b, (1000,)).force()
+    b = expr.reshape(a, (10, 100)).evaluate()
+    c = expr.reshape(b, (1000,)).evaluate()
 
   def test_reshape3(self):
     a = expr.arange((100, 100))
@@ -119,4 +119,3 @@ class ReshapeTest(test_common.ClusterTest):
     t2 = expr.from_numpy(npa2)
     t3 = expr.dot(expr.reshape(t1, (718, 1)), t2)
     Assert.all_eq(result, t3.glom(), 10e-9)
-

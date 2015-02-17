@@ -22,7 +22,6 @@ def benchmark_cholesky(ctx, timer):
   util.log_warn('prepare data!')
   #A = np.random.randn(ARRAY_SIZE, ARRAY_SIZE)
   #A = np.dot(A, A.T)
-  #A = expr.force(from_numpy(A, tile_hint=(ARRAY_SIZE/n, ARRAY_SIZE/n)))
 
   A = expr.randn(ARRAY_SIZE, ARRAY_SIZE)
   A = expr.dot(A, expr.transpose(A))

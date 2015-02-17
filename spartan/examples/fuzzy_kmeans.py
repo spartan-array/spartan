@@ -73,7 +73,7 @@ def fuzzy_kmeans(points, k=10, num_iter=10, m=2.0, centers=None):
     m(float): the parameter of fuzzy kmeans.
     centers(Expr or DistArray): the initialized centers of each cluster.
   '''
-  points = expr.force(points)
+  points = points.evaluate()
   num_dim = points.shape[1]
   if centers is None:
       centers = expr.rand(k, num_dim)
@@ -101,7 +101,7 @@ def fuzzy_kmeans(points, k=10, num_iter=10, m=2.0, centers=None):
                                                    'centers': new_centers,
                                                    'counts': new_counts,
                                                    'labels': labels,
-                                                   'm': m}).force()
+                                                   'm': m}).evaluate()
 
     # If any centroids don't have any points assigned to them.
     zcount_indices = (new_counts.glom() == 0).reshape(k)

@@ -11,7 +11,7 @@ import numpy as np
 
 from traits.api import Any, Instance, Int, PythonValue
 
-from ... import blob_ctx, node, util
+from ... import blob_ctx, util
 from ...node import Node, indent
 from ...util import Assert, copy_docstring
 from ...array import distarray
@@ -35,6 +35,7 @@ class NotShapeable(Exception):
 
 unique_id = iter(xrange(10000000))
 
+
 def _map(*args, **kw):
   '''
   Indirection for handling builtin operators (+,-,/,*).
@@ -46,6 +47,7 @@ def _map(*args, **kw):
   from .map import map
   return map(args, fn)
 
+
 def expr_like(expr, **kw):
   '''Construct a new expression like ``expr``.
 
@@ -54,7 +56,7 @@ def expr_like(expr, **kw):
   kw['expr_id'] = expr.expr_id
 
   trace = kw.pop('trace', None)
-  if trace != None and FLAGS.opt_keep_stack:
+  if trace is not None and FLAGS.opt_keep_stack:
     trace.fuse(expr.stack_trace)
     kw['stack_trace'] = trace
   else:
@@ -64,6 +66,7 @@ def expr_like(expr, **kw):
 
   #util.log_info('Copied %s', new_expr)
   return new_expr
+
 
 # Pulled out as a class so that we can add documentation.
 class EvalCache(object):
@@ -108,6 +111,7 @@ class EvalCache(object):
   def clear(self):
     self.refs.clear()
     self.cache.clear()
+
 
 class ExprTrace(object):
   '''
@@ -154,6 +158,7 @@ class ExprTrace(object):
 
 eval_cache = EvalCache()
 
+
 class Expr(Node):
   '''
   Base class for all expressions.
@@ -163,7 +168,7 @@ class Expr(Node):
   An expression can have one or more dependencies, which must
   be evaluated before the expression itself.
 
-  Expressions may be evaluated (using `Expr.force`), the
+  Expressions may be evaluated (using `Expr.evaluate`), the
   result of evaluating an expression is cached until the expression
   itself is reclaimed.
   '''
@@ -406,12 +411,12 @@ class Expr(Node):
             del_dim.append(x)
 
       if isinstance(idx, int) or is_del_dim or (isinstance(idx, tuple) and (newaxis in idx)):
-	#The shape has to be updated
+        #The shape has to be updated
         if isinstance(idx, tuple):
           new_shape = tuple([slice(x, None, None) if x == -1 else x for x in idx if not x == newaxis])
         else:
           new_shape = idx
-        ret = SliceExpr(src=self, idx = new_shape)
+        ret = SliceExpr(src=self, idx=new_shape)
 
         new_shape = []
         if isinstance(idx, tuple):
@@ -465,11 +470,6 @@ class Expr(Node):
   def size(self):
     return np.prod(self.shape)
 
-  def force(self):
-    'Evaluate this expression (and all dependencies).'
-    return self.evaluate()
-    #return self.optimized().evaluate()
-
   def optimized(self):
     '''
     Return an optimized version of this expression graph.
@@ -499,8 +499,6 @@ class Expr(Node):
 
   def __reduce__(self):
     return evaluate(self).__reduce__()
-
-
 
 
 class AsArray(Expr):
@@ -576,21 +574,31 @@ class CollectionExpr(Expr):
 
 
 class DictExpr(CollectionExpr):
-  def iteritems(self): return self.vals.iteritems()
-  def keys(self): return self.vals.keys()
-  def values(self): return self.vals.values()
-  def itervalues(self): return self.vals.itervalues()
-  def iterkeys(self): return self.vals.iterkeys()
+  def iteritems(self):
+    return self.vals.iteritems()
+
+  def keys(self):
+    return self.vals.keys()
+
+  def values(self):
+    return self.vals.values()
+
+  def itervalues(self):
+    return self.vals.itervalues()
+
+  def iterkeys(self):
+    return self.vals.iterkeys()
 
   def pretty_str(self):
     return '{ %s } ' % ',\n'.join(
-      ['%s : %s' % (k, repr(v)) for k, v in self.vals.iteritems()])
+        ['%s : %s' % (k, repr(v)) for k, v in self.vals.iteritems()])
 
   def dependencies(self):
     return self.vals
 
   def visit(self, visitor):
     return DictExpr(vals=dict([(k, visitor.visit(v)) for (k, v) in self.vals.iteritems()]))
+
 
 class ListExpr(CollectionExpr):
   def dependencies(self):
@@ -615,6 +623,7 @@ class ListExpr(CollectionExpr):
   def __len__(self):
     return len(self.vals)
 
+
 class TupleExpr(CollectionExpr):
   def dependencies(self):
     return dict(('v%d' % i, self.vals[i]) for i in range(len(self.vals)))
@@ -634,6 +643,7 @@ class TupleExpr(CollectionExpr):
 
   def __len__(self):
     return len(self.vals)
+
 
 def glom(value):
   '''
@@ -661,13 +671,6 @@ def optimized_dag(node):
   return optimize.optimize(node)
 
 
-def force(node):
-  '''
-  Evaluate ``node``.
-  :param node: `Expr`
-  '''
-  return evaluate(node)
-
 def evaluate(node):
   '''
   Evaluate ``node``.
@@ -675,10 +678,11 @@ def evaluate(node):
   :param node: `Expr`
   '''
   if isinstance(node, Expr):
-    return node.force()
+    return node.evaluate()
 
   Assert.isinstance(node, (np.ndarray, distarray.DistArray))
   return node
+
 
 def eager(node):
   '''
@@ -686,7 +690,7 @@ def eager(node):
 
   :param node: `Expr` to evaluate.
   '''
-  result = force(node)
+  result = evaluate(node)
   return Val(val=result)
 
 

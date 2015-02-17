@@ -15,7 +15,7 @@ import spartan
 
 from spartan import expr
 from spartan.expr import (arange, assign, concatenate, exp, maximum, mean,
-    ones, randn, sqrt, std, zeros)
+                          ones, randn, sqrt, std, zeros)
 
 # Parameter Values.
 DELTA = 0.5
@@ -67,8 +67,8 @@ def simulate(ts_all, te_all, lamb_all, num_paths):
 
       # Simulations of the plane f_kn for each time step.
       for t in xrange(1, time_structure.shape[0]):
-        f_kn_new = f_kn[1:, :]*exp(lamb*mu(f_kn, lamb)*DELTA-0.5*lamb*lamb *
-            DELTA + lamb*eps[t - 1, :]*sqrt(DELTA))
+        f_kn_new = f_kn[1:, :] * exp(lamb * mu(f_kn, lamb) * DELTA-0.5 * lamb * lamb *
+                                     DELTA + lamb * eps[t - 1, :]*sqrt(DELTA))
         f_kk = assign(f_kk, np.s_[t, :], f_kn_new[0])
         f_kn = f_kn_new
 
@@ -96,8 +96,7 @@ def simulate(ts_all, te_all, lamb_all, num_paths):
       me = mean((swaption[0:num_paths] + swaption[num_paths:])/2) * 10000
       st = std((swaption[0:num_paths] + swaption[num_paths:])/2)/sqrt(num_paths)*10000
 
-      swaptions.append([me.optimized().force(), st.optimized().force()])
+      swaptions.append([me.optimized().evaluate(), st.optimized().evaluate()])
       #print time() - start
       i += 1
   return swaptions
-

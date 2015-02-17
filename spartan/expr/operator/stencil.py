@@ -107,7 +107,7 @@ def stencil(images, filters, stride=1):
   images = eager(images)
   filters = eager(filters)
 
-  images = images.force()
+  images = images.evaluate()
 
   n_img, n_col, w, h = images.shape
   n_filt, f_col, fw, fh = filters.shape
@@ -154,7 +154,7 @@ def maxpool(images, pool_size=2, stride=2):
   from .shuffle import shuffle
   from .ndarray import ndarray
 
-  images = images.force()
+  images = images.evaluate()
   n_img, n_col = images.shape[:2]
   tgt_shape = divup(images.shape[2:], stride)
   tile_hint = tiles_like(images, (n_img, n_col,) + tgt_shape)

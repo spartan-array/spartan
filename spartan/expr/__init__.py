@@ -5,7 +5,7 @@ Definitions of expressions and optimizations.
 
 In Spartan, operations are not performed immediately.  Instead, they are
 represented using a graph of `Expr` nodes.  Expression graphs can be
-evaluated using the `Expr.evaluate` or `Expr.force` methods.
+evaluated using the `Expr.evaluate` methods.
 
 The `base` module contains the definition of `Expr`, the base class for all
 types of expressions.  It also defines subclasses for wrapping common
@@ -44,7 +44,7 @@ from .dot import dot
 from .fio import save, load, pickle, unpickle, partial_load, partial_unpickle
 
 from .operator.base import Expr, evaluate, optimized_dag
-from .operator.base import eager, lazify, as_array, force, glom
+from .operator.base import eager, lazify, as_array, glom
 from .operator.base import NotShapeable, newaxis
 from .operator.broadcast import broadcast
 from .operator.checkpoint import checkpoint
@@ -95,6 +95,7 @@ Expr.T = property(transpose)
 from ..array import distarray
 import mathematics
 
+distarray.DistArray.evaluate = evaluate
 distarray.DistArray.__add__ = add
 distarray.DistArray.__sub__ = sub
 distarray.DistArray.__mul__ = multiply

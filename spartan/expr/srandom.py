@@ -33,7 +33,7 @@ def _set_random_seed_mapper(input):
 def set_random_seed():
   ctx = blob_ctx.get()
   map(ndarray((ctx.num_workers, ), dtype=np.int32,
-              tile_hint=(1, )), fn=_set_random_seed_mapper).force()
+              tile_hint=(1, )), fn=_set_random_seed_mapper).evaluate()
 
 
 @disable_parakeet
