@@ -56,8 +56,8 @@ $(OBJ_DIR)/lib/libspartan_array.so: $(OBJS_ARRAY)
 	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach -lcore -Wl,-rpath='$$ORIGIN'
 
 -include $(OBJS_WORKER:.o=.d)
-$(OBJ_DIR)/pkg/worker: $(OBJS_WORKER)
-	${CC} -o $@ $^ $(LDFLAGS) -lsimplerpc -lspartan_array -lcore -Wl,-rpath='$$ORIGIN/lib'
+$(OBJ_DIR)/pkg/worker: $(OBJS_WORKER) $(OBJ_DIR)/lib/libspartan_array.so $(OBJ_DIR)/lib/libcore.so
+	${CC} -o $@ $(OBJS_WORKER) $(LDFLAGS) -lsimplerpc -lspartan_array -lcore -Wl,-rpath='$$ORIGIN/lib'
 
 #TODO: This needs to be updated
 clean:

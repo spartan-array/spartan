@@ -202,7 +202,8 @@ def setup_package():
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lspartan_array"],
                 extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"],
-                runtime_library_dirs=runtime_link['spartan/array']),
+                runtime_library_dirs=runtime_link['spartan/array'],
+                depends=["spartan/lib/libspartan_array.so"]),
       Extension('spartan.array._ctile_py_if',
                 ['spartan/src/array/_ctile_py_if.cc'],
                 language='c++',
@@ -210,7 +211,8 @@ def setup_package():
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lsparta_array"],
                 extra_link_args=["-std=c++11", "-lspartan_array", "-lpython2.7"],
-                runtime_library_dirs=runtime_link['spartan/array']),
+                runtime_library_dirs=runtime_link['spartan/array'],
+                depends=["spartan/lib/libspartan_array.so"]),
       Extension('spartan._cblob_ctx_py_if',
                 ['spartan/src/core/_cblob_ctx_py_if.cc'],
                 language='c++',
@@ -219,7 +221,13 @@ def setup_package():
                 extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc", "-lcore"],
                 extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
                                 "-lbase", "-lcore", "-lpython2.7"],
-                runtime_library_dirs=runtime_link['spartan']),
+                runtime_library_dirs=runtime_link['spartan'],
+                depends=[
+                          "spartan/lib/libspartan_array.so",
+                          "spartan/lib/libsimplerpc.so",
+                          "spartan/lib/libcore.so",
+                          "spartan/lib/libbase.so"
+                        ]),
       Extension('spartan.rpc._rpc_array',
                 ['spartan/src/rpc/_rpc_array.cc'],
                 language='c++',
@@ -228,7 +236,12 @@ def setup_package():
                 extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc"],
                 extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
                                 "-lbase", "-lpython2.7"],
-                runtime_library_dirs=runtime_link['spartan/rpc']),
+                runtime_library_dirs=runtime_link['spartan/rpc'],
+                depends=[
+                          "spartan/lib/libspartan_array.so",
+                          "spartan/lib/libsimplerpc.so",
+                          "spartan/lib/libbase.so"
+                        ]),
       Extension('spartan.expr.tiling',
                 sources=['spartan/expr/tiling.cc'],
                 language='c++',
@@ -259,7 +272,8 @@ def setup_package():
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lcore", "-pipe"],
                 extra_link_args=["-std=c++11", "-lcore"],
-                runtime_library_dirs=runtime_link['spartan']),
+                runtime_library_dirs=runtime_link['spartan'],
+                depends=["spartan/lib/libcore.so"]),
 
       # Example extensions
       Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core.pyx']),
