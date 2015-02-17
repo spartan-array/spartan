@@ -3,6 +3,7 @@ from spartan import core, expr, util, blob_ctx
 import numpy as np
 from .qr import qr
 
+
 def svd(A, k=None):
   """
   Stochastic SVD.
@@ -28,9 +29,9 @@ def svd(A, k=None):
   Omega = expr.randn(A.shape[1], k)
 
   Y = expr.dot(A, Omega)
-  
+
   Q, R = qr(Y)
-  
+
   B = expr.dot(expr.transpose(Q), A)
   BTB = expr.dot(B, expr.transpose(B)).optimized().glom()
 
@@ -42,6 +43,6 @@ def svd(A, k=None):
   S = S[si]
   U_ = U_[:, si]
 
-  U = expr.dot(Q, U_).optimized().force()
+  U = expr.dot(Q, U_).optimized().evaluate()
   V = np.dot(np.dot(expr.transpose(B).optimized().glom(), U_), np.diag(np.ones(S.shape[0]) / S))
-  return U, S, V.T 
+  return U, S, V.T

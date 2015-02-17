@@ -93,4 +93,4 @@ def scan(array, reduce_fn=np.sum, scan_fn=np.cumsum, axis=None):
                            fn_kw={'scan_fn': scan_fn,
                                   'axis': axis,
                                   'scan_base': fetch_result,
-                                  'tile_shape': array.force().tile_shape()})
+                                  'tile_shape': array.evaluate().tile_shape()})

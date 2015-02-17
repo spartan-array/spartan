@@ -31,6 +31,7 @@ class RedirectStdStreams(object):
     sys.stdout = self.old_stdout
     sys.stderr = self.old_stderr
 
+
 # Since nobody will check the output of OK unittest,
 # capture it to make output cleaerer.
 class TestTrace(test_common.ClusterTest):
@@ -44,7 +45,7 @@ class TestTrace(test_common.ClusterTest):
 
   def test_trace(self):
     devnull = open(os.devnull, 'w')
-    with RedirectStdStreams(stdout = devnull, stderr = devnull):
+    with RedirectStdStreams(stdout=devnull, stderr=devnull):
       t1 = expr.randn(100, 100)
       t2 = expr.randn(200, 100)
       t3 = expr.add(t1, t2)
@@ -54,7 +55,7 @@ class TestTrace(test_common.ClusterTest):
       t7 = expr.add(t6, t5)
       t8 = t7.optimized()
       try:
-        t8.force()
+        t8.evaluate()
       except Exception as e:
         pass
 
@@ -65,7 +66,7 @@ class TestTrace(test_common.ClusterTest):
       t5 = expr.add(t3, t4)
       t6 = t5.optimized()
       try:
-        t6.force()
+        t6.evaluate()
       except Exception as e:
         pass
 
@@ -79,7 +80,7 @@ class TestTrace(test_common.ClusterTest):
       t8 = expr.count_zero(t7)
       t9 = t8.optimized()
       try:
-        t9.force()
+        t9.evaluate()
       except Exception as e:
         pass
 

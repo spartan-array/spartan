@@ -13,11 +13,11 @@ def _shortest_path_mapper(ex,
                           directed,
                           dist_matrix):
   """
-  Mapper kernel for finding shortest path for a subset of points.  
-  
+  Mapper kernel for finding shortest path for a subset of points.
+
   kng is supposed to be a sparse matrix which represents the distance among each pair
   of points.
-  
+
   dist_matrix is the target matrix which we need to fill with the shortest path between
   each pair of points.
 
@@ -25,16 +25,16 @@ def _shortest_path_mapper(ex,
   """
   row_beg = ex.ul[0]
   row_end = ex.lr[0]
-  
+
   local_dist_matrix = graph_shortest_path(kng,
                                           row_beg,
                                           row_end,
                                           directed=directed)
   '''
   local_dist_matrix is a NxN matrix where the M(i,j) is the shortest
-  path between i and j if it's positive, otherwise it's zero.  
+  path between i and j if it's positive, otherwise it's zero.
   '''
-  dist_matrix.update(extent.from_shape(local_dist_matrix.shape), 
+  dist_matrix.update(extent.from_shape(local_dist_matrix.shape),
                       local_dist_matrix)
 
   result = core.LocalKernelResult()
@@ -98,7 +98,7 @@ class Isomap(object):
       framework for nonlinear dimensionality reduction. Science 290 (5500)
   """
   def __init__(self, n_neighbors=5, n_components=2, eigen_solver='auto',
-               tol=0, max_iter=None, 
+               tol=0, max_iter=None,
                neighbors_algorithm='auto'):
 
       self.n_neighbors = n_neighbors
@@ -109,15 +109,15 @@ class Isomap(object):
       self.neighbors_algorithm = neighbors_algorithm
       self.nbrs_ = NearestNeighbors(n_neighbors=n_neighbors,
                                     algorithm=neighbors_algorithm)
-  
+
   def _fit_transform(self, X):
     self.nbrs_.fit(X)
-    self.training_data_ = self.nbrs_._fit_X 
+    self.training_data_ = self.nbrs_._fit_X
     self.kernel_pca_ = KernelPCA(n_components=self.n_components,
                                   kernel="precomputed",
                                   eigen_solver=self.eigen_solver,
                                   tol=self.tol, max_iter=self.max_iter)
-    
+
     kng = kneighbors_graph(self.nbrs_, self.n_neighbors, mode="distance")
     n_points = X.shape[0]
     n_workers = blob_ctx.get().num_workers
@@ -128,18 +128,18 @@ class Isomap(object):
       tile_hint = (n_points / n_workers, )
 
     """
-    task_array is used for deciding the idx of starting points and idx of endding points 
+    task_array is used for deciding the idx of starting points and idx of endding points
     that each tile needs to find the shortest path among.
     """
     task_array = expr.ndarray((n_points,), tile_hint=tile_hint)
-    task_array = task_array.force()
-    
+    task_array = task_array.evaluate()
+
     #dist matrix is used to hold the result
-    dist_matrix = expr.ndarray((n_points, n_points), reduce_fn=lambda a,b:a+b).force()
-    results = task_array.foreach_tile(mapper_fn = _shortest_path_mapper,
-                                      kw = {'kng' : kng,
-                                            'directed' : False,
-                                            'dist_matrix' : dist_matrix})
+    dist_matrix = expr.ndarray((n_points, n_points), reduce_fn=lambda a, b: a+b).evaluate()
+    results = task_array.foreach_tile(mapper_fn=_shortest_path_mapper,
+                                      kw={'kng': kng,
+                                          'directed': False,
+                                          'dist_matrix': dist_matrix})
     self.dist_matrix_ = dist_matrix.glom()
     G = self.dist_matrix_ ** 2
     G *= -0.5

@@ -6,6 +6,7 @@ import time
 base = 2000
 ITERATION = 10
 
+
 class TestJacobiMethod(test_common.ClusterTest):
   def test_jacobi(self):
     global base
@@ -18,10 +19,10 @@ def benchmark_jacobi(ctx, timer):
   util.log_warn('util.log_warn: %s', ctx.num_workers)
 
   A, b = jacobi.jacobi_init(base * ctx.num_workers)
-  A, b = A.force(), b.force()
+  A, b = A.evaluate(), b.evaluate()
 
   start = time.time()
-  
+
   result = jacobi.jacobi_method(A, b, ITERATION).glom()
 
   cost = time.time() - start

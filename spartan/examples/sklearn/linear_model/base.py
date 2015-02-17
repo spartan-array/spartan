@@ -10,17 +10,17 @@ def center_data(X, y, fit_intercept, normalize=False):
   nearly all linear models will want their data to be centered.
   """
   if fit_intercept:
-    X_mean = X.mean(axis = 0)
+    X_mean = X.mean(axis=0)
     X_mean = expr.reshape(X_mean, (1, X_mean.shape[0]))
     X -= X_mean
-    
+
     if normalize:
-      X_std = expr.sqrt(expr.sum(X ** 2, axis=0)).force()
+      X_std = expr.sqrt(expr.sum(X ** 2, axis=0)).evaluate()
       X_std[X_std == 0] = 1
       X /= X_std
     else:
       X_std = expr.ones(X.shape[1])
-    
+
     y_mean = y.mean(axis=0)
     y -= y_mean
   else:
@@ -74,7 +74,7 @@ class LinearRegression(LinearModel):
   Least Squares (scipy.linalg.lstsq) wrapped as a predictor object.
 
   """
-  def __init__(self, fit_intercept=True, normalize=False, iterations = 100):
+  def __init__(self, fit_intercept=True, normalize=False, iterations=100):
     self.fit_intercept = fit_intercept
     self.normalize = normalize
     self.iterations = iterations
@@ -85,17 +85,17 @@ class LinearRegression(LinearModel):
       X = expr.make_from_numpy(X)
     if isinstance(y, np.ndarray):
       y = expr.make_from_numpy(y)
-    
+
     X, y, X_mean, y_mean, X_std = self._center_data(
         X, y, self.fit_intercept, self.normalize)
-    
+
     N_DIM = X.shape[1]
-    self._coef = np.random.randn(N_DIM, 1) 
+    self._coef = np.random.randn(N_DIM, 1)
 
     for i in range(self.iterations):
       yp = expr.dot(X, self._coef)
       print expr.sum((yp - y) ** 2).glom()
       diff = X * (yp - y)
       grad = expr.sum(diff, axis=0).glom().reshape((N_DIM, 1))
-      self._coef = self._coef - grad * 1e-6  
+      self._coef = self._coef - grad * 1e-6
     return self

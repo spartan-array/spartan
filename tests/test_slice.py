@@ -11,19 +11,22 @@ import test_common
 
 TEST_SIZE = 10
 
+
 def add_one_extent(v, ex):
   result = v.fetch(ex) + 1
   util.log_info('AddOne: %s, %s', ex, result)
   yield (ex, result)
 
+
 def add_one_tile(tile):
   return tile + 1
+
 
 class SliceTest(test_common.ClusterTest):
   def test_slice_get(self):
     x = expr.arange((TEST_SIZE, TEST_SIZE))
     z = x[5:8, 5:8]
-    val = expr.force(z)
+    val = z.evaluate()
     nx = np.arange(TEST_SIZE*TEST_SIZE).reshape(TEST_SIZE, TEST_SIZE)
     Assert.all_eq(val.glom(), nx[5:8, 5:8])
 
@@ -36,12 +39,11 @@ class SliceTest(test_common.ClusterTest):
 
     Assert.all_eq(z.glom(), nx[5:8, 5:8] + 1)
 
-
   def test_slice_shuffle(self):
     x = expr.arange((TEST_SIZE, TEST_SIZE))
     z = x[5:8, 5:8]
     z = expr.shuffle(z, add_one_extent)
-    val = z.force()
+    val = z.evaluate()
     nx = np.arange(TEST_SIZE*TEST_SIZE).reshape(TEST_SIZE, TEST_SIZE)
 
     Assert.all_eq(val.glom(), nx[5:8, 5:8] + 1)

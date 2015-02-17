@@ -3,10 +3,11 @@ from spartan import expr, array
 import numpy as np
 from .ssvd import svd
 
+
 class PCA(object):
   """Principal component analysis (PCA)
 
-  Currently we implement this based on lanczos SVD. lanczos SVD 
+  Currently we implement this based on lanczos SVD. lanczos SVD
   is efficient for decomposing sparse matrix.
   """
   def __init__(self, n_components=None):
@@ -19,13 +20,13 @@ class PCA(object):
     ----------
     X:  Spartan distributed array of shape (n_samples, n_features).
 
-    rank: Integer, optinal(default=None), the rank of this matrix. 
+    rank: Integer, optinal(default=None), the rank of this matrix.
 
     Returns
     -------
     self : object
         Returns the instance itself.
-    """    
+    """
     self.mean_ = expr.mean(X, axis=0)
     X -= self.mean_
     if rank is None:
@@ -59,9 +60,9 @@ class PCA(object):
     X : spartan arary or numpy array of shape (n_samples, n_components).
 
     Returns
-    X_original: numpyarray of shape (n_samples, n_features). 
+    X_original: numpyarray of shape (n_samples, n_features).
     """
     if isinstance(X, expr.Expr) or isinstance(X, array.distarray.DistArray):
-      return (expr.dot(X, self.components_) + self.mean_).optimized().force()
+      return (expr.dot(X, self.components_) + self.mean_).optimized().evaluate()
     else:
       return np.dot(X, self.components_) + self.mean_.glom()

@@ -1,6 +1,5 @@
 import numpy as np
 
-from .base import force
 from .map import map2
 from .ndarray import ndarray
 from .shuffle import shuffle
@@ -89,17 +88,17 @@ def sort(array, axis=-1, sample_rate=0.1):
     return map2(array, partition_axis, fn=_sort_mapper,
                 fn_kw={'axis': axis}, shape=array.shape)
 
-  array = force(array)
+  array = array.evaluate()
 
   # sample the original array
-  local_sorted_array = ndarray(array.shape, dtype=array.dtype, tile_hint=array.tile_shape()).force()
-  samples = tile_operation(array, fn=_sample_sort_mapper, kw={'sample_rate': sample_rate, 'local_sorted_array': local_sorted_array}).force().values()
+  local_sorted_array = ndarray(array.shape, dtype=array.dtype, tile_hint=array.tile_shape()).evaluate()
+  samples = tile_operation(array, fn=_sample_sort_mapper, kw={'sample_rate': sample_rate, 'local_sorted_array': local_sorted_array}).evaluate().values()
   sorted_samples = np.sort(np.concatenate(samples), axis=None)
 
   # calculate the partition keys, generate the index of each partition key in each tile.
   steps = max(1, sorted_samples.size/len(array.tiles))
   partition_keys = sorted_samples[steps::steps]
-  partition_counts = tile_operation(local_sorted_array, fn=_partition_count_mapper, kw={'partition_keys': partition_keys}).force()
+  partition_counts = tile_operation(local_sorted_array, fn=_partition_count_mapper, kw={'partition_keys': partition_keys}).evaluate()
 
   # sort the local_sorted_array into global sorted array
   sorted_array = shuffle(local_sorted_array, fn=_fetch_sort_mapper, kw={'partition_counts': partition_counts}, shape_hint=local_sorted_array.shape)

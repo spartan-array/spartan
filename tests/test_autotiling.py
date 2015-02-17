@@ -8,17 +8,19 @@ import time
 
 N = 5120
 
+
 def fn1():
   a = expr.ones((N, N))
   b = expr.ones((N, N))
   x = expr.dot(a, b)
   g = a + b + x
-   
+
   t1 = time.time()
   print g.optimized()
   t2 = time.time()
 
   print t2 - t1
+
 
 def fn2():
   a = expr.ones((N, N))
@@ -26,17 +28,19 @@ def fn2():
   g = expr.dot(a, b) + expr.dot(expr.sum(a, axis=1).reshape((1, N)), b)
   t1 = time.time()
   g_opt = g.optimized()
-  #g_opt.force()
+  #g_opt.evaluate()
   t2 = time.time()
   print t2 - t1
   print g_opt
 
+
 def fn3():
   a = expr.ones((10,))
   g = expr.diag(a)
-  g += expr.ones((10,10))
+  g += expr.ones((10, 10))
   g = expr.diagonal(g)
   print g.optimized()
+
 
 #@with_ctx
 #def test_auto_tiling_opt(ctx):

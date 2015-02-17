@@ -35,7 +35,7 @@ import scipy.sparse as sp
 from struct import unpack, pack
 
 from spartan import util
-from .operator.base import force, glom
+from .operator.base import glom
 from .operator.ndarray import ndarray
 from .operator.map import map
 from .operator.reduce import reduce
@@ -144,7 +144,7 @@ def save(array, prefix, path='.', iszip=False):
   :param iszip: Zip files or not
 
   '''
-  array = force(array)
+  array = array.evaluate()
   _save(path, prefix, array, iszip)
 
   ret = glom(reduce(array, None,
@@ -270,7 +270,7 @@ def pickle(array, prefix, path='.', iszip=False):
   :param iszip: Zip all files
 
   '''
-  array = force(array)
+  array = array.evaluate()
   _save(path, prefix, array, iszip)
 
   ret = glom(reduce(array, None,

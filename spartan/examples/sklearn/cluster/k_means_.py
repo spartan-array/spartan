@@ -249,7 +249,7 @@ class KMeans(object):
                          shape_hint=(1,),
                          cost_hint={hash(labels): {'00': 0,
                                                    '01': np.prod(labels.shape)}})
-        _.force()
+        _.evaluate()
 
         new_counts = new_counts.glom()
         new_centers = new_centers.glom()

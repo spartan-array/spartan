@@ -1,9 +1,9 @@
 '''
 The code in this module implements an SGD based matrix factorization
-of the Netflix movie ranking dataset.  
+of the Netflix movie ranking dataset.
 
 The algorithm used is the same
-as that found in the Sparkler paper  
+as that found in the Sparkler paper
 (http://people.cs.umass.edu/~boduo/publications/2013EDBT-sparkler.pdf).
 '''
 
@@ -43,36 +43,37 @@ FILE_START = 1
 # U: (N_USERS, r)
 # V ~= UM
 
+
 def load_netflix_mapper(inputs, ex, load_file=None):
   # first column will load all of the data
   row_start, row_end = ex.ul[0], ex.lr[0]
   col_start, col_end = ex.ul[1], ex.lr[1]
-  
+
   data = scipy.sparse.dok_matrix(ex.shape, dtype=np.float)
   zf = zipfile.ZipFile(load_file, 'r', allowZip64=True)
-  
+
   for i in range(row_start, row_end):
     offset = i - row_start
     row_data = cPickle.loads(zf.read('%d' % (i + FILE_START)))
     filtered = row_data[row_data['userid'] > col_start]
     filtered = filtered[filtered['userid'] < col_end]
-    
+
     for uid, rating in filtered:
       uid -= col_start
       data[(offset, uid)] = rating
-  
+
   util.log_info('Loaded: %s', ex)
   yield ex, data.tocoo()
-  
+
 
 def fake_netflix_mapper(inputs, ex, p_rating=None):
   '''
   Create "Netflix-like" data for the given extent.
-  
+
   :param p_rating: Sparsity factor (probability a given cell will have a rating)
   '''
   n_ratings = int(max(1, ex.size * p_rating))
-  
+
   uids = np.random.randint(0, ex.shape[0], n_ratings)
   mids = np.random.randint(0, ex.shape[1], n_ratings)
   ratings = np.random.randint(0, 5, n_ratings).astype(np.float32)
@@ -81,24 +82,26 @@ def fake_netflix_mapper(inputs, ex, p_rating=None):
 
   data = scipy.sparse.coo_matrix((ratings, (uids, mids)), shape=ex.shape)
   yield ex, data
-  
+
+
 def sgd_netflix_mapper(inputs, ex, V=None, M=None, U=None, worklist=None):
-  if not ex in worklist:
+  if ex not in worklist:
     return
-  
+
   v = V.fetch(ex)
-  u = U.select(ex[0].to_slice()) # size: (ex.shape[0] * r)
-  m = M.select(ex[1].to_slice()) # size: (ex.shape[1] * r)
-  
-  err = _sgd_inner(v.row.astype(np.int64), 
+  u = U.select(ex[0].to_slice())  # size: (ex.shape[0] * r)
+  m = M.select(ex[1].to_slice())  # size: (ex.shape[1] * r)
+
+  err = _sgd_inner(v.row.astype(np.int64),
                    v.col.astype(np.int64),
                    v.data, u, m)
 
   U.update_slice(ex[0].to_slice(), u)
   M.update_slice(ex[1].to_slice(), m)
-  
+
   #print '%s %s %s' % (ex.ravelled_pos(), v.row.shape[0], err)
   return []
+
 
 def strata_overlap(extents, v):
   for ex in extents:
@@ -106,22 +109,25 @@ def strata_overlap(extents, v):
     if v.ul[1] <= ex.ul[1] and v.lr[1] > ex.ul[1]: return True
   return False
 
+
 def _compute_strata(V):
+
   strata = []
   extents = V.tiles.keys()
   random.shuffle(extents)
-  
+
   while extents:
     stratum = []
     for ex in list(extents):
       if not strata_overlap(stratum, ex):
         stratum.append(ex)
     for ex in stratum:
-      extents.remove(ex)  
-    
+      extents.remove(ex)
+
     strata.append(stratum)
-  
+
   return strata
+
 
 class NetflixSGD(expr.Expr):
   V = PythonValue
@@ -133,17 +139,18 @@ class NetflixSGD(expr.Expr):
 
     strata = _compute_strata(V)
     util.log_info('Start eval')
-    
+
     for i, stratum in enumerate(strata):
       util.log_info('Processing stratum: %d of %d (size = %d)', i, len(strata), len(stratum))
       #for ex in stratum: print ex
 
       worklist = set(stratum)
       expr.shuffle(V, sgd_netflix_mapper,
-                   kw={'V' : lazify(V), 'M' : lazify(M), 'U' : lazify(U),
-                       'worklist' : worklist }).force()
-                       
+                   kw={'V': lazify(V), 'M': lazify(M), 'U': lazify(U),
+                       'worklist': worklist}).evaluate()
+
     util.log_info('Eval done.')
+
 
 def sgd(V, M, U):
   return NetflixSGD(V=V, M=M, U=U)
