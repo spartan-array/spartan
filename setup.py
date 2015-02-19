@@ -1,5 +1,7 @@
-import os, sys
+import os
+import sys
 import subprocess
+import shutil
 #from distutils.core import setup, Extension, Command
 from setuptools import setup, Extension, Command
 from Cython.Distutils import build_ext
@@ -7,7 +9,6 @@ from Cython.Distutils import build_ext
 from distutils.sysconfig import get_python_lib
 from distutils.command.install import INSTALL_SCHEMES
 
-import shutil
 
 class clean(Command):
   description = 'Remove build and trash files'
@@ -26,11 +27,12 @@ class clean(Command):
     subprocess.call("make -C spartan/src clean", shell=True)
     subprocess.call("rm -rf build", shell=True)
 
+
 #We need to build up src/ before setup invokes
 #Assume we are already under /home/..../spartan
 def pre_install():
-  subprocess.call("make -C spartan/src", shell = True)
-  subprocess.call("mkdir -p spartan/rpc/simplerpc", shell = True)
+  subprocess.call("make -C spartan/src", shell=True)
+  subprocess.call("mkdir -p spartan/rpc/simplerpc", shell=True)
   path = os.path.join(os.getcwd(), 'spartan/src/rpc/simple-rpc/pylib/simplerpc/')
   new_path = os.path.join(os.getcwd(), 'spartan/rpc/simplerpc')
 
@@ -69,6 +71,7 @@ def pre_install():
 #  subprocess.call("mv -i spartan/rpc/simplerpc/marshal.py \
 #                          spartan/rpc/simplerpc/marshal.pyx", shell = True)
 
+
 def fetch_from_src(dic):
   '''
   Append executables from /src/* into metadata
@@ -85,43 +88,50 @@ def fetch_from_src(dic):
   src_pkg = []
   for f in os.listdir(os.path.join(path, 'obj/pkg')):
     src_pkg.append('spartan/src/obj/pkg/' + f)
-    shutil.copyfile(os.path.join(path, 'obj/pkg/')+f, 'spartan/'+f)
-    shutil.copymode(os.path.join(path, 'obj/pkg/')+f, 'spartan/'+f)
+    src = os.path.join(path, 'obj/pkg/') + f
+    dst = 'spartan/' + f
+    if not os.path.exists(dst) or os.path.getmtime(src) > os.path.getmtime(dst):
+        shutil.copy2(src, dst)
 
   #From /src/lib to spartan/lib
   src_lib = []
   for f in os.listdir(os.path.join(path, 'obj/lib')):
     src_lib.append('spartan/src/obj/lib/' + f)
-    shutil.copyfile(os.path.join(path, 'obj/lib/')+f, 'spartan/lib/'+f)
-    shutil.copymode(os.path.join(path, 'obj/lib/')+f, 'spartan/lib/'+f)
+    src = os.path.join(path, 'obj/lib/') + f
+    dst = 'spartan/lib/' + f
+    if not os.path.exists(dst) or os.path.getmtime(src) > os.path.getmtime(dst):
+        shutil.copy2(src, dst)
 
   #From /src/rpc to spartan/rpc/simplerpc
   src_rpc = []
   for f in os.listdir(os.path.join(path, 'obj/rpc')):
     src_rpc.append('spartan/src/obj/rpc/' + f)
-    shutil.copyfile(os.path.join(path, 'obj/rpc/')+f, 'spartan/rpc/simplerpc/'+f)
-    shutil.copymode(os.path.join(path, 'obj/rpc/')+f, 'spartan/rpc/simplerpc/'+f)
+    src = os.path.join(path, 'obj/rpc/') + f
+    dst = 'spartan/rpc/simplerpc/' + f
+    if not os.path.exists(dst) or os.path.getmtime(src) > os.path.getmtime(dst):
+        shutil.copy2(src, dst)
 
   #Copy all pylib/simplerpc/*.py into spartan/rpc/simplerpc
   path = os.getcwd()
   for f in os.listdir(os.path.join(path, 'spartan/rpc/simplerpc')):
-#    if f.endswith('.py') and not 'marshal' in f:
+    # if f.endswith('.py') and not 'marshal' in f:
     if f.endswith('.py'):
       src_rpc.append(os.path.join(os.path.join(path, 'spartan/rpc/simplerpc'), f))
 
   dic['data_files'] = [
                         ('spartan', src_pkg),
                         ('spartan/lib', src_lib),
-                        ('spartan/rpc/simplerpc', src_rpc), 
+                        ('spartan/rpc/simplerpc', src_rpc),
                         ('spartan/rpc', ['spartan/src/rpc/service.py'])
                       ]
+
 
 def setup_package():
   src_path = os.path.dirname(os.path.abspath(sys.argv[0]))
   old_path = os.getcwd()
 
   #Calling Makefile in spartan/src
-  if not 'clean' in sys.argv:
+  if 'clean' not in sys.argv:
     pre_install()
 
   #Set Spartan source path first
@@ -143,14 +153,14 @@ def setup_package():
 
   #Set rpath
   runtime_link = {
-                    'spartan' : ['$ORIGIN/lib'],
-                    'spartan/lib' : ['$ORIGIN/../lib'],
-                    'spartan/expr' : ['$ORIGIN/../lib'],
-                    'spartan/array' : ['$ORIGIN/../lib'],
-                    'spartan/rpc' : ['$ORIGIN/../lib'],
+                    'spartan': ['$ORIGIN/lib'],
+                    'spartan/lib': ['$ORIGIN/../lib'],
+                    'spartan/expr': ['$ORIGIN/../lib'],
+                    'spartan/array': ['$ORIGIN/../lib'],
+                    'spartan/rpc': ['$ORIGIN/../lib'],
                   }
 
-  pkgs_dir = {p : p.replace('.', '/') for p in pkgs}
+  pkgs_dir = {p: p.replace('.', '/') for p in pkgs}
 
   ext_include_dirs = ['/usr/local/include',
                       src_path + '/spartan/src',
@@ -165,12 +175,12 @@ def setup_package():
                   src_path + '/spartan/src/rpc/simple-rpc/build', ]
 
   metadata = dict(
-    name = 'spartan',
-    version = '0.10',
-    maintainer = 'Russell Power',
-    maintainer_email = 'russell.power@gmail.com',
-    url = 'https://github.com/spartan-array/spartan',
-    classifiers = [
+    name='spartan',
+    version='0.10',
+    maintainer='Chien-Chin Huang',
+    maintainer_email='huang@cs.nyu.edu',
+    url='https://github.com/spartan-array/spartan',
+    classifiers=[
       'Development Status :: 4 - Beta',
       'Environment :: Other Environment',
       'Intended Audience :: Developers',
@@ -180,8 +190,8 @@ def setup_package():
       'Programming Language :: Python :: 2.6',
       'Programming Language :: Python :: 2.7',
     ],
-    description = 'Distributed Numpy-like arrays.',
-    install_requires = [
+    description='Distributed Numpy-like arrays.',
+    install_requires=[
       'appdirs',
       'scipy',
       'numpy',
@@ -189,8 +199,8 @@ def setup_package():
       'psutil',
       'traits',
     ],
-    packages = pkgs,
-    package_dir = pkgs_dir,
+    packages=pkgs,
+    package_dir=pkgs_dir,
 
     # Our extensions are written by Cython and Python C APIs
     ext_modules=[
@@ -235,7 +245,7 @@ def setup_package():
                 library_dirs=ext_link_dirs,
                 extra_compile_args=["-std=c++0x", "-lsparta_array", "-lsimplerpc"],
                 extra_link_args=["-std=c++11", "-lspartan_array", "-lsimplerpc",
-                                "-lbase", "-lpython2.7"],
+                                 "-lbase", "-lpython2.7"],
                 runtime_library_dirs=runtime_link['spartan/rpc'],
                 depends=[
                           "spartan/lib/libspartan_array.so",
@@ -256,10 +266,10 @@ def setup_package():
       Extension('spartan.rpc.cloudpickle',
                 ['spartan/rpc/cloudpickle.pyx'],
                 extra_compile_args=["-pipe"]),
-#      Extension('spartan.rpc.simplerpc.marshal',
-#                ['spartan/rpc/simplerpc/marshal.pyx'],
-#                extra_compile_args=["-pipe"],
-#                runtime_library_dirs=runtime_link),
+      #Extension('spartan.rpc.simplerpc.marshal'
+                #['spartan/rpc/simplerpc/marshal.pyx'],
+                #extra_compile_args=["-pipe"],
+                #runtime_library_dirs=runtime_link),
       Extension('spartan.array.sparse',
                 ['spartan/array/sparse.pyx'],
                 language='c++',
@@ -282,13 +292,13 @@ def setup_package():
                 ['spartan/examples/sklearn/util/graph_shortest_path.pyx']),
     ],
 
-    cmdclass = {
-      'build_ext' : build_ext,
-      'clean' : clean
+    cmdclass={
+      'build_ext': build_ext,
+      'clean': clean
     },
   )
 
-  if not 'clean' in sys.argv:
+  if 'clean' not in sys.argv:
     fetch_from_src(metadata)
 
   try:
