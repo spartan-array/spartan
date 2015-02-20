@@ -2,10 +2,9 @@ import traceback
 import numpy as np
 import scipy.sparse
 import itertools
-from . import extent
+from . import extent, sparse
 from spartan import util
 from spartan.util import Assert
-from spartan import sparse
 
 TYPE_EMPTY = 0
 TYPE_DENSE = 1

@@ -20,8 +20,7 @@ from traits.api import PythonValue
 
 from spartan import rpc
 from spartan import master
-from spartan.array import distarray, extent
-from spartan import sparse
+from spartan.array import distarray, extent, sparse
 from .base import Expr
 from .ndarray import ndarray
 from .shuffle import shuffle

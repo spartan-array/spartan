@@ -7,7 +7,6 @@ and runs user operations on workers.
 '''
 
 import atexit
-import socket
 import threading
 import weakref
 
@@ -17,16 +16,20 @@ from spartan.config import FLAGS
 
 MASTER = None
 
+
 def _dump_profile():
   import yappi
   yappi.get_func_stats().save('master_prof.out', type='pstat')
+
 
 def _shutdown():
   if MASTER is not None:
     MASTER.shutdown()
 
+
 def get():
   return MASTER
+
 
 class Master(object):
   def __init__(self, port, num_workers):
@@ -110,16 +113,17 @@ class Master(object):
 
     tile_in_worker = [tile_in_worker[worker_id] for worker_id in self._available_workers]
 
-    tile_in_worker.sort(key=lambda x : x[1])
+    tile_in_worker.sort(key=lambda x: x[1])
     result = {}
     for i in range(len(array.bad_tiles)):
-      result[array.bad_tiles[i]] = tile_in_worker[i%len(tile_in_worker)][0]
+      result[array.bad_tiles[i]] = tile_in_worker[i % len(tile_in_worker)][0]
 
     return result
 
   def init_worker_score(self, worker_id, worker_status):
     self._worker_statuses[worker_id] = worker_status
-    self._worker_scores[worker_id] = (100 - worker_status.mem_usage) * worker_status.total_physical_memory / 1e13 #0.1-0.3
+    self._worker_scores[worker_id] = ((100 - worker_status.mem_usage) *
+                                      worker_status.total_physical_memory / 1e13)
 
   def update_worker_score(self, worker_id, worker_status):
     self._worker_statuses[worker_id] = worker_status
@@ -210,7 +214,7 @@ class Master(object):
     '''
     util.log_info('Initializing...')
     req = core.InitializeReq(peers=dict([(id, w.addr())
-                                      for id, w in self._workers.iteritems()]))
+                                         for id, w in self._workers.iteritems()]))
 
     futures = rpc.FutureGroup()
     for id, w in self._workers.iteritems():
