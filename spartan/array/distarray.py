@@ -8,8 +8,8 @@ import appdirs
 import scipy.sparse
 import numpy as np
 
-from . import tile, extent
-from .. import util, core, blob_ctx, rpc, sparse
+from . import tile, extent, sparse
+from .. import util, core, blob_ctx, rpc
 from ..core import LocalKernelResult
 from ..util import Assert
 from ..config import FLAGS
@@ -18,8 +18,10 @@ from .. import master
 # number of elements per tile
 DEFAULT_TILE_SIZE = 100000
 
-def take_first(a,b):
+
+def take_first(a, b):
   return a
+
 
 def good_tile_shape(shape, num_shards=-1):
   ''' Compute a tile_shape (tile_hint) for the array.
@@ -45,6 +47,7 @@ def good_tile_shape(shape, num_shards=-1):
 
   return tile_shape
 
+
 def compute_splits(shape, tile_hint):
   ''' Based on tile_hint to compute splits for each dimension of the array of shape ``shape``
 
@@ -66,6 +69,7 @@ def compute_splits(shape, tile_hint):
 
   return splits
 
+
 def compute_extents(shape, tile_hint=None, num_shards=-1):
   '''Split an array of shape ``shape`` into `Extent`s. Each extent contains roughly `TILE_SIZE` elements if num_shards is -1.
 
@@ -81,7 +85,7 @@ def compute_extents(shape, tile_hint=None, num_shards=-1):
 
   # try to make reasonable tiles
   if len(shape) == 0:
-    return { extent.create([], [], ()) :  0 }
+    return {extent.create([], [], ()):  0}
 
   if tile_hint is None:
     tile_hint = good_tile_shape(shape, num_shards)
@@ -104,6 +108,7 @@ def compute_extents(shape, tile_hint=None, num_shards=-1):
     idx += 1
 
   return result
+
 
 def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
   '''Invoke ``user_fn`` on ``blob``, and construct tiles from the results.'''
@@ -183,7 +188,6 @@ class DistArray(object):
       result = self.select(slice(idx, idx + 1))
       return result[0]
 
-
     ex = extent.from_slice(idx, self.shape)
     #util.log_info('Select: %s + %s -> %s', idx, self.shape, ex)
     return self.fetch(ex)
@@ -231,7 +235,7 @@ class DistArrayImpl(DistArray):
     Assert.isinstance(tiles, dict)
 
     self.blob_to_ex = {}
-    for k,v in tiles.iteritems():
+    for k, v in tiles.iteritems():
       Assert.isinstance(k, extent.TileExtent)
       Assert.isinstance(v, core.TileId)
       self.blob_to_ex[v] = k
@@ -301,7 +305,6 @@ class DistArrayImpl(DistArray):
     #util.log_info('FETCH: %s %s', self.shape, region)
 
     ctx = blob_ctx.get()
-
 
     # special case exact match against a tile
     if region in self.tiles:
@@ -379,7 +382,6 @@ class DistArrayImpl(DistArray):
       #util.log_info('EXACT: %s %s ', region, dst_slice)
       return ctx.update(tile_id, dst_slice, data, self.reducer_fn, wait=wait)
 
-
     futures = []
     slices = []
 
@@ -431,6 +433,7 @@ def create(shape,
   dtype = np.dtype(dtype)
   shape = tuple(shape)
 
+  util.log_debug('Creating a new distarray with shape %s', str(shape))
   extents = compute_extents(shape, tile_hint, ctx.num_workers)
   tiles = {}
   tile_type = tile.TYPE_SPARSE if sparse else tile.TYPE_DENSE
@@ -445,7 +448,7 @@ def create(shape,
     for ex, i in extents.iteritems():
       tiles[ex] = ctx.create(
                   tile.from_shape(ex.shape, dtype, tile_type=tile_type),
-                  hint=worker_scores[i%len(worker_scores)][0])
+                  hint=worker_scores[i % len(worker_scores)][0])
   elif FLAGS.tile_assignment_strategy == 'serpentine':
     for ex, i in extents.iteritems():
       j = i % ctx.num_workers
@@ -467,8 +470,8 @@ def create(shape,
         worker = int(fp.readline().strip())
         tiles[ex] = ctx.create(
                     tile.from_shape(ex.shape, dtype, tile_type=tile_type),
-                    hint = worker)
-  else: #random
+                    hint=worker)
+  else: #  random
     for ex in extents:
       tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype, tile_type=tile_type))
 
@@ -480,6 +483,7 @@ def create(shape,
 
   array = DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
   master.get().register_array(array)
+  util.log_debug('Succcessfully created a new distarray')
   return array
 
 
@@ -501,9 +505,8 @@ def from_replica(X):
 
   for worker_id, ex_list in worker_to_tiles.iteritems():
     for ex in ex_list:
-      tiles[ex] = ctx.create(
-                  tile.from_shape(ex.shape, dtype, tile_type=tile_type),
-                  hint=worker_id+1)
+      tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype, tile_type=tile_type),
+                             hint=worker_id+1)
 
   for ex in tiles:
     tiles[ex] = tiles[ex].wait().tile_id

@@ -8,9 +8,9 @@ from traits.api import PythonValue, HasTraits
 from .operator import outer, map
 from .operator.base import Expr, lazify
 from .operator.shuffle import target_mapper, notarget_mapper
-from .. import blob_ctx, util, sparse, rpc
+from .. import blob_ctx, util, rpc
 from ..util import is_iterable, Assert
-from ..array import extent, tile, distarray
+from ..array import extent, tile, distarray, sparse
 from ..core import LocalKernelResult
 
 

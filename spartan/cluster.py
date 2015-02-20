@@ -12,16 +12,16 @@ run on a machine; typically one worker is run per core.
 import os.path
 import socket
 import subprocess
-import sys
-import threading
 import time
 import shutil
-from spartan import rpc
-from spartan import config, util
+import threading
+
 import spartan
-from spartan.config import FLAGS, BoolFlag, IntFlag
 import spartan.master
 import spartan.worker
+from spartan import rpc
+from spartan import config, util
+from spartan.config import FLAGS, BoolFlag, IntFlag
 
 
 class HostListFlag(config.Flag):
@@ -35,9 +35,11 @@ class HostListFlag(config.Flag):
   def _str(self):
     return ','.join(['%s:%d' % (host, count) for host, count in self.val])
 
+
 class AssignMode(object):
   BY_CORE = 1
   BY_NODE = 2
+
 
 class AssignModeFlag(config.Flag):
   def parse(self, option_str):
@@ -59,6 +61,7 @@ FLAGS.add(BoolFlag(
   default=True))
 FLAGS.add(IntFlag('heartbeat_interval', default=3, help='Heartbeat Interval in each worker'))
 FLAGS.add(IntFlag('worker_failed_heartbeat_threshold', default=10, help='the max number of heartbeat that a worker can delay'))
+
 
 def start_remote_worker(worker, st, ed):
   '''
@@ -84,12 +87,12 @@ def start_remote_worker(worker, st, ed):
   if FLAGS.oprofile:
     os.system('mkdir operf.%s' % worker)
 
-  ssh_args = ['ssh', '-oForwardX11=no', worker ]
+  ssh_args = ['ssh', '-oForwardX11=no', worker]
 
   args = ['cd %s && ' % os.path.abspath(os.path.curdir)]
 
   if FLAGS.xterm:
-    args += ['xterm', '-e',]
+    args += ['xterm', '-e']
 
   if FLAGS.oprofile:
     args += ['operf -e CPU_CLK_UNHALTED:100000000', '-g', '-d', 'operf.%s' % worker]
@@ -110,12 +113,14 @@ def start_remote_worker(worker, st, ed):
   #print >>sys.stderr, args
   util.log_debug('Running worker %s', ' '.join(args))
   time.sleep(0.1)
+  # TODO: improve this to make log break at newline
   if worker != 'localhost':
     p = subprocess.Popen(ssh_args + args, executable='ssh')
   else:
     p = subprocess.Popen(' '.join(args), shell=True, stdin=subprocess.PIPE)
 
   return p
+
 
 def start_cluster(num_workers, use_cluster_workers):
   '''
