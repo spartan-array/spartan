@@ -14,12 +14,14 @@ import socket
 import subprocess
 import time
 import shutil
-from spartan import rpc
-from spartan import config, util
+import threading
+
 import spartan
-from spartan.config import FLAGS, BoolFlag, IntFlag
 import spartan.master
 import spartan.worker
+from spartan import rpc
+from spartan import config, util
+from spartan.config import FLAGS, BoolFlag, IntFlag
 
 
 class HostListFlag(config.Flag):
@@ -33,9 +35,11 @@ class HostListFlag(config.Flag):
   def _str(self):
     return ','.join(['%s:%d' % (host, count) for host, count in self.val])
 
+
 class AssignMode(object):
   BY_CORE = 1
   BY_NODE = 2
+
 
 class AssignModeFlag(config.Flag):
   def parse(self, option_str):
@@ -57,6 +61,7 @@ FLAGS.add(BoolFlag(
   default=True))
 FLAGS.add(IntFlag('heartbeat_interval', default=3, help='Heartbeat Interval in each worker'))
 FLAGS.add(IntFlag('worker_failed_heartbeat_threshold', default=10, help='the max number of heartbeat that a worker can delay'))
+
 
 def start_remote_worker(worker, st, ed):
   '''
