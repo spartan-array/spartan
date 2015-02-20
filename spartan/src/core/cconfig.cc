@@ -65,6 +65,8 @@ void init_flags(void)
 
     FLAGS.add(new StrFlag("worker_list", "4,8,16,32,64,80"));
     FLAGS.add(new BoolFlag("test_optimizations", "False"));
+
+    FLAGS.add(new StrFlag("tiling_alg", "mincost", "algorithm to tile the graph"));
 }
 
 std::map<std::string, std::string> parse_argv(int argc, char **argv)

@@ -32,29 +32,6 @@ do {\
     } \
 } while (0)
 
-//static bool
-//is_integer(PyObject *o) {
-    //if (PyLong_Check(o) || PyInt_Check(o)) {
-        //return true;
-    //}
-    //return false;
-//}
-
-static long long
-get_longlong(PyObject *o) {
-    if (PyNumber_Check(o)) {
-        PyObject *_long;
-        long long ret;
-
-        _long = PyNumber_Long(o);
-        ret = PyLong_AsLongLong(_long);
-        Py_DECREF(_long);
-        return ret;
-    } else {
-        assert(0);
-    }
-    return 0;
-}
 
 static void
 TileBase_dealloc(PyObject *o)
@@ -147,32 +124,33 @@ static PyObject *
 TileBase__update(PyObject* o, PyObject* args)
 {
     TileBase *self = (TileBase*)o;
-    PyObject *slice, *data, *tile_type, *sparse_type, *reducer;
+    PyObject *slice, *data, *reducer;
+    CTILE_TYPE tile_type;
+    CTILE_SPARSE_TYPE sparse_type;
 
     Log_debug("%s", __func__);
-    if (!PyArg_ParseTuple(args, "OOOOO", &slice, &tile_type, &sparse_type, &data, &reducer))
+    if (!PyArg_ParseTuple(args, "OiiOO", &slice, &tile_type, &sparse_type, &data, &reducer))
         return NULL;
 
     CSliceIdx cslice_idx(slice, self->c_tile->get_nd(), self->c_tile->get_dimensions());
-    CTILE_TYPE ttype = (CTILE_TYPE)get_longlong(tile_type);
-    CTILE_SPARSE_TYPE stype = (CTILE_SPARSE_TYPE)get_longlong(sparse_type);
     npy_intp npy_reducer;
     if (PyInt_Check(reducer)) {
-        npy_reducer = (npy_intp)get_longlong(reducer);
+        npy_reducer = (npy_intp)PyInt_AsLong(reducer);
     } else {
         npy_reducer = (npy_intp)reducer;
     }
 
-    if (ttype != CTILE_SPARSE) {
+    if (tile_type!= CTILE_SPARSE) {
         /* TODO:Release dense*/
         PyArrayObject *dense = (PyArrayObject*)PyTuple_GetItem(data, 0);
         dense = PyArray_GETCONTIGUOUS(dense);
-        CTile tile(dense->dimensions, dense->nd, dense->descr->type, ttype, CTILE_SPARSE_NONE);
+        CTile tile(dense->dimensions, dense->nd, dense->descr->type,
+                   tile_type, CTILE_SPARSE_NONE);
         CArray *dense_array = new CArray(dense->dimensions, dense->nd,
                                          dense->descr->type, dense->data,
                                          dense);
         CArray *mask_array = NULL;
-        if (ttype == CTILE_MASKED) {
+        if (tile_type == CTILE_MASKED) {
             PyArrayObject *mask = (PyArrayObject*)PyTuple_GetItem(data, 1);
             mask_array = new CArray(mask->dimensions, mask->nd,
                                     mask->descr->type, mask->data,
@@ -191,7 +169,7 @@ TileBase__update(PyObject* o, PyObject* args)
         CExtent *ex = from_slice(cslice_idx, self->c_tile->get_dimensions(),
                                  self->c_tile->get_nd());
         CTile tile(ex->shape, sparse_array[2]->get_nd(), sparse_array[2]->get_type(),
-                   ttype, stype);
+                   tile_type, sparse_type);
         tile.set_data(sparse_array);
         self->c_tile->update(cslice_idx, tile, npy_reducer);
     }

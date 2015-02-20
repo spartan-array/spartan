@@ -32,10 +32,10 @@ def test_ravelled_pos():
     for j in range(0, 10):
       assert extent.ravelled_pos((i, j), a.array_shape) == 10 * i + j
       
-  Assert.eq(extent.to_global(a, 0, None), 22)
-  Assert.eq(extent.to_global(a, 10, None), 42)
-  Assert.eq(extent.to_global(a, 11, None), 43)
-  Assert.eq(extent.to_global(a, 20, None), 62)
+  Assert.eq(a.to_global(0, axis=None), 22)
+  Assert.eq(a.to_global(10, axis=None), 42)
+  Assert.eq(a.to_global(11, axis=None), 43)
+  Assert.eq(a.to_global(20, axis=None), 62)
   
   
 def test_unravel():

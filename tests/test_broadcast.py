@@ -3,15 +3,16 @@ from spartan.util import Assert
 import test_common
 import numpy as np
 from scipy import sparse as sp
-from spartan.expr import broadcast
+from spartan.expr.operator import broadcast
+
 
 class TestBroadcast(test_common.ClusterTest):
   def test_broadcast(self):
-    a = expr.ones((100, 1, 100, 100)).force()
-    b = expr.ones((10, 100, 1)).force()
-    a, b = broadcast.broadcast((a, b))
-    c = expr.add(a, b).force()
-    d = expr.sub(a, b).force()
+    a = expr.ones((100, 1, 100, 100)).evaluate()
+    b = expr.ones((10, 100, 1)).evaluate()
+    a, b = expr.broadcast((a, b))
+    c = expr.add(a, b).evaluate()
+    d = expr.sub(a, b).evaluate()
 
     n = np.ones((100, 10, 100, 100))
     n1 = n + n

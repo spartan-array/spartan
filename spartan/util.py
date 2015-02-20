@@ -8,7 +8,6 @@ import logging
 from math import ceil
 import os
 from os.path import basename
-import select
 import socket
 import sys
 import threading
@@ -24,6 +23,7 @@ PID = os.getpid()
 
 LOGGING_CONFIGURED = False
 
+
 def _setup_logger():
   global LOGGING_CONFIGURED, PID, HOSTNAME
   if logging.root is None:
@@ -34,30 +34,36 @@ def _setup_logger():
   logging.RootLogger.findCaller = findCaller
   LOGGING_CONFIGURED = True
 
+
 def log_debug(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
-  kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
+  kw['extra'] = {'hostname': HOSTNAME, 'pid': PID}
   logging.debug(*args, **kw)
+
 
 def log_info(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
-  kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
+  kw['extra'] = {'hostname': HOSTNAME, 'pid': PID}
   logging.info(*args, **kw)
+
 
 def log_warn(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
-  kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
+  kw['extra'] = {'hostname': HOSTNAME, 'pid': PID}
   logging.warn(*args, **kw)
+
 
 def log_error(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
-  kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
+  kw['extra'] = {'hostname': HOSTNAME, 'pid': PID}
   logging.error(*args, **kw)
+
 
 def log_fatal(*args, **kw):
   if not LOGGING_CONFIGURED: _setup_logger()
-  kw['extra'] = { 'hostname' : HOSTNAME, 'pid' : PID }
+  kw['extra'] = {'hostname': HOSTNAME, 'pid': PID}
   logging.fatal(*args, **kw)
+
 
 def findCaller(obj):
   f = sys._getframe(5)
@@ -102,34 +108,6 @@ def _dump_timer():
 
 
 atexit.register(_dump_timer)
-
-class FileWatchdog(threading.Thread):
-  """Watchdog for a file (typically `sys.stdin` or `sys.stdout`).
-
-  When the file closes, terminate the process.
-  (This occurs when an ssh connection is terminated, for example.)
-  """
-
-  def __init__(self, file_handle=sys.stdin, on_closed=lambda: os._exit(1)):
-    '''
-
-    :param file_handle:
-    :param on_closed:
-    '''
-    threading.Thread.__init__(self, name='WatchdogThread')
-    self.setDaemon(True)
-    self.file_handle = file_handle
-    self.on_closed = on_closed
-
-  def run(self):
-    f = [self.file_handle]
-    while 1:
-      r, w, x = select.select(f, f, f, 1.0)
-      #print >>sys.stderr, 'Watchdog running... %s %s %s' % (r, w, x)
-      if r or x:
-        self.on_closed()
-        return
-      time.sleep(0.1)
 
 
 def flatten(lst, depth=1, unique=False):
@@ -212,6 +190,7 @@ class Timer(object):
     #self.stop()
     pass
 
+
 def dump_stacks(out):
   '''Dump the stacks of all threads.'''
   id_to_name = dict([(th.ident, th.name) for th in threading.enumerate()])
@@ -254,7 +233,7 @@ class Assert(object):
   '''
 
   @staticmethod
-  def all_eq(a, b, tolerance = 0):
+  def all_eq(a, b, tolerance=0):
     if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
       assert a.shape == b.shape, 'Mismatched shapes: %s %s' % (a.shape, b.shape)
       if tolerance == 0:
@@ -283,6 +262,11 @@ class Assert(object):
     assert a.shape == b.shape, 'Mismatched shapes: %s %s' % (a.shape, b.shape)
     assert np.allclose(a, b), 'Failed: \n%s close to \n%s' % (a, b)
     return
+
+  @staticmethod
+  def float_close(a, b):
+    '''Test floating point equality.'''
+    Assert.all_close(np.array(a), np.array(b))
 
   @staticmethod
   def eq(a, b, fmt='', *args):
@@ -332,6 +316,14 @@ class Assert(object):
   @staticmethod
   def not_null(expr):
     assert expr is not None, expr
+
+  @staticmethod
+  def raises_exception(exception, function, *args, **kwargs):
+    try:
+      function(*args, **kwargs)
+    except exception:
+      return
+    assert False, '%s expected, no error was raised.' % exception.__name__
 
 
 def trace_fn(fn):
@@ -416,8 +408,18 @@ def divup(a, b):
   return int(ceil(float(a) / b))
 
 
+def calc_tile_hint(array, axis=0):
+  if isinstance(array, tuple):
+    tile_hint = list(array)
+  else:
+    tile_hint = list(array.shape)
+  tile_hint[axis] = divup(tile_hint[axis], FLAGS.num_workers)
+  return tile_hint
+
+
 def is_iterable(x):
   return hasattr(x, '__iter__')
+
 
 def is_lambda(fn):
   """Return True if ``fn`` is a lambda expression.
@@ -425,6 +427,7 @@ def is_lambda(fn):
   For some reason testing against LambdaType does not work correctly.
   """
   return fn.__name__ == '<lambda>'
+
 
 def as_list(x):
   if isinstance(x, list): return x
@@ -464,14 +467,16 @@ def memoize(f):
   served from the cache.
   '''
   _cache = {}
+
   def wrapped(*args):
-    if not args in _cache:
+    if args not in _cache:
       _cache[args] = f(*args)
     return _cache[args]
 
   wrapped.__name__ = f.__name__
   wrapped.__doc__ = f.__doc__
   return wrapped
+
 
 def copy_docstring(source_function):
   '''
@@ -481,12 +486,13 @@ def copy_docstring(source_function):
   '''
   def _decorator(func):
     source_doc = source_function.__doc__
-    if func.__doc__ == None:
+    if func.__doc__ is None:
       func.__doc__ = source_doc
     else:
       func.__doc__ = source_doc + '\n\n' + func.__doc__
     return func
   return _decorator
+
 
 class FileHelper(object):
   def __init__(self, **files):
@@ -501,5 +507,3 @@ class FileHelper(object):
   def __exit__(self, exc_type, exc_val, exc_tb):
     for v in self._files.values():
      v.close()
-
-

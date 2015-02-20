@@ -89,6 +89,7 @@ def start_cluster(num_workers, use_cluster_workers):
 
   master = spartan.master.Master(FLAGS.port_base, num_workers)
 
+  ssh_processes = []
   if not use_cluster_workers:
     start_remote_worker('localhost', 0, num_workers)
   else:
@@ -103,11 +104,15 @@ def start_cluster(num_workers, use_cluster_workers):
         sz = util.divup(num_workers, num_hosts)
 
       sz = min(sz, num_workers - count)
-      start_remote_worker(worker, count, count + sz)
+      ssh_processes.append(start_remote_worker(worker, count, count + sz))
       count += sz
       if count == num_workers:
         break
 
   master.wait_for_initialization()
-  return master
 
+  # Kill the now unnecessary ssh processes.
+  # Fegin : if we kill these processes, we can't get log from workers.
+  #for process in ssh_processes:
+    #process.kill()
+  return master

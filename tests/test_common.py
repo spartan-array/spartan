@@ -13,8 +13,8 @@ import time
 import types
 import unittest
 
-#FLAGS.add(StrFlag('worker_list', default='4,8,16,32,64,80'))
-#FLAGS.add(BoolFlag('test_optimizations', default=False))
+FLAGS.add(StrFlag('worker_list', default='4,8,16,32,64,80'))
+FLAGS.add(BoolFlag('test_optimizations', default=False))
 
 def millis(t1, t2):
   dt = t2 - t1
@@ -61,7 +61,7 @@ class BenchTimer(object):
   def log(self, fmt, *args):
     msg = fmt % args if len(args) > 0 else fmt
     print self.prefix, msg
-
+    
 
 def run_benchmarks(module, benchmarks, master, timer):
   for benchname in benchmarks:
@@ -82,7 +82,7 @@ def benchmark_op(op, min_time=1.0):
 
   print 'Ran %d ops, %.3f seconds, %f s/op, %f ops/s' % (iters, ed - st, (ed - st) / iters, iters / (ed - st))
 
-
+  
 def run(filename):
   signal.signal(signal.SIGQUIT, sig_handler)
   os.system('rm ./_worker_profiles/*')
@@ -91,7 +91,7 @@ def run(filename):
   module = imp.load_source(mod_name, filename)
   util.log_info('Running benchmarks for module: %s (%s)', module, filename)
   benchmarks = [k for k in dir(module) if (
-             k.startswith('benchmark_') and
+             k.startswith('benchmark_') and 
              isinstance(getattr(module, k), types.FunctionType))
           ]
 
@@ -100,21 +100,21 @@ def run(filename):
     # csv header
     print 'num_workers,bench,time'
     workers = [int(w) for w in FLAGS.worker_list.split(',')]
-
+    
     for i in workers:
       # restart the cluster
       FLAGS.num_workers = i
       ctx = spartan.initialize()
-
+      
       timer = BenchTimer(i)
       util.log_info('Running benchmarks on %d workers', i)
       if FLAGS.test_optimizations:
           timer.prefix = 'opt_enabled'
           FLAGS.optimization = 1
           run_benchmarks(module, benchmarks, ctx, timer)
-
+          
       timer.prefix = 'opt_disabled'
-      FLAGS.optimization = 0
+      FLAGS.optimization = 1
       run_benchmarks(module, benchmarks, ctx, timer)
 
       spartan.shutdown()
@@ -128,22 +128,22 @@ def run(filename):
 class ClusterTest(unittest.TestCase):
   '''
   Helper class for running cluster tests.
-
+  
   Ensures a cluster instance is available before running any tests.
   '''
   @classmethod
   def setUpClass(cls):
     cls.ctx = spartan.initialize()
-
+    
 def with_ctx(fn):
   def test_fn():
       ctx = spartan.initialize()
       fn(ctx)
-
+      
   test_fn.__name__ = fn.__name__
   return test_fn
-
-
+    
+ 
 def join_profiles(dir):
   import glob
   import pstats

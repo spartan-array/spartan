@@ -4,8 +4,8 @@
 
 import numpy as np
 
+from .operator.region_map import region_map
 from ..array import extent
-from .region_map import region_map
 
 
 def _assign_mapper(tile, ex, assign_region, value):
@@ -23,11 +23,12 @@ def _assign_mapper(tile, ex, assign_region, value):
       j = region_shape.index(axis_shape, j + 1)
       s.append(value_slice[j])
     value_slice = tuple(s)
- 
+
   if isinstance(value, np.ndarray):
     return value[value_slice]
-  
+
   return value.fetch(extent.from_slice(value_slice, value.shape))
+
 
 def assign(a, idx, value):
   '''Assigns ``value`` to a[index].
@@ -46,4 +47,3 @@ def assign(a, idx, value):
 
   return region_map(a, region, _assign_mapper, {'assign_region': region,
                                                 'value': value})
-
