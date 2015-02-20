@@ -18,23 +18,34 @@ sending out RPC messages to many workers at once.  This context, is for historic
 reasons located in `spartan.blob_ctx`.
 """
 
+import atexit
 import sys
+
+from .expr import *
 from . import config
 from .config import FLAGS
 from .cluster import start_cluster
-from .expr import *
+
 
 CTX = None
+
+
 def initialize(argv=None):
   global CTX
 
   if CTX is not None:
     return CTX
 
-  if argv is None: argv = sys.argv
+  if argv is None:
+    argv = sys.argv
+
   config.parse(argv)
   CTX = start_cluster(FLAGS.num_workers, FLAGS.cluster)
+
+  # Shutdown workers at exit; necessary for cluster mode.
+  atexit.register(shutdown)
   return CTX
+
 
 def shutdown():
   global CTX

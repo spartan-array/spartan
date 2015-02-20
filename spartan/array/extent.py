@@ -119,3 +119,100 @@ def is_complete(shape, slices):
     if slice.start > 0: return False
     if slice.stop < dim: return False
   return True
+
+
+def largest_intact_dim_axis(ex, exclude_axes=None):
+  '''
+  Args:
+    shape:
+    exclude_axes: tuple or list
+  '''
+  idx = np.argsort(ex.array_shape)
+  for i in xrange(len(idx)-1, -1, -1):
+    if ex.shape[idx[i]] == ex.array_shape[idx[i]] and \
+        (exclude_axes is None or idx[i] not in exclude_axes):
+      return idx[i]
+  for i in xrange(len(idx)-1, -1, -1):
+    if exclude_axes is None or idx[i] not in exclude_axes:
+      return idx[i]
+
+
+def partition_axes(ex):
+  partition_axes = []
+  for i in xrange(len(ex.shape)):
+    if ex.shape[i] != ex.array_shape[i]:
+      partition_axes.append(i)
+
+  return partition_axes
+
+
+def change_partition_axis(ex, axis):
+  if isinstance(axis, (list, tuple)):
+    # Changing to grid partition
+    old_axes = partition_axes(ex)
+    if len(old_axes) > 1:
+      # TODO: Changing from a kind of grid partition to another grid partition.
+      # May be useful for multi-dimensional matrices.
+      return ex
+    else:
+      # FIXME: We assume that every extent has similar size when calling this
+      # API. Otherwise, we don't know how to do repartition.
+      # TODO: Our extent may need an extra information which is index.
+      old_axis = old_axes[0]
+      n_dim = len(axis)
+      step = ex.lr[old_axis] - ex.ul[old_axis]
+      ntiles = util.divup(ex.array_shape[old_axis], step)
+      original_index = int(ex.ul[old_axis] / step)
+      n = int(math.pow(ntiles, 1.0 / n_dim))
+      grid_index = [0 for i in range(n_dim)]
+      for i in reversed(range(n_dim)):
+        grid_index[i] = original_index % n
+        original_index -= grid_index[i]
+        original_index /= n
+      steps = [util.divup(ex.array_shape[i], n) for i in range(n_dim)]
+      ul = [steps[i] * grid_index[i] for i in range(n_dim)]
+      lr = [steps[i] * (grid_index[i] + 1) for i in range(n_dim)]
+      for i in range(len(lr)):
+        if lr[i] > ex.array_shape[i]:
+          return None
+      return create(ul, lr, ex.array_shape)
+  else:
+    # Change to one-dimension partition
+    if axis < 0:
+      axis += len(ex.array_shape)
+
+    # Vector is a special case
+    if len(ex.shape) == 1:
+      if axis == 1:
+        # We define that if axis is 1, users need the whole vector.
+        return create((0, ), ex.array_shape, ex.array_shape)
+      else:
+        return ex
+
+    old_axes = partition_axes(ex)
+    if len(old_axes) > 1:
+      # Changing from grid tiling to one-dimensional tiling.
+      blk_idx = (ex.ul[0]/ex.shape[0]) * util.divup(ex.array_shape[1], ex.shape[1]) + ex.ul[1]/ex.shape[1]
+      ul = [0, 0]
+      lr = list(ex.array_shape)
+      ul[axis] = blk_idx
+      lr[axis] = blk_idx+1
+      return create(ul, lr, ex.array_shape)
+
+    if len(old_axes) == 0 or old_axes[0] == axis:
+      return ex
+
+    old_axis = old_axes[0]
+
+    new_ul = list(ex.ul[:])
+    new_lr = list(ex.lr[:])
+    new_ul[axis] = util.divup(new_ul[old_axis] * ex.array_shape[axis],
+                              ex.array_shape[old_axis])
+    new_ul[old_axis] = 0
+    new_lr[axis] = util.divup(new_lr[old_axis] * ex.array_shape[axis],
+                              ex.array_shape[old_axis])
+    new_lr[old_axis] = ex.array_shape[old_axis]
+
+    target_ex = create(new_ul, new_lr, ex.array_shape)
+    #assert target_ex is not None, (new_ul, new_lr, axis, ex.array_shape, ex)
+    return target_ex

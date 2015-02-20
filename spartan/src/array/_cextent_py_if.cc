@@ -484,6 +484,17 @@ from_shape(PyObject *self, PyObject *args)
 }
 
 static PyObject*
+from_tuple(PyObject *self, PyObject *args)
+{
+    PyObject *tuple;
+
+    if (!PyArg_ParseTuple(args, "O", &tuple))
+        return NULL;
+
+    return create(self, tuple);
+}
+
+static PyObject*
 intersection(PyObject *self, PyObject *args)
 {
     TileExtent *ex_a, *ex_b;
@@ -690,6 +701,7 @@ ravelled_pos(PyObject *self, PyObject *args)
 static PyMethodDef extent_methods[] = {
     {"create", create, METH_VARARGS, ""},
     {"from_shape", from_shape, METH_VARARGS, ""},
+    {"from_tuple", from_tuple, METH_VARARGS, ""},
     {"intersection", intersection, METH_VARARGS, ""},
     {"compute_slice", compute_slice, METH_VARARGS, ""},
     {"offset_from", offset_from, METH_VARARGS, ""},

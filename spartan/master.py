@@ -5,25 +5,32 @@ Spartan computations consist of a master and one or more workers.
 The master tracks the location of array data, manages worker health,
 and runs user operations on workers.
 '''
+
 import atexit
 import threading
 import weakref
+
 import time
 from spartan import util, core, blob_ctx
 from spartan.config import FLAGS
 from spartan.rpc import MasterService, WorkerProxy, FutureGroup, Server, Client
 
 MASTER = None
+
+
 def _dump_profile():
   import yappi
   yappi.get_func_stats().save('master_prof.out', type='pstat')
+
 
 def _shutdown():
   if MASTER is not None:
     MASTER.shutdown()
 
+
 def get():
   return MASTER
+
 
 class Master(MasterService):
   def __init__(self, port, num_workers):
@@ -93,7 +100,6 @@ class Master(MasterService):
 
     if len(self._workers) == self.num_workers:
       threading.Thread(target=self._initialize).start()
-    return
 
   def register_array(self, array):
     self._arrays.add(array)
@@ -108,16 +114,17 @@ class Master(MasterService):
 
     tile_in_worker = [tile_in_worker[worker_id] for worker_id in self._available_workers]
 
-    tile_in_worker.sort(key=lambda x : x[1])
+    tile_in_worker.sort(key=lambda x: x[1])
     result = {}
     for i in range(len(array.bad_tiles)):
-      result[array.bad_tiles[i]] = tile_in_worker[i%len(tile_in_worker)][0]
+      result[array.bad_tiles[i]] = tile_in_worker[i % len(tile_in_worker)][0]
 
     return result
 
   def init_worker_score(self, worker_id, worker_status):
     self._worker_statuses[worker_id] = worker_status
-    self._worker_scores[worker_id] = (100 - worker_status.mem_usage) * worker_status.total_physical_memory / 1e13 #0.1-0.3
+    self._worker_scores[worker_id] = ((100 - worker_status.mem_usage) *
+                                      worker_status.total_physical_memory / 1e13)
 
   def update_worker_score(self, worker_id, worker_status):
     self._worker_statuses[worker_id] = worker_status
@@ -178,7 +185,7 @@ class Master(MasterService):
         slow_worker[1].kernel_remain_tiles.remove(tile_id)
         return core.TileIdMessage(tile_id)
 
-    return core.TileIdMessage(core.TileId(-1,-1))
+    return core.TileIdMessage(core.TileId(-1, -1))
 
   def heartbeat(self, req):
     '''RPC method.
@@ -223,4 +230,3 @@ class Master(MasterService):
       time.sleep(0.1)
 
     blob_ctx.set(self._ctx)
-
