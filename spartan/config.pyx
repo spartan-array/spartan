@@ -215,8 +215,8 @@ def parse(argv):
   '''Parse configuration from flags and/or configuration file.'''
 
   # load flags defined in other modules (is there a better way to do this?)
-  import spartan.expr.local
-  import spartan.expr.optimize
+  import spartan.expr.operator.local
+  import spartan.expr.operator.optimize
   import spartan.cluster
   import spartan.util
 
