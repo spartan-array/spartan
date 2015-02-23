@@ -252,8 +252,8 @@ def setup_package():
                           "spartan/lib/libsimplerpc.so",
                           "spartan/lib/libbase.so"
                         ]),
-      Extension('spartan.expr.tiling',
-                sources=['spartan/expr/tiling.cc'],
+      Extension('spartan.expr.operator.tiling',
+                sources=['spartan/expr/operator/tiling.cc'],
                 language='c++',
                 extra_compile_args=["-std=c++0x"],
                 extra_link_args=["-std=c++11", "-fPIC"],
