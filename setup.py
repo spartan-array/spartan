@@ -12,7 +12,7 @@ from distutils.command.install import INSTALL_SCHEMES
 
 class clean(Command):
   description = 'Remove build and trash files'
-  user_options = [("all", "a", "the smae")]
+  user_options = [("all", "a", "Remove all compiled files")]
 
   def initialize_options(self):
     self.all = None
@@ -24,9 +24,16 @@ class clean(Command):
     subprocess.call("rm -rf spartan/*.so spartan/*.c spartan/*.cpp spartan/worker spartan/lib", shell=True)
     subprocess.call("rm -rf spartan/array/*.so spartan/array/*.c spartan/array/*.cpp", shell=True)
     subprocess.call("rm -rf spartan/rpc/*.so spartan/rpc/*.c spartan/rpc/*.cpp spartan/rpc/simplerpc", shell=True)
-    subprocess.call("make -C spartan/src clean", shell=True)
     subprocess.call("rm -rf build", shell=True)
 
+    if not self.all:
+      subprocess.call("make -C spartan/src clean", shell=True)
+    else:
+      subprocess.call("make -C spartan/src cleanall", shell=True)
+      for path, dirs, files in os.walk(os.getcwd(), topdown=False):
+        for fileName in files:
+          if fileName.endswith(".pyc") or fileName.endswith(".so"):
+            os.remove(os.path.join(path, fileName))
 
 #We need to build up src/ before setup invokes
 #Assume we are already under /home/..../spartan
