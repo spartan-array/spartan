@@ -83,7 +83,7 @@ def tile_mapper(ex, children, child_to_var, op):
 
   # make a new tile and return it
   result_tile = tile.from_data(result)
-  tile_id = blob_ctx.get().create(result_tile).wait().tile_id
+  tile_id = blob_ctx.get().create(result_tile).result.tile_id
 
   return LocalKernelResult(result=[(ex, tile_id)])
 

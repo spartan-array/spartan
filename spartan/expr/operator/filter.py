@@ -72,7 +72,7 @@ def _int_index_mapper(ex, src, idx, dst):
 
   #util.log_info('%s %s', output_ex.shape, np.array(output).shape)
   output_tile = tile.from_data(np.array(output))
-  tile_id = blob_ctx.get().create(output_tile).wait().tile_id
+  tile_id = blob_ctx.get().create(output_tile).result.tile_id
   return LocalKernelResult(result=[(output_ex, tile_id)])
 
 
@@ -93,7 +93,7 @@ def _bool_index_mapper(ex, src, idx):
   #util.log_info('\nVal: %s\n Mask: %s', val, mask)
   masked_val = np.ma.masked_array(val, mask)
   output_tile = tile.from_data(masked_val)
-  tile_id = blob_ctx.get().create(output_tile).wait().tile_id
+  tile_id = blob_ctx.get().create(output_tile).result.tile_id
   return LocalKernelResult(result=[(ex, tile_id)])
 
 
