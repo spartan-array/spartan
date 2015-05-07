@@ -224,7 +224,7 @@ public:
     };
 
     int get_flag_count(void) {
-        return vals.size();
+        return static_cast<int>(vals.size());
     };
 
     void set_parsed(void) {

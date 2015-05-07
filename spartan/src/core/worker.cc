@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/param.h> 
+#include <sys/sysctl.h>
 #include <string>
 
 #include "cconfig.h"
@@ -35,10 +36,22 @@ CWorker::CWorker(const std::string& master_addr, const std::string& worker_addr,
     _clt_poll = new rpc::PollMgr;
     _clt_pool = new rpc::ClientPool(_clt_poll);
     _master = new spartan::MasterProxy(_clt_pool->get_client(master_addr));
-    _worker_status = new WorkerStatus(sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE),
-                                      (int32_t)sysconf(_SC_NPROCESSORS_CONF),
-                                      0, 0, (double)time(0), _kernel_remain_tiles);
     HEARTBEAT_INTERVAL = heartbeat_interval;
+#ifdef __APPLE__
+    uint64_t size;
+    int mib[2] = { CTL_HW, HW_MEMSIZE };
+    uint32_t namelen = sizeof(mib) / sizeof(mib[0]);
+    size_t len = sizeof(size);
+
+    if (sysctl(mib, namelen, &size, &len, NULL, 0) < 0)
+        perror("sysctl");
+    else
+        printf("HW.HW_MEMSIZE = %llu bytes\n", size);
+#else
+    uint64_t size = sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
+#endif
+    _worker_status = new WorkerStatus(size, (int32_t)sysconf(_SC_NPROCESSORS_CONF),
+                                      0, 0, (double)time(0), _kernel_remain_tiles);
 }
 
 CWorker::~CWorker()

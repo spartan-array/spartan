@@ -19,7 +19,7 @@
 
 
 #include <iostream>
-CSliceIdx::CSliceIdx(PyObject *idx, int nd, npy_intp *dimensions)
+CSliceIdx::CSliceIdx(PyObject *idx, long nd, npy_intp *dimensions)
 {
     int i;
 
@@ -65,7 +65,7 @@ CSliceIdx::CSliceIdx(PyObject *idx, int nd, npy_intp *dimensions)
             slices[0].step = 1;
         }
     } else {
-        int size = PyTuple_Size(idx);
+        long size = PyTuple_Size(idx);
         for (i = 0; i < size ; i++) {
             PyObject *slc = PyTuple_GET_ITEM(idx, i);
             //std::cout << "1" << std::endl;

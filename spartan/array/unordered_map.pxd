@@ -1,6 +1,6 @@
 from libcpp.utility cimport pair
  
-cdef extern from "<tr1/unordered_map>" namespace "std::tr1":
+cdef extern from "<unordered_map>" namespace "std" nogil:
     cdef cppclass unordered_map[T, U]:
         cppclass iterator:
             pair[T, U]& operator*() nogil

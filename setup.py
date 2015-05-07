@@ -169,10 +169,13 @@ def setup_package():
 
   pkgs_dir = {p: p.replace('.', '/') for p in pkgs}
 
+
+  import numpy
   ext_include_dirs = ['/usr/local/include',
                       src_path + '/spartan/src',
                       src_path + '/spartan/src/rpc/simple-rpc',
-                      src_path + '/spartan/src/rpc/simple-rpc/build', ]
+                      src_path + '/spartan/src/rpc/simple-rpc/build',
+                      numpy.get_include(), ]
   ext_link_dirs = ['/usr/lib',
                   src_path + '/spartan/src/',
                   src_path + '/spartan/src/obj/pkg',
@@ -269,6 +272,7 @@ def setup_package():
       # Spartan extensions, cython part.
       Extension('spartan.rpc.serialization_buffer',
                 ['spartan/rpc/serialization_buffer.pyx'],
+                include_dirs=ext_include_dirs,
                 extra_compile_args=["-pipe"]),
       Extension('spartan.rpc.cloudpickle',
                 ['spartan/rpc/cloudpickle.pyx'],
@@ -280,7 +284,8 @@ def setup_package():
       Extension('spartan.array.sparse',
                 ['spartan/array/sparse.pyx'],
                 language='c++',
-                extra_compile_args=["-std=c++0x", "-pipe"],
+                include_dirs=ext_include_dirs,
+                extra_compile_args=["-std=c++11", "-pipe"],
                 extra_link_args=["-std=c++11"]),
       Extension('spartan.config',
                 ['spartan/config.pyx'],
@@ -293,10 +298,15 @@ def setup_package():
                 depends=["spartan/lib/libcore.so"]),
 
       # Example extensions
-      Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core.pyx']),
-      Extension('spartan.examples.cf.helper', ['spartan/examples/cf/helper.pyx']),
+      Extension('spartan.examples.netflix_core',
+                ['spartan/examples/netflix_core.pyx'],
+                include_dirs=ext_include_dirs,),
+      Extension('spartan.examples.cf.helper',
+                ['spartan/examples/cf/helper.pyx'],
+                include_dirs=ext_include_dirs,),
       Extension('spartan.examples.sklearn.util.graph_shortest_path',
-                ['spartan/examples/sklearn/util/graph_shortest_path.pyx']),
+                ['spartan/examples/sklearn/util/graph_shortest_path.pyx'],
+                include_dirs=ext_include_dirs,),
     ],
 
     cmdclass={

@@ -5,13 +5,14 @@
 #include <vector>
 #include <map>
 #include <iostream>
-#include <sys/types.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/param.h>
 #include "array/ctile.h"
 #include "array/cslice.h"
 #include "base/logging.h"
 
-inline unsigned get_rpc_id(unsigned rpc_count) 
+inline unsigned get_rpc_id(unsigned rpc_count)
 {
     static unsigned rpc_id = 0;
     if (rpc_id == 0) {
@@ -257,7 +258,7 @@ struct GetResp {
     ~GetResp() {
         if (own_data) {
             delete (bool*)data[0];
-            int size = data.size();
+            int size = static_cast<int>(data.size());
             for (int i = 1; i < size; ++i) {
                 //Log_debug("GetResp delete sources %d %p", i, ((NpyMemManager*)(data[i]))->get_source());
                 delete (NpyMemManager*)data[i];
@@ -267,7 +268,7 @@ struct GetResp {
 };
 
 inline rpc::Marshal& operator <<(rpc::Marshal& m, const GetResp& o) {
-    int size = o.data.size();
+    int size = static_cast<int>(o.data.size());
 
     m << o.rpc_id;
     m << o.id;
@@ -361,7 +362,7 @@ inline rpc::Marshal& operator <<(rpc::Marshal& m, const UpdateReq& o) {
     m << o.rpc_id;
     m << o.id;
     m << o.region;
-    m << o.reducer;
+    m << static_cast<uint64_t>(o.reducer);
     m << *(o.data);
     Log_debug("UpdateReq %X marshal << id = %s, reducer = %u",
               o.rpc_id, o.id.to_string().c_str(), o.reducer);
@@ -369,10 +370,12 @@ inline rpc::Marshal& operator <<(rpc::Marshal& m, const UpdateReq& o) {
 }
 
 inline rpc::Marshal& operator >>(rpc::Marshal& m, UpdateReq& o) {
+    uint64_t reducer;
     m >> o.rpc_id;
     m >> o.id;
     m >> o.region;
-    m >> o.reducer;
+    m >> reducer;
+    o.reducer = static_cast<unsigned long>(reducer);
     o.data = new CTile();
     m >> *(o.data);
     Log_debug("UpdateReq %X marshal >> %s", o.rpc_id, o.id.to_string().c_str());

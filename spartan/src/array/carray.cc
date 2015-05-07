@@ -2,7 +2,7 @@
 #include <Python.h>
 /* For Numpy C-API */
 #define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
-#include <arrayobject.h>
+#include <numpy/arrayobject.h>
 #include "carray.h"
 #include <sys/time.h>
 
@@ -238,7 +238,7 @@ CArray::to_npy(void)
     Log_debug("CArray::to_npy");
     type_num = npy_type_token_to_number(type);
     array = (PyArrayObject*)PyArray_New(&PyArray_Type, nd, dimensions, type_num, strides, 
-                                        data, size, NPY_CARRAY, NULL);
+                                        data, static_cast<int>(size), NPY_CARRAY, NULL);
     assert(array != NULL);
     if (data_source != NULL) {
         manager = new NpyMemManager(*data_source);
@@ -298,7 +298,9 @@ CArray::to_carray_rpc(void)
 }
 
 // This is the entry when loading the shared library
-static void _attach(void) __attribute__((constructor));
+extern "C" {
+    void _attach(void) __attribute__((constructor));
+};
 void _attach(void) {
     Py_Initialize();
     import_array();   /* required NumPy initialization */

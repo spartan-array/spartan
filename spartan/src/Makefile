@@ -7,14 +7,19 @@ ARRAY_DIR := $(CUR_DIR)/array
 RPCDIR := $(CUR_DIR)/rpc
 RPC := $(RPCDIR)/simple-rpc
 OBJ_DIR := $(CUR_DIR)/obj
+UNAME := $(shell uname)
 
-PY_CFLAGS = $(shell python-config --cflags)
+PY_CFLAGS := $(shell python-config --cflags)#'-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'
+ifneq (,$(findstring -arch x86_64,$(PY_CFLAGS)))
+	PY_CFLAGS := $(subst -arch i386,,$(PY_CFLAGS))
+	#PY_CFLAGS := $(subst -arch x86_64,,$(PY_CFLAGS))
+endif
 PY_LDFLAGS = $(shell python-config --ldflags)
 ifndef $(NUMPY_FLAGS)
-    NUMPY = $(shell python -c "import numpy; print '-I' + numpy.__path__[0] + '/core/include/numpy'")
+	NUMPY_FLAGS = $(shell python -c "import numpy; print '-I' + numpy.get_include()")
 endif
 
-CFLAGS := -I$(CUR_DIR) -I$(CORE_DIR) -I$(ARRAY_DIR) -I$(RPC) $(PY_CFLAGS) $(NUMPY) -pthread -std=c++0x -O2
+CFLAGS := -I$(CUR_DIR) -I$(CORE_DIR) -I$(ARRAY_DIR) -I$(RPC) $(PY_CFLAGS) $(NUMPY_FLAGS) -pthread -std=c++0x -O2
 LDFLAGS := -L$(RPC)/build -L$(OBJ_DIR)/lib -L$(OBJ_DIR)/rpc -L$(CURDIR) -L$(RPC) $(PY_LDFLAGS) -lbase -lpython2.7 -std=c++11
 
 OBJS_WORKER = $(CUR_DIR)/core/worker.o
@@ -23,6 +28,8 @@ OBJS_CORE = $(CUR_DIR)/core/cconfig.o
 
 all: rpc $(OBJ_DIR)/lib/libcore.so $(OBJ_DIR)/lib/libspartan_array.so $(OBJ_DIR)/pkg/worker
 
+print-%: ;@echo $* = $($*)
+
 .cc.o:
 	$(CC) $(CFLAGS) $< -c -o $@ -fPIC
 	$(CC) -MM $(CFLAGS) -MT '$@' $< > $(<:.cc=.d)
@@ -30,8 +37,8 @@ all: rpc $(OBJ_DIR)/lib/libcore.so $(OBJ_DIR)/lib/libspartan_array.so $(OBJ_DIR)
 .PHONY:simple-rpc
 simple-rpc:
 	@if [ ! -d "$(RPC)" ] ; then \
-	    git clone https://github.com/santazhang/simple-rpc $(RPC); \
-	    cp $(RPCDIR)/simple-rpc-wscript $(RPC)/wscript; \
+		git clone https://github.com/santazhang/simple-rpc $(RPC); \
+		cp $(RPCDIR)/simple-rpc-wscript $(RPC)/wscript; \
 			cd $(RPCDIR) && patch -Np1 < $(CUR_DIR)/rpc/base-patch 2> /dev/null && cd -; \
 			patch $(RPC)/pylib/simplerpc/marshal.py < $(RPCDIR)/marshal-patch; \
 	fi
@@ -49,15 +56,27 @@ rpc: simple-rpc
 
 -include $(OBJS_CORE:.o=.d)
 $(OBJ_DIR)/lib/libcore.so: $(OBJS_CORE)
-	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach -Wl,-rpath='$$ORIGIN'
+ifeq ($(UNAME), Linux)
+	${CC} -v -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-rpath=$$ORIGIN
+else # Darwin, MacOS
+	${CC} -v -o $@ $^ $(LDFLAGS) -shared -fPIC -rpath @executable_path/
+endif
 
 -include $(OBJS_ARRAY:.o=.d)
 $(OBJ_DIR)/lib/libspartan_array.so: $(OBJS_ARRAY)
-	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,_attach -lcore -Wl,-rpath='$$ORIGIN'
+ifeq ($(UNAME), Linux)
+	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,__attach -lcore -Wl,-rpath=$$ORIGIN
+else # Darwin, MacOS
+	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,__attach -lcore -rpath @executable_path/
+endif
 
 -include $(OBJS_WORKER:.o=.d)
 $(OBJ_DIR)/pkg/worker: $(OBJS_WORKER) $(OBJ_DIR)/lib/libspartan_array.so $(OBJ_DIR)/lib/libcore.so
-	${CC} -o $@ $(OBJS_WORKER) $(LDFLAGS) -lsimplerpc -lspartan_array -lcore -Wl,-rpath='$$ORIGIN/lib'
+ifeq ($(UNAME), Linux)
+	${CC} -o $@ $(OBJS_WORKER) $(LDFLAGS) -lsimplerpc -lspartan_array -lcore -Wl,-rpath=$$ORIGIN/lib/
+else
+	${CC} -o $@ $(OBJS_WORKER) $(LDFLAGS) -lsimplerpc -lspartan_array -lcore -rpath executable_path/lib
+endif
 
 #TODO: This needs to be updated
 clean:

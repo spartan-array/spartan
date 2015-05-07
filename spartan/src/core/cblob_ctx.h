@@ -34,7 +34,8 @@ private:
 public:
     CBlobCtx(int32_t wid, std::unordered_map<int32_t, spartan::WorkerProxy*>* peers,
              CWorker* l_worker = NULL, bool o_workers = false)
-                : worker_id(wid), local_worker(l_worker), num_workers(peers->size()),
+                : worker_id(wid), local_worker(l_worker),
+                  num_workers(static_cast<int32_t>(peers->size())),
                   workers(peers), id_counter(0) {}
 
     ~CBlobCtx() {}
