@@ -1,6 +1,6 @@
 from libcpp.utility cimport pair
 
-cdef extern from "<tr1/unordered_set>" namespace "std::tr1":
+cdef extern from "<unordered_set>" namespace "std" nogil:
     cdef cppclass unordered_set[T]:
         cppclass iterator:
             T& operator*() nogil

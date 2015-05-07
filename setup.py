@@ -31,6 +31,8 @@ class cython_sdist(sdist):
 
 cmdclass['sdist'] = cython_sdist
 
+import numpy
+ext_include_dirs = [numpy.get_include(),]
 setup(
   name='spartan',
   version='0.06',
@@ -65,10 +67,15 @@ setup(
             'spartan.array' ],
   ext_modules = [
     Extension('spartan.core', ['spartan/core' + suffix]),
-    Extension('spartan.examples.netflix_core', ['spartan/examples/netflix_core' + suffix]),
-    Extension('spartan.examples.cf.helper', ['spartan/examples/cf/helper' + suffix]),
+    Extension('spartan.examples.netflix_core',
+              ['spartan/examples/netflix_core' + suffix],
+              include_dirs=ext_include_dirs,),
+    Extension('spartan.examples.cf.helper',
+              ['spartan/examples/cf/helper' + suffix],
+              include_dirs=ext_include_dirs,),
     Extension('spartan.rpc.serialization_buffer',
-              ['spartan/rpc/serialization_buffer' + suffix]),
+              ['spartan/rpc/serialization_buffer' + suffix],
+              include_dirs=ext_include_dirs,),
     Extension('spartan.cloudpickle', ['spartan/cloudpickle' + suffix]),
     Extension('spartan.rpc.serialization',
               ['spartan/rpc/serialization' + suffix],
@@ -78,13 +85,17 @@ setup(
     Extension('spartan.rpc.rlock',
               ['spartan/rpc/rlock' + suffix], language="c++"),
     Extension('spartan.examples.sklearn.util.graph_shortest_path',
-              ['spartan/examples/sklearn/util/graph_shortest_path' + suffix]),
+              ['spartan/examples/sklearn/util/graph_shortest_path' + suffix],
+              include_dirs=ext_include_dirs,),
     Extension('spartan.array.sparse',
               ['spartan/array/sparse' + suffix],
               language='c++',
-              extra_compile_args=["-std=c++0x"],
+              include_dirs=ext_include_dirs,
+              extra_compile_args=["-std=c++11"],
               extra_link_args=["-std=c++11"]),
-    Extension('spartan.array.extent', ['spartan/array/extent' + suffix]),
+    Extension('spartan.array.extent',
+              ['spartan/array/extent' + suffix],
+              include_dirs=ext_include_dirs,),
     Extension('spartan.array.tile', ['spartan/array/tile' + suffix]),
     Extension('spartan.expr.operator.tiling',
               sources=['spartan/expr/operator/tiling.cc'],
