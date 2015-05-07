@@ -1,6 +1,7 @@
 import numpy as np
 import copy_reg
 from _cextent_py_if import *
+from spartan import util
 
 #def offset_slice(base, other):
   #'''
