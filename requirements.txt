@@ -1,0 +1,7 @@
+nose
+pyzmq
+dsltools
+cython
+parakeet
+scikit-learn
+traits
