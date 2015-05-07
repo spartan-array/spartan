@@ -14,6 +14,7 @@ ifneq (,$(findstring -arch x86_64,$(PY_CFLAGS)))
 	PY_CFLAGS := $(subst -arch i386,,$(PY_CFLAGS))
 	#PY_CFLAGS := $(subst -arch x86_64,,$(PY_CFLAGS))
 endif
+PY_CFLAGS := $(subst -Wstrict-prototypes,,$(PY_CFLAGS))
 PY_LDFLAGS = $(shell python-config --ldflags)
 ifndef $(NUMPY_FLAGS)
 	NUMPY_FLAGS = $(shell python -c "import numpy; print '-I' + numpy.get_include()")
@@ -57,7 +58,7 @@ rpc: simple-rpc
 -include $(OBJS_CORE:.o=.d)
 $(OBJ_DIR)/lib/libcore.so: $(OBJS_CORE)
 ifeq ($(UNAME), Linux)
-	${CC} -v -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-rpath=$$ORIGIN
+	${CC} -v -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-rpath='$$ORIGIN'
 else # Darwin, MacOS
 	${CC} -v -o $@ $^ $(LDFLAGS) -shared -fPIC -rpath @executable_path/
 endif
@@ -65,7 +66,7 @@ endif
 -include $(OBJS_ARRAY:.o=.d)
 $(OBJ_DIR)/lib/libspartan_array.so: $(OBJS_ARRAY)
 ifeq ($(UNAME), Linux)
-	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,__attach -lcore -Wl,-rpath=$$ORIGIN
+	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,__attach -lcore -Wl,-rpath='$$ORIGIN'
 else # Darwin, MacOS
 	${CC} -o $@ $^ $(LDFLAGS) -shared -fPIC -Wl,-init,__attach -lcore -rpath @executable_path/
 endif
@@ -73,7 +74,7 @@ endif
 -include $(OBJS_WORKER:.o=.d)
 $(OBJ_DIR)/pkg/worker: $(OBJS_WORKER) $(OBJ_DIR)/lib/libspartan_array.so $(OBJ_DIR)/lib/libcore.so
 ifeq ($(UNAME), Linux)
-	${CC} -o $@ $(OBJS_WORKER) $(LDFLAGS) -lsimplerpc -lspartan_array -lcore -Wl,-rpath=$$ORIGIN/lib/
+	${CC} -o $@ $(OBJS_WORKER) $(LDFLAGS) -lsimplerpc -lspartan_array -lcore -Wl,-rpath='$$ORIGIN/lib/'
 else
 	${CC} -o $@ $(OBJS_WORKER) $(LDFLAGS) -lsimplerpc -lspartan_array -lcore -rpath executable_path/lib
 endif

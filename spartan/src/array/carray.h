@@ -240,7 +240,7 @@ inline rpc::Marshal& operator >>(rpc::Marshal&m, CArray& o)
     if (o.size > 0) {
         o.data = new char[o.size];
         o.data_source = new NpyMemManager(o.data, o.data, false, o.size);
-        assert(m.content_size() == o.size);
+        assert(m.content_size() == static_cast<unsigned long>(o.size));
         m.read(o.data, o.size);
     }
     return m;

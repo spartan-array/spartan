@@ -3,7 +3,7 @@
 template<typename Q, typename R>
 rpc::Future* CBlobCtx::_send(int32_t worker_id, void (CWorker::*pLocalFunc)(const Q&, R*),
                             rpc::Future* (spartan::WorkerProxy::*pFunc)(const Q&, const rpc::FutureAttr&),
-                            Q& req, R* resp, bool wait, int32_t timeout) const 
+                            Q& req, R* resp, bool wait, int32_t timeout) const
 {
 
     rpc::Future* fu = NULL;
@@ -45,7 +45,7 @@ rpc::Future* CBlobCtx::_send(int32_t worker_id, void (CWorker::*pLocalFunc)(cons
 template<typename Q, typename R>
 rpc::Future* CBlobCtx::_py_send(int32_t worker_id, void (CWorker::*pLocalFunc)(const Q&, R*),
                                 rpc::Future* (spartan::WorkerProxy::*pFunc)(const Q&, const rpc::FutureAttr&),
-                                Q& req, R* resp) const 
+                                Q& req, R* resp) const
 {
     rpc::Future* fu = NULL;
     if (worker_id == this->worker_id) {
@@ -69,7 +69,7 @@ rpc::Future* CBlobCtx::_py_send(int32_t worker_id, void (CWorker::*pLocalFunc)(c
 template<typename Q, typename R>
 void CBlobCtx::_send_all(rpc::Future* (spartan::WorkerProxy::*pFunc)(const Q&, const rpc::FutureAttr&),
                          Q& req, std::vector<R*>* resp, std::vector<int32_t>* target_workers,
-                         bool wait, int32_t timeout) const 
+                         bool wait, int32_t timeout) const
 {
     rpc::Future* fu = NULL;
     std::vector<rpc::Future*> fu_group;

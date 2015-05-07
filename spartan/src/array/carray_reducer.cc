@@ -16,6 +16,7 @@
  */
 
 #include <iostream>
+#define NO_IMPORT_ARRAY
 #include "carray.h"
 #include "carray_reducer.h"
 #include "cextent.h"

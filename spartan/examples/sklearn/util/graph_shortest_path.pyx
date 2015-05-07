@@ -52,7 +52,7 @@ def graph_shortest_path(dist_matrix, row_beg=None, row_end=None, directed=True):
     """
     if not isspmatrix_csr(dist_matrix):
         dist_matrix = csr_matrix(dist_matrix)
-    
+
     if row_beg is None:
       row_beg = 0
     if row_end is None:
@@ -294,7 +294,9 @@ cdef void link(FibonacciHeap* heap, FibonacciNode* node):
     #              - node is a valid pointer
     #              - node is already within heap
 
-    cdef FibonacciNode *linknode, *parent, *child
+    cdef FibonacciNode *linknode
+    cdef FibonacciNode *parent
+    cdef FibonacciNode *child
 
     if heap.roots_by_rank[node.rank] == NULL:
         heap.roots_by_rank[node.rank] = node
@@ -315,7 +317,9 @@ cdef void link(FibonacciHeap* heap, FibonacciNode* node):
 cdef FibonacciNode* remove_min(FibonacciHeap* heap):
     # Assumptions: - heap is a valid pointer
     #              - heap.min_node is a valid pointer
-    cdef FibonacciNode *temp, *temp_right, *out
+    cdef FibonacciNode *temp
+    cdef FibonacciNode *temp_right
+    cdef FibonacciNode *out
     cdef unsigned int i
 
     # make all min_node children into root nodes
@@ -410,7 +414,8 @@ cdef void dijkstra_directed_one_row(
     """
     cdef unsigned int N = graph.shape[0]
     cdef unsigned int i
-    cdef FibonacciNode *v, *current_neighbor
+    cdef FibonacciNode *v,
+    cdef FibonacciNode *current_neighbor
     cdef DTYPE_t dist
 
     # initialize nodes
@@ -474,7 +479,8 @@ cdef void dijkstra_one_row(unsigned int i_node,
     """
     cdef unsigned int N = graph.shape[0]
     cdef unsigned int i
-    cdef FibonacciNode *v, *current_neighbor
+    cdef FibonacciNode *v
+    cdef FibonacciNode *current_neighbor
     cdef DTYPE_t dist
 
     # re-initialize nodes

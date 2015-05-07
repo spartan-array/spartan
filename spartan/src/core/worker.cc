@@ -7,6 +7,7 @@
 #include <sys/sysctl.h>
 #include <string>
 
+#define NO_IMPORT_ARRAY
 #include "cconfig.h"
 #include "cblob_ctx.h"
 #include "cworker.h"

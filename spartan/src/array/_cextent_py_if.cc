@@ -1,7 +1,8 @@
 #include <Python.h>
 #include <structmember.h>
-#include "cextent.h"
 #include <iostream>
+#define NO_IMPORT_ARRAY
+#include "cextent.h"
 
 #define RETURN_IF_NULL(val) \
 do {\

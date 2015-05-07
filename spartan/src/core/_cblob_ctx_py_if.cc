@@ -1,7 +1,7 @@
 #include <Python.h>
 #include <structmember.h>
 //#define PY_ARRAY_UNIQUE_SYMBOL spartan_ctile_ARRAY_API
-//#define NO_IMPORT_ARRAY
+#define NO_IMPORT_ARRAY
 #include <numpy/arrayobject.h>
 #include <iostream>
 #include <unordered_map>
