@@ -45,7 +45,7 @@ void init_graph(PyObject *args) {
 
 	// init t node
 	t = (int)PyInt_AsLong(PyTuple_GetItem(args, 0));
-    printf("number of nodes:%d\n", t);
+    //printf("number of nodes:%d\n", t);
 
 	// init edges
 	e = 0;
@@ -163,7 +163,7 @@ static PyObject* mincost_tiling(PyObject *self, PyObject *args) {
 	for (int u = 1; u < t; u++)
 		if (vis[u]) PyList_Append(ans, Py_BuildValue("i", u));
 
-	printf("mincost allcost:%ld\n", mincost);
+	//printf("mincost allcost:%ld\n", mincost);
 	return ans;
 }
 
@@ -347,7 +347,7 @@ static PyObject* maxedge_tiling(PyObject *self, PyObject *args) {
 				min_u = u;
 			}
 		}
-        printf("max group:%d %ld choose u:%d %ld\n", u_cost.first, u_cost.second.second, min_u, min_cost);
+        //printf("max group:%d %ld choose u:%d %ld\n", u_cost.first, u_cost.second.second, min_u, min_cost);
 		vis[min_u] = true;
 		for (k = 0; k < NUM_NODE_PER_GROUP; k++) {
 			u = groups[u_cost.first][k];
@@ -363,7 +363,7 @@ static PyObject* maxedge_tiling(PyObject *self, PyObject *args) {
 	for (u = 1; u < t; u++)
 		if (vis[u]) PyList_Append(ans, Py_BuildValue("i", u));
 
-	printf("maxedge allcost:%ld\n", mincost);
+	//printf("maxedge allcost:%ld\n", mincost);
 	return ans;
 }
 
@@ -403,7 +403,7 @@ static PyObject* best_tiling(PyObject *self, PyObject *args) {
 	for (int u = 1; u < t; u++)
 		if (vis[u]) PyList_Append(ans, Py_BuildValue("i", u));
 
-	printf("best allcost:%ld\n", mincost);
+	//printf("best allcost:%ld\n", mincost);
 	return ans;
 }
 
@@ -421,7 +421,7 @@ static PyObject* worse_tiling(PyObject *self, PyObject *args) {
 	for (int u = 1; u < t; u++)
 		if (vis[u]) PyList_Append(ans, Py_BuildValue("i", u));
 
-	printf("worse:%ld\n", mincost);
+	//printf("worse:%ld\n", mincost);
 	return ans;
 }
 

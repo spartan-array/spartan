@@ -192,9 +192,14 @@ def dot_map2_vec_mapper(extents, tiles):
   yield target_ex, tiles[0].dot(tiles[1]).reshape(1,)
 
 
-def dot_map2_mapper(extents, tiles):
+def dot_map2_mapper(extents, tiles, is_vec=None):
   # Dense * Dense
-  if len(tiles[1].shape) == 1:
+  if is_vec:
+    ul = (0, )
+    lr = (extents[1].lr[1], )
+    shape = (extents[1].shape[1], )
+    tiles[0] = tiles[0].reshape(extents[0].shape[1], )
+  elif len(tiles[1].shape) == 1:
     ul = (0, )
     lr = (extents[0].lr[0], )
     shape = (extents[0].shape[0], )
@@ -258,26 +263,38 @@ def dot(a, b, tile_hint=None):
   else:
     if len(a.shape) == 1 and len(b.shape) == 1:
       if a.shape[0] != b.shape[0]:
-        raise ValueError("objects are not aligned")
+        raise ValueError("objects are not aligned %d %d", a.shape[0], b.shape[0])
       return map.map2((a, b), (0, 0), fn=dot_map2_vec_mapper, shape=(1, ), reducer=np.add)
+    elif len(a.shape) == 1 and len(b.shape) > 1:
+      if a.shape[0] != b.shape[0]:
+        raise ValueError("objects are not aligned %d %d", a.shape[0], b.shape[0])
+      shape = (b.shape[1], )
     elif len(a.shape) > 1 and len(b.shape) == 1:
       if a.shape[1] != b.shape[0]:
-        raise ValueError("objects are not aligned")
+        raise ValueError("objects are not aligned %d %d", a.shape[1], b.shape[0])
       shape = (a.shape[0], )
     elif len(a.shape) > 1 and len(b.shape) > 1:
       if tile_hint is None:
         tile_hint = (a.shape[0], b.shape[1])
+      if a.shape[1] != b.shape[0]:
+        raise ValueError("objects are not aligned %d %d", a.shape[1], b.shape[0])
       shape = (a.shape[0], b.shape[1])
     else:
       raise ValueError
 
-    if a.shape[0] > a.shape[1]:
+    if len(a.shape) > 1 and a.shape[0] > a.shape[1]:
       # Use outer(join) to implement dot
       #util.log_warn('Using outer to do dot')
       return outer.outer((a, b), (0, None), dot_outer_mapper, shape=shape,
                          tile_hint=tile_hint, reducer=np.add)
-    else:
+    elif len(a.shape) > 1:
       # Use map2(join) to implement dot
       #util.log_warn('Using map2 to do dot')
       return map.map2((a, b), (1, 0), dot_map2_mapper, shape=shape,
                       tile_hint=tile_hint, reducer=np.add)
+    else:
+      return map.map2((a.reshape(1, a.shape[0]), b), (1, 0),
+                      dot_map2_mapper, shape=shape,
+                      tile_hint=tile_hint, reducer=np.add,
+                      fn_kw={'is_vec': True})
+

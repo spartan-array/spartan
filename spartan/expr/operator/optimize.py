@@ -943,21 +943,23 @@ class AutomaticTiling(OptimizePass):
     # compute best tiling for all exprs
     self.visited_nodes = set()
     edges = self.generate_edges()
-    print 'num of groups', len(self.groups)
+    util.log_debug('num of groups %d' % len(self.groups))
 
     nodes = []
     if FLAGS.tiling_alg == 'maxedge':
       nodes = tiling.maxedge_tiling(self.cur_node_id - 1, edges, self.groups)
-      print 'maxedge', nodes
+      #print 'maxedge', nodes
     elif FLAGS.tiling_alg == 'mincost':
       nodes = tiling.mincost_tiling(self.cur_node_id - 1, edges, self.groups)
-      print 'mincost', nodes
+      #print 'mincost', nodes
     elif FLAGS.tiling_alg == 'best':
       nodes = tiling.best_tiling(self.cur_node_id - 1, edges, self.groups)
-      print 'best', nodes
+      #print 'best', nodes
     elif FLAGS.tiling_alg == 'worse':
       nodes = tiling.worse_tiling(self.cur_node_id - 1, edges, self.groups)
-      print 'worse', nodes
+      #print 'worse', nodes
+    else:
+      assert 'Unknown tiling algorithm'
 
     # give expr the best tiling hint
     for node_id in nodes:
@@ -1069,10 +1071,10 @@ passes = []
 
 def optimize(dag):
   if not FLAGS.optimization:
-    util.log_debug('Optimizations disabled')
+    util.log_info('Optimizations disabled')
     return dag
 
-  util.log_debug('Optimization: applying %d passes', len(passes))
+  util.log_info('Optimization: applying %d passes', len(passes))
   for p in passes:
     dag = apply_pass(p, dag)
 
