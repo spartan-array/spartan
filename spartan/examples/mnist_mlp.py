@@ -13,9 +13,9 @@ def _extract(prefix, md, max_dig):
   ret = []
   for dig in range(max_dig):
     samples = md[prefix + str(dig)]
-    labels = np.empty([samples.shape[0], 1], dtype=np.float32)
+    labels = np.empty([samples.shape[0], 1], dtype=np.float)
     labels.fill(dig)
-    ret.append(np.hstack((samples.astype(np.float32) / 256, labels)))
+    ret.append(np.hstack((samples.astype(np.float) / 256, labels)))
   return ret
 
 
@@ -23,10 +23,10 @@ def _split_sample_and_label(merged_mb):
   [s, l] = np.hsplit(merged_mb, [merged_mb.shape[1] - 1])
   # change label to sparse representation
   n = merged_mb.shape[0]
-  ll = np.zeros([n, 10], dtype=np.float32)
+  ll = np.zeros([n, 10], dtype=np.float)
   ll[np.arange(n), l.astype(int).flat] = 1
-  return (spartan.from_numpy(s).optimized().evaluate(),
-          spartan.from_numpy(ll).optimized().evaluate())
+  return (spartan.from_numpy(s).evaluate(),
+          spartan.from_numpy(ll).evaluate())
 
 
 def load_mb_from_mat(mat_file, mb_size):
@@ -51,13 +51,13 @@ def load_mb_from_mat(mat_file, mb_size):
 def relu(x):
   #zm = np.zeros(x.shape)
   #return np.greater(x, zm) * x
-  return (x > 0) * x
+  return (x > 0).astype(float) * x
 
 
 def relu_back(y, x):
   #zm = np.zeros(x.shape)
   #return np.greater(x, zm) * y
-  return (x > 0) * y
+  return (x > 0).astype(float) * y
 
 
 def softmax(m):
@@ -82,7 +82,7 @@ class MnistTrainer:
     self.ctx = ctx
     # init weight
     l1 = 784
-    l2 = mb_size
+    l2 = 256
     l3 = 10
     self.l1 = l1
     self.l2 = l2
@@ -102,10 +102,10 @@ class MnistTrainer:
     #(test_samples, test_labels) = test_data
     count = 1
     begin = time.time()
-    begin2 = begin
     for epoch in range(self.num_epochs):
       print '---Start epoch #%d' % epoch
       # train
+      iterations = len(train_data)
       for (mb_samples, mb_labels) in train_data:
         num_samples = mb_samples.shape[0]
 
@@ -139,15 +139,20 @@ class MnistTrainer:
         self.b1 -= self.eps_b * gb1
         self.b2 -= self.eps_b * gb2
 
-        if (count % 40 == 0):
+        iterations -= 1
+        out.optimized().evaluate()
+        self.w1.evaluate()
+        self.w2.evaluate()
+        self.b1.evaluate()
+        self.b2.evaluate()
+        #if count % 40 == 0 or iterations == 0:
+        if count % 40 == 0:
           #correct = np.argmax(out, axis=0) - np.argmax(target, axis=0)
           #print 'Training error:', float(np.count_nonzero(correct)) / num_samples
-          out.optimized().evaluate()
           correct = spartan.argmax(out, axis=0) - spartan.argmax(target, axis=0)
           print 'Training error:', (float(spartan.count_nonzero(correct).glom())
                                     / num_samples)
         count = count + 1
-      out.optimized().evaluate()
       print 'spent ', (time.time() - begin)
 
       # test
@@ -163,6 +168,5 @@ class MnistTrainer:
 if __name__ == '__main__':
   spartan.config.parse(sys.argv)
   ctx = spartan.initialize()
-  trainer = MnistTrainer(num_epochs=1, ctx=ctx,
-                         mb_size=int(256 * math.sqrt(ctx.num_workers)))
+  trainer = MnistTrainer(num_epochs=100, ctx=ctx, mb_size=256 * 2 * ctx.num_workers)
   trainer.run()
