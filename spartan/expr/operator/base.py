@@ -54,6 +54,7 @@ def expr_like(expr, **kw):
   The new expression has the same id, but is initialized using ``kw``
   '''
   kw['expr_id'] = expr.expr_id
+  kw['shape_cache'] = expr.shape_cache
 
   trace = kw.pop('trace', None)
   if trace is not None and FLAGS.opt_keep_stack:
@@ -173,6 +174,7 @@ class Expr(Node):
   itself is reclaimed.
   '''
   expr_id = PythonValue(None, desc="Integer or None")
+  shape_cache = PythonValue(None, desc="List, Tuple or None")
   stack_trace = Instance(ExprTrace)
 
   # should evaluation of this object be cached
@@ -460,11 +462,13 @@ class Expr(Node):
     if cache is not None:
       return cache.shape
 
-    try:
-      return self.compute_shape()
-    except NotShapeable:
-      util.log_debug('Not shapeable: %s', self)
-      return evaluate(self).shape
+    if self.shape_cache is None:
+      try:
+        self.shape_cache = self.compute_shape()
+      except NotShapeable:
+        util.log_debug('Not shapeable: %s', self)
+        self.shape_cache = evaluate(self).shape
+    return self.shape_cache
 
   @property
   def size(self):
