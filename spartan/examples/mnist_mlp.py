@@ -91,10 +91,10 @@ class MnistTrainer:
     #self.w2 = np.random.randn(l3, l2) * math.sqrt(4.0 / (l2 + l3))
     #self.b1 = np.zeros([l2, 1])
     #self.b2 = np.zeros([l3, 1])
-    self.w1 = (spartan.randn(l2, l1) * math.sqrt(4.0 / (l1 + l2))).optimized().evaluate()
-    self.w2 = (spartan.randn(l3, l2) * math.sqrt(4.0 / (l2 + l3))).optimized().evaluate()
-    self.b1 = (spartan.zeros([l2, 1])).optimized().evaluate()
-    self.b2 = (spartan.zeros([l3, 1])).optimized().evaluate()
+    self.w1 = (spartan.randn(l2, l1) * math.sqrt(4.0 / (l1 + l2))).evaluate()
+    self.w2 = (spartan.randn(l3, l2) * math.sqrt(4.0 / (l2 + l3))).evaluate()
+    self.b1 = (spartan.zeros([l2, 1])).evaluate()
+    self.b2 = (spartan.zeros([l3, 1])).evaluate()
 
   def run(self):
     (train_data, test_data) = load_mb_from_mat(self.data_file, self.mb_size)
@@ -140,7 +140,7 @@ class MnistTrainer:
         self.b2 -= self.eps_b * gb2
 
         iterations -= 1
-        out.optimized().evaluate()
+        out.evaluate()
         self.w1.evaluate()
         self.w2.evaluate()
         self.b1.evaluate()
