@@ -160,6 +160,10 @@ class MnistTrainer:
       #a2 = relu(np.dot(self.w1, a1) + self.b1)
       #a3 = np.dot(self.w2, a2) + self.b2
       #correct = np.argmax(a3, axis=0) - np.argmax(test_labels.T, axis=0)
+      a1 = test_samples.T
+      a2 = relu(spartan.dot(self.w1, a1) + self.b1)
+      a3 = spartan.dot(self.w2, a2) + self.b2
+      correct = spartan.argmax(a3, axis=0) - spartan.argmax(test_labels.T, axis=0)
       ##print correct
       #print 'Testing error:', float(np.count_nonzero(correct)) / num_test_samples
       #print '---Finish epoch #%d' % epoch
