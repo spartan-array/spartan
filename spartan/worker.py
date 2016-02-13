@@ -61,7 +61,7 @@ class Worker(object):
     self._master = master
     self._running = True
     self._ctx = None
-    self.worker_status = core.WorkerStatus(psutil.TOTAL_PHYMEM, psutil.NUM_CPUS,
+    self.worker_status = core.WorkerStatus(psutil.virtual_memory().total, psutil.cpu_count(),
                                            psutil.virtual_memory().percent,
                                            psutil.cpu_percent(), 
                                            time.time(),

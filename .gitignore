@@ -40,3 +40,11 @@ doc/_templates
 build/
 
 .ropeproject/
+
+#cython generated
+*.h
+*.c
+*.cpp
+
+#intellij stuff
+.idea
