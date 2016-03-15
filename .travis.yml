@@ -5,13 +5,23 @@ virtualenv:
   system_site_packages: true
 before_install:
    - sudo apt-get update -qq
-   - sudo apt-get install python-numpy python-scipy libzmq3-dev
-install: 
-  - LANG=C pip install pyzmq
-  - LANG=C pip install dsltools
-  - LANG=C pip install cython
-  - LANG=C pip install parakeet
-  - LANG=C pip install scikit-learn
-  - LANG=C pip install traits 
-  - LANG=C python setup.py develop
+install:
+   - if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
+   - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.8 90
+   - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 90
+   - sudo apt-get install -y -qq python-numpy python-scipy libzmq3-dev python-nose
+   - LANG=C pip install pyzmq    -q --user
+   - LANG=C pip install dsltools -q --user
+   - LANG=C pip install cython   -q --user
+   - LANG=C pip install parakeet -q --user
+   - LANG=C pip install scikit-learn -q --user
+   - LANG=C pip install traits   -q --user
+   - LANG=C python setup.py develop  --user
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - gcc-4.8
+    - g++-4.8
 script: nosetests -v --logging-level=INFO --logging-clear-handlers --logging-format='%(filename)s:%(lineno)s [%(funcName)s] %(message)s'
