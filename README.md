@@ -10,7 +10,7 @@ array backend across multiple machines.
 Check out the
 [tutorial on the wiki.](https://github.com/spartan-array/spartan/wiki/Tutorial)
 ## Publication
-[Spartan: A Distributed Array Framework with Smart Tiling](https://www.usenix.org/system/files/conference/atc15/atc15-paper-huang-chien-chin.pdf)
+[Spartan: A Distributed Array Framework with Smart Tiling, USENIX ATC'15](https://www.usenix.org/system/files/conference/atc15/atc15-paper-huang-chien-chin.pdf)
 
 ## Installation
 
